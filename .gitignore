@@ -1,0 +1,22 @@
+# Dependencies
+node_modules/
+.venv/
+venv/
+
+# Build output
+dist/
+build/
+.next/
+
+# Local files
+.env
+.env.*
+!.env.example
+tmp/
+output/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
