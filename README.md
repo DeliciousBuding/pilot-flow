@@ -1,6 +1,6 @@
-# Agent Pilot IM Office Assistant
+# PilotFlow
 
-Agent-Pilot is a Feishu-first AI office assistant for the Feishu AI Campus Challenge. It turns IM conversations into structured documents, presentation materials, and deliverable archives through an Agent-driven workflow.
+PilotFlow is a Feishu-first AI office assistant for the Feishu AI Campus Challenge. It turns IM conversations into structured documents, presentation materials, and deliverable archives through an Agent-driven workflow.
 
 ## Track
 
@@ -59,3 +59,4 @@ Next steps:
 - Create remote GitHub repository.
 - Define MVP technical stack.
 - Implement the first Feishu CLI proof of concept.
+

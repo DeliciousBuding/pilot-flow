@@ -6,7 +6,7 @@ Team work often starts from an IM conversation, then moves through document draf
 
 ## Solution
 
-Agent-Pilot uses an AI Agent as the primary workflow driver. The user gives natural language instructions from IM. The Agent understands intent, creates a plan, invokes Feishu tools, generates documents, turns the content into presentation material, and archives the final result.
+PilotFlow uses an AI Agent as the primary workflow driver. The user gives natural language instructions from IM. The Agent understands intent, creates a plan, invokes Feishu tools, generates documents, turns the content into presentation material, and archives the final result.
 
 ## Design Principles
 
@@ -32,3 +32,4 @@ Agent-Pilot uses an AI Agent as the primary workflow driver. The user gives natu
 - Show Agent-driven planning and tool execution.
 - Operate IM, document, and slides or free canvas in one demo.
 - Include at least one multi-scene composed workflow.
+
