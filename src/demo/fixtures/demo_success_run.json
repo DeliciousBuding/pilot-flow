@@ -56,7 +56,11 @@
       "title": "Project brief",
       "status": "created",
       "external_id": "rec_demo_1",
-      "record_type": "task"
+      "record_type": "task",
+      "owner": "Product Owner",
+      "due_date": "2026-05-02",
+      "source_run": "run-demo-success",
+      "source_message": "manual-trigger"
     },
     {
       "id": "base-record-demo-2",
@@ -64,7 +68,12 @@
       "title": "missing Feishu group scope",
       "status": "created",
       "external_id": "rec_demo_2",
-      "record_type": "risk"
+      "record_type": "risk",
+      "owner": "Product Owner",
+      "due_date": "2026-05-02",
+      "risk_level": "medium",
+      "source_run": "run-demo-success",
+      "source_message": "manual-trigger"
     },
     {
       "id": "task-demo",

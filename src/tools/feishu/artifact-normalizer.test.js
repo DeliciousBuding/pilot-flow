@@ -36,8 +36,8 @@ assert.deepEqual(
     "base.write",
     {
       body: {
-        fields: ["type", "title", "status", "source_run"],
-        rows: [["task", "Project brief", "todo", runId]]
+        fields: ["type", "title", "owner", "due_date", "status", "risk_level", "source_run", "source_message", "url"],
+        rows: [["task", "Project brief", "Product Owner", "2026-05-02", "todo", "", runId, "manual-trigger", ""]]
       }
     },
     { json: { data: { record_id_list: ["rec_123"] } } },
@@ -50,7 +50,11 @@ assert.deepEqual(
       title: "Project brief",
       status: "created",
       external_id: "rec_123",
-      record_type: "task"
+      record_type: "task",
+      owner: "Product Owner",
+      due_date: "2026-05-02",
+      source_run: runId,
+      source_message: "manual-trigger"
     }
   ]
 );

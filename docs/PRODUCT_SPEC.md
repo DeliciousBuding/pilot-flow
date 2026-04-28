@@ -60,7 +60,8 @@ Expected flow:
 | Confirmation gate | Require approval before writes | dry-run auto-confirm, live text fallback implemented |
 | Doc creation | Create project brief | live validated with returned Doc URL |
 | Base write | Store project state | live validated with returned record IDs |
-| Task creation | Create first action item | live validated with returned Task URL |
+| Base owner/deadline fallback | Store owner, due date, risk level, source, and URL as text fields | dry-run prototype implemented |
+| Task creation | Create first action item | live validated with returned Task URL; text owner fallback in description |
 | Project entry message | Stable project entrance fallback | dry-run prototype implemented |
 | IM summary | Send final summary to group | live validated; artifact-aware text summary implemented |
 | Run log | JSONL trace | implemented with step status and artifact events |
@@ -103,5 +104,6 @@ Expected flow:
 | Traceability | Every tool call appears in run log |
 | Feishu-native proof | IM, Card, Doc, Base or Task are visible in Feishu |
 | Human control | At least one confirmation before writes |
+| Operational state | Base rows include fallback owner, due date, risk level, source run, source message, and URL fields |
 | Duplicate safety | Repeating a live project-init run is blocked unless explicitly bypassed |
 | Recovery | At least one fallback path is demonstrated |

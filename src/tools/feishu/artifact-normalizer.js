@@ -55,7 +55,13 @@ function normalizeBaseArtifacts(input, output, runId, status) {
 
   const typeIndex = fields.indexOf("type");
   const titleIndex = fields.indexOf("title");
+  const ownerIndex = fields.indexOf("owner");
+  const dueDateIndex = fields.indexOf("due_date");
   const statusIndex = fields.indexOf("status");
+  const riskLevelIndex = fields.indexOf("risk_level");
+  const sourceRunIndex = fields.indexOf("source_run");
+  const sourceMessageIndex = fields.indexOf("source_message");
+  const urlIndex = fields.indexOf("url");
   const rowCount = Math.max(rows.length, recordIds.length, 1);
 
   return Array.from({ length: rowCount }, (_, index) => {
@@ -69,7 +75,13 @@ function normalizeBaseArtifacts(input, output, runId, status) {
       title,
       status: row[statusIndex] === "failed" ? "failed" : status,
       external_id: externalId,
-      record_type: row[typeIndex]
+      record_type: row[typeIndex],
+      owner: row[ownerIndex],
+      due_date: row[dueDateIndex],
+      risk_level: row[riskLevelIndex],
+      source_run: row[sourceRunIndex],
+      source_message: row[sourceMessageIndex],
+      url: row[urlIndex]
     });
   });
 }

@@ -6,6 +6,13 @@ import { buildDeliverySummaryText } from "./summary-builder.js";
 import { buildFlightPlanCard } from "./flight-plan-card.js";
 import { buildProjectEntryMessageText } from "./entry-message-builder.js";
 import { buildProjectInitDedupeKey, duplicateGuardSummary, DuplicateRunGuard } from "./duplicate-run-guard.js";
+import {
+  buildProjectStateRows,
+  firstTaskFallbackOwner,
+  firstTaskSummary,
+  normalizeDueDate,
+  PROJECT_STATE_FIELDS
+} from "./project-state-builder.js";
 
 const SIDE_EFFECT_TOOLS = ["doc.create", "base.write", "task.create", "im.send"];
 
@@ -109,8 +116,8 @@ export class RunOrchestrator {
       artifacts.push(
         ...(await this.callTool(runId, 2, "step-state", "base.write", {
           body: {
-            fields: ["type", "title", "status", "source_run"],
-            rows: buildStateRows(plan, runId)
+            fields: PROJECT_STATE_FIELDS,
+            rows: buildProjectStateRows(plan, { runId, artifacts })
           }
         }))
       );
@@ -118,7 +125,7 @@ export class RunOrchestrator {
       artifacts.push(
         ...(await this.callTool(runId, 3, "step-task", "task.create", {
           summary: firstTaskSummary(plan),
-          description: `Created by PilotFlow run ${runId}.\n\nGoal: ${plan.goal}`,
+          description: `Created by PilotFlow run ${runId}.\n\nGoal: ${plan.goal}\nFallback owner: ${firstTaskFallbackOwner(plan)}`,
           due: normalizeDueDate(plan.deadline)
         }))
       );
@@ -275,18 +282,4 @@ ${plan.deadline}
 
 ${plan.risks.map((risk) => `- ${risk.title}`).join("\n") || "- No explicit risks"}
 `;
-}
-
-function buildStateRows(plan, runId) {
-  const taskRows = plan.deliverables.map((item) => ["task", item, "todo", runId]);
-  const riskRows = plan.risks.map((risk) => ["risk", risk.title, "open", runId]);
-  return [...taskRows, ...riskRows, ["artifact", "Project brief document", "planned", runId]];
-}
-
-function firstTaskSummary(plan) {
-  return plan.deliverables[0] || `Kick off: ${plan.goal}`;
-}
-
-function normalizeDueDate(deadline) {
-  return /^\d{4}-\d{2}-\d{2}$/.test(deadline) ? deadline : undefined;
 }

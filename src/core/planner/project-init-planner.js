@@ -29,7 +29,7 @@ export function createProjectInitPlan(inputText) {
       { id: "step-confirm", title: "Post flight plan card and request human confirmation", status: "pending", tool: "card.send" },
       { id: "step-doc", title: "Create project brief document", status: "pending", tool: "doc.create" },
       { id: "step-state", title: "Write tasks and risks to project state", status: "pending", tool: "base.write" },
-      { id: "step-task", title: "Create first ownerless task", status: "pending", tool: "task.create" },
+      { id: "step-task", title: "Create first task with owner/deadline fallback context", status: "pending", tool: "task.create" },
       { id: "step-entry", title: "Send project entry message", status: "pending", tool: "entry.send" },
       { id: "step-summary", title: "Send delivery summary", status: "pending", tool: "im.send" }
     ],

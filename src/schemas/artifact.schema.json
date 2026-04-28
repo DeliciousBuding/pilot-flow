@@ -10,6 +10,12 @@
     "title": { "type": "string" },
     "status": { "type": "string", "enum": ["planned", "created", "failed"] },
     "url": { "type": "string" },
-    "external_id": { "type": "string" }
+    "external_id": { "type": "string" },
+    "record_type": { "type": "string" },
+    "owner": { "type": "string" },
+    "due_date": { "type": "string" },
+    "risk_level": { "type": "string" },
+    "source_run": { "type": "string" },
+    "source_message": { "type": "string" }
   }
 }

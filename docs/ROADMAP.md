@@ -14,7 +14,7 @@ Status after the latest implementation pass:
 - Phase 2 should now prioritize stable Feishu-native product surfaces over heavier automation.
 - Card callback remains useful, but it depends on event/callback wiring and permissions. Text confirmation remains the fallback.
 - Group announcement is still a risk area, so the near-term project-entry path is an entry message that can later be pinned or upgraded to an announcement.
-- Duplicate-run protection is now part of the live safety rail; the next product slice is owner/deadline fallback for a more realistic Base.
+- Base owner/deadline fallback is now implemented in the generated Project State rows; the next product slice should move toward card callback readiness or group announcement update, while keeping text confirmation and entry message fallback.
 
 Main loop:
 
@@ -101,7 +101,7 @@ Work items:
 - [ ] Support card buttons for confirm, edit, doc-only, cancel.
 - [x] Implement text confirmation fallback when card callback is blocked.
 - [x] Add duplicate-run guard before more live demo repetitions.
-- [ ] Create a Base template with fields:
+- [x] Create a Base template with fields:
   - `type`
   - `title`
   - `owner`
@@ -112,7 +112,7 @@ Work items:
   - `source_message`
   - `url`
 - [ ] Create real task records with owner/deadline when mappings are available.
-- [ ] Add owner mapping fallback to text fields.
+- [x] Add owner mapping fallback to text fields.
 - [ ] Try group announcement update.
 - [x] Fall back to a project entry message if announcement update fails.
 - [ ] Build a lightweight Flight Recorder view.
@@ -178,11 +178,11 @@ Longer-term direction after competition MVP.
 
 ## Immediate Next Actions
 
-1. Add owner/deadline fallback fields to generated state rows.
-2. Add card callback confirmation only after event/callback readiness is verified.
-3. Try group announcement update; keep entry-message fallback as the default stable path.
-4. Start a lightweight Flight Recorder viewer from the existing JSONL runs.
-5. Prepare the first happy-path recording after owner/deadline fallback lands.
+1. Check event/callback readiness for card button confirmation; keep text confirmation as fallback.
+2. Try group announcement update; keep entry-message fallback as the default stable path.
+3. Start a lightweight Flight Recorder viewer from the existing JSONL runs.
+4. Prepare the first happy-path recording after a fresh rich Base table is created.
+5. Add Task assignee mapping only after contact lookup and permissions are verified.
 6. Keep README and docs updated with each implementation step.
 7. Commit and push every completed vertical slice to GitHub.
 
@@ -201,7 +201,8 @@ Longer-term direction after competition MVP.
 - [x] Add text confirmation fallback.
 - [x] Add Base template setup command.
 - [ ] Add card callback confirmation.
-- [ ] Add Task mapping and owner fallback.
+- [x] Add owner fallback text fields.
+- [ ] Add Task assignee mapping.
 - [x] Add entry-message fallback.
 - [ ] Try group announcement update.
 - [ ] Add risk decision summary.

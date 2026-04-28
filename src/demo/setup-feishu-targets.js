@@ -1,4 +1,5 @@
 import { LarkCliCommandRunner } from "../adapters/lark-cli/command-runner.js";
+import { PROJECT_STATE_FIELD_DEFINITIONS } from "../core/orchestrator/project-state-builder.js";
 
 const CONFIRMATION_TEXT = "创建PilotFlow测试Base";
 
@@ -29,12 +30,7 @@ const runner = new LarkCliCommandRunner({
 });
 
 const baseName = config.name || `PilotFlow Demo State ${new Date().toISOString().slice(0, 10)}`;
-const fields = [
-  { name: "type", type: "text" },
-  { name: "title", type: "text" },
-  { name: "status", type: "text" },
-  { name: "source_run", type: "text" }
-];
+const fields = PROJECT_STATE_FIELD_DEFINITIONS;
 
 const baseResult = await runner.run(
   ["base", "+base-create", "--as", "user", "--name", baseName],

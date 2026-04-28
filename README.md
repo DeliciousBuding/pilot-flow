@@ -152,8 +152,8 @@ Detailed architecture: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 | IM | Main collaboration entry and summary channel | ✅ validated |
 | Cards | Flight plan, confirmation, risk decision | ✅ static card validated |
 | Docs | Project brief and delivery documents | ✅ creation validated |
-| Base | Tasks, risks, artifacts, confirmations | ✅ write validated |
-| Task | Concrete owner/deadline action items | ✅ creation validated |
+| Base | Tasks, risks, artifacts, confirmations | ✅ rich fallback fields prototype |
+| Task | Concrete owner/deadline action items | ✅ creation validated, text owner fallback |
 | Group Announcement | Stable project entrance | 🟡 entry-message fallback prototype |
 | Event subscription | `@PilotFlow` automatic trigger | 🟡 planned |
 | Chat Tab / H5 | Lightweight cockpit and flight recorder | 🟡 planned |
@@ -171,6 +171,7 @@ PilotFlow is currently in **MVP prototype** stage. The first deliverable is a re
 | Static interactive card send | ✅ validated |
 | Feishu Doc creation | ✅ validated |
 | Base state write | ✅ validated |
+| Base owner/deadline fallback fields | ✅ prototype |
 | Task creation | ✅ validated |
 | Local Flight Recorder | ✅ prototype |
 | Real one-command Feishu run | ✅ validated |
@@ -229,6 +230,7 @@ npm run test:artifacts
 npm run test:card
 npm run test:guard
 npm run test:entry
+npm run test:state
 npm run test:summary
 ```
 

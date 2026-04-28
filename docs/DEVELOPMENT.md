@@ -61,6 +61,20 @@ Expected output:
 - status `completed`
 - run log path `tmp/runs/latest-manual-run.jsonl`
 
+Preview Feishu target setup:
+
+```bash
+npm run setup:feishu -- --dry-run
+```
+
+The current `Project State` table template uses text fallback fields:
+
+```text
+type, title, owner, due_date, status, risk_level, source_run, source_message, url
+```
+
+Existing older demo tables with only `type/title/status/source_run` should be replaced by a fresh `setup:feishu` table before the next confirmed live run.
+
 Show runtime options:
 
 ```bash
@@ -164,6 +178,7 @@ Implemented:
 - `src/core/orchestrator/duplicate-run-guard.js`
 - `src/core/orchestrator/entry-message-builder.js`
 - `src/core/orchestrator/flight-plan-card.js`
+- `src/core/orchestrator/project-state-builder.js`
 - `src/core/orchestrator/summary-builder.js`
 - `src/core/recorder/jsonl-recorder.js`
 - `src/tools/feishu/artifact-normalizer.js`
@@ -186,13 +201,15 @@ Implemented in the current Phase 1 slice:
 - optional `--send-plan-card` flow that can post the card and wait for text confirmation
 - optional `--send-entry-message` fallback for a stable project entrance when group announcement is not available
 - duplicate live-run guard with stable dedupe key, local ignored guard file, and explicit bypass
+- shared Project State template with owner/deadline/risk/source/url fallback fields
+- Task description text fallback for owner when Feishu assignee mapping is not ready
 - artifact-aware final IM summary with Doc URL, Base record IDs, Task URL, and next-step prompt
 - demo snapshot fixtures for success and guarded failure paths
 
 Next implementation targets:
 
-- owner/deadline fallback fields
 - card callback confirmation
+- group announcement update attempt
 
 ## Validation Matrix
 
@@ -205,6 +222,7 @@ Next implementation targets:
 | Flight plan card | `npm run test:card`, `npm run demo:manual -- --send-plan-card --no-auto-confirm` |
 | Duplicate-run guard | `npm run test:guard`, live missing-config check, inspect guard events in JSONL |
 | Entry message fallback | `npm run test:entry`, `npm run demo:manual -- --send-entry-message`, inspect entry artifact |
+| Project state rows | `npm run test:state`, `npm run setup:feishu -- --dry-run`, inspect Base fields |
 | Summary text | `npm run test:summary`, `npm run demo:manual`, inspect final IM tool input |
 | Feishu tool wrapper | dry-run command, then live test against `pilotflow-contest` |
 | Live Feishu write | dry-run first, live command second, record returned IDs |
