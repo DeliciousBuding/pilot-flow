@@ -30,6 +30,7 @@ try {
     sendRiskCard: config.riskCard.send,
     ownerOpenIdMap: config.taskAssignee.ownerOpenIdMap,
     taskAssigneeOpenId: config.taskAssignee.defaultOpenId,
+    autoLookupOwnerContact: config.taskAssignee.autoLookupContact,
     dedupeKey: config.duplicateGuard.key
   });
 

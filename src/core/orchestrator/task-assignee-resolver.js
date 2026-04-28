@@ -12,6 +12,15 @@ export function resolveTaskAssignee(plan, { ownerOpenIdMap = {}, defaultOpenId =
   };
 }
 
+export function applyDefaultTaskAssignee(taskAssignee, defaultOpenId = "") {
+  if (taskAssignee?.assignee || !defaultOpenId) return taskAssignee;
+  return {
+    ...taskAssignee,
+    assignee: defaultOpenId,
+    source: "default_task_assignee"
+  };
+}
+
 export function lookupOwnerOpenId(owner, ownerOpenIdMap = {}) {
   if (!owner || !ownerOpenIdMap || typeof ownerOpenIdMap !== "object") return "";
   if (typeof ownerOpenIdMap[owner] === "string") return ownerOpenIdMap[owner];

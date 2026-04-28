@@ -6,9 +6,10 @@ import { buildDeliverySummaryText } from "./summary-builder.js";
 import { buildFlightPlanCard } from "./flight-plan-card.js";
 import { buildProjectEntryMessageText } from "./entry-message-builder.js";
 import { buildProjectInitDedupeKey, duplicateGuardSummary, DuplicateRunGuard } from "./duplicate-run-guard.js";
+import { resolveContactSearchAssignee } from "./contact-owner-resolver.js";
 import { buildRiskDecisionCard } from "./risk-decision-card.js";
 import { detectProjectRisks, summarizeRiskDecision } from "./risk-detector.js";
-import { resolveTaskAssignee } from "./task-assignee-resolver.js";
+import { applyDefaultTaskAssignee, resolveTaskAssignee } from "./task-assignee-resolver.js";
 import {
   buildProjectStateRows,
   firstTaskSummary,
@@ -39,6 +40,7 @@ export class RunOrchestrator {
       sendRiskCard = false,
       ownerOpenIdMap = {},
       taskAssigneeOpenId = "",
+      autoLookupOwnerContact = false,
       dedupeKey = ""
     } = {}
   ) {
@@ -138,12 +140,19 @@ export class RunOrchestrator {
         }))
       );
 
-      const taskAssignee = resolveTaskAssignee(plan, {
+      let taskAssignee = resolveTaskAssignee(plan, {
         ownerOpenIdMap,
-        defaultOpenId: taskAssigneeOpenId
+        defaultOpenId: autoLookupOwnerContact ? "" : taskAssigneeOpenId
       });
+      let sequence = 3;
+      if (autoLookupOwnerContact && !taskAssignee.assignee) {
+        taskAssignee = await this.lookupOwnerContact(runId, sequence, taskAssignee);
+        sequence += 1;
+        taskAssignee = applyDefaultTaskAssignee(taskAssignee, taskAssigneeOpenId);
+      }
+
       artifacts.push(
-        ...(await this.callTool(runId, 3, "step-task", "task.create", {
+        ...(await this.callTool(runId, sequence, "step-task", "task.create", {
           summary: firstTaskSummary(plan),
           description: buildTaskDescription({ runId, plan, taskAssignee }),
           due: normalizeDueDate(plan.deadline),
@@ -152,10 +161,11 @@ export class RunOrchestrator {
           assignee_source: taskAssignee.source
         }))
       );
+      sequence += 1;
 
       if (sendRiskCard) {
         artifacts.push(
-          ...(await this.callTool(runId, 4, "step-risk", "card.send", {
+          ...(await this.callTool(runId, sequence, "step-risk", "card.send", {
             title: "PilotFlow 风险裁决卡",
             card: buildRiskDecisionCard({ runId, plan, risks, summary: riskDecision })
           }))
@@ -163,12 +173,13 @@ export class RunOrchestrator {
       } else {
         await this.skipStep(runId, "step-risk", "risk decision card disabled");
       }
+      sequence += 1;
 
       const shouldSendEntryMessage = sendEntryMessage || pinEntryMessage;
       let entryMessageArtifact;
       if (shouldSendEntryMessage) {
         const entryMessageText = buildProjectEntryMessageText({ runId, plan, artifacts });
-        const entryArtifacts = await this.callTool(runId, 5, "step-entry", "entry.send", {
+        const entryArtifacts = await this.callTool(runId, sequence, "step-entry", "entry.send", {
           text: entryMessageText
         });
         artifacts.push(...entryArtifacts);
@@ -176,12 +187,13 @@ export class RunOrchestrator {
       } else {
         await this.skipStep(runId, "step-entry", "entry message disabled");
       }
+      sequence += 1;
 
       if (pinEntryMessage) {
         const messageId = entryMessageArtifact?.external_id || (entryMessageArtifact?.status === "planned" ? entryMessageArtifact.id : "");
         if (messageId) {
           artifacts.push(
-            ...(await this.callTool(runId, 6, "step-pin", "entry.pin", {
+            ...(await this.callTool(runId, sequence, "step-pin", "entry.pin", {
               title: "Pinned PilotFlow project entry",
               messageId
             }))
@@ -192,10 +204,11 @@ export class RunOrchestrator {
       } else {
         await this.skipStep(runId, "step-pin", "entry pin disabled");
       }
+      sequence += 1;
 
       const summaryText = buildDeliverySummaryText({ runId, plan, artifacts });
       artifacts.push(
-        ...(await this.callTool(runId, 7, "step-summary", "im.send", {
+        ...(await this.callTool(runId, sequence, "step-summary", "im.send", {
           text: summaryText
         }))
       );
@@ -255,6 +268,59 @@ export class RunOrchestrator {
       });
       await this.recorder.record({ run_id: runId, event: "step.status_changed", step_id: stepId, status: "failed" });
       throw error;
+    }
+  }
+
+  async lookupOwnerContact(runId, sequence, taskAssignee) {
+    const owner = taskAssignee.owner;
+    const toolCallId = `tool-${sequence}`;
+    await this.recorder.record({ run_id: runId, event: "step.status_changed", step_id: "step-owner-lookup", status: "running" });
+    await this.recorder.record({
+      run_id: runId,
+      event: "tool.called",
+      tool_call_id: toolCallId,
+      tool: "contact.search",
+      input: { query: owner, pageSize: 5 }
+    });
+
+    try {
+      const output = await this.tools.execute("contact.search", { query: owner, pageSize: 5 }, { runId, sequence });
+      await this.recorder.record({ run_id: runId, event: "tool.succeeded", tool_call_id: toolCallId, tool: "contact.search", output });
+      const resolved = resolveContactSearchAssignee(owner, output);
+      await this.recorder.record({ run_id: runId, event: "owner.lookup_completed", owner, contact_lookup: resolved.contact_lookup });
+      await this.recorder.record({ run_id: runId, event: "step.status_changed", step_id: "step-owner-lookup", status: "succeeded" });
+      return resolved.assignee ? resolved : { ...taskAssignee, source: resolved.source, contact_lookup: resolved.contact_lookup };
+    } catch (error) {
+      await this.recorder.record({
+        run_id: runId,
+        event: "tool.failed",
+        tool_call_id: toolCallId,
+        tool: "contact.search",
+        error: {
+          message: error.message,
+          result: error.result
+        }
+      });
+      await this.recorder.record({
+        run_id: runId,
+        event: "owner.lookup_failed",
+        owner,
+        error: { message: error.message }
+      });
+      await this.recorder.record({
+        run_id: runId,
+        event: "step.status_changed",
+        step_id: "step-owner-lookup",
+        status: "skipped",
+        reason: "optional contact lookup failed"
+      });
+      return {
+        ...taskAssignee,
+        contact_lookup: {
+          status: "failed",
+          reason: error.message
+        }
+      };
     }
   }
 
@@ -355,7 +421,7 @@ function buildTaskDescription({ runId, plan, taskAssignee }) {
   if (taskAssignee.assignee) {
     lines.push(`Feishu assignee: ${taskAssignee.assignee} (${taskAssignee.source})`);
   } else {
-    lines.push("Feishu assignee: unmapped; using text owner fallback.");
+    lines.push(`Feishu assignee: ${taskAssignee.source}; using text owner fallback.`);
   }
 
   return lines.join("\n");

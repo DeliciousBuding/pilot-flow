@@ -63,6 +63,7 @@ Expected flow:
 | Base owner/deadline fallback | Store owner, due date, risk level, source, and URL as text fields | dry-run prototype implemented |
 | Task creation | Create first action item | live validated with returned Task URL; text owner fallback and optional open_id assignee mapping |
 | Task assignee mapping | Map planner owner labels to Feishu `open_id` values for Task assignment | dry-run prototype implemented |
+| Contact owner lookup | Resolve the first task owner through Feishu Contacts when no explicit map exists | read-path validated; optional prototype implemented |
 | Project entry message | Stable project entrance fallback | dry-run prototype implemented |
 | Pinned project entry | Pin the entry message before full group announcement support | dry-run prototype implemented |
 | Risk detection | Enrich planner risks with derived operational risks | prototype implemented |
@@ -78,7 +79,6 @@ Expected flow:
 - Interactive card confirmation.
 - Card update after confirmation.
 - Base template.
-- Automatic contact lookup for Task owner mapping.
 - Group announcement project entry beyond pinned-entry fallback.
 - Risk decision persistence after card callbacks are wired.
 - Flight Recorder cockpit.
@@ -110,6 +110,7 @@ Expected flow:
 | Feishu-native proof | IM, Card, Doc, Base or Task are visible in Feishu |
 | Human control | At least one confirmation before writes |
 | Operational state | Base rows include fallback owner, due date, risk level, source run, source message, and URL fields |
+| Native assignment | Task assignee can come from explicit `open_id` mapping or optional Feishu Contacts lookup |
 | Risk handling | Detected risks appear consistently in run output, Base rows, and risk decision card |
 | Duplicate safety | Repeating a live project-init run is blocked unless explicitly bypassed |
 | Recovery | At least one fallback path is demonstrated |

@@ -35,7 +35,9 @@ export function loadRuntimeConfig(argv = process.argv.slice(2), env = process.en
         stringValue(args["owner-open-id-map-json"]) || env.PILOTFLOW_OWNER_OPEN_ID_MAP_JSON,
         "owner open_id map"
       ),
-      defaultOpenId: stringValue(args["task-assignee-open-id"]) || env.PILOTFLOW_TASK_ASSIGNEE_OPEN_ID || ""
+      defaultOpenId: stringValue(args["task-assignee-open-id"]) || env.PILOTFLOW_TASK_ASSIGNEE_OPEN_ID || "",
+      autoLookupContact:
+        booleanValue(args["auto-lookup-owner-contact"]) || booleanEnv(env.PILOTFLOW_AUTO_LOOKUP_OWNER_CONTACT)
     },
     duplicateGuard: {
       enabled: mode === "live" && !booleanValue(args["disable-duplicate-guard"]) && !booleanEnv(env.PILOTFLOW_DISABLE_DUPLICATE_GUARD),
@@ -114,6 +116,7 @@ Options:
   --pin-entry-message       Send the project entry message and pin it in the target chat.
   --send-risk-card          Send or dry-run a risk decision card after state rows are created.
   --owner-open-id-map-json <json>  Map planner owner labels to Feishu open_id values.
+  --auto-lookup-owner-contact  Search Feishu Contacts for the first task owner when no explicit map matches.
   --task-assignee-open-id <open_id> Optional default assignee for the first created Task.
   --dedupe-key <key>        Optional stable key for live duplicate-run protection.
   --allow-duplicate-run     Bypass duplicate-run protection for intentional repeated live writes.

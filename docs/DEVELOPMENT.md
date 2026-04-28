@@ -123,10 +123,12 @@ Preview Task assignee mapping:
 
 ```bash
 npm run demo:manual -- --owner-open-id-map-json '{"Product Owner":"ou_xxx"}'
+npm run demo:manual -- --auto-lookup-owner-contact
+npm run test:contact
 npm run test:assignee
 ```
 
-The planner keeps human-readable owner labels. When `--owner-open-id-map-json` or `PILOTFLOW_OWNER_OPEN_ID_MAP_JSON` maps the first task owner label to a Feishu `open_id`, `task.create` receives `--assignee`. If no mapping exists, PilotFlow keeps the text owner fallback.
+The planner keeps human-readable owner labels. When `--owner-open-id-map-json` or `PILOTFLOW_OWNER_OPEN_ID_MAP_JSON` maps the first task owner label to a Feishu `open_id`, `task.create` receives `--assignee`. If no explicit mapping exists, `--auto-lookup-owner-contact` or `PILOTFLOW_AUTO_LOOKUP_OWNER_CONTACT=1` performs a read-only Contacts search and assigns only exact or unambiguous results. If lookup is blocked, ambiguous, or still dry-run only, PilotFlow keeps the text owner fallback.
 
 Render a local Flight Recorder view from a JSONL run log:
 
@@ -162,6 +164,7 @@ Before running the confirmed live command, provide the target Feishu resources t
 | `PILOTFLOW_BASE_TABLE_ID` | Base table ID or name |
 | `PILOTFLOW_TASKLIST_ID` | optional tasklist GUID or AppLink |
 | `PILOTFLOW_OWNER_OPEN_ID_MAP_JSON` | JSON object mapping owner labels to Feishu `open_id` values |
+| `PILOTFLOW_AUTO_LOOKUP_OWNER_CONTACT` | `true` or `1` to search Feishu Contacts when no explicit owner map matches |
 | `PILOTFLOW_TASK_ASSIGNEE_OPEN_ID` | optional default assignee `open_id` for the first created Task |
 | `PILOTFLOW_CONFIRMATION_TEXT` | must equal `确认起飞` for live writes |
 
@@ -207,6 +210,7 @@ Implemented:
 - `src/demo/setup-feishu-targets.js`
 - `src/core/planner/project-init-planner.js`
 - `src/core/orchestrator/run-orchestrator.js`
+- `src/core/orchestrator/contact-owner-resolver.js`
 - `src/core/orchestrator/duplicate-run-guard.js`
 - `src/core/orchestrator/entry-message-builder.js`
 - `src/core/orchestrator/flight-plan-card.js`
@@ -220,7 +224,7 @@ Implemented:
 - `src/adapters/lark-cli/command-runner.js`
 - `src/schemas/*.schema.json`
 
-Implemented in the current Phase 1 slice:
+Implemented to date:
 
 - `dry-run` / `live` runtime mode
 - explicit `pilotflow-contest` profile support
@@ -239,6 +243,7 @@ Implemented in the current Phase 1 slice:
 - shared Project State template with owner/deadline/risk/source/url fallback fields
 - Task description text fallback for owner when Feishu assignee mapping is not ready
 - optional owner-label to open_id mapping for the first Feishu Task assignee
+- optional read-only Feishu Contacts lookup for first-task owner assignment, with explicit-map priority and ambiguity fallback
 - static Flight Recorder HTML view over JSONL run logs
 - risk detection over planner risks, missing project facts, non-concrete deadlines, and owner text fallbacks
 - optional `--send-risk-card` flow that sends or dry-runs a Feishu-native risk decision card
@@ -266,6 +271,7 @@ Next implementation targets:
 | Flight Recorder view | `npm run test:flight`, `npm run flight:recorder -- --input <run.jsonl>`, inspect generated HTML |
 | Risk detection/card | `npm run test:risk`, `npm run demo:manual -- --send-risk-card`, inspect `risk.detected` and card artifact |
 | Task assignee mapping | `npm run test:assignee`, `npm run test:config`, `npm run demo:manual -- --owner-open-id-map-json '{"Product Owner":"ou_xxx"}'`, inspect `--assignee` |
+| Contact owner lookup | `npm run test:contact`, `npm run demo:manual -- --auto-lookup-owner-contact`, inspect `contact.search` and `owner.lookup_completed` |
 | Project state rows | `npm run test:state`, `npm run setup:feishu -- --dry-run`, inspect Base fields |
 | Summary text | `npm run test:summary`, `npm run demo:manual`, inspect final IM tool input |
 | Feishu tool wrapper | dry-run command, then live test against `pilotflow-contest` |

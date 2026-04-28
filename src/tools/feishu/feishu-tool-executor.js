@@ -126,6 +126,21 @@ function toLarkCliArgs(tool, input, options) {
     ];
   }
 
+  if (tool === "contact.search") {
+    return [
+      "contact",
+      "+search-user",
+      "--as",
+      "user",
+      "--query",
+      input.query,
+      "--page-size",
+      String(input.pageSize || 5),
+      "--format",
+      "json"
+    ];
+  }
+
   throw new Error(`Unsupported Feishu tool: ${tool}`);
 }
 

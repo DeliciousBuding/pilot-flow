@@ -153,7 +153,7 @@ Detailed architecture: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 | Cards | Flight plan, confirmation, risk decision | ✅ flight plan + risk decision prototypes |
 | Docs | Project brief and delivery documents | ✅ creation validated |
 | Base | Tasks, detected risks, artifacts, confirmations | ✅ rich fallback fields prototype |
-| Task | Concrete owner/deadline action items | ✅ creation validated, optional open_id assignee mapping |
+| Task | Concrete owner/deadline action items | ✅ creation validated, optional open_id/contact assignee mapping |
 | Pinned Entry / Announcement | Stable project entrance | ✅ pinned entry-message prototype, announcement planned |
 | Event subscription | `@PilotFlow` automatic trigger | 🟡 planned |
 | Chat Tab / H5 | Lightweight cockpit and flight recorder | ✅ static recorder prototype |
@@ -174,6 +174,7 @@ PilotFlow is currently in **MVP prototype** stage. The first deliverable is a re
 | Base owner/deadline fallback fields | ✅ prototype |
 | Task creation | ✅ validated |
 | Task assignee open_id mapping | ✅ dry-run prototype |
+| Contact lookup for Task owner | ✅ read-path validated, optional prototype |
 | Local Flight Recorder | ✅ prototype |
 | Real one-command Feishu run | ✅ validated |
 | Project flight plan card | ✅ dry-run prototype |
@@ -200,7 +201,8 @@ gantt
     Live Feishu tool mode                :done,    b1, 2026-04-28, 1d
     Confirmation fallback                :done,    b2, 2026-04-28, 1d
     Base and Task project state          :done,    b3, 2026-04-28, 1d
-    Artifact-aware summary               :active,  b4, 2026-04-28, 1d
+    Contact owner lookup                 :done,    b4, 2026-04-28, 1d
+    Artifact-aware summary               :done,    b5, 2026-04-28, 1d
     section Demo
     Risk detection and decision card     :done,    c1, 2026-04-28, 1d
     Flight Recorder cockpit              :         c2, 2026-05-03, 3d
@@ -234,6 +236,7 @@ npm run demo:manual -- --send-entry-message
 npm run demo:manual -- --pin-entry-message
 npm run demo:manual -- --send-risk-card
 npm run demo:manual -- --owner-open-id-map-json '{"Product Owner":"ou_xxx"}'
+npm run demo:manual -- --auto-lookup-owner-contact
 npm run flight:recorder -- --input tmp/runs/latest-manual-run.jsonl
 npm run test:artifacts
 npm run test:card
@@ -243,6 +246,7 @@ npm run test:flight
 npm run test:risk
 npm run test:state
 npm run test:summary
+npm run test:contact
 npm run test:assignee
 npm run test:config
 ```

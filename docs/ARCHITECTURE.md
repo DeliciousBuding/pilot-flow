@@ -79,7 +79,7 @@ Artifact normalization currently supports Feishu Doc, Base record batch writes, 
 
 The risk detector runs immediately after the plan is generated. It preserves planner risks and adds derived risks such as missing members, missing deliverables, non-concrete deadlines, and text-only owner mappings. The same detected risk list is used for the run output, Base risk rows, and optional risk decision card, so the product surfaces stay consistent.
 
-Task assignee resolution runs before `task.create`. Planner member labels remain human-readable, while `PILOTFLOW_OWNER_OPEN_ID_MAP_JSON` can map those labels to Feishu `open_id` values. If a matching owner is found, the tool call includes `--assignee`; otherwise PilotFlow keeps the text owner fallback in the task description and run trace.
+Task assignee resolution runs before `task.create`. Planner member labels remain human-readable, while `PILOTFLOW_OWNER_OPEN_ID_MAP_JSON` can map those labels to Feishu `open_id` values. If no explicit map matches and `PILOTFLOW_AUTO_LOOKUP_OWNER_CONTACT` is enabled, PilotFlow performs a read-only `contact +search-user` lookup and assigns the first task only when the result is exact or unambiguous. If lookup is blocked or ambiguous, PilotFlow keeps the text owner fallback in the task description and run trace. The priority order is explicit owner map, optional contact lookup, optional default assignee, then text fallback.
 
 The project flight plan card is generated before side effects and can be sent with `--send-plan-card`. The risk decision card is generated after Doc/Base/Task writes and can be sent with `--send-risk-card`. The project entry message is generated after Doc, Base, and Task calls complete and can be sent with `--send-entry-message` as the current fallback for a stable group entrance. `--pin-entry-message` sends that entry message and then calls `im.pins.create` to pin it in the target chat, giving the demo a Feishu-native stable entry before a full group announcement path is wired. The final IM summary is generated afterward, so the group message can include the created Doc URL, Base record IDs, Task URL, project entry state, run ID, and next-step prompt.
 
@@ -93,7 +93,7 @@ The current Base state template is shared by `setup:feishu` and the orchestrator
 | --- | --- |
 | `type` | `task`, `risk`, or `artifact` |
 | `title` | Human-readable item title |
-| `owner` | Text fallback owner, before Feishu contact mapping is available |
+| `owner` | Human-readable owner label, also used as the contact lookup query when enabled |
 | `due_date` | Text fallback due date, or `TBD` |
 | `status` | `todo`, `open`, `planned`, `created`, or failure status |
 | `risk_level` | Risk severity for risk rows |
@@ -101,7 +101,7 @@ The current Base state template is shared by `setup:feishu` and the orchestrator
 | `source_message` | Source message ID when available, otherwise `manual-trigger` |
 | `url` | Artifact link when already known |
 
-This is intentionally text-first for the Base table. The Task creation path can now accept an explicit owner-label to `open_id` map for the first task; automatic contact lookup and ambiguous-name resolution remain later steps.
+This is intentionally text-first for the Base table. The Task creation path can accept an explicit owner-label to `open_id` map, or optionally search Feishu Contacts for the first task owner. Ambiguous names do not auto-assign; the run records the lookup result and falls back to the text owner.
 
 ## Tool Routing
 
@@ -149,6 +149,7 @@ PILOTFLOW_BASE_TOKEN=<base_token>
 PILOTFLOW_BASE_TABLE_ID=<tbl_xxx>
 PILOTFLOW_TASKLIST_ID=<tasklist_guid_or_url>
 PILOTFLOW_OWNER_OPEN_ID_MAP_JSON={"Product Owner":"ou_xxx"}
+PILOTFLOW_AUTO_LOOKUP_OWNER_CONTACT=true|false
 PILOTFLOW_TASK_ASSIGNEE_OPEN_ID=<optional_default_open_id>
 PILOTFLOW_CONFIRMATION_TEXT=确认起飞
 ```
