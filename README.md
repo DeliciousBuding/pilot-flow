@@ -156,7 +156,7 @@ Detailed architecture: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 | Task | Concrete owner/deadline action items | ✅ creation validated, text owner fallback |
 | Group Announcement | Stable project entrance | 🟡 entry-message fallback prototype |
 | Event subscription | `@PilotFlow` automatic trigger | 🟡 planned |
-| Chat Tab / H5 | Lightweight cockpit and flight recorder | 🟡 planned |
+| Chat Tab / H5 | Lightweight cockpit and flight recorder | ✅ static recorder prototype |
 | Whiteboard / Calendar / Slides | Demo enhancement surfaces | ⏳ later |
 
 ## 🧪 MVP Progress
@@ -179,6 +179,7 @@ PilotFlow is currently in **MVP prototype** stage. The first deliverable is a re
 | Project entry message fallback | ✅ prototype |
 | Artifact-aware final summary | ✅ prototype |
 | Duplicate live-run guard | ✅ prototype |
+| Flight Recorder static view | ✅ prototype |
 | Card callback confirmation | 🟡 next |
 | Group announcement project entry | 🟡 next |
 
@@ -226,10 +227,12 @@ npm run check
 npm run demo:manual
 npm run demo:manual -- --send-plan-card --no-auto-confirm
 npm run demo:manual -- --send-entry-message
+npm run flight:recorder -- --input tmp/runs/latest-manual-run.jsonl
 npm run test:artifacts
 npm run test:card
 npm run test:guard
 npm run test:entry
+npm run test:flight
 npm run test:state
 npm run test:summary
 ```

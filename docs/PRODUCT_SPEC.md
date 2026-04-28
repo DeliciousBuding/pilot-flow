@@ -66,6 +66,7 @@ Expected flow:
 | IM summary | Send final summary to group | live validated; artifact-aware text summary implemented |
 | Run log | JSONL trace | implemented with step status and artifact events |
 | Duplicate-run guard | Prevent accidental repeated live writes | local prototype implemented |
+| Flight Recorder view | Render JSONL run logs as a local HTML cockpit | static prototype implemented |
 
 ## P1 Features
 

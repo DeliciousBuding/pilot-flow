@@ -109,6 +109,14 @@ npm run demo:manual -- --send-entry-message
 
 In live mode, `--send-entry-message` sends a stable project entrance after Doc/Base/Task artifacts are created. It is the current fallback when group announcement update is blocked or not yet wired.
 
+Render a local Flight Recorder view from a JSONL run log:
+
+```bash
+npm run flight:recorder -- --input tmp/runs/latest-manual-run.jsonl --output tmp/flight-recorder/latest.html
+```
+
+The generated HTML is local-only by default and lives under ignored `tmp/`.
+
 Live project-init runs are guarded against accidental duplicates. If you intentionally need to repeat a visible Feishu write, pass an explicit key or bypass flag:
 
 ```bash
@@ -171,6 +179,7 @@ If push fails, record the error and keep the local commit.
 Implemented:
 
 - `src/config/runtime-config.js`
+- `src/demo/flight-recorder-view.js`
 - `src/demo/manual-trigger.js`
 - `src/demo/setup-feishu-targets.js`
 - `src/core/planner/project-init-planner.js`
@@ -203,6 +212,7 @@ Implemented in the current Phase 1 slice:
 - duplicate live-run guard with stable dedupe key, local ignored guard file, and explicit bypass
 - shared Project State template with owner/deadline/risk/source/url fallback fields
 - Task description text fallback for owner when Feishu assignee mapping is not ready
+- static Flight Recorder HTML view over JSONL run logs
 - artifact-aware final IM summary with Doc URL, Base record IDs, Task URL, and next-step prompt
 - demo snapshot fixtures for success and guarded failure paths
 
@@ -222,6 +232,7 @@ Next implementation targets:
 | Flight plan card | `npm run test:card`, `npm run demo:manual -- --send-plan-card --no-auto-confirm` |
 | Duplicate-run guard | `npm run test:guard`, live missing-config check, inspect guard events in JSONL |
 | Entry message fallback | `npm run test:entry`, `npm run demo:manual -- --send-entry-message`, inspect entry artifact |
+| Flight Recorder view | `npm run test:flight`, `npm run flight:recorder -- --input <run.jsonl>`, inspect generated HTML |
 | Project state rows | `npm run test:state`, `npm run setup:feishu -- --dry-run`, inspect Base fields |
 | Summary text | `npm run test:summary`, `npm run demo:manual`, inspect final IM tool input |
 | Feishu tool wrapper | dry-run command, then live test against `pilotflow-contest` |

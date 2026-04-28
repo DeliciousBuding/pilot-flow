@@ -14,7 +14,7 @@ Status after the latest implementation pass:
 - Phase 2 should now prioritize stable Feishu-native product surfaces over heavier automation.
 - Card callback remains useful, but it depends on event/callback wiring and permissions. Text confirmation remains the fallback.
 - Group announcement is still a risk area, so the near-term project-entry path is an entry message that can later be pinned or upgraded to an announcement.
-- Base owner/deadline fallback is now implemented in the generated Project State rows; the next product slice should move toward card callback readiness or group announcement update, while keeping text confirmation and entry message fallback.
+- Base owner/deadline fallback and a local Flight Recorder view are now implemented. The next product slice should move toward card callback readiness or group announcement update, while keeping text confirmation and entry message fallback.
 
 Main loop:
 
@@ -115,7 +115,7 @@ Work items:
 - [x] Add owner mapping fallback to text fields.
 - [ ] Try group announcement update.
 - [x] Fall back to a project entry message if announcement update fails.
-- [ ] Build a lightweight Flight Recorder view.
+- [x] Build a lightweight Flight Recorder view.
 - [ ] Add risk detection:
   - missing owner
   - deadline conflict
@@ -180,9 +180,9 @@ Longer-term direction after competition MVP.
 
 1. Check event/callback readiness for card button confirmation; keep text confirmation as fallback.
 2. Try group announcement update; keep entry-message fallback as the default stable path.
-3. Start a lightweight Flight Recorder viewer from the existing JSONL runs.
-4. Prepare the first happy-path recording after a fresh rich Base table is created.
-5. Add Task assignee mapping only after contact lookup and permissions are verified.
+3. Prepare the first happy-path recording after a fresh rich Base table is created.
+4. Add Task assignee mapping only after contact lookup and permissions are verified.
+5. Add risk decision summary and risk decision card.
 6. Keep README and docs updated with each implementation step.
 7. Commit and push every completed vertical slice to GitHub.
 
@@ -206,7 +206,7 @@ Longer-term direction after competition MVP.
 - [x] Add entry-message fallback.
 - [ ] Try group announcement update.
 - [ ] Add risk decision summary.
-- [ ] Add Flight Recorder viewer.
+- [x] Add Flight Recorder viewer.
 
 ### Week 3: Demo and Evaluation
 
