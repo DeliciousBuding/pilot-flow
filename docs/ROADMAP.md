@@ -52,15 +52,18 @@ Manual trigger -> JSON plan -> confirmation -> Doc -> Base/Task -> IM summary ->
 
 Work items:
 
-- [ ] Add runtime mode: `dry-run` vs `live`.
-- [ ] Add explicit profile support for `pilotflow-contest`.
-- [ ] Implement real `doc.create` in the orchestrator.
-- [ ] Implement real `base.write` for tasks, risks, artifacts, confirmations.
-- [ ] Implement real `task.create` for action items.
-- [ ] Implement real `im.send` final summary to the test group.
-- [ ] Add confirmation text fallback: "确认起飞".
-- [ ] Add step status updates in run logs.
+- [x] Add runtime mode: `dry-run` vs `live`.
+- [x] Add explicit profile support for `pilotflow-contest`.
+- [x] Implement live-capable `doc.create` command path in the orchestrator.
+- [x] Implement live-capable `base.write` command path for tasks, risks, artifacts, confirmations.
+- [x] Implement live-capable `task.create` command path for action items.
+- [x] Implement live-capable `im.send` command path for final summary.
+- [x] Add confirmation text fallback: "确认起飞".
+- [x] Add step status updates in run logs.
+- [x] Add live preflight so missing Base/chat targets fail before side effects.
 - [ ] Add fallback plan when plan schema validation fails.
+- [ ] Run confirmed live mode against the target test group and Base.
+- [ ] Extract live artifact IDs and URLs into the final run result.
 - [ ] Add `demo_success_run.json`.
 - [ ] Add `demo_partial_failure_run.json`.
 
@@ -162,16 +165,18 @@ Longer-term direction after competition MVP.
 
 1. Add live execution mode to the current tool executor.
 2. Use `pilotflow-contest` profile by default for project API tests.
-3. Wire `doc.create`, `base.write`, `task.create`, and `im.send` into one real run.
-4. Keep README and docs updated with each implementation step.
-5. Commit and push every completed vertical slice to GitHub.
+3. Fill target env values for chat, Base, table, and optional tasklist.
+4. Run `npm run demo:manual -- --live --confirm "确认起飞"` against real Feishu targets.
+5. Extract created Doc, Base rows, Task, and IM message links into the run result.
+6. Keep README and docs updated with each implementation step.
+7. Commit and push every completed vertical slice to GitHub.
 
 ## Long-Term Roadmap
 
 ### Week 1: Real Feishu Loop
 
-- [ ] Replace dry-run tool outputs with live mode behind an explicit flag.
-- [ ] Use environment variables for test chat, Base, table, and profile.
+- [x] Replace dry-run tool outputs with live mode behind an explicit flag.
+- [x] Use environment variables for test chat, Base, table, and profile.
 - [ ] Make `npm run demo:manual -- --live` create real artifacts.
 - [ ] Add idempotency protection for every write.
 - [ ] Add screenshots or recordings only after the flow is stable.

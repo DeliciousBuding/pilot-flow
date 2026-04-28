@@ -32,7 +32,7 @@ For project API tests, use the active `pilotflow-contest` profile.
 For personal progress sync, always specify:
 
 ```powershell
-lark-cli docs +update --profile cli_a935d47f8138dcd2 --doc "<progress-doc>" --as user --mode overwrite --markdown "@PERSONAL_PROGRESS.md"
+lark-cli docs +update --api-version v2 --profile cli_a935d47f8138dcd2 --doc "<progress-doc>" --as user --command overwrite --doc-format markdown --content "@PERSONAL_PROGRESS.md"
 ```
 
 ## Commands
@@ -60,6 +60,36 @@ Expected output:
 - a `project_init` plan
 - status `completed`
 - run log path `tmp/runs/latest-manual-run.jsonl`
+
+Show runtime options:
+
+```bash
+npm run demo:manual -- --help
+```
+
+Preview live mode without side effects:
+
+```bash
+npm run demo:manual -- --live
+```
+
+Expected output: `waiting_confirmation`. Live writes require the exact fallback confirmation phrase:
+
+```bash
+npm run demo:manual -- --live --confirm "确认起飞"
+```
+
+Before running the confirmed live command, provide the target Feishu resources through flags or environment variables:
+
+| Variable | Meaning |
+| --- | --- |
+| `PILOTFLOW_FEISHU_MODE` | `dry-run` or `live` |
+| `PILOTFLOW_LARK_PROFILE` | lark-cli profile, default `pilotflow-contest` |
+| `PILOTFLOW_TEST_CHAT_ID` | group chat ID for final summary |
+| `PILOTFLOW_BASE_TOKEN` | Base token for state rows |
+| `PILOTFLOW_BASE_TABLE_ID` | Base table ID or name |
+| `PILOTFLOW_TASKLIST_ID` | optional tasklist GUID or AppLink |
+| `PILOTFLOW_CONFIRMATION_TEXT` | must equal `确认起飞` for live writes |
 
 ## Development Workflow
 
@@ -97,6 +127,7 @@ If push fails, record the error and keep the local commit.
 
 Implemented:
 
+- `src/config/runtime-config.js`
 - `src/demo/manual-trigger.js`
 - `src/core/planner/project-init-planner.js`
 - `src/core/orchestrator/run-orchestrator.js`
@@ -105,16 +136,22 @@ Implemented:
 - `src/adapters/lark-cli/command-runner.js`
 - `src/schemas/*.schema.json`
 
+Implemented in the current Phase 1 slice:
+
+- `dry-run` / `live` runtime mode
+- explicit `pilotflow-contest` profile support
+- live-capable `doc.create`, `base.write`, `task.create`, and `im.send` command paths
+- text confirmation fallback with `确认起飞`
+- step status events in JSONL run logs
+- live preflight that blocks partial side effects when Base or chat targets are missing
+
 Next implementation targets:
 
-- live Feishu execution mode
-- profile-aware command runner
-- real `doc.create`
-- real `base.write`
-- real `task.create`
-- real `im.send`
-- confirmation fallback
-- step status updates
+- real live run against target Base/chat IDs
+- extracted artifact IDs and links from live `lark-cli` JSON output
+- `demo_success_run.json`
+- `demo_partial_failure_run.json`
+- card confirmation
 
 ## Validation Matrix
 

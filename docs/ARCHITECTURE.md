@@ -34,10 +34,10 @@ flowchart TB
 | --- | --- | --- |
 | Trigger | Starts a run from manual input now, IM event later | manual trigger implemented |
 | Planner | Converts input into project plan JSON | fixed demo planner implemented |
-| Confirmation Gate | Stops side effects until human approval | auto-confirm demo path implemented |
-| Orchestrator | Owns run lifecycle and tool sequence | first version implemented |
-| Feishu Tool Executor | Converts tool calls into `lark-cli` commands | dry-run wrapper implemented |
-| Flight Recorder | Records events, tool calls, artifacts, failures | JSONL implemented |
+| Confirmation Gate | Stops side effects until human approval | dry-run auto-confirm and live text fallback implemented |
+| Orchestrator | Owns run lifecycle and tool sequence | Doc/Base/Task/IM sequence implemented |
+| Feishu Tool Executor | Converts tool calls into `lark-cli` commands | dry-run and live-capable command runner implemented |
+| Flight Recorder | Records events, tool calls, artifacts, failures | JSONL with step status events implemented |
 | Risk Engine | Detects missing owner, deadline conflict, overload | planned |
 | Cockpit | Shows run state and replay | planned |
 
@@ -101,7 +101,7 @@ sequenceDiagram
 | `live` | Execute `lark-cli` against the activity tenant profile |
 | `fallback` | Write local JSONL or text summary when a Feishu capability is blocked |
 
-Planned environment variables:
+Runtime variables:
 
 ```text
 PILOTFLOW_FEISHU_MODE=dry-run|live
@@ -109,7 +109,11 @@ PILOTFLOW_LARK_PROFILE=pilotflow-contest
 PILOTFLOW_TEST_CHAT_ID=<oc_xxx>
 PILOTFLOW_BASE_TOKEN=<base_token>
 PILOTFLOW_BASE_TABLE_ID=<tbl_xxx>
+PILOTFLOW_TASKLIST_ID=<tasklist_guid_or_url>
+PILOTFLOW_CONFIRMATION_TEXT=确认起飞
 ```
+
+Live mode requires the confirmation text `确认起飞`. It also preflights required Base and chat targets before the first Feishu write so a missing target does not create a partial Doc-only run.
 
 ## Reliability Rules
 
@@ -118,6 +122,7 @@ PILOTFLOW_BASE_TABLE_ID=<tbl_xxx>
 - The Agent must never invent a successful Feishu write.
 - Run logs must include planned input and actual output.
 - Human confirmation is required before writing project artifacts.
+- Local Windows execution bypasses shell string concatenation by invoking the installed `lark-cli` Node entrypoint with an argument array.
 
 ## Why Not Multi-Agent First
 

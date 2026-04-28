@@ -1,14 +1,43 @@
 import { readFile } from "node:fs/promises";
-import { resolve } from "node:path";
 import { JsonlRecorder } from "../core/recorder/jsonl-recorder.js";
 import { RunOrchestrator } from "../core/orchestrator/run-orchestrator.js";
+import { loadRuntimeConfig } from "../config/runtime-config.js";
 
-const inputPath = resolve("src/demo/fixtures/demo_input_project_init.txt");
-const outputPath = resolve("tmp/runs/latest-manual-run.jsonl");
+const config = loadRuntimeConfig();
 
-const inputText = await readFile(inputPath, "utf8");
-const recorder = new JsonlRecorder(outputPath);
-const orchestrator = new RunOrchestrator({ recorder, dryRun: true });
-const result = await orchestrator.startProjectInit(inputText, { autoConfirm: true });
+if (config.help) {
+  console.log(config.usage);
+  process.exit(0);
+}
 
-console.log(JSON.stringify({ ...result, run_log: outputPath }, null, 2));
+const inputText = await readFile(config.inputPath, "utf8");
+const recorder = new JsonlRecorder(config.outputPath);
+const orchestrator = new RunOrchestrator({
+  recorder,
+  dryRun: config.dryRun,
+  mode: config.mode,
+  profile: config.profile,
+  feishuTargets: config.feishu
+});
+try {
+  const result = await orchestrator.startProjectInit(inputText, {
+    autoConfirm: config.confirmation.autoConfirm,
+    confirmationText: config.confirmation.text
+  });
+
+  console.log(JSON.stringify({ ...result, mode: config.mode, run_log: config.outputPath }, null, 2));
+} catch (error) {
+  console.error(
+    JSON.stringify(
+      {
+        status: "failed",
+        mode: config.mode,
+        run_log: config.outputPath,
+        error: error.message
+      },
+      null,
+      2
+    )
+  );
+  process.exitCode = 1;
+}
