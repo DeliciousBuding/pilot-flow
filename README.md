@@ -173,7 +173,8 @@ PilotFlow is currently in **MVP prototype** stage. The first deliverable is a re
 | Base state write | ✅ validated |
 | Task creation | ✅ validated |
 | Local Flight Recorder | ✅ prototype |
-| Real one-command Feishu run | 🟡 next |
+| Real one-command Feishu run | ✅ validated |
+| Artifact-aware final summary | ✅ prototype |
 | Card callback confirmation | 🟡 next |
 | Group announcement project entry | 🟡 next |
 
@@ -187,9 +188,10 @@ gantt
     CLI update and API validation        :done,    a1, 2026-04-28, 1d
     Runnable prototype skeleton          :done,    a2, 2026-04-28, 1d
     section Real Loop
-    Live Feishu tool mode                :active,  b1, 2026-04-29, 2d
-    Confirmation fallback                :         b2, 2026-04-30, 2d
-    Base and Task project state          :         b3, 2026-05-01, 2d
+    Live Feishu tool mode                :done,    b1, 2026-04-28, 1d
+    Confirmation fallback                :done,    b2, 2026-04-28, 1d
+    Base and Task project state          :done,    b3, 2026-04-28, 1d
+    Artifact-aware summary               :active,  b4, 2026-04-28, 1d
     section Demo
     Flight Recorder cockpit              :         c1, 2026-05-03, 3d
     Risk decision demo                   :         c2, 2026-05-04, 2d
@@ -218,16 +220,18 @@ For local development and reviewer reproduction:
 ```bash
 npm run check
 npm run demo:manual
+npm run test:artifacts
+npm run test:summary
 ```
 
-The current local demo reads a project-init fixture and writes a traceable run log. Detailed setup lives in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
+The current local demo reads a project-init fixture, writes a traceable run log, and returns planned artifacts. Live Feishu execution is available behind an explicit confirmation gate; detailed setup lives in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
 
 ## 🔐 Safety Principles
 
 - Human confirmation is required before publishing project artifacts.
 - Tool failures must be recorded and surfaced.
 - The Agent must not pretend a failed Feishu write succeeded.
-- Every write path should have an idempotency key.
+- Every write path should be designed for idempotency or duplicate detection.
 - Secrets never belong in the repository, public docs, screenshots, or chat logs.
 - Official Feishu reference caches stay outside this repo.
 

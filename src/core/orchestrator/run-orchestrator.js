@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { createProjectInitPlan } from "../planner/project-init-planner.js";
 import { FeishuToolExecutor } from "../../tools/feishu/feishu-tool-executor.js";
 import { normalizeFeishuArtifacts } from "../../tools/feishu/artifact-normalizer.js";
+import { buildDeliverySummaryText } from "./summary-builder.js";
 
 export class RunOrchestrator {
   constructor({ recorder, dryRun = true, mode = "dry-run", profile, feishuTargets = {} } = {}) {
@@ -81,9 +82,10 @@ export class RunOrchestrator {
         }))
       );
 
+      const summaryText = buildDeliverySummaryText({ runId, plan, artifacts });
       artifacts.push(
         ...(await this.callTool(runId, 4, "step-summary", "im.send", {
-          text: `PilotFlow run ${runId} completed. Brief, state records, and summary are ready for review.`
+          text: summaryText
         }))
       );
     } catch (error) {

@@ -129,9 +129,12 @@ Implemented:
 
 - `src/config/runtime-config.js`
 - `src/demo/manual-trigger.js`
+- `src/demo/setup-feishu-targets.js`
 - `src/core/planner/project-init-planner.js`
 - `src/core/orchestrator/run-orchestrator.js`
+- `src/core/orchestrator/summary-builder.js`
 - `src/core/recorder/jsonl-recorder.js`
+- `src/tools/feishu/artifact-normalizer.js`
 - `src/tools/feishu/feishu-tool-executor.js`
 - `src/adapters/lark-cli/command-runner.js`
 - `src/schemas/*.schema.json`
@@ -147,13 +150,14 @@ Implemented in the current Phase 1 slice:
 - Feishu artifact normalization for Doc, Base records, Task, IM message, and run log
 - confirmed live run against the activity-tenant test group and Base
 - live extraction of Doc URL, Base record IDs, Task URL, IM message ID, and run log artifact
+- artifact-aware final IM summary with Doc URL, Base record IDs, Task URL, and next-step prompt
+- demo snapshot fixtures for success and guarded failure paths
 
 Next implementation targets:
 
-- `demo_success_run.json`
-- `demo_partial_failure_run.json`
-- richer final IM summary that includes artifact links and IDs
 - card confirmation
+- group announcement or entry-message fallback
+- duplicate-run guard for Doc/Base writes
 
 ## Validation Matrix
 
@@ -163,6 +167,7 @@ Next implementation targets:
 | Planner logic | `npm run check`, `npm run demo:manual` |
 | Orchestrator logic | `npm run check`, `npm run demo:manual`, inspect JSONL |
 | Artifact normalization | `npm run test:artifacts`, `npm run demo:manual`, inspect final artifacts |
+| Summary text | `npm run test:summary`, `npm run demo:manual`, inspect final IM tool input |
 | Feishu tool wrapper | dry-run command, then live test against `pilotflow-contest` |
 | Live Feishu write | dry-run first, live command second, record returned IDs |
 

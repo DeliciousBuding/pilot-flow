@@ -1,0 +1,85 @@
+{
+  "status": "completed",
+  "mode": "demo-snapshot",
+  "runId": "run-demo-success",
+  "plan": {
+    "intent": "project_init",
+    "goal": "Launch PilotFlow MVP for a Feishu-native project operations demo",
+    "members": [
+      "Product Owner",
+      "Agent Engineer",
+      "Feishu Integration Owner",
+      "Demo Owner"
+    ],
+    "deliverables": [
+      "Project brief",
+      "task board",
+      "risk list",
+      "final summary"
+    ],
+    "deadline": "2026-05-02",
+    "missing_info": [],
+    "risks": [
+      {
+        "id": "risk-1",
+        "title": "missing Feishu group scope",
+        "level": "medium",
+        "status": "open"
+      },
+      {
+        "id": "risk-2",
+        "title": "card callback delay",
+        "level": "medium",
+        "status": "open"
+      }
+    ]
+  },
+  "artifacts": [
+    {
+      "id": "doc-demo",
+      "type": "doc",
+      "title": "PilotFlow Project Brief",
+      "status": "created",
+      "url": "https://example.feishu.cn/docx/demo",
+      "external_id": "doc_demo"
+    },
+    {
+      "id": "base-record-demo-1",
+      "type": "base_record",
+      "title": "Project brief",
+      "status": "created",
+      "external_id": "rec_demo_1",
+      "record_type": "task"
+    },
+    {
+      "id": "base-record-demo-2",
+      "type": "base_record",
+      "title": "missing Feishu group scope",
+      "status": "created",
+      "external_id": "rec_demo_2",
+      "record_type": "risk"
+    },
+    {
+      "id": "task-demo",
+      "type": "task",
+      "title": "Project brief",
+      "status": "created",
+      "url": "https://applink.feishu.cn/client/todo/detail?guid=demo",
+      "external_id": "task_demo"
+    },
+    {
+      "id": "message-demo",
+      "type": "message",
+      "title": "PilotFlow 已完成项目起飞。",
+      "status": "created",
+      "external_id": "om_demo"
+    },
+    {
+      "id": "artifact-run-demo-success-log",
+      "type": "run_log",
+      "title": "JSONL run log",
+      "status": "created"
+    }
+  ],
+  "summary_text": "PilotFlow 已完成项目起飞。\n\nRun ID: run-demo-success\n目标: Launch PilotFlow MVP for a Feishu-native project operations demo\n\n已生成产物:\n- Doc: PilotFlow Project Brief - https://example.feishu.cn/docx/demo\n- Base records: 2 条 (rec_demo_1, rec_demo_2)\n- Task: Project brief - https://applink.feishu.cn/client/todo/detail?guid=demo\n\n下一步: 请在群内确认负责人、截止时间和风险处理方式。"
+}

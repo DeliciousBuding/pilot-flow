@@ -1,0 +1,55 @@
+{
+  "status": "failed",
+  "mode": "demo-snapshot",
+  "runId": "run-demo-partial-failure",
+  "failed_before_side_effects": true,
+  "error": {
+    "message": "Live mode is missing required configuration: PILOTFLOW_BASE_TOKEN, PILOTFLOW_BASE_TABLE_ID, PILOTFLOW_TEST_CHAT_ID"
+  },
+  "plan": {
+    "intent": "project_init",
+    "goal": "Launch PilotFlow MVP for a Feishu-native project operations demo",
+    "members": [
+      "Product Owner",
+      "Agent Engineer",
+      "Feishu Integration Owner",
+      "Demo Owner"
+    ],
+    "deliverables": [
+      "Project brief",
+      "task board",
+      "risk list",
+      "final summary"
+    ],
+    "deadline": "2026-05-02",
+    "missing_info": [],
+    "risks": [
+      {
+        "id": "risk-1",
+        "title": "missing Feishu group scope",
+        "level": "medium",
+        "status": "open"
+      }
+    ]
+  },
+  "events": [
+    {
+      "event": "run.created"
+    },
+    {
+      "event": "plan.generated"
+    },
+    {
+      "event": "confirmation.requested"
+    },
+    {
+      "event": "confirmation.approved"
+    },
+    {
+      "event": "run.failed",
+      "failed_before_side_effects": true
+    }
+  ],
+  "artifacts": [],
+  "demo_talk_track": "PilotFlow 在 live 模式下会先检查目标 Base、表和群聊配置；缺少配置时直接失败并写入 run log，避免创建一半产物。"
+}
