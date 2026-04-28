@@ -174,6 +174,7 @@ PilotFlow is currently in **MVP prototype** stage. The first deliverable is a re
 | Task creation | ✅ validated |
 | Local Flight Recorder | ✅ prototype |
 | Real one-command Feishu run | ✅ validated |
+| Project flight plan card | ✅ dry-run prototype |
 | Artifact-aware final summary | ✅ prototype |
 | Card callback confirmation | 🟡 next |
 | Group announcement project entry | 🟡 next |
@@ -220,7 +221,9 @@ For local development and reviewer reproduction:
 ```bash
 npm run check
 npm run demo:manual
+npm run demo:manual -- --send-plan-card --no-auto-confirm
 npm run test:artifacts
+npm run test:card
 npm run test:summary
 ```
 

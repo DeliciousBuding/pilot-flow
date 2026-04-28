@@ -55,6 +55,7 @@ Expected flow:
 | --- | --- | --- |
 | Manual trigger | Start from local command | implemented |
 | Project plan JSON | Extract goal, members, deliverables, deadline, risks | implemented for fixture |
+| Flight plan card | Show plan before write side effects | dry-run prototype implemented |
 | Confirmation gate | Require approval before writes | dry-run auto-confirm, live text fallback implemented |
 | Doc creation | Create project brief | live validated with returned Doc URL |
 | Base write | Store project state | live validated with returned record IDs |

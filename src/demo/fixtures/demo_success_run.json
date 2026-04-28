@@ -36,6 +36,13 @@
   },
   "artifacts": [
     {
+      "id": "card-demo",
+      "type": "card",
+      "title": "PilotFlow 项目飞行计划",
+      "status": "created",
+      "external_id": "om_card_demo"
+    },
+    {
       "id": "doc-demo",
       "type": "doc",
       "title": "PilotFlow Project Brief",

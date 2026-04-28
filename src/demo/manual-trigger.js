@@ -22,7 +22,8 @@ const orchestrator = new RunOrchestrator({
 try {
   const result = await orchestrator.startProjectInit(inputText, {
     autoConfirm: config.confirmation.autoConfirm,
-    confirmationText: config.confirmation.text
+    confirmationText: config.confirmation.text,
+    sendPlanCard: config.planCard.send
   });
 
   console.log(JSON.stringify({ ...result, mode: config.mode, run_log: config.outputPath }, null, 2));

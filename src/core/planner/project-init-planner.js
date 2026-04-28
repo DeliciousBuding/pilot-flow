@@ -26,7 +26,7 @@ export function createProjectInitPlan(inputText) {
     missing_info: missingInfo,
     steps: [
       { id: "step-plan", title: "Generate project flight plan", status: "pending" },
-      { id: "step-confirm", title: "Request human confirmation", status: "pending" },
+      { id: "step-confirm", title: "Post flight plan card and request human confirmation", status: "pending", tool: "card.send" },
       { id: "step-doc", title: "Create project brief document", status: "pending", tool: "doc.create" },
       { id: "step-state", title: "Write tasks and risks to project state", status: "pending", tool: "base.write" },
       { id: "step-task", title: "Create first ownerless task", status: "pending", tool: "task.create" },

@@ -18,6 +18,10 @@ export function normalizeFeishuArtifacts(tool, input, output, context) {
     return [normalizeMessageArtifact(input, output, runId, status)];
   }
 
+  if (tool === "card.send") {
+    return [normalizeCardArtifact(input, output, runId, status)];
+  }
+
   return [];
 }
 
@@ -92,6 +96,24 @@ function normalizeMessageArtifact(input, output, runId, status) {
     id: externalId ? `message-${externalId}` : `artifact-${runId}-message`,
     type: "message",
     title: input.text ? input.text.slice(0, 80) : "PilotFlow summary message",
+    status,
+    external_id: externalId
+  });
+}
+
+function normalizeCardArtifact(input, output, runId, status) {
+  const message =
+    getPath(output, ["json", "data", "message"]) ||
+    getPath(output, ["json", "message"]) ||
+    getPath(output, ["json", "data"]) ||
+    {};
+  const externalId = message.message_id || message.messageId || message.id;
+  const title = input.title || getPath(input, ["card", "header", "title", "content"]) || "PilotFlow card";
+
+  return cleanArtifact({
+    id: externalId ? `card-${externalId}` : `artifact-${runId}-card`,
+    type: "card",
+    title,
     status,
     external_id: externalId
   });

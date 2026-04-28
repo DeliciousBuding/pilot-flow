@@ -19,6 +19,9 @@ export function loadRuntimeConfig(argv = process.argv.slice(2), env = process.en
     profile: stringValue(args.profile) || env.PILOTFLOW_LARK_PROFILE || "pilotflow-contest",
     inputPath: resolve(stringValue(args.input) || "src/demo/fixtures/demo_input_project_init.txt"),
     outputPath: resolve(stringValue(args.output) || "tmp/runs/latest-manual-run.jsonl"),
+    planCard: {
+      send: booleanValue(args["send-plan-card"]) || booleanEnv(env.PILOTFLOW_SEND_PLAN_CARD)
+    },
     confirmation: {
       expectedText: CONFIRMATION_PHRASE,
       text: confirmationText,
@@ -85,6 +88,7 @@ function buildUsage() {
 Options:
   --dry-run                 Build lark-cli commands without writing to Feishu.
   --live                    Execute lark-cli commands against Feishu.
+  --send-plan-card          Send or dry-run the project flight plan card before confirmation.
   --confirm <text>          Live writes require the exact phrase: ${CONFIRMATION_PHRASE}
   --profile <name>          lark-cli profile. Defaults to pilotflow-contest.
   --chat-id <oc_xxx>        Target Feishu group chat for final summary.
@@ -94,4 +98,12 @@ Options:
   --input <path>            Input fixture path.
   --output <path>           JSONL run log path.
 `;
+}
+
+function booleanValue(value) {
+  return value === true || value === "true" || value === "1";
+}
+
+function booleanEnv(value) {
+  return value === "true" || value === "1";
 }

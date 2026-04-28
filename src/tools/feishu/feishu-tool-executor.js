@@ -14,9 +14,11 @@ export class FeishuToolExecutor {
     if (tools.includes("base.write") && !this.targets.baseToken) missing.push("PILOTFLOW_BASE_TOKEN");
     if (tools.includes("base.write") && !this.targets.baseTableId) missing.push("PILOTFLOW_BASE_TABLE_ID");
     if (tools.includes("im.send") && !this.targets.chatId) missing.push("PILOTFLOW_TEST_CHAT_ID");
+    if (tools.includes("card.send") && !this.targets.chatId) missing.push("PILOTFLOW_TEST_CHAT_ID");
 
-    if (missing.length > 0) {
-      throw new Error(`Live mode is missing required configuration: ${missing.join(", ")}`);
+    const uniqueMissing = [...new Set(missing)];
+    if (uniqueMissing.length > 0) {
+      throw new Error(`Live mode is missing required configuration: ${uniqueMissing.join(", ")}`);
     }
   }
 
@@ -94,6 +96,23 @@ function toLarkCliArgs(tool, input, options) {
       input.chatId || targets.chatId || dryRunPlaceholder(dryRun, "chat-id"),
       "--text",
       input.text,
+      "--idempotency-key",
+      idempotencyKey
+    ];
+  }
+
+  if (tool === "card.send") {
+    return [
+      "im",
+      "+messages-send",
+      "--as",
+      "user",
+      "--chat-id",
+      input.chatId || targets.chatId || dryRunPlaceholder(dryRun, "chat-id"),
+      "--msg-type",
+      "interactive",
+      "--content",
+      JSON.stringify(input.card),
       "--idempotency-key",
       idempotencyKey
     ];

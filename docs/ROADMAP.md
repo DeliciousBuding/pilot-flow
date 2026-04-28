@@ -64,6 +64,8 @@ Work items:
 - [x] Normalize Doc/Base/Task/IM artifacts into final run output and JSONL logs.
 - [x] Run confirmed live mode against the target test group and Base.
 - [x] Validate live artifact IDs and URLs against real `lark-cli` responses.
+- [x] Add Feishu-native project flight plan card builder.
+- [x] Add optional `--send-plan-card` flow with text-confirmation wait state.
 - [x] Add artifact-aware final summary text.
 - [x] Add `demo_success_run.json`.
 - [x] Add `demo_partial_failure_run.json`.
@@ -187,7 +189,7 @@ Longer-term direction after competition MVP.
 
 - [x] Add text confirmation fallback.
 - [x] Add Base template setup command.
-- [ ] Add card confirmation.
+- [ ] Add card callback confirmation.
 - [ ] Add Task mapping and owner fallback.
 - [ ] Add group announcement or entry-message fallback.
 - [ ] Add risk decision summary.

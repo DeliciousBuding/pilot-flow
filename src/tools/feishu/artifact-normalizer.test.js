@@ -70,4 +70,21 @@ assert.equal(
   "om_123"
 );
 
+assert.deepEqual(
+  normalizeFeishuArtifacts(
+    "card.send",
+    { title: "PilotFlow 项目飞行计划", card: { header: { title: { content: "Ignored fallback" } } } },
+    { dry_run: true },
+    { runId }
+  ),
+  [
+    {
+      id: "artifact-run-test-card",
+      type: "card",
+      title: "PilotFlow 项目飞行计划",
+      status: "planned"
+    }
+  ]
+);
+
 console.log("artifact normalizer tests passed");

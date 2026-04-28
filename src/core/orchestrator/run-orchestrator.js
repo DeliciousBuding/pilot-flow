@@ -3,6 +3,9 @@ import { createProjectInitPlan } from "../planner/project-init-planner.js";
 import { FeishuToolExecutor } from "../../tools/feishu/feishu-tool-executor.js";
 import { normalizeFeishuArtifacts } from "../../tools/feishu/artifact-normalizer.js";
 import { buildDeliverySummaryText } from "./summary-builder.js";
+import { buildFlightPlanCard } from "./flight-plan-card.js";
+
+const SIDE_EFFECT_TOOLS = ["doc.create", "base.write", "task.create", "im.send"];
 
 export class RunOrchestrator {
   constructor({ recorder, dryRun = true, mode = "dry-run", profile, feishuTargets = {} } = {}) {
@@ -11,7 +14,7 @@ export class RunOrchestrator {
     this.tools = new FeishuToolExecutor({ dryRun, profile, targets: feishuTargets });
   }
 
-  async startProjectInit(inputText, { autoConfirm = true, confirmationText = "" } = {}) {
+  async startProjectInit(inputText, { autoConfirm = true, confirmationText = "", sendPlanCard = false } = {}) {
     const runId = `run-${randomUUID()}`;
     await this.recorder.record({ run_id: runId, event: "run.created", intent: "project_init", mode: this.mode });
 
@@ -24,6 +27,28 @@ export class RunOrchestrator {
       confirmation: plan.confirmations[0]
     });
 
+    const artifacts = [];
+
+    if (sendPlanCard) {
+      try {
+        this.tools.preflight(autoConfirm ? ["card.send", ...SIDE_EFFECT_TOOLS] : ["card.send"]);
+        artifacts.push(
+          ...(await this.callTool(runId, 0, "step-confirm", "card.send", {
+            title: "PilotFlow 项目飞行计划",
+            card: buildFlightPlanCard({ runId, plan, confirmationText: "确认起飞" })
+          }))
+        );
+      } catch (error) {
+        await this.recorder.record({
+          run_id: runId,
+          event: "run.failed",
+          error: { message: error.message },
+          failed_before_side_effects: true
+        });
+        throw error;
+      }
+    }
+
     if (!autoConfirm) {
       await this.recorder.record({
         run_id: runId,
@@ -31,11 +56,11 @@ export class RunOrchestrator {
         expected_confirmation_text: "确认起飞",
         received_confirmation_text: confirmationText || null
       });
-      return { runId, status: "waiting_confirmation", plan };
+      return { runId, status: "waiting_confirmation", plan, artifacts };
     }
 
     try {
-      this.tools.preflight(["doc.create", "base.write", "task.create", "im.send"]);
+      this.tools.preflight(SIDE_EFFECT_TOOLS);
     } catch (error) {
       await this.recorder.record({
         run_id: runId,
@@ -54,8 +79,6 @@ export class RunOrchestrator {
       confirmation_text: confirmationText || "auto-confirmed dry-run"
     };
     await this.recorder.record({ run_id: runId, event: "confirmation.approved", confirmation: approved });
-
-    const artifacts = [];
 
     try {
       artifacts.push(
