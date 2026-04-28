@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pilotflow.local/schemas/step.schema.json",
+  "title": "Step",
+  "type": "object",
+  "required": ["id", "title", "status"],
+  "properties": {
+    "id": { "type": "string" },
+    "title": { "type": "string" },
+    "status": { "type": "string", "enum": ["pending", "running", "succeeded", "failed", "skipped"] },
+    "tool": { "type": "string" },
+    "depends_on": { "type": "array", "items": { "type": "string" } }
+  }
+}

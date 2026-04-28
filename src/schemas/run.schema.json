@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pilotflow.local/schemas/run.schema.json",
+  "title": "Run",
+  "type": "object",
+  "required": ["id", "intent", "status", "created_at", "steps", "tool_calls", "artifacts", "confirmations", "risks"],
+  "properties": {
+    "id": { "type": "string" },
+    "intent": { "type": "string" },
+    "status": { "type": "string", "enum": ["created", "planning", "waiting_confirmation", "executing", "completed", "failed", "cancelled"] },
+    "created_at": { "type": "string", "format": "date-time" },
+    "updated_at": { "type": "string", "format": "date-time" },
+    "steps": { "type": "array", "items": { "$ref": "step.schema.json" } },
+    "tool_calls": { "type": "array", "items": { "$ref": "tool-call.schema.json" } },
+    "artifacts": { "type": "array", "items": { "$ref": "artifact.schema.json" } },
+    "confirmations": { "type": "array", "items": { "$ref": "confirmation.schema.json" } },
+    "risks": { "type": "array", "items": { "$ref": "risk.schema.json" } }
+  }
+}

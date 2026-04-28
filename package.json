@@ -1,0 +1,14 @@
+{
+  "name": "pilot-flow",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Feishu-native AI project operations officer proof of concept.",
+  "scripts": {
+    "demo:manual": "node src/demo/manual-trigger.js",
+    "check": "node --check src/demo/manual-trigger.js && node --check src/core/planner/project-init-planner.js && node --check src/core/orchestrator/run-orchestrator.js && node --check src/core/recorder/jsonl-recorder.js && node --check src/tools/feishu/feishu-tool-executor.js && node --check src/adapters/lark-cli/command-runner.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

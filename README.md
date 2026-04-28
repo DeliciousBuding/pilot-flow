@@ -76,7 +76,23 @@ Feishu IM
 
 ## Current Status
 
-Initialized on 2026-04-25.
+Initialized on 2026-04-25. The first runnable skeleton now supports a manual demo trigger, fixed project-init planning, Feishu tool dry-runs, and JSONL run recording.
+
+## Development
+
+Run the local checks:
+
+```bash
+npm run check
+```
+
+Run the dry-run manual demo:
+
+```bash
+npm run demo:manual
+```
+
+The demo reads `src/demo/fixtures/demo_input_project_init.txt` and writes an ignored local run log to `tmp/runs/latest-manual-run.jsonl`.
 
 Next steps:
 

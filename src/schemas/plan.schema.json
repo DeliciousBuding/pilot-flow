@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pilotflow.local/schemas/plan.schema.json",
+  "title": "Plan",
+  "type": "object",
+  "required": ["intent", "goal", "members", "deliverables", "deadline", "steps", "confirmations", "risks"],
+  "properties": {
+    "intent": { "type": "string", "enum": ["project_init"] },
+    "goal": { "type": "string" },
+    "members": { "type": "array", "items": { "type": "string" } },
+    "deliverables": { "type": "array", "items": { "type": "string" } },
+    "deadline": { "type": "string" },
+    "missing_info": { "type": "array", "items": { "type": "string" } },
+    "steps": { "type": "array", "items": { "$ref": "step.schema.json" } },
+    "confirmations": { "type": "array", "items": { "$ref": "confirmation.schema.json" } },
+    "risks": { "type": "array", "items": { "$ref": "risk.schema.json" } }
+  }
+}

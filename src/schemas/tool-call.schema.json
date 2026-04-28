@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pilotflow.local/schemas/tool-call.schema.json",
+  "title": "ToolCall",
+  "type": "object",
+  "required": ["id", "tool", "status", "idempotency_key", "input"],
+  "properties": {
+    "id": { "type": "string" },
+    "tool": { "type": "string" },
+    "status": { "type": "string", "enum": ["planned", "running", "succeeded", "failed", "skipped"] },
+    "idempotency_key": { "type": "string" },
+    "input": { "type": "object" },
+    "output": { "type": "object" },
+    "error": { "type": "object" }
+  }
+}

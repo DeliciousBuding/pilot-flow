@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pilotflow.local/schemas/confirmation.schema.json",
+  "title": "Confirmation",
+  "type": "object",
+  "required": ["id", "prompt", "status", "required_for"],
+  "properties": {
+    "id": { "type": "string" },
+    "prompt": { "type": "string" },
+    "status": { "type": "string", "enum": ["pending", "approved", "rejected", "expired"] },
+    "required_for": { "type": "array", "items": { "type": "string" } },
+    "approved_by": { "type": "string" },
+    "approved_at": { "type": "string", "format": "date-time" }
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pilotflow.local/schemas/risk.schema.json",
+  "title": "Risk",
+  "type": "object",
+  "required": ["id", "title", "level", "status"],
+  "properties": {
+    "id": { "type": "string" },
+    "title": { "type": "string" },
+    "level": { "type": "string", "enum": ["low", "medium", "high", "critical"] },
+    "status": { "type": "string", "enum": ["open", "accepted", "mitigated", "closed"] },
+    "owner": { "type": "string" },
+    "source_run": { "type": "string" }
+  }
+}
