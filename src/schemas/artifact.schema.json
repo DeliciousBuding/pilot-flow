@@ -6,7 +6,7 @@
   "required": ["id", "type", "title", "status"],
   "properties": {
     "id": { "type": "string" },
-    "type": { "type": "string", "enum": ["doc", "base_record", "task", "message", "card", "run_log", "summary"] },
+    "type": { "type": "string", "enum": ["doc", "base_record", "task", "message", "entry_message", "card", "run_log", "summary"] },
     "title": { "type": "string" },
     "status": { "type": "string", "enum": ["planned", "created", "failed"] },
     "url": { "type": "string" },

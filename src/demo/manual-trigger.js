@@ -23,7 +23,8 @@ try {
   const result = await orchestrator.startProjectInit(inputText, {
     autoConfirm: config.confirmation.autoConfirm,
     confirmationText: config.confirmation.text,
-    sendPlanCard: config.planCard.send
+    sendPlanCard: config.planCard.send,
+    sendEntryMessage: config.entryMessage.send
   });
 
   console.log(JSON.stringify({ ...result, mode: config.mode, run_log: config.outputPath }, null, 2));

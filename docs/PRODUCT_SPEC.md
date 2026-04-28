@@ -60,6 +60,7 @@ Expected flow:
 | Doc creation | Create project brief | live validated with returned Doc URL |
 | Base write | Store project state | live validated with returned record IDs |
 | Task creation | Create first action item | live validated with returned Task URL |
+| Project entry message | Stable project entrance fallback | dry-run prototype implemented |
 | IM summary | Send final summary to group | live validated; artifact-aware text summary implemented |
 | Run log | JSONL trace | implemented with step status and artifact events |
 

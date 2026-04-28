@@ -87,6 +87,14 @@ npm run demo:manual -- --send-plan-card --no-auto-confirm
 
 In live mode, `--send-plan-card` sends the flight plan card to the configured test group, then waits unless the confirmation phrase is also provided. Sending a live card is visible in Feishu, so use it only against the test group.
 
+Preview the project entry-message fallback:
+
+```bash
+npm run demo:manual -- --send-entry-message
+```
+
+In live mode, `--send-entry-message` sends a stable project entrance after Doc/Base/Task artifacts are created. It is the current fallback when group announcement update is blocked or not yet wired.
+
 Before running the confirmed live command, provide the target Feishu resources through flags or environment variables:
 
 | Variable | Meaning |
@@ -94,6 +102,7 @@ Before running the confirmed live command, provide the target Feishu resources t
 | `PILOTFLOW_FEISHU_MODE` | `dry-run` or `live` |
 | `PILOTFLOW_LARK_PROFILE` | lark-cli profile, default `pilotflow-contest` |
 | `PILOTFLOW_SEND_PLAN_CARD` | `true` or `1` to send the flight plan card before confirmation |
+| `PILOTFLOW_SEND_ENTRY_MESSAGE` | `true` or `1` to send the project entry-message fallback after artifacts are created |
 | `PILOTFLOW_TEST_CHAT_ID` | group chat ID for final summary |
 | `PILOTFLOW_BASE_TOKEN` | Base token for state rows |
 | `PILOTFLOW_BASE_TABLE_ID` | Base table ID or name |
@@ -141,6 +150,7 @@ Implemented:
 - `src/demo/setup-feishu-targets.js`
 - `src/core/planner/project-init-planner.js`
 - `src/core/orchestrator/run-orchestrator.js`
+- `src/core/orchestrator/entry-message-builder.js`
 - `src/core/orchestrator/flight-plan-card.js`
 - `src/core/orchestrator/summary-builder.js`
 - `src/core/recorder/jsonl-recorder.js`
@@ -162,14 +172,15 @@ Implemented in the current Phase 1 slice:
 - live extraction of Doc URL, Base record IDs, Task URL, IM message ID, and run log artifact
 - Feishu-native project flight plan card builder
 - optional `--send-plan-card` flow that can post the card and wait for text confirmation
+- optional `--send-entry-message` fallback for a stable project entrance when group announcement is not available
 - artifact-aware final IM summary with Doc URL, Base record IDs, Task URL, and next-step prompt
 - demo snapshot fixtures for success and guarded failure paths
 
 Next implementation targets:
 
-- card confirmation
-- group announcement or entry-message fallback
 - duplicate-run guard for Doc/Base writes
+- owner/deadline fallback fields
+- card callback confirmation
 
 ## Validation Matrix
 
@@ -180,6 +191,7 @@ Next implementation targets:
 | Orchestrator logic | `npm run check`, `npm run demo:manual`, inspect JSONL |
 | Artifact normalization | `npm run test:artifacts`, `npm run demo:manual`, inspect final artifacts |
 | Flight plan card | `npm run test:card`, `npm run demo:manual -- --send-plan-card --no-auto-confirm` |
+| Entry message fallback | `npm run test:entry`, `npm run demo:manual -- --send-entry-message`, inspect entry artifact |
 | Summary text | `npm run test:summary`, `npm run demo:manual`, inspect final IM tool input |
 | Feishu tool wrapper | dry-run command, then live test against `pilotflow-contest` |
 | Live Feishu write | dry-run first, live command second, record returned IDs |

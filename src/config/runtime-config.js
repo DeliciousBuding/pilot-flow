@@ -22,6 +22,9 @@ export function loadRuntimeConfig(argv = process.argv.slice(2), env = process.en
     planCard: {
       send: booleanValue(args["send-plan-card"]) || booleanEnv(env.PILOTFLOW_SEND_PLAN_CARD)
     },
+    entryMessage: {
+      send: booleanValue(args["send-entry-message"]) || booleanEnv(env.PILOTFLOW_SEND_ENTRY_MESSAGE)
+    },
     confirmation: {
       expectedText: CONFIRMATION_PHRASE,
       text: confirmationText,
@@ -89,6 +92,7 @@ Options:
   --dry-run                 Build lark-cli commands without writing to Feishu.
   --live                    Execute lark-cli commands against Feishu.
   --send-plan-card          Send or dry-run the project flight plan card before confirmation.
+  --send-entry-message      Send or dry-run a project entry message after Doc/Base/Task artifacts are created.
   --confirm <text>          Live writes require the exact phrase: ${CONFIRMATION_PHRASE}
   --profile <name>          lark-cli profile. Defaults to pilotflow-contest.
   --chat-id <oc_xxx>        Target Feishu group chat for final summary.

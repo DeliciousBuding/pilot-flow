@@ -35,7 +35,7 @@ flowchart TB
 | Trigger | Starts a run from manual input now, IM event later | manual trigger implemented |
 | Planner | Converts input into project plan JSON | fixed demo planner implemented |
 | Confirmation Gate | Stops side effects until human approval | flight plan card, dry-run auto-confirm, and live text fallback implemented |
-| Orchestrator | Owns run lifecycle and tool sequence | Doc/Base/Task/IM sequence implemented with artifact-aware summary |
+| Orchestrator | Owns run lifecycle and tool sequence | Doc/Base/Task/entry/IM sequence implemented with artifact-aware messages |
 | Feishu Tool Executor | Converts tool calls into `lark-cli` commands | dry-run and live-capable command runner implemented |
 | Flight Recorder | Records events, tool calls, artifacts, failures | JSONL with step status and artifact events implemented |
 | Risk Engine | Detects missing owner, deadline conflict, overload | planned |
@@ -70,12 +70,12 @@ The current schemas live in `src/schemas`.
 | `Step` | Unit of planned work |
 | `ToolCall` | One call to a Feishu or local tool |
 | `Confirmation` | Human approval gate |
-| `Artifact` | Created Doc, Task, Base record, message, summary, or run log |
+| `Artifact` | Created Doc, Task, Base record, card, entry message, summary, or run log |
 | `Risk` | Risk item detected or entered during planning |
 
-Artifact normalization currently supports Feishu Doc, Base record batch writes, Task creation, IM message sends, and local run logs. Dry-run artifacts are marked `planned`; live artifacts are marked `created` once the corresponding `lark-cli` call succeeds.
+Artifact normalization currently supports Feishu Doc, Base record batch writes, Task creation, card sends, project entry messages, IM message sends, and local run logs. Dry-run artifacts are marked `planned`; live artifacts are marked `created` once the corresponding `lark-cli` call succeeds.
 
-The project flight plan card is generated before side effects and can be sent with `--send-plan-card`. The final IM summary is generated after Doc, Base, and Task calls complete, so the group message can include the created Doc URL, Base record IDs, Task URL, run ID, and next-step prompt.
+The project flight plan card is generated before side effects and can be sent with `--send-plan-card`. The project entry message is generated after Doc, Base, and Task calls complete and can be sent with `--send-entry-message` as the current fallback for a stable group entrance. The final IM summary is generated afterward, so the group message can include the created Doc URL, Base record IDs, Task URL, run ID, and next-step prompt.
 
 ## Tool Routing
 
@@ -110,6 +110,8 @@ Runtime variables:
 ```text
 PILOTFLOW_FEISHU_MODE=dry-run|live
 PILOTFLOW_LARK_PROFILE=pilotflow-contest
+PILOTFLOW_SEND_PLAN_CARD=true|false
+PILOTFLOW_SEND_ENTRY_MESSAGE=true|false
 PILOTFLOW_TEST_CHAT_ID=<oc_xxx>
 PILOTFLOW_BASE_TOKEN=<base_token>
 PILOTFLOW_BASE_TABLE_ID=<tbl_xxx>

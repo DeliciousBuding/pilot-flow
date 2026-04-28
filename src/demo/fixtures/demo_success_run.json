@@ -75,6 +75,13 @@
       "external_id": "task_demo"
     },
     {
+      "id": "entry-message-demo",
+      "type": "entry_message",
+      "title": "PilotFlow 项目入口已就绪。",
+      "status": "created",
+      "external_id": "om_entry_demo"
+    },
+    {
       "id": "message-demo",
       "type": "message",
       "title": "PilotFlow 已完成项目起飞。",
@@ -88,5 +95,6 @@
       "status": "created"
     }
   ],
+  "entry_message_text": "PilotFlow 项目入口已就绪。\n\nRun ID: run-demo-success\n目标: Launch PilotFlow MVP for a Feishu-native project operations demo\n\n项目入口:\n- Brief: PilotFlow Project Brief - https://example.feishu.cn/docx/demo\n- 状态台账: 2 条 Base records (rec_demo_1, rec_demo_2)\n- 首个任务: Project brief - https://applink.feishu.cn/client/todo/detail?guid=demo\n\n建议: 将本消息置顶或升级为群公告，作为团队后续进入项目空间的固定入口。",
   "summary_text": "PilotFlow 已完成项目起飞。\n\nRun ID: run-demo-success\n目标: Launch PilotFlow MVP for a Feishu-native project operations demo\n\n已生成产物:\n- Doc: PilotFlow Project Brief - https://example.feishu.cn/docx/demo\n- Base records: 2 条 (rec_demo_1, rec_demo_2)\n- Task: Project brief - https://applink.feishu.cn/client/todo/detail?guid=demo\n\n下一步: 请在群内确认负责人、截止时间和风险处理方式。"
 }

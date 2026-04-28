@@ -154,7 +154,7 @@ Detailed architecture: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 | Docs | Project brief and delivery documents | ✅ creation validated |
 | Base | Tasks, risks, artifacts, confirmations | ✅ write validated |
 | Task | Concrete owner/deadline action items | ✅ creation validated |
-| Group Announcement | Stable project entrance | 🟡 next |
+| Group Announcement | Stable project entrance | 🟡 entry-message fallback prototype |
 | Event subscription | `@PilotFlow` automatic trigger | 🟡 planned |
 | Chat Tab / H5 | Lightweight cockpit and flight recorder | 🟡 planned |
 | Whiteboard / Calendar / Slides | Demo enhancement surfaces | ⏳ later |
@@ -175,6 +175,7 @@ PilotFlow is currently in **MVP prototype** stage. The first deliverable is a re
 | Local Flight Recorder | ✅ prototype |
 | Real one-command Feishu run | ✅ validated |
 | Project flight plan card | ✅ dry-run prototype |
+| Project entry message fallback | ✅ prototype |
 | Artifact-aware final summary | ✅ prototype |
 | Card callback confirmation | 🟡 next |
 | Group announcement project entry | 🟡 next |
@@ -222,8 +223,10 @@ For local development and reviewer reproduction:
 npm run check
 npm run demo:manual
 npm run demo:manual -- --send-plan-card --no-auto-confirm
+npm run demo:manual -- --send-entry-message
 npm run test:artifacts
 npm run test:card
+npm run test:entry
 npm run test:summary
 ```
 

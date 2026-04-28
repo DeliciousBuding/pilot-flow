@@ -4,6 +4,7 @@ import { FeishuToolExecutor } from "../../tools/feishu/feishu-tool-executor.js";
 import { normalizeFeishuArtifacts } from "../../tools/feishu/artifact-normalizer.js";
 import { buildDeliverySummaryText } from "./summary-builder.js";
 import { buildFlightPlanCard } from "./flight-plan-card.js";
+import { buildProjectEntryMessageText } from "./entry-message-builder.js";
 
 const SIDE_EFFECT_TOOLS = ["doc.create", "base.write", "task.create", "im.send"];
 
@@ -14,7 +15,10 @@ export class RunOrchestrator {
     this.tools = new FeishuToolExecutor({ dryRun, profile, targets: feishuTargets });
   }
 
-  async startProjectInit(inputText, { autoConfirm = true, confirmationText = "", sendPlanCard = false } = {}) {
+  async startProjectInit(
+    inputText,
+    { autoConfirm = true, confirmationText = "", sendPlanCard = false, sendEntryMessage = false } = {}
+  ) {
     const runId = `run-${randomUUID()}`;
     await this.recorder.record({ run_id: runId, event: "run.created", intent: "project_init", mode: this.mode });
 
@@ -31,7 +35,7 @@ export class RunOrchestrator {
 
     if (sendPlanCard) {
       try {
-        this.tools.preflight(autoConfirm ? ["card.send", ...SIDE_EFFECT_TOOLS] : ["card.send"]);
+        this.tools.preflight(autoConfirm ? ["card.send", ...toolsForRun(sendEntryMessage)] : ["card.send"]);
         artifacts.push(
           ...(await this.callTool(runId, 0, "step-confirm", "card.send", {
             title: "PilotFlow 项目飞行计划",
@@ -60,7 +64,7 @@ export class RunOrchestrator {
     }
 
     try {
-      this.tools.preflight(SIDE_EFFECT_TOOLS);
+      this.tools.preflight(toolsForRun(sendEntryMessage));
     } catch (error) {
       await this.recorder.record({
         run_id: runId,
@@ -105,9 +109,20 @@ export class RunOrchestrator {
         }))
       );
 
+      if (sendEntryMessage) {
+        const entryMessageText = buildProjectEntryMessageText({ runId, plan, artifacts });
+        artifacts.push(
+          ...(await this.callTool(runId, 4, "step-entry", "entry.send", {
+            text: entryMessageText
+          }))
+        );
+      } else {
+        await this.skipStep(runId, "step-entry", "entry message disabled");
+      }
+
       const summaryText = buildDeliverySummaryText({ runId, plan, artifacts });
       artifacts.push(
-        ...(await this.callTool(runId, 4, "step-summary", "im.send", {
+        ...(await this.callTool(runId, 5, "step-summary", "im.send", {
           text: summaryText
         }))
       );
@@ -167,6 +182,14 @@ export class RunOrchestrator {
       throw error;
     }
   }
+
+  async skipStep(runId, stepId, reason) {
+    await this.recorder.record({ run_id: runId, event: "step.status_changed", step_id: stepId, status: "skipped", reason });
+  }
+}
+
+function toolsForRun(sendEntryMessage) {
+  return sendEntryMessage ? [...SIDE_EFFECT_TOOLS, "entry.send"] : SIDE_EFFECT_TOOLS;
 }
 
 function buildBriefMarkdown(plan) {

@@ -15,6 +15,7 @@ export class FeishuToolExecutor {
     if (tools.includes("base.write") && !this.targets.baseTableId) missing.push("PILOTFLOW_BASE_TABLE_ID");
     if (tools.includes("im.send") && !this.targets.chatId) missing.push("PILOTFLOW_TEST_CHAT_ID");
     if (tools.includes("card.send") && !this.targets.chatId) missing.push("PILOTFLOW_TEST_CHAT_ID");
+    if (tools.includes("entry.send") && !this.targets.chatId) missing.push("PILOTFLOW_TEST_CHAT_ID");
 
     const uniqueMissing = [...new Set(missing)];
     if (uniqueMissing.length > 0) {
@@ -87,18 +88,11 @@ function toLarkCliArgs(tool, input, options) {
   }
 
   if (tool === "im.send") {
-    return [
-      "im",
-      "+messages-send",
-      "--as",
-      "user",
-      "--chat-id",
-      input.chatId || targets.chatId || dryRunPlaceholder(dryRun, "chat-id"),
-      "--text",
-      input.text,
-      "--idempotency-key",
-      idempotencyKey
-    ];
+    return textMessageArgs(input, { idempotencyKey, dryRun, targets });
+  }
+
+  if (tool === "entry.send") {
+    return textMessageArgs(input, { idempotencyKey, dryRun, targets });
   }
 
   if (tool === "card.send") {
@@ -119,6 +113,22 @@ function toLarkCliArgs(tool, input, options) {
   }
 
   throw new Error(`Unsupported Feishu tool: ${tool}`);
+}
+
+function textMessageArgs(input, options) {
+  const { idempotencyKey, dryRun, targets } = options;
+  return [
+    "im",
+    "+messages-send",
+    "--as",
+    "user",
+    "--chat-id",
+    input.chatId || targets.chatId || dryRunPlaceholder(dryRun, "chat-id"),
+    "--text",
+    input.text,
+    "--idempotency-key",
+    idempotencyKey
+  ];
 }
 
 function dryRunPlaceholder(dryRun, label) {

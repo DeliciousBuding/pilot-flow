@@ -6,6 +6,16 @@ This roadmap is the product and engineering plan for turning PilotFlow from a va
 
 PilotFlow is a project operations officer inside Feishu group chats. It should help a team move from discussion to delivery without forcing everyone into a separate project-management system.
 
+## Current Planning Update
+
+Status after the latest implementation pass:
+
+- Phase 1 is effectively closed: the manual trigger can create real Feishu artifacts and return a traceable run.
+- Phase 2 should now prioritize stable Feishu-native product surfaces over heavier automation.
+- Card callback remains useful, but it depends on event/callback wiring and permissions. Text confirmation remains the fallback.
+- Group announcement is still a risk area, so the near-term project-entry path is an entry message that can later be pinned or upgraded to an announcement.
+- Duplicate-run protection should land before more live demo repetitions.
+
 Main loop:
 
 ```mermaid
@@ -87,9 +97,9 @@ IM + Cards + Doc + Group Announcement + Base + Task + Risk + Flight Recorder
 
 Work items:
 
-- [ ] Design and send a project flight plan card.
+- [x] Design and send a project flight plan card.
 - [ ] Support card buttons for confirm, edit, doc-only, cancel.
-- [ ] Implement text confirmation fallback when card callback is blocked.
+- [x] Implement text confirmation fallback when card callback is blocked.
 - [ ] Create a Base template with fields:
   - `type`
   - `title`
@@ -103,7 +113,7 @@ Work items:
 - [ ] Create real task records with owner/deadline when mappings are available.
 - [ ] Add owner mapping fallback to text fields.
 - [ ] Try group announcement update.
-- [ ] Fall back to a project entry message if announcement update fails.
+- [x] Fall back to a project entry message if announcement update fails.
 - [ ] Build a lightweight Flight Recorder view.
 - [ ] Add risk detection:
   - missing owner
@@ -167,11 +177,11 @@ Longer-term direction after competition MVP.
 
 ## Immediate Next Actions
 
-1. Add live execution mode to the current tool executor.
-2. Use `pilotflow-contest` profile by default for project API tests.
-3. Fill target env values for chat, Base, table, and optional tasklist.
-4. Run `npm run demo:manual -- --live --confirm "确认起飞"` against real Feishu targets.
-5. Validate created Doc, Base rows, Task, and IM message links in the run result.
+1. Add duplicate-run guard before more live demo repetitions.
+2. Add owner/deadline fallback fields to generated state rows.
+3. Add card callback confirmation only after event/callback readiness is verified.
+4. Try group announcement update; keep entry-message fallback as the default stable path.
+5. Start a lightweight Flight Recorder viewer from the existing JSONL runs.
 6. Keep README and docs updated with each implementation step.
 7. Commit and push every completed vertical slice to GitHub.
 
@@ -191,7 +201,8 @@ Longer-term direction after competition MVP.
 - [x] Add Base template setup command.
 - [ ] Add card callback confirmation.
 - [ ] Add Task mapping and owner fallback.
-- [ ] Add group announcement or entry-message fallback.
+- [x] Add entry-message fallback.
+- [ ] Try group announcement update.
 - [ ] Add risk decision summary.
 - [ ] Add Flight Recorder viewer.
 

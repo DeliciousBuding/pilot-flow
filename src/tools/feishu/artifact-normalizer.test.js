@@ -72,6 +72,24 @@ assert.equal(
 
 assert.deepEqual(
   normalizeFeishuArtifacts(
+    "entry.send",
+    { text: "PilotFlow project entry" },
+    { json: { data: { message_id: "om_entry" } } },
+    { runId }
+  ),
+  [
+    {
+      id: "entry_message-om_entry",
+      type: "entry_message",
+      title: "PilotFlow project entry",
+      status: "created",
+      external_id: "om_entry"
+    }
+  ]
+);
+
+assert.deepEqual(
+  normalizeFeishuArtifacts(
     "card.send",
     { title: "PilotFlow 项目飞行计划", card: { header: { title: { content: "Ignored fallback" } } } },
     { dry_run: true },
