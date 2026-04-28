@@ -95,6 +95,13 @@ npm run demo:manual -- --send-entry-message
 
 In live mode, `--send-entry-message` sends a stable project entrance after Doc/Base/Task artifacts are created. It is the current fallback when group announcement update is blocked or not yet wired.
 
+Live project-init runs are guarded against accidental duplicates. If you intentionally need to repeat a visible Feishu write, pass an explicit key or bypass flag:
+
+```bash
+npm run demo:manual -- --live --confirm "确认起飞" --dedupe-key "pilotflow-demo-20260428"
+npm run demo:manual -- --live --confirm "确认起飞" --allow-duplicate-run
+```
+
 Before running the confirmed live command, provide the target Feishu resources through flags or environment variables:
 
 | Variable | Meaning |
@@ -103,6 +110,10 @@ Before running the confirmed live command, provide the target Feishu resources t
 | `PILOTFLOW_LARK_PROFILE` | lark-cli profile, default `pilotflow-contest` |
 | `PILOTFLOW_SEND_PLAN_CARD` | `true` or `1` to send the flight plan card before confirmation |
 | `PILOTFLOW_SEND_ENTRY_MESSAGE` | `true` or `1` to send the project entry-message fallback after artifacts are created |
+| `PILOTFLOW_DEDUPE_KEY` | optional stable project key for live duplicate-run protection |
+| `PILOTFLOW_ALLOW_DUPLICATE_RUN` | `true` or `1` to intentionally bypass duplicate-run protection |
+| `PILOTFLOW_DISABLE_DUPLICATE_GUARD` | `true` or `1` to disable the local guard |
+| `PILOTFLOW_DUPLICATE_GUARD_PATH` | local guard file path, default `tmp/run-guard/project-init-runs.json` |
 | `PILOTFLOW_TEST_CHAT_ID` | group chat ID for final summary |
 | `PILOTFLOW_BASE_TOKEN` | Base token for state rows |
 | `PILOTFLOW_BASE_TABLE_ID` | Base table ID or name |
@@ -150,6 +161,7 @@ Implemented:
 - `src/demo/setup-feishu-targets.js`
 - `src/core/planner/project-init-planner.js`
 - `src/core/orchestrator/run-orchestrator.js`
+- `src/core/orchestrator/duplicate-run-guard.js`
 - `src/core/orchestrator/entry-message-builder.js`
 - `src/core/orchestrator/flight-plan-card.js`
 - `src/core/orchestrator/summary-builder.js`
@@ -173,12 +185,12 @@ Implemented in the current Phase 1 slice:
 - Feishu-native project flight plan card builder
 - optional `--send-plan-card` flow that can post the card and wait for text confirmation
 - optional `--send-entry-message` fallback for a stable project entrance when group announcement is not available
+- duplicate live-run guard with stable dedupe key, local ignored guard file, and explicit bypass
 - artifact-aware final IM summary with Doc URL, Base record IDs, Task URL, and next-step prompt
 - demo snapshot fixtures for success and guarded failure paths
 
 Next implementation targets:
 
-- duplicate-run guard for Doc/Base writes
 - owner/deadline fallback fields
 - card callback confirmation
 
@@ -191,6 +203,7 @@ Next implementation targets:
 | Orchestrator logic | `npm run check`, `npm run demo:manual`, inspect JSONL |
 | Artifact normalization | `npm run test:artifacts`, `npm run demo:manual`, inspect final artifacts |
 | Flight plan card | `npm run test:card`, `npm run demo:manual -- --send-plan-card --no-auto-confirm` |
+| Duplicate-run guard | `npm run test:guard`, live missing-config check, inspect guard events in JSONL |
 | Entry message fallback | `npm run test:entry`, `npm run demo:manual -- --send-entry-message`, inspect entry artifact |
 | Summary text | `npm run test:summary`, `npm run demo:manual`, inspect final IM tool input |
 | Feishu tool wrapper | dry-run command, then live test against `pilotflow-contest` |

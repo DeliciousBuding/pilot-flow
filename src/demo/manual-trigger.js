@@ -17,14 +17,16 @@ const orchestrator = new RunOrchestrator({
   dryRun: config.dryRun,
   mode: config.mode,
   profile: config.profile,
-  feishuTargets: config.feishu
+  feishuTargets: config.feishu,
+  duplicateGuard: config.duplicateGuard
 });
 try {
   const result = await orchestrator.startProjectInit(inputText, {
     autoConfirm: config.confirmation.autoConfirm,
     confirmationText: config.confirmation.text,
     sendPlanCard: config.planCard.send,
-    sendEntryMessage: config.entryMessage.send
+    sendEntryMessage: config.entryMessage.send,
+    dedupeKey: config.duplicateGuard.key
   });
 
   console.log(JSON.stringify({ ...result, mode: config.mode, run_log: config.outputPath }, null, 2));

@@ -35,6 +35,7 @@ flowchart TB
 | Trigger | Starts a run from manual input now, IM event later | manual trigger implemented |
 | Planner | Converts input into project plan JSON | fixed demo planner implemented |
 | Confirmation Gate | Stops side effects until human approval | flight plan card, dry-run auto-confirm, and live text fallback implemented |
+| Duplicate Run Guard | Blocks accidental repeated live runs for the same project target | local guard file implemented under `tmp/run-guard/` |
 | Orchestrator | Owns run lifecycle and tool sequence | Doc/Base/Task/entry/IM sequence implemented with artifact-aware messages |
 | Feishu Tool Executor | Converts tool calls into `lark-cli` commands | dry-run and live-capable command runner implemented |
 | Flight Recorder | Records events, tool calls, artifacts, failures | JSONL with step status and artifact events implemented |
@@ -77,6 +78,8 @@ Artifact normalization currently supports Feishu Doc, Base record batch writes, 
 
 The project flight plan card is generated before side effects and can be sent with `--send-plan-card`. The project entry message is generated after Doc, Base, and Task calls complete and can be sent with `--send-entry-message` as the current fallback for a stable group entrance. The final IM summary is generated afterward, so the group message can include the created Doc URL, Base record IDs, Task URL, run ID, and next-step prompt.
 
+The duplicate-run guard runs after live target preflight and before Feishu side effects. It computes a stable project-init key from normalized input, plan shape, profile, and hashed targets. The guard file lives in ignored local storage by default, so it protects live demos on the operator machine without publishing target IDs or secrets.
+
 ## Tool Routing
 
 ```mermaid
@@ -112,6 +115,10 @@ PILOTFLOW_FEISHU_MODE=dry-run|live
 PILOTFLOW_LARK_PROFILE=pilotflow-contest
 PILOTFLOW_SEND_PLAN_CARD=true|false
 PILOTFLOW_SEND_ENTRY_MESSAGE=true|false
+PILOTFLOW_DEDUPE_KEY=<optional_stable_key>
+PILOTFLOW_ALLOW_DUPLICATE_RUN=true|false
+PILOTFLOW_DISABLE_DUPLICATE_GUARD=true|false
+PILOTFLOW_DUPLICATE_GUARD_PATH=tmp/run-guard/project-init-runs.json
 PILOTFLOW_TEST_CHAT_ID=<oc_xxx>
 PILOTFLOW_BASE_TOKEN=<base_token>
 PILOTFLOW_BASE_TABLE_ID=<tbl_xxx>
@@ -124,6 +131,7 @@ Live mode requires the confirmation text `确认起飞`. It also preflights requ
 ## Reliability Rules
 
 - Every write tool must receive an idempotency key.
+- Live project-init runs must pass duplicate-run protection before visible side effects.
 - Tool failures must stop or degrade the run explicitly.
 - The Agent must never invent a successful Feishu write.
 - Run logs must include planned input and actual output.

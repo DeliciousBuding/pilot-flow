@@ -46,8 +46,9 @@ Expected flow:
 2. User confirms the plan.
 3. PilotFlow creates a Feishu Doc.
 4. PilotFlow writes task/risk state to Base or Task.
-5. PilotFlow sends a final summary to the group.
-6. PilotFlow records the run in Flight Recorder.
+5. PilotFlow publishes a stable project entry message or group announcement.
+6. PilotFlow sends a final summary to the group.
+7. PilotFlow records the run in Flight Recorder.
 
 ## P0 Features
 
@@ -63,6 +64,7 @@ Expected flow:
 | Project entry message | Stable project entrance fallback | dry-run prototype implemented |
 | IM summary | Send final summary to group | live validated; artifact-aware text summary implemented |
 | Run log | JSONL trace | implemented with step status and artifact events |
+| Duplicate-run guard | Prevent accidental repeated live writes | local prototype implemented |
 
 ## P1 Features
 
@@ -101,4 +103,5 @@ Expected flow:
 | Traceability | Every tool call appears in run log |
 | Feishu-native proof | IM, Card, Doc, Base or Task are visible in Feishu |
 | Human control | At least one confirmation before writes |
+| Duplicate safety | Repeating a live project-init run is blocked unless explicitly bypassed |
 | Recovery | At least one fallback path is demonstrated |

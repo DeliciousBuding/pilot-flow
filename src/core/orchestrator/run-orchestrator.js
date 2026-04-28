@@ -5,19 +5,23 @@ import { normalizeFeishuArtifacts } from "../../tools/feishu/artifact-normalizer
 import { buildDeliverySummaryText } from "./summary-builder.js";
 import { buildFlightPlanCard } from "./flight-plan-card.js";
 import { buildProjectEntryMessageText } from "./entry-message-builder.js";
+import { buildProjectInitDedupeKey, duplicateGuardSummary, DuplicateRunGuard } from "./duplicate-run-guard.js";
 
 const SIDE_EFFECT_TOOLS = ["doc.create", "base.write", "task.create", "im.send"];
 
 export class RunOrchestrator {
-  constructor({ recorder, dryRun = true, mode = "dry-run", profile, feishuTargets = {} } = {}) {
+  constructor({ recorder, dryRun = true, mode = "dry-run", profile, feishuTargets = {}, duplicateGuard = {} } = {}) {
     this.recorder = recorder;
     this.mode = mode;
+    this.profile = profile;
+    this.feishuTargets = feishuTargets;
     this.tools = new FeishuToolExecutor({ dryRun, profile, targets: feishuTargets });
+    this.duplicateGuard = new DuplicateRunGuard(duplicateGuard);
   }
 
   async startProjectInit(
     inputText,
-    { autoConfirm = true, confirmationText = "", sendPlanCard = false, sendEntryMessage = false } = {}
+    { autoConfirm = true, confirmationText = "", sendPlanCard = false, sendEntryMessage = false, dedupeKey = "" } = {}
   ) {
     const runId = `run-${randomUUID()}`;
     await this.recorder.record({ run_id: runId, event: "run.created", intent: "project_init", mode: this.mode });
@@ -32,10 +36,32 @@ export class RunOrchestrator {
     });
 
     const artifacts = [];
+    const plannedTools = plannedToolsForRun({ autoConfirm, sendPlanCard, sendEntryMessage });
+    if (plannedTools.length > 0) {
+      try {
+        this.tools.preflight(plannedTools);
+      } catch (error) {
+        await this.recorder.record({
+          run_id: runId,
+          event: "run.failed",
+          error: { message: error.message },
+          failed_before_side_effects: true
+        });
+        throw error;
+      }
+    }
+
+    const guardKey = buildProjectInitDedupeKey({
+      inputText,
+      plan,
+      profile: this.profile,
+      targets: this.feishuTargets,
+      explicitKey: dedupeKey
+    });
+    const guardState = await this.startDuplicateGuard(runId, guardKey, plan, shouldGuardRun({ autoConfirm, sendPlanCard }));
 
     if (sendPlanCard) {
       try {
-        this.tools.preflight(autoConfirm ? ["card.send", ...toolsForRun(sendEntryMessage)] : ["card.send"]);
         artifacts.push(
           ...(await this.callTool(runId, 0, "step-confirm", "card.send", {
             title: "PilotFlow 项目飞行计划",
@@ -60,19 +86,7 @@ export class RunOrchestrator {
         expected_confirmation_text: "确认起飞",
         received_confirmation_text: confirmationText || null
       });
-      return { runId, status: "waiting_confirmation", plan, artifacts };
-    }
-
-    try {
-      this.tools.preflight(toolsForRun(sendEntryMessage));
-    } catch (error) {
-      await this.recorder.record({
-        run_id: runId,
-        event: "run.failed",
-        error: { message: error.message },
-        failed_before_side_effects: true
-      });
-      throw error;
+      return { runId, status: "waiting_confirmation", plan, artifacts, duplicate_guard: guardState };
     }
 
     const approved = {
@@ -127,6 +141,7 @@ export class RunOrchestrator {
         }))
       );
     } catch (error) {
+      await this.duplicateGuard.mark({ key: guardState.key, runId, status: "failed", artifacts });
       await this.recorder.record({ run_id: runId, event: "run.failed", error: { message: error.message } });
       throw error;
     }
@@ -144,9 +159,10 @@ export class RunOrchestrator {
       event: "artifact.created",
       artifact: runLogArtifact
     });
+    await this.duplicateGuard.mark({ key: guardState.key, runId, status: "completed", artifacts });
     await this.recorder.record({ run_id: runId, event: "run.completed" });
 
-    return { runId, status: "completed", plan, artifacts };
+    return { runId, status: "completed", plan, artifacts, duplicate_guard: guardState };
   }
 
   async callTool(runId, sequence, stepId, tool, input) {
@@ -186,10 +202,54 @@ export class RunOrchestrator {
   async skipStep(runId, stepId, reason) {
     await this.recorder.record({ run_id: runId, event: "step.status_changed", step_id: stepId, status: "skipped", reason });
   }
+
+  async startDuplicateGuard(runId, key, plan, enabledForRun) {
+    if (!enabledForRun) {
+      const state = { enabled: false, key, status: "skipped", reason: "no_live_side_effects" };
+      await this.recorder.record({ run_id: runId, event: "run.guard_skipped", duplicate_guard: state });
+      return state;
+    }
+
+    try {
+      const state = await this.duplicateGuard.start({
+        key,
+        runId,
+        summary: duplicateGuardSummary({ plan, mode: this.mode, profile: this.profile })
+      });
+      await this.recorder.record({ run_id: runId, event: "run.guard_checked", duplicate_guard: state });
+      return state;
+    } catch (error) {
+      await this.recorder.record({
+        run_id: runId,
+        event: "run.duplicate_blocked",
+        duplicate_guard: {
+          enabled: true,
+          key,
+          status: "blocked",
+          existing_run: error.existingRun
+        }
+      });
+      await this.recorder.record({
+        run_id: runId,
+        event: "run.failed",
+        error: { message: error.message, code: error.code },
+        failed_before_side_effects: true
+      });
+      throw error;
+    }
+  }
 }
 
 function toolsForRun(sendEntryMessage) {
   return sendEntryMessage ? [...SIDE_EFFECT_TOOLS, "entry.send"] : SIDE_EFFECT_TOOLS;
+}
+
+function plannedToolsForRun({ autoConfirm, sendPlanCard, sendEntryMessage }) {
+  return [...(sendPlanCard ? ["card.send"] : []), ...(autoConfirm ? toolsForRun(sendEntryMessage) : [])];
+}
+
+function shouldGuardRun({ autoConfirm, sendPlanCard }) {
+  return autoConfirm || sendPlanCard;
 }
 
 function buildBriefMarkdown(plan) {

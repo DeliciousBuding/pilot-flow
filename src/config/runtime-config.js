@@ -1,4 +1,5 @@
 import { resolve } from "node:path";
+import { DEFAULT_DUPLICATE_GUARD_PATH } from "../core/orchestrator/duplicate-run-guard.js";
 
 const CONFIRMATION_PHRASE = "确认起飞";
 
@@ -24,6 +25,12 @@ export function loadRuntimeConfig(argv = process.argv.slice(2), env = process.en
     },
     entryMessage: {
       send: booleanValue(args["send-entry-message"]) || booleanEnv(env.PILOTFLOW_SEND_ENTRY_MESSAGE)
+    },
+    duplicateGuard: {
+      enabled: mode === "live" && !booleanValue(args["disable-duplicate-guard"]) && !booleanEnv(env.PILOTFLOW_DISABLE_DUPLICATE_GUARD),
+      allowDuplicate: booleanValue(args["allow-duplicate-run"]) || booleanEnv(env.PILOTFLOW_ALLOW_DUPLICATE_RUN),
+      key: stringValue(args["dedupe-key"]) || env.PILOTFLOW_DEDUPE_KEY || "",
+      filePath: resolve(stringValue(args["duplicate-guard-path"]) || env.PILOTFLOW_DUPLICATE_GUARD_PATH || DEFAULT_DUPLICATE_GUARD_PATH)
     },
     confirmation: {
       expectedText: CONFIRMATION_PHRASE,
@@ -93,6 +100,10 @@ Options:
   --live                    Execute lark-cli commands against Feishu.
   --send-plan-card          Send or dry-run the project flight plan card before confirmation.
   --send-entry-message      Send or dry-run a project entry message after Doc/Base/Task artifacts are created.
+  --dedupe-key <key>        Optional stable key for live duplicate-run protection.
+  --allow-duplicate-run     Bypass duplicate-run protection for intentional repeated live writes.
+  --disable-duplicate-guard Disable live duplicate-run protection.
+  --duplicate-guard-path <path>  Local duplicate-run guard file. Defaults to ${DEFAULT_DUPLICATE_GUARD_PATH}.
   --confirm <text>          Live writes require the exact phrase: ${CONFIRMATION_PHRASE}
   --profile <name>          lark-cli profile. Defaults to pilotflow-contest.
   --chat-id <oc_xxx>        Target Feishu group chat for final summary.

@@ -14,7 +14,7 @@ Status after the latest implementation pass:
 - Phase 2 should now prioritize stable Feishu-native product surfaces over heavier automation.
 - Card callback remains useful, but it depends on event/callback wiring and permissions. Text confirmation remains the fallback.
 - Group announcement is still a risk area, so the near-term project-entry path is an entry message that can later be pinned or upgraded to an announcement.
-- Duplicate-run protection should land before more live demo repetitions.
+- Duplicate-run protection is now part of the live safety rail; the next product slice is owner/deadline fallback for a more realistic Base.
 
 Main loop:
 
@@ -100,6 +100,7 @@ Work items:
 - [x] Design and send a project flight plan card.
 - [ ] Support card buttons for confirm, edit, doc-only, cancel.
 - [x] Implement text confirmation fallback when card callback is blocked.
+- [x] Add duplicate-run guard before more live demo repetitions.
 - [ ] Create a Base template with fields:
   - `type`
   - `title`
@@ -177,11 +178,11 @@ Longer-term direction after competition MVP.
 
 ## Immediate Next Actions
 
-1. Add duplicate-run guard before more live demo repetitions.
-2. Add owner/deadline fallback fields to generated state rows.
-3. Add card callback confirmation only after event/callback readiness is verified.
-4. Try group announcement update; keep entry-message fallback as the default stable path.
-5. Start a lightweight Flight Recorder viewer from the existing JSONL runs.
+1. Add owner/deadline fallback fields to generated state rows.
+2. Add card callback confirmation only after event/callback readiness is verified.
+3. Try group announcement update; keep entry-message fallback as the default stable path.
+4. Start a lightweight Flight Recorder viewer from the existing JSONL runs.
+5. Prepare the first happy-path recording after owner/deadline fallback lands.
 6. Keep README and docs updated with each implementation step.
 7. Commit and push every completed vertical slice to GitHub.
 
@@ -192,7 +193,7 @@ Longer-term direction after competition MVP.
 - [x] Replace dry-run tool outputs with live mode behind an explicit flag.
 - [x] Use environment variables for test chat, Base, table, and profile.
 - [x] Make `npm run demo:manual -- --live` create real artifacts.
-- [ ] Add idempotency or duplicate-run guard for every write.
+- [x] Add idempotency or duplicate-run guard for every write.
 - [ ] Add screenshots or recordings only after the flow is stable.
 
 ### Week 2: Product-Shaped MVP

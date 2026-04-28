@@ -177,6 +177,7 @@ PilotFlow is currently in **MVP prototype** stage. The first deliverable is a re
 | Project flight plan card | ✅ dry-run prototype |
 | Project entry message fallback | ✅ prototype |
 | Artifact-aware final summary | ✅ prototype |
+| Duplicate live-run guard | ✅ prototype |
 | Card callback confirmation | 🟡 next |
 | Group announcement project entry | 🟡 next |
 
@@ -226,6 +227,7 @@ npm run demo:manual -- --send-plan-card --no-auto-confirm
 npm run demo:manual -- --send-entry-message
 npm run test:artifacts
 npm run test:card
+npm run test:guard
 npm run test:entry
 npm run test:summary
 ```
@@ -238,6 +240,7 @@ The current local demo reads a project-init fixture, writes a traceable run log,
 - Tool failures must be recorded and surfaced.
 - The Agent must not pretend a failed Feishu write succeeded.
 - Every write path should be designed for idempotency or duplicate detection.
+- Live project-init runs are guarded against accidental duplicate Feishu writes unless explicitly bypassed.
 - Secrets never belong in the repository, public docs, screenshots, or chat logs.
 - Official Feishu reference caches stay outside this repo.
 
