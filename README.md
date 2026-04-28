@@ -1,8 +1,8 @@
 # PilotFlow
 
-PilotFlow is a Feishu-native AI collaboration pilot for the Feishu AI Campus Challenge.
+PilotFlow is a Feishu-native AI project operations officer for the Feishu AI Campus Challenge.
 
-It works like a project manager inside a Feishu group chat: it helps teams move from scattered discussion to executable tasks, traceable project state, and concrete deliverables.
+It works like a project manager inside a Feishu group chat, but keeps human owners in control: it turns scattered discussion into confirmed plans, executable tasks, traceable project state, risk decisions, and concrete deliverables.
 
 > 像一个项目经理一样，在飞书群里推动团队从讨论走向交付。
 
@@ -24,6 +24,18 @@ Build a multi-device collaborative assistant that connects:
 - Base: visible task, risk, artifact, and confirmation state.
 - Tasks: concrete execution items assigned to owners.
 - Chat Tab or lightweight H5: optional cockpit and flight recorder, not the main workflow.
+
+The MVP is not a generic chatbot, document generator, heavy project-management web app, or code agent. The first product loop is a Feishu-native project operations loop:
+
+```text
+Group chat
+  -> Flight plan
+  -> Human confirmation
+  -> Feishu tool execution
+  -> Project state
+  -> Risk decision
+  -> Delivery summary
+```
 
 ## Feishu Integration
 
@@ -50,6 +62,7 @@ Feishu IM
   -> Tool Orchestrator
   -> Feishu CLI / OpenAPI tools
   -> Docs / Group Announcement / Base / Tasks
+  -> Risk decision / Delivery summary
   -> Lightweight cockpit and flight recorder
 ```
 

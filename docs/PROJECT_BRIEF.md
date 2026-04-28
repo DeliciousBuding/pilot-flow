@@ -1,35 +1,44 @@
 # Project Brief
 
+## Positioning
+
+PilotFlow is a Feishu-native AI project operations officer.
+
+It does not replace the human project owner. It helps a team turn group-chat discussion into confirmed plans, executable tasks, traceable state, risk decisions, and delivery summaries inside Feishu.
+
 ## Problem
 
-Team work often starts from an IM conversation, then moves through document drafting, discussion, revisions, and finally a formal presentation. The current workflow requires repeated manual work and frequent context switching across applications.
+Team work often starts from an IM conversation, but the important project signals are scattered across messages: goals, commitments, owners, deadlines, risks, and materials. Current workflows require repeated manual work and frequent context switching across chat, documents, task lists, spreadsheets, announcements, and presentation materials.
 
 ## Solution
 
-PilotFlow uses an AI Agent as the primary workflow driver. The user gives natural language instructions from IM. The Agent understands intent, creates a plan, invokes Feishu tools, generates documents, turns the content into presentation material, and archives the final result.
+PilotFlow uses an AI Agent as the primary workflow driver. The user gives natural language instructions from IM. The Agent understands intent, creates a flight plan, asks for missing information, requests human confirmation, invokes Feishu tools, writes project artifacts, tracks risk, and sends a delivery summary back to the group.
 
 ## Design Principles
 
 - Agent-first: the Agent plans and executes the core workflow.
 - GUI-second: the GUI displays progress, confirmation points, and manual adjustment controls.
-- Feishu-native: use Feishu CLI and OpenAPI for real IM, Doc, Slides, Whiteboard, Drive, and Wiki operations.
+- Feishu-native: use Feishu CLI and OpenAPI for real IM, Cards, Docs, group announcements, Base, Tasks, and later Slides, Whiteboard, Drive, and Wiki operations.
 - Multi-device by default: desktop and mobile clients share task state and content state.
 - Modular scenes: each scene can be demoed independently and composed into larger flows.
+- Human-confirmed side effects: writing to project assets, creating tasks, updating announcements, and publishing risky changes must pass through a confirmation gate.
+- Traceable by default: every run records steps, tool calls, artifacts, confirmations, failures, and fallbacks.
 
 ## Scene Modules
 
 - Scene A: IM intent entry.
 - Scene B: task planning and decomposition.
-- Scene C: document or whiteboard generation and editing.
-- Scene D: slides or canvas generation, rehearsal, and revision.
-- Scene E: multi-device collaboration and consistency.
-- Scene F: summary, delivery, and archive.
+- Scene C: confirmation cards and human approval.
+- Scene D: Doc, Base, Task, and group announcement execution.
+- Scene E: risk decision and flight recorder.
+- Scene F: summary, delivery, archive, and optional presentation material.
 
 ## Demo Requirements
 
 - Show real-time two-way sync between mobile and desktop.
 - Trigger the main workflow from Feishu IM using natural language.
 - Show Agent-driven planning and tool execution.
-- Operate IM, document, and slides or free canvas in one demo.
+- Operate IM, Cards, Doc, Base or Task, and a project entry point in one demo.
 - Include at least one multi-scene composed workflow.
+- Keep Slides, Whiteboard, Calendar, Minutes, and Worker artifacts as later enhancements unless the core loop is already stable.
 
