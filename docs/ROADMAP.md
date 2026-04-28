@@ -12,9 +12,9 @@ Status after the latest implementation pass:
 
 - Phase 1 is effectively closed: the manual trigger can create real Feishu artifacts and return a traceable run.
 - Phase 2 should now prioritize stable Feishu-native product surfaces over heavier automation.
-- Card callback action protocol is now implemented locally, but live callback event wiring still depends on event subscription behavior and permissions. Text confirmation remains the fallback.
+- Card callback action protocol, bounded listener process, and callback-trigger bridge are implemented locally. The next risk is real Feishu button-click verification in the test group. Text confirmation remains the fallback.
 - Group announcement is still a risk area, so the near-term project-entry path is a pinned entry message that can later be upgraded to an announcement.
-- Base owner/deadline fallback, local Flight Recorder view, risk detection, a dry-run risk decision card, a pinned entry-message prototype, explicit Task assignee mapping, optional Contacts-based owner lookup, plan-validation fallback, and card callback action protocol are now implemented. The next product slice should move toward live callback event wiring, group announcement upgrade attempts, and demo hardening while keeping text confirmation, pinned entry fallback, and risk-card dry-run behavior.
+- Base owner/deadline fallback, local Flight Recorder view, risk detection, a dry-run risk decision card, a pinned entry-message prototype, explicit Task assignee mapping, optional Contacts-based owner lookup, plan-validation fallback, card callback action protocol, and a bounded card listener are now implemented. The next product slice should verify a real card button click, attempt group announcement upgrade, and harden the demo while keeping text confirmation, pinned entry fallback, and risk-card dry-run behavior.
 
 Main loop:
 
@@ -100,7 +100,8 @@ Work items:
 - [x] Design and send a project flight plan card.
 - [x] Add card buttons for confirm, edit, doc-only, cancel.
 - [x] Add local callback parser/handler for flight-plan and risk-card actions.
-- [ ] Wire live card callback events into the orchestrator.
+- [x] Add a bounded card callback event listener and callback-trigger bridge.
+- [ ] Verify a real Feishu card button click triggers the orchestrator in the test group.
 - [x] Implement text confirmation fallback when card callback is blocked.
 - [x] Add duplicate-run guard before more live demo repetitions.
 - [x] Create a Base template with fields:
@@ -188,7 +189,7 @@ Longer-term direction after competition MVP.
 
 ## Immediate Next Actions
 
-1. Wire live card callback events into the orchestrator; keep text confirmation as fallback.
+1. Verify real Feishu card button-click confirmation in the test group; keep text confirmation as fallback.
 2. Try full group announcement update only after confirming the API and permission path; keep pinned entry-message fallback as the default stable path.
 3. Prepare the first happy-path recording after a fresh rich Base table is created.
 4. Prepare risk-card callback persistence after live event wiring is verified.
@@ -210,7 +211,8 @@ Longer-term direction after competition MVP.
 - [x] Add text confirmation fallback.
 - [x] Add Base template setup command.
 - [x] Add card callback action protocol.
-- [ ] Add live card callback confirmation.
+- [x] Add bounded card listener and callback-trigger bridge.
+- [ ] Verify live card callback confirmation from a real Feishu button click.
 - [x] Add owner fallback text fields.
 - [x] Add Task assignee mapping with explicit owner/open_id map.
 - [x] Add automatic contact lookup for owner labels.

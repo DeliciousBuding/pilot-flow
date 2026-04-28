@@ -150,12 +150,12 @@ Detailed architecture: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 | Surface | Product role | MVP status |
 | --- | --- | --- |
 | IM | Main collaboration entry and summary channel | ✅ validated |
-| Cards | Flight plan, confirmation, risk decision | ✅ flight plan + risk decision prototypes, callback action protocol |
+| Cards | Flight plan, confirmation, risk decision | ✅ flight plan + risk decision prototypes, callback action protocol, bounded listener bridge |
 | Docs | Project brief and delivery documents | ✅ creation validated |
 | Base | Tasks, detected risks, artifacts, confirmations | ✅ rich fallback fields prototype |
 | Task | Concrete owner/deadline action items | ✅ creation validated, optional open_id/contact assignee mapping |
 | Pinned Entry / Announcement | Stable project entrance | ✅ pinned entry-message prototype, announcement planned |
-| Event subscription | `@PilotFlow` automatic trigger | 🟡 planned |
+| Event subscription | Card callback listener first, `@PilotFlow` automatic trigger later | 🟡 listener prototype; real button-click validation next |
 | Chat Tab / H5 | Lightweight cockpit and flight recorder | ✅ static recorder prototype |
 | Whiteboard / Calendar / Slides | Demo enhancement surfaces | ⏳ later |
 
@@ -187,7 +187,8 @@ PilotFlow is currently in **MVP prototype** stage. The first deliverable is a re
 | Flight Recorder static view | ✅ prototype |
 | Risk detection | ✅ prototype |
 | Risk decision card | ✅ dry-run prototype |
-| Live card callback confirmation | 🟡 event wiring next |
+| Card callback listener bridge | ✅ local tests passed |
+| Live card callback confirmation | 🟡 real Feishu button-click validation next |
 | Group announcement project entry | 🟡 planned upgrade |
 
 ## 🗺️ Roadmap Snapshot
@@ -244,6 +245,9 @@ npm run flight:recorder -- --input tmp/runs/latest-manual-run.jsonl
 npm run test:artifacts
 npm run test:plan
 npm run test:callback
+npm run test:listener
+npm run test:trigger
+npm run listen:cards -- --dry-run --max-events 1 --timeout 30s
 npm run test:card
 npm run test:guard
 npm run test:entry

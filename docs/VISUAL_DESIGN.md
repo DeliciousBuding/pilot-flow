@@ -44,7 +44,7 @@ Risk decision card:
 | Header | Risk level |
 | Context | Goal, source run, and risk overview |
 | Options | Accept risk, assign owner, change deadline, defer |
-| Result | Current prototype records the card action protocol and keeps text confirmation as fallback until live callbacks are wired |
+| Result | Current prototype records the card action protocol and keeps text confirmation as fallback until real button-click validation passes |
 
 ## Cockpit Layout
 

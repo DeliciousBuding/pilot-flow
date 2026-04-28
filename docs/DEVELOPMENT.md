@@ -102,7 +102,15 @@ npm run test:callback
 
 In live mode, `--send-plan-card` sends the flight plan card to the configured test group, then waits unless the confirmation phrase is also provided. Sending a live card is visible in Feishu, so use it only against the test group.
 
-The flight plan card now includes four action values: `confirm_takeoff`, `edit_plan`, `doc_only`, and `cancel`. `src/core/orchestrator/card-callback-handler.js` parses Feishu-style callback payloads and returns the next PilotFlow decision. Current `lark-cli event +subscribe --dry-run` works for constructing an event subscriber command, but live callback event wiring is not yet part of the main run loop.
+The flight plan card now includes four action values: `confirm_takeoff`, `edit_plan`, `doc_only`, and `cancel`. `src/core/orchestrator/card-callback-handler.js` parses Feishu-style callback payloads and returns the next PilotFlow decision. Current `lark-cli event +subscribe --dry-run` works for constructing an event subscriber command, and PilotFlow now has a bounded listener bridge; real Feishu button-click verification is still the next step.
+
+Listen for Feishu card callback events with a bounded local process:
+
+```bash
+npm run listen:cards -- --dry-run --max-events 1 --timeout 30s
+```
+
+`src/core/events/card-event-listener.js` wraps `lark-cli event +subscribe --event-types card.action.trigger`, parses callback payloads, and can trigger the orchestrator through `src/core/events/callback-run-trigger.js` when a flight-plan card is approved. The listener writes its own JSONL event log and supports `--max-events` / `--timeout` so test runs do not leave long-running processes behind. Code-level listener wiring is implemented; the next validation step is a real Feishu button click in the test group.
 
 Preview the project entry-message fallback:
 
@@ -179,6 +187,8 @@ Before running the confirmed live command, provide the target Feishu resources t
 | `PILOTFLOW_AUTO_LOOKUP_OWNER_CONTACT` | `true` or `1` to search Feishu Contacts when no explicit owner map matches |
 | `PILOTFLOW_TASK_ASSIGNEE_OPEN_ID` | optional default assignee `open_id` for the first created Task |
 | `PILOTFLOW_CONFIRMATION_TEXT` | must equal `确认起飞` for live writes |
+| `PILOTFLOW_LISTENER_MAX_EVENTS` | optional max event count for `listen:cards` |
+| `PILOTFLOW_LISTENER_TIMEOUT` | optional listener timeout such as `30s` or `2m` |
 
 ## Development Workflow
 
@@ -218,8 +228,11 @@ Implemented:
 
 - `src/config/runtime-config.js`
 - `src/demo/flight-recorder-view.js`
+- `src/demo/card-listener.js`
 - `src/demo/manual-trigger.js`
 - `src/demo/setup-feishu-targets.js`
+- `src/core/events/card-event-listener.js`
+- `src/core/events/callback-run-trigger.js`
 - `src/core/planner/project-init-planner.js`
 - `src/core/planner/plan-validator.js`
 - `src/core/orchestrator/run-orchestrator.js`
@@ -253,6 +266,8 @@ Implemented to date:
 - Feishu-native project flight plan card builder
 - optional `--send-plan-card` flow that can post the card and wait for text confirmation
 - callback action protocol and parser for flight-plan actions: confirm, edit, doc-only, cancel
+- bounded card event listener for `card.action.trigger`, with JSONL listener logs and `--max-events` / `--timeout`
+- callback-trigger bridge that can start the orchestrator from an approved flight-plan card callback
 - optional `--send-entry-message` fallback for a stable project entrance when group announcement is not available
 - optional `--pin-entry-message` flow that sends the project entry and pins it through `im.pins.create`
 - duplicate live-run guard with stable dedupe key, local ignored guard file, and explicit bypass
@@ -270,7 +285,7 @@ Implemented to date:
 
 Next implementation targets:
 
-- live card callback event wiring into the orchestrator
+- real Feishu card button-click verification in the test group
 - group announcement update attempt beyond the current pin-based entry path
 
 ## Validation Matrix
@@ -281,6 +296,7 @@ Next implementation targets:
 | Planner logic | `npm run check`, `npm run demo:manual` |
 | Plan validation fallback | `npm run test:plan`, `npm run test:orchestrator`, inspect `plan.validation_failed` |
 | Card callback action protocol | `npm run test:callback`, inspect `pilotflow_action` values in card JSONL |
+| Card callback listener | `npm run test:listener`, `npm run test:trigger`, `npm run listen:cards -- --dry-run --max-events 1 --timeout 30s` |
 | Orchestrator logic | `npm run check`, `npm run demo:manual`, inspect JSONL |
 | Artifact normalization | `npm run test:artifacts`, `npm run demo:manual`, inspect final artifacts |
 | Flight plan card | `npm run test:card`, `npm run demo:manual -- --send-plan-card --no-auto-confirm` |
