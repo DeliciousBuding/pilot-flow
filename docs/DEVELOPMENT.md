@@ -109,6 +109,15 @@ npm run demo:manual -- --send-entry-message
 
 In live mode, `--send-entry-message` sends a stable project entrance after Doc/Base/Task artifacts are created. It is the current fallback when group announcement update is blocked or not yet wired.
 
+Preview the risk decision card:
+
+```bash
+npm run demo:manual -- --send-risk-card
+npm run test:risk
+```
+
+The risk detector runs in every project-init run. `--send-risk-card` adds an optional card send after Doc/Base/Task artifacts are created; without the flag, the run still records `risk.detected` and skips the risk-card step.
+
 Render a local Flight Recorder view from a JSONL run log:
 
 ```bash
@@ -132,6 +141,7 @@ Before running the confirmed live command, provide the target Feishu resources t
 | `PILOTFLOW_LARK_PROFILE` | lark-cli profile, default `pilotflow-contest` |
 | `PILOTFLOW_SEND_PLAN_CARD` | `true` or `1` to send the flight plan card before confirmation |
 | `PILOTFLOW_SEND_ENTRY_MESSAGE` | `true` or `1` to send the project entry-message fallback after artifacts are created |
+| `PILOTFLOW_SEND_RISK_CARD` | `true` or `1` to send the risk decision card after state rows are created |
 | `PILOTFLOW_DEDUPE_KEY` | optional stable project key for live duplicate-run protection |
 | `PILOTFLOW_ALLOW_DUPLICATE_RUN` | `true` or `1` to intentionally bypass duplicate-run protection |
 | `PILOTFLOW_DISABLE_DUPLICATE_GUARD` | `true` or `1` to disable the local guard |
@@ -188,6 +198,8 @@ Implemented:
 - `src/core/orchestrator/entry-message-builder.js`
 - `src/core/orchestrator/flight-plan-card.js`
 - `src/core/orchestrator/project-state-builder.js`
+- `src/core/orchestrator/risk-decision-card.js`
+- `src/core/orchestrator/risk-detector.js`
 - `src/core/orchestrator/summary-builder.js`
 - `src/core/recorder/jsonl-recorder.js`
 - `src/tools/feishu/artifact-normalizer.js`
@@ -213,6 +225,9 @@ Implemented in the current Phase 1 slice:
 - shared Project State template with owner/deadline/risk/source/url fallback fields
 - Task description text fallback for owner when Feishu assignee mapping is not ready
 - static Flight Recorder HTML view over JSONL run logs
+- risk detection over planner risks, missing project facts, non-concrete deadlines, and owner text fallbacks
+- optional `--send-risk-card` flow that sends or dry-runs a Feishu-native risk decision card
+- Base risk rows now use the same detected risk set shown in the run output and risk card
 - artifact-aware final IM summary with Doc URL, Base record IDs, Task URL, and next-step prompt
 - demo snapshot fixtures for success and guarded failure paths
 
@@ -233,6 +248,7 @@ Next implementation targets:
 | Duplicate-run guard | `npm run test:guard`, live missing-config check, inspect guard events in JSONL |
 | Entry message fallback | `npm run test:entry`, `npm run demo:manual -- --send-entry-message`, inspect entry artifact |
 | Flight Recorder view | `npm run test:flight`, `npm run flight:recorder -- --input <run.jsonl>`, inspect generated HTML |
+| Risk detection/card | `npm run test:risk`, `npm run demo:manual -- --send-risk-card`, inspect `risk.detected` and card artifact |
 | Project state rows | `npm run test:state`, `npm run setup:feishu -- --dry-run`, inspect Base fields |
 | Summary text | `npm run test:summary`, `npm run demo:manual`, inspect final IM tool input |
 | Feishu tool wrapper | dry-run command, then live test against `pilotflow-contest` |

@@ -26,6 +26,7 @@ try {
     confirmationText: config.confirmation.text,
     sendPlanCard: config.planCard.send,
     sendEntryMessage: config.entryMessage.send,
+    sendRiskCard: config.riskCard.send,
     dedupeKey: config.duplicateGuard.key
   });
 

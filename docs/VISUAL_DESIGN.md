@@ -41,9 +41,9 @@ Risk decision card:
 | Region | Content |
 | --- | --- |
 | Header | Risk level |
-| Context | Source run and affected task |
+| Context | Goal, source run, and risk overview |
 | Options | Accept risk, assign owner, change deadline, defer |
-| Result | Update risk state and final summary |
+| Result | Current prototype records the card and keeps text confirmation as fallback until callbacks are wired |
 
 ## Cockpit Layout
 

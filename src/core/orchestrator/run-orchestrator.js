@@ -6,6 +6,8 @@ import { buildDeliverySummaryText } from "./summary-builder.js";
 import { buildFlightPlanCard } from "./flight-plan-card.js";
 import { buildProjectEntryMessageText } from "./entry-message-builder.js";
 import { buildProjectInitDedupeKey, duplicateGuardSummary, DuplicateRunGuard } from "./duplicate-run-guard.js";
+import { buildRiskDecisionCard } from "./risk-decision-card.js";
+import { detectProjectRisks, summarizeRiskDecision } from "./risk-detector.js";
 import {
   buildProjectStateRows,
   firstTaskFallbackOwner,
@@ -28,13 +30,17 @@ export class RunOrchestrator {
 
   async startProjectInit(
     inputText,
-    { autoConfirm = true, confirmationText = "", sendPlanCard = false, sendEntryMessage = false, dedupeKey = "" } = {}
+    { autoConfirm = true, confirmationText = "", sendPlanCard = false, sendEntryMessage = false, sendRiskCard = false, dedupeKey = "" } = {}
   ) {
     const runId = `run-${randomUUID()}`;
     await this.recorder.record({ run_id: runId, event: "run.created", intent: "project_init", mode: this.mode });
 
     const plan = createProjectInitPlan(inputText);
     await this.recorder.record({ run_id: runId, event: "plan.generated", plan });
+
+    const risks = detectProjectRisks(plan);
+    const riskDecision = summarizeRiskDecision(risks);
+    await this.recorder.record({ run_id: runId, event: "risk.detected", risks, risk_decision: riskDecision });
 
     await this.recorder.record({
       run_id: runId,
@@ -43,7 +49,7 @@ export class RunOrchestrator {
     });
 
     const artifacts = [];
-    const plannedTools = plannedToolsForRun({ autoConfirm, sendPlanCard, sendEntryMessage });
+    const plannedTools = plannedToolsForRun({ autoConfirm, sendPlanCard, sendEntryMessage, sendRiskCard });
     if (plannedTools.length > 0) {
       try {
         this.tools.preflight(plannedTools);
@@ -93,7 +99,7 @@ export class RunOrchestrator {
         expected_confirmation_text: "确认起飞",
         received_confirmation_text: confirmationText || null
       });
-      return { runId, status: "waiting_confirmation", plan, artifacts, duplicate_guard: guardState };
+      return { runId, status: "waiting_confirmation", plan, risks, risk_decision: riskDecision, artifacts, duplicate_guard: guardState };
     }
 
     const approved = {
@@ -117,7 +123,7 @@ export class RunOrchestrator {
         ...(await this.callTool(runId, 2, "step-state", "base.write", {
           body: {
             fields: PROJECT_STATE_FIELDS,
-            rows: buildProjectStateRows(plan, { runId, artifacts })
+            rows: buildProjectStateRows(plan, { runId, artifacts, risks })
           }
         }))
       );
@@ -130,10 +136,21 @@ export class RunOrchestrator {
         }))
       );
 
+      if (sendRiskCard) {
+        artifacts.push(
+          ...(await this.callTool(runId, 4, "step-risk", "card.send", {
+            title: "PilotFlow 风险裁决卡",
+            card: buildRiskDecisionCard({ runId, plan, risks, summary: riskDecision })
+          }))
+        );
+      } else {
+        await this.skipStep(runId, "step-risk", "risk decision card disabled");
+      }
+
       if (sendEntryMessage) {
         const entryMessageText = buildProjectEntryMessageText({ runId, plan, artifacts });
         artifacts.push(
-          ...(await this.callTool(runId, 4, "step-entry", "entry.send", {
+          ...(await this.callTool(runId, 5, "step-entry", "entry.send", {
             text: entryMessageText
           }))
         );
@@ -143,7 +160,7 @@ export class RunOrchestrator {
 
       const summaryText = buildDeliverySummaryText({ runId, plan, artifacts });
       artifacts.push(
-        ...(await this.callTool(runId, 5, "step-summary", "im.send", {
+        ...(await this.callTool(runId, 6, "step-summary", "im.send", {
           text: summaryText
         }))
       );
@@ -169,7 +186,7 @@ export class RunOrchestrator {
     await this.duplicateGuard.mark({ key: guardState.key, runId, status: "completed", artifacts });
     await this.recorder.record({ run_id: runId, event: "run.completed" });
 
-    return { runId, status: "completed", plan, artifacts, duplicate_guard: guardState };
+    return { runId, status: "completed", plan, risks, risk_decision: riskDecision, artifacts, duplicate_guard: guardState };
   }
 
   async callTool(runId, sequence, stepId, tool, input) {
@@ -247,12 +264,12 @@ export class RunOrchestrator {
   }
 }
 
-function toolsForRun(sendEntryMessage) {
-  return sendEntryMessage ? [...SIDE_EFFECT_TOOLS, "entry.send"] : SIDE_EFFECT_TOOLS;
+function toolsForRun({ sendEntryMessage, sendRiskCard }) {
+  return [...SIDE_EFFECT_TOOLS, ...(sendEntryMessage ? ["entry.send"] : []), ...(sendRiskCard ? ["card.send"] : [])];
 }
 
-function plannedToolsForRun({ autoConfirm, sendPlanCard, sendEntryMessage }) {
-  return [...(sendPlanCard ? ["card.send"] : []), ...(autoConfirm ? toolsForRun(sendEntryMessage) : [])];
+function plannedToolsForRun({ autoConfirm, sendPlanCard, sendEntryMessage, sendRiskCard }) {
+  return [...(sendPlanCard ? ["card.send"] : []), ...(autoConfirm ? toolsForRun({ sendEntryMessage, sendRiskCard }) : [])];
 }
 
 function shouldGuardRun({ autoConfirm, sendPlanCard }) {

@@ -150,9 +150,9 @@ Detailed architecture: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 | Surface | Product role | MVP status |
 | --- | --- | --- |
 | IM | Main collaboration entry and summary channel | ✅ validated |
-| Cards | Flight plan, confirmation, risk decision | ✅ static card validated |
+| Cards | Flight plan, confirmation, risk decision | ✅ flight plan + risk decision prototypes |
 | Docs | Project brief and delivery documents | ✅ creation validated |
-| Base | Tasks, risks, artifacts, confirmations | ✅ rich fallback fields prototype |
+| Base | Tasks, detected risks, artifacts, confirmations | ✅ rich fallback fields prototype |
 | Task | Concrete owner/deadline action items | ✅ creation validated, text owner fallback |
 | Group Announcement | Stable project entrance | 🟡 entry-message fallback prototype |
 | Event subscription | `@PilotFlow` automatic trigger | 🟡 planned |
@@ -180,6 +180,8 @@ PilotFlow is currently in **MVP prototype** stage. The first deliverable is a re
 | Artifact-aware final summary | ✅ prototype |
 | Duplicate live-run guard | ✅ prototype |
 | Flight Recorder static view | ✅ prototype |
+| Risk detection | ✅ prototype |
+| Risk decision card | ✅ dry-run prototype |
 | Card callback confirmation | 🟡 next |
 | Group announcement project entry | 🟡 next |
 
@@ -198,8 +200,8 @@ gantt
     Base and Task project state          :done,    b3, 2026-04-28, 1d
     Artifact-aware summary               :active,  b4, 2026-04-28, 1d
     section Demo
-    Flight Recorder cockpit              :         c1, 2026-05-03, 3d
-    Risk decision demo                   :         c2, 2026-05-04, 2d
+    Risk detection and decision card     :done,    c1, 2026-04-28, 1d
+    Flight Recorder cockpit              :         c2, 2026-05-03, 3d
     Demo hardening and recording         :         c3, 2026-05-06, 2d
 ```
 
@@ -227,12 +229,14 @@ npm run check
 npm run demo:manual
 npm run demo:manual -- --send-plan-card --no-auto-confirm
 npm run demo:manual -- --send-entry-message
+npm run demo:manual -- --send-risk-card
 npm run flight:recorder -- --input tmp/runs/latest-manual-run.jsonl
 npm run test:artifacts
 npm run test:card
 npm run test:guard
 npm run test:entry
 npm run test:flight
+npm run test:risk
 npm run test:state
 npm run test:summary
 ```

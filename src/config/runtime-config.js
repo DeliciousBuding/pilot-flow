@@ -26,6 +26,9 @@ export function loadRuntimeConfig(argv = process.argv.slice(2), env = process.en
     entryMessage: {
       send: booleanValue(args["send-entry-message"]) || booleanEnv(env.PILOTFLOW_SEND_ENTRY_MESSAGE)
     },
+    riskCard: {
+      send: booleanValue(args["send-risk-card"]) || booleanEnv(env.PILOTFLOW_SEND_RISK_CARD)
+    },
     duplicateGuard: {
       enabled: mode === "live" && !booleanValue(args["disable-duplicate-guard"]) && !booleanEnv(env.PILOTFLOW_DISABLE_DUPLICATE_GUARD),
       allowDuplicate: booleanValue(args["allow-duplicate-run"]) || booleanEnv(env.PILOTFLOW_ALLOW_DUPLICATE_RUN),
@@ -100,6 +103,7 @@ Options:
   --live                    Execute lark-cli commands against Feishu.
   --send-plan-card          Send or dry-run the project flight plan card before confirmation.
   --send-entry-message      Send or dry-run a project entry message after Doc/Base/Task artifacts are created.
+  --send-risk-card          Send or dry-run a risk decision card after state rows are created.
   --dedupe-key <key>        Optional stable key for live duplicate-run protection.
   --allow-duplicate-run     Bypass duplicate-run protection for intentional repeated live writes.
   --disable-duplicate-guard Disable live duplicate-run protection.

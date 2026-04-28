@@ -33,6 +33,10 @@ const plan = {
 const rows = buildProjectStateRows(plan, {
   runId: "run-state",
   sourceMessage: "om_source",
+  risks: [
+    { title: "missing Feishu group scope", level: "medium", status: "open", owner: "Feishu Integration Owner" },
+    { title: "derived owner text fallback", level: "medium", status: "open", owner: "Integration Lead" }
+  ],
   artifacts: [
     {
       type: "doc",
@@ -43,14 +47,14 @@ const rows = buildProjectStateRows(plan, {
   ]
 });
 
-assert.equal(rows.length, 5);
+assert.equal(rows.length, 6);
 assert.deepEqual(rows[0], ["task", "Project brief", "Product Owner", "2026-05-02", "todo", "", "run-state", "om_source", ""]);
 assert.deepEqual(rows[1], ["task", "task board", "Agent Engineer", "2026-05-02", "todo", "", "run-state", "om_source", ""]);
 assert.deepEqual(rows[2], ["task", "risk list", "Product Owner", "2026-05-02", "todo", "", "run-state", "om_source", ""]);
 assert.deepEqual(rows[3], [
   "risk",
   "missing Feishu group scope",
-  "Product Owner",
+  "Feishu Integration Owner",
   "2026-05-02",
   "open",
   "medium",
@@ -59,6 +63,17 @@ assert.deepEqual(rows[3], [
   ""
 ]);
 assert.deepEqual(rows[4], [
+  "risk",
+  "derived owner text fallback",
+  "Integration Lead",
+  "2026-05-02",
+  "open",
+  "medium",
+  "run-state",
+  "om_source",
+  ""
+]);
+assert.deepEqual(rows[5], [
   "artifact",
   "Project brief document",
   "Product Owner",

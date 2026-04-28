@@ -63,6 +63,8 @@ Expected flow:
 | Base owner/deadline fallback | Store owner, due date, risk level, source, and URL as text fields | dry-run prototype implemented |
 | Task creation | Create first action item | live validated with returned Task URL; text owner fallback in description |
 | Project entry message | Stable project entrance fallback | dry-run prototype implemented |
+| Risk detection | Enrich planner risks with derived operational risks | prototype implemented |
+| Risk decision card | Present risk summary and decision actions in Feishu card format | dry-run prototype implemented |
 | IM summary | Send final summary to group | live validated; artifact-aware text summary implemented |
 | Run log | JSONL trace | implemented with step status and artifact events |
 | Duplicate-run guard | Prevent accidental repeated live writes | local prototype implemented |
@@ -76,7 +78,7 @@ Expected flow:
 - Base template.
 - Task owner/deadline mapping.
 - Group announcement project entry.
-- Risk detection and decision card.
+- Risk decision persistence after card callbacks are wired.
 - Flight Recorder cockpit.
 
 ## P2 Features
@@ -106,5 +108,6 @@ Expected flow:
 | Feishu-native proof | IM, Card, Doc, Base or Task are visible in Feishu |
 | Human control | At least one confirmation before writes |
 | Operational state | Base rows include fallback owner, due date, risk level, source run, source message, and URL fields |
+| Risk handling | Detected risks appear consistently in run output, Base rows, and risk decision card |
 | Duplicate safety | Repeating a live project-init run is blocked unless explicitly bypassed |
 | Recovery | At least one fallback path is demonstrated |

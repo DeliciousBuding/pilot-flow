@@ -15,7 +15,7 @@ export const PROJECT_STATE_FIELD_DEFINITIONS = PROJECT_STATE_FIELDS.map((name) =
   type: "text"
 }));
 
-export function buildProjectStateRows(plan, { runId, artifacts = [], sourceMessage = "manual-trigger" } = {}) {
+export function buildProjectStateRows(plan, { runId, artifacts = [], risks = plan.risks || [], sourceMessage = "manual-trigger" } = {}) {
   const doc = artifacts.find((artifact) => artifact.type === "doc");
   const dueDate = normalizeDueDateText(plan.deadline);
 
@@ -33,11 +33,11 @@ export function buildProjectStateRows(plan, { runId, artifacts = [], sourceMessa
     })
   );
 
-  const riskRows = plan.risks.map((risk, index) =>
+  const riskRows = risks.map((risk, index) =>
     rowToArray({
       type: "risk",
       title: risk.title,
-      owner: ownerFallback(plan, index),
+      owner: risk.owner || ownerFallback(plan, index),
       due_date: dueDate,
       status: risk.status || "open",
       risk_level: risk.level || "medium",
