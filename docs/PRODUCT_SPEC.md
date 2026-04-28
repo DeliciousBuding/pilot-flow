@@ -57,8 +57,9 @@ Expected flow:
 | Manual trigger | Start from local command | implemented |
 | Project plan JSON | Extract goal, members, deliverables, deadline, risks | implemented for fixture |
 | Plan validation fallback | Stop unsafe runs when planner output is malformed | prototype implemented |
-| Flight plan card | Show plan before write side effects | dry-run prototype implemented |
+| Flight plan card | Show plan before write side effects | dry-run prototype with confirm/edit/doc-only/cancel actions |
 | Confirmation gate | Require approval before writes | dry-run auto-confirm, live text fallback implemented |
+| Card callback readiness | Parse card action callbacks into PilotFlow decisions | local handler prototype implemented; live event wiring pending |
 | Doc creation | Create project brief | live validated with returned Doc URL |
 | Base write | Store project state | live validated with returned record IDs |
 | Base owner/deadline fallback | Store owner, due date, risk level, source, and URL as text fields | dry-run prototype implemented |
@@ -77,7 +78,7 @@ Expected flow:
 ## P1 Features
 
 - IM event trigger.
-- Interactive card confirmation.
+- Live interactive card confirmation.
 - Card update after confirmation.
 - Base template.
 - Group announcement project entry beyond pinned-entry fallback.

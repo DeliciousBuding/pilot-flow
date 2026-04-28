@@ -22,11 +22,20 @@ export function buildFlightPlanCard({ runId, plan, confirmationText = DEFAULT_CO
       markdownBlock(`**风险**\n${formatRiskList(plan.risks)}`),
       divider(),
       {
+        tag: "action",
+        actions: [
+          actionButton("确认起飞", "confirm_takeoff", "primary", runId),
+          actionButton("编辑计划", "edit_plan", "default", runId),
+          actionButton("仅生成文档", "doc_only", "default", runId),
+          actionButton("取消", "cancel", "danger", runId)
+        ]
+      },
+      {
         tag: "note",
         elements: [
           {
             tag: "plain_text",
-            content: `回复“${confirmationText}”后，PilotFlow 将创建 Doc、Base/Task 和交付总结。`
+            content: `按钮回调接入前，也可以回复“${confirmationText}”继续。`
           }
         ]
       }
@@ -46,6 +55,22 @@ function markdownBlock(content) {
 
 function divider() {
   return { tag: "hr" };
+}
+
+function actionButton(text, action, type, runId) {
+  return {
+    tag: "button",
+    text: {
+      tag: "plain_text",
+      content: text
+    },
+    type,
+    value: {
+      pilotflow_card: "flight_plan",
+      pilotflow_run_id: runId,
+      pilotflow_action: action
+    }
+  };
 }
 
 function formatList(items = [], fallback) {

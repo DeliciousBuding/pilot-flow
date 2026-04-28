@@ -24,5 +24,10 @@ assert.match(content, /Project brief/);
 assert.match(content, /2026-05-02/);
 assert.match(content, /card callback delay/);
 assert.match(content, /确认起飞/);
+assert.match(content, /confirm_takeoff/);
+assert.match(content, /edit_plan/);
+assert.match(content, /doc_only/);
+assert.match(content, /cancel/);
+assert.match(content, /flight_plan/);
 
 console.log("flight plan card tests passed");

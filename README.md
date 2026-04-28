@@ -150,7 +150,7 @@ Detailed architecture: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 | Surface | Product role | MVP status |
 | --- | --- | --- |
 | IM | Main collaboration entry and summary channel | ✅ validated |
-| Cards | Flight plan, confirmation, risk decision | ✅ flight plan + risk decision prototypes |
+| Cards | Flight plan, confirmation, risk decision | ✅ flight plan + risk decision prototypes, callback action protocol |
 | Docs | Project brief and delivery documents | ✅ creation validated |
 | Base | Tasks, detected risks, artifacts, confirmations | ✅ rich fallback fields prototype |
 | Task | Concrete owner/deadline action items | ✅ creation validated, optional open_id/contact assignee mapping |
@@ -179,6 +179,7 @@ PilotFlow is currently in **MVP prototype** stage. The first deliverable is a re
 | Local Flight Recorder | ✅ prototype |
 | Real one-command Feishu run | ✅ validated |
 | Project flight plan card | ✅ dry-run prototype |
+| Card button action protocol | ✅ local handler prototype |
 | Project entry message fallback | ✅ prototype |
 | Pinned project entry message | ✅ dry-run prototype |
 | Artifact-aware final summary | ✅ prototype |
@@ -186,7 +187,7 @@ PilotFlow is currently in **MVP prototype** stage. The first deliverable is a re
 | Flight Recorder static view | ✅ prototype |
 | Risk detection | ✅ prototype |
 | Risk decision card | ✅ dry-run prototype |
-| Card callback confirmation | 🟡 next |
+| Live card callback confirmation | 🟡 event wiring next |
 | Group announcement project entry | 🟡 planned upgrade |
 
 ## 🗺️ Roadmap Snapshot
@@ -206,8 +207,9 @@ gantt
     Artifact-aware summary               :done,    b5, 2026-04-28, 1d
     section Demo
     Risk detection and decision card     :done,    c1, 2026-04-28, 1d
-    Flight Recorder cockpit              :         c2, 2026-05-03, 3d
-    Demo hardening and recording         :         c3, 2026-05-06, 2d
+    Card callback action protocol        :done,    c2, 2026-04-28, 1d
+    Flight Recorder cockpit              :         c3, 2026-05-03, 3d
+    Demo hardening and recording         :         c4, 2026-05-06, 2d
 ```
 
 Full roadmap: [docs/ROADMAP.md](docs/ROADMAP.md).
@@ -241,6 +243,7 @@ npm run demo:manual -- --auto-lookup-owner-contact
 npm run flight:recorder -- --input tmp/runs/latest-manual-run.jsonl
 npm run test:artifacts
 npm run test:plan
+npm run test:callback
 npm run test:card
 npm run test:guard
 npm run test:entry

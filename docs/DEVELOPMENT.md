@@ -97,9 +97,12 @@ Preview the Feishu-native flight plan card without continuing into side effects:
 
 ```bash
 npm run demo:manual -- --send-plan-card --no-auto-confirm
+npm run test:callback
 ```
 
 In live mode, `--send-plan-card` sends the flight plan card to the configured test group, then waits unless the confirmation phrase is also provided. Sending a live card is visible in Feishu, so use it only against the test group.
+
+The flight plan card now includes four action values: `confirm_takeoff`, `edit_plan`, `doc_only`, and `cancel`. `src/core/orchestrator/card-callback-handler.js` parses Feishu-style callback payloads and returns the next PilotFlow decision. Current `lark-cli event +subscribe --dry-run` works for constructing an event subscriber command, but live callback event wiring is not yet part of the main run loop.
 
 Preview the project entry-message fallback:
 
@@ -220,6 +223,7 @@ Implemented:
 - `src/core/planner/project-init-planner.js`
 - `src/core/planner/plan-validator.js`
 - `src/core/orchestrator/run-orchestrator.js`
+- `src/core/orchestrator/card-callback-handler.js`
 - `src/core/orchestrator/contact-owner-resolver.js`
 - `src/core/orchestrator/duplicate-run-guard.js`
 - `src/core/orchestrator/entry-message-builder.js`
@@ -248,6 +252,7 @@ Implemented to date:
 - live extraction of Doc URL, Base record IDs, Task URL, IM message ID, and run log artifact
 - Feishu-native project flight plan card builder
 - optional `--send-plan-card` flow that can post the card and wait for text confirmation
+- callback action protocol and parser for flight-plan actions: confirm, edit, doc-only, cancel
 - optional `--send-entry-message` fallback for a stable project entrance when group announcement is not available
 - optional `--pin-entry-message` flow that sends the project entry and pins it through `im.pins.create`
 - duplicate live-run guard with stable dedupe key, local ignored guard file, and explicit bypass
@@ -258,13 +263,14 @@ Implemented to date:
 - static Flight Recorder HTML view over JSONL run logs
 - risk detection over planner risks, missing project facts, non-concrete deadlines, and owner text fallbacks
 - optional `--send-risk-card` flow that sends or dry-runs a Feishu-native risk decision card
+- callback action protocol and parser for risk decisions: assign owner, adjust deadline, accept risk, defer
 - Base risk rows now use the same detected risk set shown in the run output and risk card
 - artifact-aware final IM summary with Doc URL, Base record IDs, Task URL, and next-step prompt
 - demo snapshot fixtures for success and guarded failure paths
 
 Next implementation targets:
 
-- card callback confirmation
+- live card callback event wiring into the orchestrator
 - group announcement update attempt beyond the current pin-based entry path
 
 ## Validation Matrix
@@ -274,6 +280,7 @@ Next implementation targets:
 | README/docs only | `git diff --check` |
 | Planner logic | `npm run check`, `npm run demo:manual` |
 | Plan validation fallback | `npm run test:plan`, `npm run test:orchestrator`, inspect `plan.validation_failed` |
+| Card callback action protocol | `npm run test:callback`, inspect `pilotflow_action` values in card JSONL |
 | Orchestrator logic | `npm run check`, `npm run demo:manual`, inspect JSONL |
 | Artifact normalization | `npm run test:artifacts`, `npm run demo:manual`, inspect final artifacts |
 | Flight plan card | `npm run test:card`, `npm run demo:manual -- --send-plan-card --no-auto-confirm` |

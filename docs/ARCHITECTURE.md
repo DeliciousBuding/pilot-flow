@@ -35,7 +35,7 @@ flowchart TB
 | --- | --- | --- |
 | Trigger | Starts a run from manual input now, IM event later | manual trigger implemented |
 | Planner | Converts input into project plan JSON | fixed demo planner implemented |
-| Confirmation Gate | Stops side effects until human approval | flight plan card, dry-run auto-confirm, and live text fallback implemented |
+| Confirmation Gate | Stops side effects until human approval | flight plan card, dry-run auto-confirm, live text fallback, and callback action protocol implemented |
 | Duplicate Run Guard | Blocks accidental repeated live runs for the same project target | local guard file implemented under `tmp/run-guard/` |
 | Orchestrator | Owns run lifecycle and tool sequence | Doc/Base/Task/risk/entry/pin/IM sequence implemented with artifact-aware messages and state rows |
 | Feishu Tool Executor | Converts tool calls into `lark-cli` commands | dry-run and live-capable command runner implemented |
@@ -83,7 +83,9 @@ The risk detector runs immediately after the plan is generated. It preserves pla
 
 Task assignee resolution runs before `task.create`. Planner member labels remain human-readable, while `PILOTFLOW_OWNER_OPEN_ID_MAP_JSON` can map those labels to Feishu `open_id` values. If no explicit map matches and `PILOTFLOW_AUTO_LOOKUP_OWNER_CONTACT` is enabled, PilotFlow performs a read-only `contact +search-user` lookup and assigns the first task only when the result is exact or unambiguous. If lookup is blocked or ambiguous, PilotFlow keeps the text owner fallback in the task description and run trace. The priority order is explicit owner map, optional contact lookup, optional default assignee, then text fallback.
 
-The project flight plan card is generated before side effects and can be sent with `--send-plan-card`. The risk decision card is generated after Doc/Base/Task writes and can be sent with `--send-risk-card`. The project entry message is generated after Doc, Base, and Task calls complete and can be sent with `--send-entry-message` as the current fallback for a stable group entrance. `--pin-entry-message` sends that entry message and then calls `im.pins.create` to pin it in the target chat, giving the demo a Feishu-native stable entry before a full group announcement path is wired. The final IM summary is generated afterward, so the group message can include the created Doc URL, Base record IDs, Task URL, project entry state, run ID, and next-step prompt.
+The project flight plan card is generated before side effects and can be sent with `--send-plan-card`. Its buttons carry a stable `pilotflow_card`, `pilotflow_run_id`, and `pilotflow_action` value for confirm, edit, doc-only, and cancel decisions. The risk decision card is generated after Doc/Base/Task writes and can be sent with `--send-risk-card`; its buttons use the same callback value convention for owner, deadline, accept, and defer decisions. `card-callback-handler.js` can parse Feishu-style callback payloads and return PilotFlow decisions, but live event wiring still remains a separate step.
+
+The project entry message is generated after Doc, Base, and Task calls complete and can be sent with `--send-entry-message` as the current fallback for a stable group entrance. `--pin-entry-message` sends that entry message and then calls `im.pins.create` to pin it in the target chat, giving the demo a Feishu-native stable entry before a full group announcement path is wired. The final IM summary is generated afterward, so the group message can include the created Doc URL, Base record IDs, Task URL, project entry state, run ID, and next-step prompt.
 
 The duplicate-run guard runs after live target preflight and before Feishu side effects. It computes a stable project-init key from normalized input, plan shape, profile, and hashed targets. The guard file lives in ignored local storage by default, so it protects live demos on the operator machine without publishing target IDs or secrets.
 

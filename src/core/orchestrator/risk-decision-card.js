@@ -20,10 +20,10 @@ export function buildRiskDecisionCard({ runId, plan, risks, summary }) {
       {
         tag: "action",
         actions: [
-          decisionButton("确认负责人", "assign_owner", "primary"),
-          decisionButton("调整截止时间", "adjust_deadline", "default"),
-          decisionButton("接受并跟踪", "accept_risk", "default"),
-          decisionButton("暂缓推进", "defer", "danger")
+          decisionButton("确认负责人", "assign_owner", "primary", runId),
+          decisionButton("调整截止时间", "adjust_deadline", "default", runId),
+          decisionButton("接受并跟踪", "accept_risk", "default", runId),
+          decisionButton("暂缓推进", "defer", "danger", runId)
         ]
       },
       {
@@ -53,7 +53,7 @@ function divider() {
   return { tag: "hr" };
 }
 
-function decisionButton(text, action, type) {
+function decisionButton(text, action, type, runId) {
   return {
     tag: "button",
     text: {
@@ -62,6 +62,8 @@ function decisionButton(text, action, type) {
     },
     type,
     value: {
+      pilotflow_card: "risk_decision",
+      pilotflow_run_id: runId,
       pilotflow_action: action
     }
   };

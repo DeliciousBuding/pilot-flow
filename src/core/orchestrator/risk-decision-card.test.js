@@ -24,6 +24,8 @@ assert.match(content, /Launch PilotFlow MVP/);
 assert.match(content, /No project members were captured/);
 assert.match(content, /确认负责人/);
 assert.match(content, /adjust_deadline/);
+assert.match(content, /risk_decision/);
+assert.match(content, /run-risk/);
 assert.match(content, /文本确认/);
 
 console.log("risk decision card tests passed");
