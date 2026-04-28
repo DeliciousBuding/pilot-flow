@@ -152,4 +152,22 @@ assert.deepEqual(
   ]
 );
 
+assert.deepEqual(
+  normalizeFeishuArtifacts(
+    "announcement.update",
+    { title: "PilotFlow group announcement", revision: "0", html: "<p>entry</p>" },
+    { dry_run: true },
+    { runId }
+  ),
+  [
+    {
+      id: "announcement-run-test",
+      type: "announcement",
+      title: "PilotFlow group announcement",
+      status: "planned",
+      revision: "0"
+    }
+  ]
+);
+
 console.log("artifact normalizer tests passed");

@@ -37,12 +37,12 @@ flowchart TB
 | Planner | Converts input into project plan JSON | fixed demo planner implemented |
 | Confirmation Gate | Stops side effects until human approval | flight plan card, dry-run auto-confirm, live text fallback, callback action protocol, and bounded callback listener implemented |
 | Duplicate Run Guard | Blocks accidental repeated live runs for the same project target | local guard file implemented under `tmp/run-guard/` |
-| Orchestrator | Owns run lifecycle and tool sequence | Doc/Base/Task/risk/entry/pin/IM sequence implemented with artifact-aware messages and state rows |
-| Feishu Tool Executor | Converts tool calls into `lark-cli` commands | dry-run and live-capable command runner implemented |
+| Orchestrator | Owns run lifecycle and tool sequence | Doc/Base/Task/risk/entry/announcement/pin/IM sequence implemented with artifact-aware messages and state rows |
+| Feishu Tool Executor | Converts tool calls into `lark-cli` commands | dry-run and live-capable command runner implemented with short Feishu-safe idempotency keys |
 | Flight Recorder | Records events, tool calls, artifacts, failures | JSONL with step status and artifact events implemented |
 | Risk Engine | Enriches planner risks and creates a decision summary | initial detector and risk decision card implemented |
 | Cockpit | Shows run state and replay | static Flight Recorder HTML view implemented |
-| Card Event Listener | Streams Feishu card callbacks and triggers approved runs | code-level listener and callback-trigger bridge implemented; real button-click validation pending |
+| Card Event Listener | Streams Feishu card callbacks and triggers approved runs | code-level listener and callback-trigger bridge implemented; live listener connected but callback delivery still pending |
 
 ## Run State
 
@@ -73,10 +73,10 @@ The current schemas live in `src/schemas`.
 | `Step` | Unit of planned work |
 | `ToolCall` | One call to a Feishu or local tool |
 | `Confirmation` | Human approval gate |
-| `Artifact` | Created Doc, Task, Base record, card, entry message, pinned message, summary, or run log |
+| `Artifact` | Created Doc, Task, Base record, card, entry message, announcement attempt, pinned message, summary, or run log |
 | `Risk` | Risk item detected or entered during planning |
 
-Artifact normalization currently supports Feishu Doc, Base record batch writes, Task creation, card sends, project entry messages, pinned messages, IM message sends, and local run logs. Dry-run artifacts are marked `planned`; live artifacts are marked `created` once the corresponding `lark-cli` call succeeds. Base record artifacts also expose fallback fields such as `owner`, `due_date`, `risk_level`, `source_run`, `source_message`, and `url` for Flight Recorder and demo inspection.
+Artifact normalization currently supports Feishu Doc, Base record batch writes, Task creation, card sends, project entry messages, announcement update attempts, pinned messages, IM message sends, and local run logs. Dry-run artifacts are marked `planned`; live artifacts are marked `created` once the corresponding `lark-cli` call succeeds. Optional announcement failures are marked `failed` and do not abort the run. Base record artifacts also expose fallback fields such as `owner`, `due_date`, `risk_level`, `source_run`, `source_message`, and `url` for Flight Recorder and demo inspection.
 
 Plan validation runs immediately after planner output and before confirmation, preflight, duplicate-run guard, or any Feishu tool call. If required project-init fields fail validation, PilotFlow records `plan.validation_failed`, returns `needs_clarification`, and uses a safe fallback plan instead of creating Doc/Base/Task/IM artifacts.
 
@@ -84,9 +84,9 @@ The risk detector runs immediately after the plan is generated. It preserves pla
 
 Task assignee resolution runs before `task.create`. Planner member labels remain human-readable, while `PILOTFLOW_OWNER_OPEN_ID_MAP_JSON` can map those labels to Feishu `open_id` values. If no explicit map matches and `PILOTFLOW_AUTO_LOOKUP_OWNER_CONTACT` is enabled, PilotFlow performs a read-only `contact +search-user` lookup and assigns the first task only when the result is exact or unambiguous. If lookup is blocked or ambiguous, PilotFlow keeps the text owner fallback in the task description and run trace. The priority order is explicit owner map, optional contact lookup, optional default assignee, then text fallback.
 
-The project flight plan card is generated before side effects and can be sent with `--send-plan-card`. Its buttons carry a stable `pilotflow_card`, `pilotflow_run_id`, and `pilotflow_action` value for confirm, edit, doc-only, and cancel decisions. The risk decision card is generated after Doc/Base/Task writes and can be sent with `--send-risk-card`; its buttons use the same callback value convention for owner, deadline, accept, and defer decisions. `card-callback-handler.js` parses Feishu-style callback payloads, while `card-event-listener.js` wraps `lark-cli event +subscribe` and `callback-run-trigger.js` can start the orchestrator from an approved flight-plan callback. This is code-level wiring; the remaining validation is a real Feishu button click in the test group.
+The project flight plan card is generated before side effects and can be sent with `--send-plan-card`. Its buttons carry a stable `pilotflow_card`, `pilotflow_run_id`, and `pilotflow_action` value for confirm, edit, doc-only, and cancel decisions. The risk decision card is generated after Doc/Base/Task writes and can be sent with `--send-risk-card`; its buttons use the same callback value convention for owner, deadline, accept, and defer decisions. `card-callback-handler.js` parses Feishu-style callback payloads, while `card-event-listener.js` wraps `lark-cli event +subscribe` and `callback-run-trigger.js` can start the orchestrator from an approved flight-plan callback. This is code-level wiring; the latest live listener connected to Feishu but received no callback event, so Open Platform card callback configuration is the remaining validation.
 
-The project entry message is generated after Doc, Base, and Task calls complete and can be sent with `--send-entry-message` as the current fallback for a stable group entrance. `--pin-entry-message` sends that entry message and then calls `im.pins.create` to pin it in the target chat, giving the demo a Feishu-native stable entry before a full group announcement path is wired. The final IM summary is generated afterward, so the group message can include the created Doc URL, Base record IDs, Task URL, project entry state, run ID, and next-step prompt.
+The project entry message is generated after Doc, Base, and Task calls complete and can be sent with `--send-entry-message` as the current fallback for a stable group entrance. `--pin-entry-message` sends that entry message and then calls `im.pins.create` to pin it in the target chat. `--update-announcement` attempts the native group announcement API as bot identity; the current test group returns `232097 Unable to operate docx type chat announcement`, so PilotFlow records a failed announcement artifact and continues with the pinned entry fallback. The final IM summary is generated afterward, so the group message can include the created Doc URL, Base record IDs, Task URL, project entry state, announcement fallback state, run ID, and next-step prompt.
 
 The duplicate-run guard runs after live target preflight and before Feishu side effects. It computes a stable project-init key from normalized input, plan shape, profile, and hashed targets. The guard file lives in ignored local storage by default, so it protects live demos on the operator machine without publishing target IDs or secrets.
 
@@ -144,6 +144,7 @@ PILOTFLOW_LARK_PROFILE=pilotflow-contest
 PILOTFLOW_SEND_PLAN_CARD=true|false
 PILOTFLOW_SEND_ENTRY_MESSAGE=true|false
 PILOTFLOW_PIN_ENTRY_MESSAGE=true|false
+PILOTFLOW_UPDATE_ANNOUNCEMENT=true|false
 PILOTFLOW_SEND_RISK_CARD=true|false
 PILOTFLOW_DEDUPE_KEY=<optional_stable_key>
 PILOTFLOW_ALLOW_DUPLICATE_RUN=true|false
@@ -165,7 +166,7 @@ Live mode requires the confirmation text `确认起飞`. It also preflights requ
 
 ## Reliability Rules
 
-- Every write tool must receive an idempotency key.
+- Every write tool must receive a Feishu-safe idempotency key no longer than the message API field limit.
 - Live project-init runs must pass duplicate-run protection before visible side effects.
 - Tool failures must stop or degrade the run explicitly.
 - Invalid planner output must become a clarification state before any Feishu side effect.

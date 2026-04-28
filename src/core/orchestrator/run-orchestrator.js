@@ -5,7 +5,7 @@ import { FeishuToolExecutor } from "../../tools/feishu/feishu-tool-executor.js";
 import { normalizeFeishuArtifacts } from "../../tools/feishu/artifact-normalizer.js";
 import { buildDeliverySummaryText } from "./summary-builder.js";
 import { buildFlightPlanCard } from "./flight-plan-card.js";
-import { buildProjectEntryMessageText } from "./entry-message-builder.js";
+import { buildProjectAnnouncementHtml, buildProjectEntryMessageText } from "./entry-message-builder.js";
 import { buildProjectInitDedupeKey, duplicateGuardSummary, DuplicateRunGuard } from "./duplicate-run-guard.js";
 import { resolveContactSearchAssignee } from "./contact-owner-resolver.js";
 import { buildRiskDecisionCard } from "./risk-decision-card.js";
@@ -39,6 +39,7 @@ export class RunOrchestrator {
       sendPlanCard = false,
       sendEntryMessage = false,
       pinEntryMessage = false,
+      updateAnnouncement = false,
       sendRiskCard = false,
       ownerOpenIdMap = {},
       taskAssigneeOpenId = "",
@@ -93,7 +94,7 @@ export class RunOrchestrator {
     });
 
     const artifacts = [];
-    const plannedTools = plannedToolsForRun({ autoConfirm, sendPlanCard, sendEntryMessage, pinEntryMessage, sendRiskCard });
+    const plannedTools = plannedToolsForRun({ autoConfirm, sendPlanCard, sendEntryMessage, pinEntryMessage, updateAnnouncement, sendRiskCard });
     if (plannedTools.length > 0) {
       try {
         this.tools.preflight(plannedTools);
@@ -207,7 +208,7 @@ export class RunOrchestrator {
       }
       sequence += 1;
 
-      const shouldSendEntryMessage = sendEntryMessage || pinEntryMessage;
+      const shouldSendEntryMessage = sendEntryMessage || pinEntryMessage || updateAnnouncement;
       let entryMessageArtifact;
       if (shouldSendEntryMessage) {
         const entryMessageText = buildProjectEntryMessageText({ runId, plan, artifacts });
@@ -218,6 +219,20 @@ export class RunOrchestrator {
         entryMessageArtifact = entryArtifacts.find((artifact) => artifact.type === "entry_message");
       } else {
         await this.skipStep(runId, "step-entry", "entry message disabled");
+      }
+      sequence += 1;
+
+      if (updateAnnouncement) {
+        const announcementHtml = buildProjectAnnouncementHtml({ runId, plan, artifacts });
+        artifacts.push(
+          ...(await this.callOptionalTool(runId, sequence, "step-announcement", "announcement.update", {
+            title: "PilotFlow group announcement",
+            html: announcementHtml,
+            revision: "0"
+          }))
+        );
+      } else {
+        await this.skipStep(runId, "step-announcement", "announcement update disabled");
       }
       sequence += 1;
 
@@ -267,6 +282,34 @@ export class RunOrchestrator {
     await this.recorder.record({ run_id: runId, event: "run.completed" });
 
     return { runId, status: "completed", plan, risks, risk_decision: riskDecision, artifacts, duplicate_guard: guardState };
+  }
+
+  async callOptionalTool(runId, sequence, stepId, tool, input) {
+    try {
+      return await this.callTool(runId, sequence, stepId, tool, input);
+    } catch (error) {
+      const failedArtifact = {
+        id: `artifact-${runId}-${tool.replaceAll(".", "-")}`,
+        type: tool === "announcement.update" ? "announcement" : "message",
+        title: input.title || tool,
+        status: "failed",
+        error: error.message
+      };
+      await this.recorder.record({
+        run_id: runId,
+        event: "artifact.failed",
+        tool_call_id: `tool-${sequence}`,
+        artifact: failedArtifact
+      });
+      await this.recorder.record({
+        run_id: runId,
+        event: "optional_tool.fallback",
+        tool,
+        fallback: "continue_with_existing_project_entry_path",
+        error: { message: error.message }
+      });
+      return [failedArtifact];
+    }
   }
 
   async callTool(runId, sequence, stepId, tool, input) {
@@ -397,19 +440,20 @@ export class RunOrchestrator {
   }
 }
 
-function toolsForRun({ sendEntryMessage, pinEntryMessage, sendRiskCard }) {
+function toolsForRun({ sendEntryMessage, pinEntryMessage, updateAnnouncement, sendRiskCard }) {
   return [
     ...SIDE_EFFECT_TOOLS,
-    ...(sendEntryMessage || pinEntryMessage ? ["entry.send"] : []),
+    ...(sendEntryMessage || pinEntryMessage || updateAnnouncement ? ["entry.send"] : []),
+    ...(updateAnnouncement ? ["announcement.update"] : []),
     ...(pinEntryMessage ? ["entry.pin"] : []),
     ...(sendRiskCard ? ["card.send"] : [])
   ];
 }
 
-function plannedToolsForRun({ autoConfirm, sendPlanCard, sendEntryMessage, pinEntryMessage, sendRiskCard }) {
+function plannedToolsForRun({ autoConfirm, sendPlanCard, sendEntryMessage, pinEntryMessage, updateAnnouncement, sendRiskCard }) {
   return [
     ...(sendPlanCard ? ["card.send"] : []),
-    ...(autoConfirm ? toolsForRun({ sendEntryMessage, pinEntryMessage, sendRiskCard }) : [])
+    ...(autoConfirm ? toolsForRun({ sendEntryMessage, pinEntryMessage, updateAnnouncement, sendRiskCard }) : [])
   ];
 }
 

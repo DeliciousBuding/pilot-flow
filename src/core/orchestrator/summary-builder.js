@@ -29,6 +29,13 @@ export function buildDeliverySummaryText({ runId, plan, artifacts = [] }) {
     lines.push(`- Project entry: ${pinnedEntry ? "pinned, " : ""}${formatArtifactTarget(entry)}`);
   }
 
+  const announcement = firstArtifact(artifacts, "announcement");
+  if (announcement?.status === "created") {
+    lines.push(`- Group announcement: updated`);
+  } else if (announcement?.status === "failed") {
+    lines.push(`- Group announcement: API blocked, using pinned entry fallback`);
+  }
+
   lines.push("", "下一步: 请在群内确认负责人、截止时间和风险处理方式。");
 
   return lines.join("\n");

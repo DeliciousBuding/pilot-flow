@@ -7,7 +7,7 @@ This guide explains how to run, validate, commit, and synchronize PilotFlow.
 Required:
 
 - Node.js `>=20`
-- Global `lark-cli >=1.0.20`
+- Global `lark-cli >=1.0.21`
 - Feishu activity tenant profile: `pilotflow-contest`
 
 Check versions:
@@ -102,7 +102,7 @@ npm run test:callback
 
 In live mode, `--send-plan-card` sends the flight plan card to the configured test group, then waits unless the confirmation phrase is also provided. Sending a live card is visible in Feishu, so use it only against the test group.
 
-The flight plan card now includes four action values: `confirm_takeoff`, `edit_plan`, `doc_only`, and `cancel`. `src/core/orchestrator/card-callback-handler.js` parses Feishu-style callback payloads and returns the next PilotFlow decision. Current `lark-cli event +subscribe --dry-run` works for constructing an event subscriber command, and PilotFlow now has a bounded listener bridge; real Feishu button-click verification is still the next step.
+The flight plan card now includes four action values: `confirm_takeoff`, `edit_plan`, `doc_only`, and `cancel`. `src/core/orchestrator/card-callback-handler.js` parses Feishu-style callback payloads and returns the next PilotFlow decision. PilotFlow has a bounded listener bridge; the latest live listener connected to Feishu but received no `card.action.trigger` event in the validation window, so platform callback configuration remains the next verification target.
 
 Listen for Feishu card callback events with a bounded local process:
 
@@ -110,7 +110,7 @@ Listen for Feishu card callback events with a bounded local process:
 npm run listen:cards -- --dry-run --max-events 1 --timeout 30s
 ```
 
-`src/core/events/card-event-listener.js` wraps `lark-cli event +subscribe --event-types card.action.trigger`, parses callback payloads, and can trigger the orchestrator through `src/core/events/callback-run-trigger.js` when a flight-plan card is approved. The listener writes its own JSONL event log and supports `--max-events` / `--timeout` so test runs do not leave long-running processes behind. Code-level listener wiring is implemented; the next validation step is a real Feishu button click in the test group.
+`src/core/events/card-event-listener.js` wraps `lark-cli event +subscribe --event-types card.action.trigger`, parses callback payloads, and can trigger the orchestrator through `src/core/events/callback-run-trigger.js` when a flight-plan card is approved. The listener writes its own JSONL event log and supports `--max-events` / `--timeout` so test runs do not leave long-running processes behind. Code-level listener wiring is implemented; Open Platform card callback delivery still needs to be verified for the app.
 
 Preview the project entry-message fallback:
 
@@ -120,6 +120,14 @@ npm run demo:manual -- --pin-entry-message
 ```
 
 In live mode, `--send-entry-message` sends a stable project entrance after Doc/Base/Task artifacts are created. `--pin-entry-message` implies the entry message and then pins it with `im.pins.create`. This is the current Feishu-native stable-entry path while group announcement update is blocked or not yet wired.
+
+Try the group announcement upgrade with fallback:
+
+```bash
+npm run demo:manual -- --update-announcement
+```
+
+`--update-announcement` attempts `PATCH /open-apis/im/v1/chats/:chat_id/announcement` through `lark-cli api` as bot identity, after sending the project entry message. In the current test group, the API returns `232097 Unable to operate docx type chat announcement`; PilotFlow records this as a failed announcement artifact and continues with the pinned entry message fallback.
 
 Preview the risk decision card:
 
@@ -174,6 +182,7 @@ Before running the confirmed live command, provide the target Feishu resources t
 | `PILOTFLOW_SEND_PLAN_CARD` | `true` or `1` to send the flight plan card before confirmation |
 | `PILOTFLOW_SEND_ENTRY_MESSAGE` | `true` or `1` to send the project entry-message fallback after artifacts are created |
 | `PILOTFLOW_PIN_ENTRY_MESSAGE` | `true` or `1` to send and pin the project entry message |
+| `PILOTFLOW_UPDATE_ANNOUNCEMENT` | `true` or `1` to try group announcement update and keep pinned entry fallback on failure |
 | `PILOTFLOW_SEND_RISK_CARD` | `true` or `1` to send the risk decision card after state rows are created |
 | `PILOTFLOW_DEDUPE_KEY` | optional stable project key for live duplicate-run protection |
 | `PILOTFLOW_ALLOW_DUPLICATE_RUN` | `true` or `1` to intentionally bypass duplicate-run protection |
@@ -257,6 +266,7 @@ Implemented to date:
 - explicit `pilotflow-contest` profile support
 - plan schema validation fallback that stops before Feishu side effects and returns `needs_clarification`
 - live-capable `doc.create`, `base.write`, `task.create`, and `im.send` command paths
+- short Feishu write idempotency keys, avoiding message field validation failures caused by UUID-length run IDs
 - text confirmation fallback with `确认起飞`
 - step status events in JSONL run logs
 - live preflight that blocks partial side effects when Base or chat targets are missing
@@ -270,6 +280,7 @@ Implemented to date:
 - callback-trigger bridge that can start the orchestrator from an approved flight-plan card callback
 - optional `--send-entry-message` fallback for a stable project entrance when group announcement is not available
 - optional `--pin-entry-message` flow that sends the project entry and pins it through `im.pins.create`
+- optional `--update-announcement` flow that attempts group announcement update and records API failure without aborting the main run
 - duplicate live-run guard with stable dedupe key, local ignored guard file, and explicit bypass
 - shared Project State template with owner/deadline/risk/source/url fallback fields
 - Task description text fallback for owner when Feishu assignee mapping is not ready
@@ -285,8 +296,8 @@ Implemented to date:
 
 Next implementation targets:
 
-- real Feishu card button-click verification in the test group
-- group announcement update attempt beyond the current pin-based entry path
+- Open Platform card callback delivery verification for `card.action.trigger`
+- demo hardening and recording using the live rich Base, risk card, pinned entry, and announcement fallback path
 
 ## Validation Matrix
 
@@ -303,6 +314,7 @@ Next implementation targets:
 | Duplicate-run guard | `npm run test:guard`, live missing-config check, inspect guard events in JSONL |
 | Entry message fallback | `npm run test:entry`, `npm run demo:manual -- --send-entry-message`, inspect entry artifact |
 | Pinned entry message | `npm run test:artifacts`, `npm run demo:manual -- --pin-entry-message`, inspect `pinned_message` artifact |
+| Group announcement fallback | `npm run test:entry`, `npm run test:summary`, `npm run demo:manual -- --update-announcement`, inspect `announcement` artifact |
 | Flight Recorder view | `npm run test:flight`, `npm run flight:recorder -- --input <run.jsonl>`, inspect generated HTML |
 | Risk detection/card | `npm run test:risk`, `npm run demo:manual -- --send-risk-card`, inspect `risk.detected` and card artifact |
 | Task assignee mapping | `npm run test:assignee`, `npm run test:config`, `npm run demo:manual -- --owner-open-id-map-json '{"Product Owner":"ou_xxx"}'`, inspect `--assignee` |

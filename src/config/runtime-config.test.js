@@ -2,7 +2,14 @@ import assert from "node:assert/strict";
 import { loadRuntimeConfig } from "./runtime-config.js";
 
 const config = loadRuntimeConfig(
-  ["--owner-open-id-map-json", '{"Product Owner":"ou_product"}', "--task-assignee-open-id", "ou_default", "--auto-lookup-owner-contact"],
+  [
+    "--owner-open-id-map-json",
+    '{"Product Owner":"ou_product"}',
+    "--task-assignee-open-id",
+    "ou_default",
+    "--auto-lookup-owner-contact",
+    "--update-announcement"
+  ],
   {}
 );
 
@@ -11,6 +18,7 @@ assert.deepEqual(config.taskAssignee.ownerOpenIdMap, {
 });
 assert.equal(config.taskAssignee.defaultOpenId, "ou_default");
 assert.equal(config.taskAssignee.autoLookupContact, true);
+assert.equal(config.announcement.update, true);
 
 assert.deepEqual(
   loadRuntimeConfig([], {

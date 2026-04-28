@@ -36,6 +36,11 @@ const text = buildDeliverySummaryText({
       type: "pinned_message",
       title: "Pinned PilotFlow project entry",
       external_id: "om_entry"
+    },
+    {
+      type: "announcement",
+      title: "PilotFlow group announcement",
+      status: "failed"
     }
   ]
 });
@@ -47,6 +52,7 @@ assert.match(text, /Doc: PilotFlow Project Brief - https:\/\/example\.feishu\.cn
 assert.match(text, /Base records: 2 条 \(rec_1, rec_2\)/);
 assert.match(text, /Task: Project brief - https:\/\/applink\.feishu\.cn\/client\/todo\/detail\?guid=task_123/);
 assert.match(text, /Project entry: pinned, PilotFlow project entry \(om_entry\)/);
+assert.match(text, /Group announcement: API blocked, using pinned entry fallback/);
 
 assert.match(
   buildDeliverySummaryText({

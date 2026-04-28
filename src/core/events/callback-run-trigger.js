@@ -63,6 +63,7 @@ export async function triggerRunFromCallback(callback, {
       confirmationText: "确认起飞 (card callback)",
       sendEntryMessage: true,
       pinEntryMessage: true,
+      updateAnnouncement: true,
       sendRiskCard: true
     });
 

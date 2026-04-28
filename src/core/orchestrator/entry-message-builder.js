@@ -23,6 +23,25 @@ export function buildProjectEntryMessageText({ runId, plan, artifacts = [] }) {
   return lines.join("\n");
 }
 
+export function buildProjectAnnouncementHtml({ runId, plan, artifacts = [] }) {
+  const doc = firstArtifact(artifacts, "doc");
+  const task = firstArtifact(artifacts, "task");
+  const baseRecords = artifacts.filter((artifact) => artifact.type === "base_record");
+
+  const items = [
+    `<li><b>Run ID:</b> ${escapeHtml(runId)}</li>`,
+    `<li><b>目标:</b> ${escapeHtml(plan.goal)}</li>`
+  ];
+
+  if (doc) items.push(`<li><b>Brief:</b> ${escapeHtml(formatArtifactTarget(doc))}</li>`);
+  if (baseRecords.length > 0) {
+    items.push(`<li><b>状态台账:</b> ${baseRecords.length} 条 Base records (${escapeHtml(formatRecordIds(baseRecords))})</li>`);
+  }
+  if (task) items.push(`<li><b>首个任务:</b> ${escapeHtml(formatArtifactTarget(task))}</li>`);
+
+  return `<h3>PilotFlow 项目入口</h3><ul>${items.join("")}</ul><p>本公告由 PilotFlow 自动生成；若公告 API 不可用，请使用群内置顶项目入口消息。</p>`;
+}
+
 function firstArtifact(artifacts, type) {
   return artifacts.find((artifact) => artifact.type === type);
 }
@@ -40,4 +59,12 @@ function formatRecordIds(records) {
   const visible = ids.slice(0, 3).join(", ");
   if (ids.length <= 3) return visible;
   return `${visible}, ...`;
+}
+
+function escapeHtml(value = "") {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
 }

@@ -32,6 +32,7 @@ export function createProjectInitPlan(inputText) {
       { id: "step-task", title: "Create first task with owner/deadline fallback context", status: "pending", tool: "task.create" },
       { id: "step-risk", title: "Build risk decision card", status: "pending", tool: "card.send" },
       { id: "step-entry", title: "Send project entry message", status: "pending", tool: "entry.send" },
+      { id: "step-announcement", title: "Try to upgrade project entry to group announcement", status: "pending", tool: "announcement.update" },
       { id: "step-pin", title: "Pin project entry message", status: "pending", tool: "entry.pin" },
       { id: "step-summary", title: "Send delivery summary", status: "pending", tool: "im.send" }
     ],
@@ -40,7 +41,7 @@ export function createProjectInitPlan(inputText) {
         id: "confirm-takeoff",
         prompt: "Confirm the flight plan before PilotFlow writes project artifacts.",
         status: "pending",
-        required_for: ["step-doc", "step-state", "step-task", "step-risk", "step-entry", "step-pin", "step-summary"]
+        required_for: ["step-doc", "step-state", "step-task", "step-risk", "step-entry", "step-announcement", "step-pin", "step-summary"]
       }
     ],
     risks

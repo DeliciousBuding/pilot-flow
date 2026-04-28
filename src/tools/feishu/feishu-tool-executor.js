@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { LarkCliCommandRunner } from "../../adapters/lark-cli/command-runner.js";
 
 export class FeishuToolExecutor {
@@ -16,6 +17,7 @@ export class FeishuToolExecutor {
     if (tools.includes("im.send") && !this.targets.chatId) missing.push("PILOTFLOW_TEST_CHAT_ID");
     if (tools.includes("card.send") && !this.targets.chatId) missing.push("PILOTFLOW_TEST_CHAT_ID");
     if (tools.includes("entry.send") && !this.targets.chatId) missing.push("PILOTFLOW_TEST_CHAT_ID");
+    if (tools.includes("announcement.update") && !this.targets.chatId) missing.push("PILOTFLOW_TEST_CHAT_ID");
 
     const uniqueMissing = [...new Set(missing)];
     if (uniqueMissing.length > 0) {
@@ -24,7 +26,7 @@ export class FeishuToolExecutor {
   }
 
   async execute(tool, input, context) {
-    const idempotencyKey = `${context.runId}:${tool}:${context.sequence}`;
+    const idempotencyKey = buildToolIdempotencyKey({ runId: context.runId, tool, sequence: context.sequence });
     const args = toLarkCliArgs(tool, input, {
       idempotencyKey,
       dryRun: this.dryRun,
@@ -32,6 +34,13 @@ export class FeishuToolExecutor {
     });
     return this.runner.run(args, { idempotencyKey });
   }
+}
+
+export function buildToolIdempotencyKey({ runId, tool, sequence }) {
+  const toolSlug = String(tool).replaceAll(".", "-").replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 20) || "tool";
+  const sequenceSlug = String(sequence).replace(/[^0-9a-zA-Z_-]/g, "").slice(0, 6) || "0";
+  const hash = createHash("sha256").update(`${runId}:${tool}:${sequence}`).digest("hex").slice(0, 16);
+  return `pf-${toolSlug}-${sequenceSlug}-${hash}`;
 }
 
 function toLarkCliArgs(tool, input, options) {
@@ -105,6 +114,22 @@ function toLarkCliArgs(tool, input, options) {
       "--data",
       JSON.stringify({
         message_id: input.messageId
+      })
+    ];
+  }
+
+  if (tool === "announcement.update") {
+    const chatId = input.chatId || targets.chatId || dryRunPlaceholder(dryRun, "chat-id");
+    return [
+      "api",
+      "PATCH",
+      `/open-apis/im/v1/chats/${chatId}/announcement`,
+      "--as",
+      "bot",
+      "--data",
+      JSON.stringify({
+        revision: input.revision || "0",
+        requests: [input.html]
       })
     ];
   }

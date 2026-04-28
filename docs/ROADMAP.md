@@ -12,9 +12,9 @@ Status after the latest implementation pass:
 
 - Phase 1 is effectively closed: the manual trigger can create real Feishu artifacts and return a traceable run.
 - Phase 2 should now prioritize stable Feishu-native product surfaces over heavier automation.
-- Card callback action protocol, bounded listener process, and callback-trigger bridge are implemented locally. The next risk is real Feishu button-click verification in the test group. Text confirmation remains the fallback.
-- Group announcement is still a risk area, so the near-term project-entry path is a pinned entry message that can later be upgraded to an announcement.
-- Base owner/deadline fallback, local Flight Recorder view, risk detection, a dry-run risk decision card, a pinned entry-message prototype, explicit Task assignee mapping, optional Contacts-based owner lookup, plan-validation fallback, card callback action protocol, and a bounded card listener are now implemented. The next product slice should verify a real card button click, attempt group announcement upgrade, and harden the demo while keeping text confirmation, pinned entry fallback, and risk-card dry-run behavior.
+- Card callback action protocol, bounded listener process, and callback-trigger bridge are implemented locally. A live listener connected to Feishu successfully, but no `card.action.trigger` event was received in the two-minute validation window; text confirmation remains the fallback until Open Platform callback configuration is verified.
+- Group announcement has been attempted through the native announcement API. The test group currently returns `232097 Unable to operate docx type chat announcement`, so the product path now records the failed announcement upgrade and keeps the pinned entry message as the stable Feishu-native entrance.
+- Base owner/deadline fallback, local Flight Recorder view, risk detection, live risk decision card send, live pinned entry message, explicit Task assignee mapping, optional Contacts-based owner lookup, plan-validation fallback, card callback action protocol, and a bounded card listener are now implemented. The next product slice should harden the demo, capture evidence, and resolve platform callback configuration.
 
 Main loop:
 
@@ -36,7 +36,7 @@ Status: mostly complete.
 - [x] Collect Feishu official reference docs outside the repo.
 - [x] Define positioning as "AI project operations officer".
 - [x] Create executable roadmap checklist.
-- [x] Upgrade `lark-cli` to `1.0.20`.
+- [x] Upgrade `lark-cli` to `1.0.21`.
 - [x] Create activity tenant profile `pilotflow-contest`.
 - [x] Validate Feishu group creation.
 - [x] Validate group IM send.
@@ -102,7 +102,9 @@ Work items:
 - [x] Add local callback parser/handler for flight-plan and risk-card actions.
 - [x] Add a bounded card callback event listener and callback-trigger bridge.
 - [ ] Verify a real Feishu card button click triggers the orchestrator in the test group.
+- [x] Run a bounded live listener attempt for `card.action.trigger`; WebSocket connected, but no callback event was received.
 - [x] Implement text confirmation fallback when card callback is blocked.
+- [x] Shorten Feishu write idempotency keys to avoid message field validation errors.
 - [x] Add duplicate-run guard before more live demo repetitions.
 - [x] Create a Base template with fields:
   - `type`
@@ -117,9 +119,10 @@ Work items:
 - [x] Create real task records with owner/deadline when owner open_id mappings are configured.
 - [x] Add owner mapping fallback to text fields.
 - [x] Add automatic contact lookup for owner labels.
-- [ ] Try group announcement update.
+- [x] Try group announcement update.
 - [x] Fall back to a project entry message if announcement update fails.
 - [x] Pin the project entry message with `im.pins.create` as a Feishu-native stable-entry upgrade.
+- [x] Record announcement API failure as a non-blocking artifact and continue the main run.
 - [x] Build a lightweight Flight Recorder view.
 - [x] Add risk detection:
   - planner risk enrichment
@@ -189,9 +192,9 @@ Longer-term direction after competition MVP.
 
 ## Immediate Next Actions
 
-1. Verify real Feishu card button-click confirmation in the test group; keep text confirmation as fallback.
-2. Try full group announcement update only after confirming the API and permission path; keep pinned entry-message fallback as the default stable path.
-3. Prepare the first happy-path recording after a fresh rich Base table is created.
+1. Verify Open Platform card callback configuration so `card.action.trigger` reaches the listener; keep text confirmation as fallback.
+2. Treat group announcement as a documented platform limitation for this test group and keep pinned entry-message fallback as the default stable path.
+3. Prepare the first happy-path recording from the latest live run with rich Base fields, risk card, pinned entry, announcement fallback, and Flight Recorder.
 4. Prepare risk-card callback persistence after live event wiring is verified.
 5. Keep README and docs updated with each implementation step.
 6. Commit and push every completed vertical slice to GitHub.
@@ -213,12 +216,13 @@ Longer-term direction after competition MVP.
 - [x] Add card callback action protocol.
 - [x] Add bounded card listener and callback-trigger bridge.
 - [ ] Verify live card callback confirmation from a real Feishu button click.
+- [x] Fix live card send failure caused by overlong Feishu idempotency keys.
 - [x] Add owner fallback text fields.
 - [x] Add Task assignee mapping with explicit owner/open_id map.
 - [x] Add automatic contact lookup for owner labels.
 - [x] Add entry-message fallback.
 - [x] Add pinned entry-message upgrade.
-- [ ] Try full group announcement update.
+- [x] Try full group announcement update.
 - [x] Add risk decision summary.
 - [x] Add Flight Recorder viewer.
 

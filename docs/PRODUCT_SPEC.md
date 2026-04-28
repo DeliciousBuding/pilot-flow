@@ -46,7 +46,7 @@ Expected flow:
 2. User confirms the plan.
 3. PilotFlow creates a Feishu Doc.
 4. PilotFlow writes task/risk state to Base or Task.
-5. PilotFlow publishes a stable project entry message and can pin it in the group.
+5. PilotFlow publishes a stable project entry message, tries to upgrade it to a group announcement, and can pin it in the group when announcement is blocked.
 6. PilotFlow sends a final summary to the group.
 7. PilotFlow records the run in Flight Recorder.
 
@@ -57,19 +57,20 @@ Expected flow:
 | Manual trigger | Start from local command | implemented |
 | Project plan JSON | Extract goal, members, deliverables, deadline, risks | implemented for fixture |
 | Plan validation fallback | Stop unsafe runs when planner output is malformed | prototype implemented |
-| Flight plan card | Show plan before write side effects | dry-run prototype with confirm/edit/doc-only/cancel actions |
+| Flight plan card | Show plan before write side effects | live send validated with confirm/edit/doc-only/cancel actions |
 | Confirmation gate | Require approval before writes | dry-run auto-confirm, live text fallback implemented |
-| Card callback readiness | Parse card action callbacks into PilotFlow decisions and trigger approved runs | local handler, bounded listener, and trigger bridge implemented; real button-click validation pending |
+| Card callback readiness | Parse card action callbacks into PilotFlow decisions and trigger approved runs | local handler, bounded listener, and trigger bridge implemented; live listener connected but callback delivery pending |
 | Doc creation | Create project brief | live validated with returned Doc URL |
 | Base write | Store project state | live validated with returned record IDs |
-| Base owner/deadline fallback | Store owner, due date, risk level, source, and URL as text fields | dry-run prototype implemented |
+| Base owner/deadline fallback | Store owner, due date, risk level, source, and URL as text fields | live Project State table validated |
 | Task creation | Create first action item | live validated with returned Task URL; text owner fallback and optional open_id assignee mapping |
 | Task assignee mapping | Map planner owner labels to Feishu `open_id` values for Task assignment | dry-run prototype implemented |
 | Contact owner lookup | Resolve the first task owner through Feishu Contacts when no explicit map exists | read-path validated; optional prototype implemented |
-| Project entry message | Stable project entrance fallback | dry-run prototype implemented |
-| Pinned project entry | Pin the entry message before full group announcement support | dry-run prototype implemented |
+| Project entry message | Stable project entrance fallback | live validated |
+| Pinned project entry | Pin the entry message before full group announcement support | live validated |
+| Group announcement fallback | Attempt native group announcement update and continue when the API is blocked | live attempted; current test group returns docx announcement API block |
 | Risk detection | Enrich planner risks with derived operational risks | prototype implemented |
-| Risk decision card | Present risk summary and decision actions in Feishu card format | dry-run prototype implemented |
+| Risk decision card | Present risk summary and decision actions in Feishu card format | live send validated |
 | IM summary | Send final summary to group | live validated; artifact-aware text summary implemented |
 | Run log | JSONL trace | implemented with step status and artifact events |
 | Duplicate-run guard | Prevent accidental repeated live writes | local prototype implemented |
@@ -81,7 +82,8 @@ Expected flow:
 - Live interactive card confirmation from a real Feishu button click.
 - Card update after confirmation.
 - Base template.
-- Group announcement project entry beyond pinned-entry fallback.
+- Open Platform card callback delivery verification.
+- Announcement fallback polish for docx-type group announcements.
 - Risk decision persistence after card callbacks are wired.
 - Flight Recorder cockpit.
 

@@ -12,7 +12,7 @@ Turn group-chat discussion into confirmed plans, executable tasks, traceable sta
 [![Feishu](https://img.shields.io/badge/Feishu-native-00A4FF)](#-feishu-native-surfaces)
 [![Agent](https://img.shields.io/badge/Agent-as%20Pilot-6f42c1)](#-product-experience)
 [![Node](https://img.shields.io/badge/node-%3E%3D20-339933)](docs/DEVELOPMENT.md)
-[![lark-cli](https://img.shields.io/badge/lark--cli-1.0.20-blue)](docs/DEVELOPMENT.md)
+[![lark-cli](https://img.shields.io/badge/lark--cli-1.0.21-blue)](docs/DEVELOPMENT.md)
 [![GitHub stars](https://img.shields.io/github/stars/DeliciousBuding/pilot-flow?style=social)](https://github.com/DeliciousBuding/pilot-flow/stargazers)
 [![GitHub last commit](https://img.shields.io/github/last-commit/DeliciousBuding/pilot-flow)](https://github.com/DeliciousBuding/pilot-flow/commits/main)
 
@@ -150,12 +150,12 @@ Detailed architecture: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 | Surface | Product role | MVP status |
 | --- | --- | --- |
 | IM | Main collaboration entry and summary channel | ✅ validated |
-| Cards | Flight plan, confirmation, risk decision | ✅ flight plan + risk decision prototypes, callback action protocol, bounded listener bridge |
+| Cards | Flight plan, confirmation, risk decision | ✅ live send fixed, flight plan + risk decision prototypes, callback action protocol, bounded listener bridge |
 | Docs | Project brief and delivery documents | ✅ creation validated |
-| Base | Tasks, detected risks, artifacts, confirmations | ✅ rich fallback fields prototype |
+| Base | Tasks, detected risks, artifacts, confirmations | ✅ live rich Project State table validated |
 | Task | Concrete owner/deadline action items | ✅ creation validated, optional open_id/contact assignee mapping |
-| Pinned Entry / Announcement | Stable project entrance | ✅ pinned entry-message prototype, announcement planned |
-| Event subscription | Card callback listener first, `@PilotFlow` automatic trigger later | 🟡 listener prototype; real button-click validation next |
+| Pinned Entry / Announcement | Stable project entrance | ✅ live pinned entry; announcement attempted and falls back on docx announcement API block |
+| Event subscription | Card callback listener first, `@PilotFlow` automatic trigger later | 🟡 listener bridge ready; platform card callback EventKey/config still needs validation |
 | Chat Tab / H5 | Lightweight cockpit and flight recorder | ✅ static recorder prototype |
 | Whiteboard / Calendar / Slides | Demo enhancement surfaces | ⏳ later |
 
@@ -172,24 +172,24 @@ PilotFlow is currently in **MVP prototype** stage. The first deliverable is a re
 | Feishu Doc creation | ✅ validated |
 | Plan schema validation fallback | ✅ prototype |
 | Base state write | ✅ validated |
-| Base owner/deadline fallback fields | ✅ prototype |
+| Base owner/deadline fallback fields | ✅ live validated |
 | Task creation | ✅ validated |
 | Task assignee open_id mapping | ✅ dry-run prototype |
 | Contact lookup for Task owner | ✅ read-path validated, optional prototype |
 | Local Flight Recorder | ✅ prototype |
 | Real one-command Feishu run | ✅ validated |
-| Project flight plan card | ✅ dry-run prototype |
+| Project flight plan card | ✅ live send validated |
 | Card button action protocol | ✅ local handler prototype |
 | Project entry message fallback | ✅ prototype |
-| Pinned project entry message | ✅ dry-run prototype |
+| Pinned project entry message | ✅ live validated |
 | Artifact-aware final summary | ✅ prototype |
 | Duplicate live-run guard | ✅ prototype |
 | Flight Recorder static view | ✅ prototype |
 | Risk detection | ✅ prototype |
-| Risk decision card | ✅ dry-run prototype |
+| Risk decision card | ✅ live send validated |
 | Card callback listener bridge | ✅ local tests passed |
-| Live card callback confirmation | 🟡 real Feishu button-click validation next |
-| Group announcement project entry | 🟡 planned upgrade |
+| Live card callback confirmation | 🟡 listener connected, no real callback event received yet |
+| Group announcement project entry | ✅ attempted; current group returns docx announcement API block and falls back to pinned entry |
 
 ## 🗺️ Roadmap Snapshot
 

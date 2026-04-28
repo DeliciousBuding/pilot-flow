@@ -27,6 +27,7 @@ try {
     sendPlanCard: config.planCard.send,
     sendEntryMessage: config.entryMessage.send,
     pinEntryMessage: config.entryMessage.pin,
+    updateAnnouncement: config.announcement.update,
     sendRiskCard: config.riskCard.send,
     ownerOpenIdMap: config.taskAssignee.ownerOpenIdMap,
     taskAssigneeOpenId: config.taskAssignee.defaultOpenId,

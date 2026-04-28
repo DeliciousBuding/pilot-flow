@@ -26,6 +26,10 @@ export function normalizeFeishuArtifacts(tool, input, output, context) {
     return [normalizePinnedMessageArtifact(input, output, runId, status)];
   }
 
+  if (tool === "announcement.update") {
+    return [normalizeAnnouncementArtifact(input, output, runId, status)];
+  }
+
   if (tool === "card.send") {
     return [normalizeCardArtifact(input, output, runId, status)];
   }
@@ -155,6 +159,22 @@ function normalizePinnedMessageArtifact(input, output, runId, status) {
     message_id: externalId,
     chat_id: pin.chat_id,
     created_at: pin.create_time
+  });
+}
+
+function normalizeAnnouncementArtifact(input, output, runId, status) {
+  const revision =
+    getPath(output, ["json", "data", "revision"]) ||
+    getPath(output, ["json", "revision"]) ||
+    input.revision ||
+    "0";
+
+  return cleanArtifact({
+    id: `announcement-${runId}`,
+    type: "announcement",
+    title: input.title || "PilotFlow group announcement",
+    status,
+    revision
   });
 }
 
