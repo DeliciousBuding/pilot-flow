@@ -23,6 +23,12 @@ export function buildDeliverySummaryText({ runId, plan, artifacts = [] }) {
     lines.push(`- Task: ${formatArtifactTarget(task)}`);
   }
 
+  const entry = firstArtifact(artifacts, "entry_message");
+  const pinnedEntry = firstArtifact(artifacts, "pinned_message");
+  if (entry) {
+    lines.push(`- Project entry: ${pinnedEntry ? "pinned, " : ""}${formatArtifactTarget(entry)}`);
+  }
+
   lines.push("", "下一步: 请在群内确认负责人、截止时间和风险处理方式。");
 
   return lines.join("\n");

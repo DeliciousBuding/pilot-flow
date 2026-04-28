@@ -105,9 +105,10 @@ Preview the project entry-message fallback:
 
 ```bash
 npm run demo:manual -- --send-entry-message
+npm run demo:manual -- --pin-entry-message
 ```
 
-In live mode, `--send-entry-message` sends a stable project entrance after Doc/Base/Task artifacts are created. It is the current fallback when group announcement update is blocked or not yet wired.
+In live mode, `--send-entry-message` sends a stable project entrance after Doc/Base/Task artifacts are created. `--pin-entry-message` implies the entry message and then pins it with `im.pins.create`. This is the current Feishu-native stable-entry path while group announcement update is blocked or not yet wired.
 
 Preview the risk decision card:
 
@@ -141,6 +142,7 @@ Before running the confirmed live command, provide the target Feishu resources t
 | `PILOTFLOW_LARK_PROFILE` | lark-cli profile, default `pilotflow-contest` |
 | `PILOTFLOW_SEND_PLAN_CARD` | `true` or `1` to send the flight plan card before confirmation |
 | `PILOTFLOW_SEND_ENTRY_MESSAGE` | `true` or `1` to send the project entry-message fallback after artifacts are created |
+| `PILOTFLOW_PIN_ENTRY_MESSAGE` | `true` or `1` to send and pin the project entry message |
 | `PILOTFLOW_SEND_RISK_CARD` | `true` or `1` to send the risk decision card after state rows are created |
 | `PILOTFLOW_DEDUPE_KEY` | optional stable project key for live duplicate-run protection |
 | `PILOTFLOW_ALLOW_DUPLICATE_RUN` | `true` or `1` to intentionally bypass duplicate-run protection |
@@ -221,6 +223,7 @@ Implemented in the current Phase 1 slice:
 - Feishu-native project flight plan card builder
 - optional `--send-plan-card` flow that can post the card and wait for text confirmation
 - optional `--send-entry-message` fallback for a stable project entrance when group announcement is not available
+- optional `--pin-entry-message` flow that sends the project entry and pins it through `im.pins.create`
 - duplicate live-run guard with stable dedupe key, local ignored guard file, and explicit bypass
 - shared Project State template with owner/deadline/risk/source/url fallback fields
 - Task description text fallback for owner when Feishu assignee mapping is not ready
@@ -234,7 +237,7 @@ Implemented in the current Phase 1 slice:
 Next implementation targets:
 
 - card callback confirmation
-- group announcement update attempt
+- group announcement update attempt beyond the current pin-based entry path
 
 ## Validation Matrix
 
@@ -247,6 +250,7 @@ Next implementation targets:
 | Flight plan card | `npm run test:card`, `npm run demo:manual -- --send-plan-card --no-auto-confirm` |
 | Duplicate-run guard | `npm run test:guard`, live missing-config check, inspect guard events in JSONL |
 | Entry message fallback | `npm run test:entry`, `npm run demo:manual -- --send-entry-message`, inspect entry artifact |
+| Pinned entry message | `npm run test:artifacts`, `npm run demo:manual -- --pin-entry-message`, inspect `pinned_message` artifact |
 | Flight Recorder view | `npm run test:flight`, `npm run flight:recorder -- --input <run.jsonl>`, inspect generated HTML |
 | Risk detection/card | `npm run test:risk`, `npm run demo:manual -- --send-risk-card`, inspect `risk.detected` and card artifact |
 | Project state rows | `npm run test:state`, `npm run setup:feishu -- --dry-run`, inspect Base fields |

@@ -26,6 +26,16 @@ const text = buildDeliverySummaryText({
       type: "task",
       title: "Project brief",
       url: "https://applink.feishu.cn/client/todo/detail?guid=task_123"
+    },
+    {
+      type: "entry_message",
+      title: "PilotFlow project entry",
+      external_id: "om_entry"
+    },
+    {
+      type: "pinned_message",
+      title: "Pinned PilotFlow project entry",
+      external_id: "om_entry"
     }
   ]
 });
@@ -36,6 +46,7 @@ assert.match(text, /目标: Launch PilotFlow MVP/);
 assert.match(text, /Doc: PilotFlow Project Brief - https:\/\/example\.feishu\.cn\/docx\/doc_123/);
 assert.match(text, /Base records: 2 条 \(rec_1, rec_2\)/);
 assert.match(text, /Task: Project brief - https:\/\/applink\.feishu\.cn\/client\/todo\/detail\?guid=task_123/);
+assert.match(text, /Project entry: pinned, PilotFlow project entry \(om_entry\)/);
 
 assert.match(
   buildDeliverySummaryText({

@@ -109,4 +109,25 @@ assert.deepEqual(
   ]
 );
 
+assert.deepEqual(
+  normalizeFeishuArtifacts(
+    "entry.pin",
+    { title: "Pinned project entry", messageId: "om_entry" },
+    { json: { data: { pin: { message_id: "om_entry", chat_id: "oc_demo", create_time: "1770000000000" } } } },
+    { runId }
+  ),
+  [
+    {
+      id: "pin-om_entry",
+      type: "pinned_message",
+      title: "Pinned project entry",
+      status: "created",
+      external_id: "om_entry",
+      message_id: "om_entry",
+      chat_id: "oc_demo",
+      created_at: "1770000000000"
+    }
+  ]
+);
+
 console.log("artifact normalizer tests passed");

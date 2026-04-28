@@ -46,7 +46,7 @@ Expected flow:
 2. User confirms the plan.
 3. PilotFlow creates a Feishu Doc.
 4. PilotFlow writes task/risk state to Base or Task.
-5. PilotFlow publishes a stable project entry message or group announcement.
+5. PilotFlow publishes a stable project entry message and can pin it in the group.
 6. PilotFlow sends a final summary to the group.
 7. PilotFlow records the run in Flight Recorder.
 
@@ -63,6 +63,7 @@ Expected flow:
 | Base owner/deadline fallback | Store owner, due date, risk level, source, and URL as text fields | dry-run prototype implemented |
 | Task creation | Create first action item | live validated with returned Task URL; text owner fallback in description |
 | Project entry message | Stable project entrance fallback | dry-run prototype implemented |
+| Pinned project entry | Pin the entry message before full group announcement support | dry-run prototype implemented |
 | Risk detection | Enrich planner risks with derived operational risks | prototype implemented |
 | Risk decision card | Present risk summary and decision actions in Feishu card format | dry-run prototype implemented |
 | IM summary | Send final summary to group | live validated; artifact-aware text summary implemented |
@@ -77,7 +78,7 @@ Expected flow:
 - Card update after confirmation.
 - Base template.
 - Task owner/deadline mapping.
-- Group announcement project entry.
+- Group announcement project entry beyond pinned-entry fallback.
 - Risk decision persistence after card callbacks are wired.
 - Flight Recorder cockpit.
 

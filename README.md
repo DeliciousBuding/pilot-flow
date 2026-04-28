@@ -67,7 +67,7 @@ PilotFlow is designed for practical team operations first: fewer lost decisions,
 | Discussion is scattered across group messages | Extract goals, members, deadlines, deliverables, and risks | Project flight plan |
 | Verbal agreement is hard to track | Ask for explicit confirmation before side effects | Card or text confirmation |
 | Tasks and risks disappear in chat history | Write structured project state | Base records and Tasks |
-| Project entry points are hard to find | Publish a stable project entry | Group announcement or entry message |
+| Project entry points are hard to find | Publish a stable project entry | Pinned entry message or group announcement |
 | AI actions are hard to trust | Record plans, tool calls, artifacts, fallbacks, and errors | Flight Recorder |
 
 ## 🧭 Product Experience
@@ -99,7 +99,7 @@ flowchart LR
     D --> E["Doc<br/>project brief"]
     D --> F["Base / Task<br/>state and actions"]
     D --> G["IM / Card<br/>updates and decisions"]
-    D --> H["Group Announcement<br/>project entry"]
+    D --> H["Pinned Entry / Group Announcement<br/>project entry"]
     E --> I["Delivery Summary"]
     F --> I
     G --> I
@@ -117,7 +117,7 @@ flowchart TB
         Doc["Docs"]
         Base["Base"]
         Task["Tasks"]
-        Ann["Group Announcement"]
+        Ann["Pinned Entry / Announcement"]
     end
 
     subgraph "PilotFlow Core"
@@ -154,7 +154,7 @@ Detailed architecture: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 | Docs | Project brief and delivery documents | ✅ creation validated |
 | Base | Tasks, detected risks, artifacts, confirmations | ✅ rich fallback fields prototype |
 | Task | Concrete owner/deadline action items | ✅ creation validated, text owner fallback |
-| Group Announcement | Stable project entrance | 🟡 entry-message fallback prototype |
+| Pinned Entry / Announcement | Stable project entrance | ✅ pinned entry-message prototype, announcement planned |
 | Event subscription | `@PilotFlow` automatic trigger | 🟡 planned |
 | Chat Tab / H5 | Lightweight cockpit and flight recorder | ✅ static recorder prototype |
 | Whiteboard / Calendar / Slides | Demo enhancement surfaces | ⏳ later |
@@ -177,13 +177,14 @@ PilotFlow is currently in **MVP prototype** stage. The first deliverable is a re
 | Real one-command Feishu run | ✅ validated |
 | Project flight plan card | ✅ dry-run prototype |
 | Project entry message fallback | ✅ prototype |
+| Pinned project entry message | ✅ dry-run prototype |
 | Artifact-aware final summary | ✅ prototype |
 | Duplicate live-run guard | ✅ prototype |
 | Flight Recorder static view | ✅ prototype |
 | Risk detection | ✅ prototype |
 | Risk decision card | ✅ dry-run prototype |
 | Card callback confirmation | 🟡 next |
-| Group announcement project entry | 🟡 next |
+| Group announcement project entry | 🟡 planned upgrade |
 
 ## 🗺️ Roadmap Snapshot
 
@@ -229,6 +230,7 @@ npm run check
 npm run demo:manual
 npm run demo:manual -- --send-plan-card --no-auto-confirm
 npm run demo:manual -- --send-entry-message
+npm run demo:manual -- --pin-entry-message
 npm run demo:manual -- --send-risk-card
 npm run flight:recorder -- --input tmp/runs/latest-manual-run.jsonl
 npm run test:artifacts

@@ -24,7 +24,7 @@ flowchart TB
     Router --> Base["Base Tool"]
     Router --> Task["Task Tool"]
     Router --> Card["Card Tool"]
-    Router --> Ann["Announcement Tool"]
+    Router --> Pin["Pin / Announcement Tool"]
     Orchestrator --> Recorder["Flight Recorder"]
     Recorder --> Log["JSONL / future SQLite"]
 ```
@@ -37,7 +37,7 @@ flowchart TB
 | Planner | Converts input into project plan JSON | fixed demo planner implemented |
 | Confirmation Gate | Stops side effects until human approval | flight plan card, dry-run auto-confirm, and live text fallback implemented |
 | Duplicate Run Guard | Blocks accidental repeated live runs for the same project target | local guard file implemented under `tmp/run-guard/` |
-| Orchestrator | Owns run lifecycle and tool sequence | Doc/Base/Task/entry/IM sequence implemented with artifact-aware messages and state rows |
+| Orchestrator | Owns run lifecycle and tool sequence | Doc/Base/Task/risk/entry/pin/IM sequence implemented with artifact-aware messages and state rows |
 | Feishu Tool Executor | Converts tool calls into `lark-cli` commands | dry-run and live-capable command runner implemented |
 | Flight Recorder | Records events, tool calls, artifacts, failures | JSONL with step status and artifact events implemented |
 | Risk Engine | Enriches planner risks and creates a decision summary | initial detector and risk decision card implemented |
@@ -72,14 +72,14 @@ The current schemas live in `src/schemas`.
 | `Step` | Unit of planned work |
 | `ToolCall` | One call to a Feishu or local tool |
 | `Confirmation` | Human approval gate |
-| `Artifact` | Created Doc, Task, Base record, card, entry message, summary, or run log |
+| `Artifact` | Created Doc, Task, Base record, card, entry message, pinned message, summary, or run log |
 | `Risk` | Risk item detected or entered during planning |
 
-Artifact normalization currently supports Feishu Doc, Base record batch writes, Task creation, card sends, project entry messages, IM message sends, and local run logs. Dry-run artifacts are marked `planned`; live artifacts are marked `created` once the corresponding `lark-cli` call succeeds. Base record artifacts also expose fallback fields such as `owner`, `due_date`, `risk_level`, `source_run`, `source_message`, and `url` for Flight Recorder and demo inspection.
+Artifact normalization currently supports Feishu Doc, Base record batch writes, Task creation, card sends, project entry messages, pinned messages, IM message sends, and local run logs. Dry-run artifacts are marked `planned`; live artifacts are marked `created` once the corresponding `lark-cli` call succeeds. Base record artifacts also expose fallback fields such as `owner`, `due_date`, `risk_level`, `source_run`, `source_message`, and `url` for Flight Recorder and demo inspection.
 
 The risk detector runs immediately after the plan is generated. It preserves planner risks and adds derived risks such as missing members, missing deliverables, non-concrete deadlines, and text-only owner mappings. The same detected risk list is used for the run output, Base risk rows, and optional risk decision card, so the product surfaces stay consistent.
 
-The project flight plan card is generated before side effects and can be sent with `--send-plan-card`. The risk decision card is generated after Doc/Base/Task writes and can be sent with `--send-risk-card`. The project entry message is generated after Doc, Base, and Task calls complete and can be sent with `--send-entry-message` as the current fallback for a stable group entrance. The final IM summary is generated afterward, so the group message can include the created Doc URL, Base record IDs, Task URL, run ID, and next-step prompt.
+The project flight plan card is generated before side effects and can be sent with `--send-plan-card`. The risk decision card is generated after Doc/Base/Task writes and can be sent with `--send-risk-card`. The project entry message is generated after Doc, Base, and Task calls complete and can be sent with `--send-entry-message` as the current fallback for a stable group entrance. `--pin-entry-message` sends that entry message and then calls `im.pins.create` to pin it in the target chat, giving the demo a Feishu-native stable entry before a full group announcement path is wired. The final IM summary is generated afterward, so the group message can include the created Doc URL, Base record IDs, Task URL, project entry state, run ID, and next-step prompt.
 
 The duplicate-run guard runs after live target preflight and before Feishu side effects. It computes a stable project-init key from normalized input, plan shape, profile, and hashed targets. The guard file lives in ignored local storage by default, so it protects live demos on the operator machine without publishing target IDs or secrets.
 
@@ -136,6 +136,7 @@ PILOTFLOW_FEISHU_MODE=dry-run|live
 PILOTFLOW_LARK_PROFILE=pilotflow-contest
 PILOTFLOW_SEND_PLAN_CARD=true|false
 PILOTFLOW_SEND_ENTRY_MESSAGE=true|false
+PILOTFLOW_PIN_ENTRY_MESSAGE=true|false
 PILOTFLOW_SEND_RISK_CARD=true|false
 PILOTFLOW_DEDUPE_KEY=<optional_stable_key>
 PILOTFLOW_ALLOW_DUPLICATE_RUN=true|false

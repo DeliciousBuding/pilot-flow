@@ -22,6 +22,10 @@ export function normalizeFeishuArtifacts(tool, input, output, context) {
     return [normalizeMessageArtifact(input, output, runId, status, "entry_message", "PilotFlow project entry message")];
   }
 
+  if (tool === "entry.pin") {
+    return [normalizePinnedMessageArtifact(input, output, runId, status)];
+  }
+
   if (tool === "card.send") {
     return [normalizeCardArtifact(input, output, runId, status)];
   }
@@ -132,6 +136,22 @@ function normalizeCardArtifact(input, output, runId, status) {
     title,
     status,
     external_id: externalId
+  });
+}
+
+function normalizePinnedMessageArtifact(input, output, runId, status) {
+  const pin = getPath(output, ["json", "data", "pin"]) || getPath(output, ["json", "pin"]) || getPath(output, ["json", "data"]) || {};
+  const externalId = pin.message_id || input.messageId;
+
+  return cleanArtifact({
+    id: externalId ? `pin-${externalId}` : `artifact-${runId}-pin`,
+    type: "pinned_message",
+    title: input.title || "Pinned project entry message",
+    status,
+    external_id: externalId,
+    message_id: externalId,
+    chat_id: pin.chat_id,
+    created_at: pin.create_time
   });
 }
 

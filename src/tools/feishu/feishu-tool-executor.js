@@ -95,6 +95,20 @@ function toLarkCliArgs(tool, input, options) {
     return textMessageArgs(input, { idempotencyKey, dryRun, targets });
   }
 
+  if (tool === "entry.pin") {
+    return [
+      "im",
+      "pins",
+      "create",
+      "--as",
+      "user",
+      "--data",
+      JSON.stringify({
+        message_id: input.messageId
+      })
+    ];
+  }
+
   if (tool === "card.send") {
     return [
       "im",

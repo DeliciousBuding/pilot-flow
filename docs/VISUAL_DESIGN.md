@@ -11,6 +11,7 @@ PilotFlow should feel like a Feishu-native operations layer, not a separate mark
 | Docs | Structured project artifacts |
 | Base | Dense project state table |
 | Tasks | Action items with owner/deadline |
+| Pinned entry | Stable project entrance inside the group |
 | Cockpit | Trace and replay, not the primary workspace |
 
 ## Interaction Model

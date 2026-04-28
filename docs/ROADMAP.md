@@ -13,8 +13,8 @@ Status after the latest implementation pass:
 - Phase 1 is effectively closed: the manual trigger can create real Feishu artifacts and return a traceable run.
 - Phase 2 should now prioritize stable Feishu-native product surfaces over heavier automation.
 - Card callback remains useful, but it depends on event/callback wiring and permissions. Text confirmation remains the fallback.
-- Group announcement is still a risk area, so the near-term project-entry path is an entry message that can later be pinned or upgraded to an announcement.
-- Base owner/deadline fallback, local Flight Recorder view, risk detection, and a dry-run risk decision card are now implemented. The next product slice should move toward card callback readiness or group announcement update, while keeping text confirmation, entry message fallback, and risk-card dry-run behavior.
+- Group announcement is still a risk area, so the near-term project-entry path is a pinned entry message that can later be upgraded to an announcement.
+- Base owner/deadline fallback, local Flight Recorder view, risk detection, a dry-run risk decision card, and a pinned entry-message prototype are now implemented. The next product slice should move toward card callback readiness or Task owner mapping while keeping text confirmation, pinned entry fallback, and risk-card dry-run behavior.
 
 Main loop:
 
@@ -115,6 +115,7 @@ Work items:
 - [x] Add owner mapping fallback to text fields.
 - [ ] Try group announcement update.
 - [x] Fall back to a project entry message if announcement update fails.
+- [x] Pin the project entry message with `im.pins.create` as a Feishu-native stable-entry upgrade.
 - [x] Build a lightweight Flight Recorder view.
 - [x] Add risk detection:
   - planner risk enrichment
@@ -185,7 +186,7 @@ Longer-term direction after competition MVP.
 ## Immediate Next Actions
 
 1. Check event/callback readiness for card button confirmation; keep text confirmation as fallback.
-2. Try group announcement update; keep entry-message fallback as the default stable path.
+2. Try full group announcement update only after confirming the API and permission path; keep pinned entry-message fallback as the default stable path.
 3. Prepare the first happy-path recording after a fresh rich Base table is created.
 4. Add Task assignee mapping only after contact lookup and permissions are verified.
 5. Prepare risk-card callback handling after event/callback readiness is verified.
@@ -210,7 +211,8 @@ Longer-term direction after competition MVP.
 - [x] Add owner fallback text fields.
 - [ ] Add Task assignee mapping.
 - [x] Add entry-message fallback.
-- [ ] Try group announcement update.
+- [x] Add pinned entry-message upgrade.
+- [ ] Try full group announcement update.
 - [x] Add risk decision summary.
 - [x] Add Flight Recorder viewer.
 

@@ -30,7 +30,15 @@ export class RunOrchestrator {
 
   async startProjectInit(
     inputText,
-    { autoConfirm = true, confirmationText = "", sendPlanCard = false, sendEntryMessage = false, sendRiskCard = false, dedupeKey = "" } = {}
+    {
+      autoConfirm = true,
+      confirmationText = "",
+      sendPlanCard = false,
+      sendEntryMessage = false,
+      pinEntryMessage = false,
+      sendRiskCard = false,
+      dedupeKey = ""
+    } = {}
   ) {
     const runId = `run-${randomUUID()}`;
     await this.recorder.record({ run_id: runId, event: "run.created", intent: "project_init", mode: this.mode });
@@ -49,7 +57,7 @@ export class RunOrchestrator {
     });
 
     const artifacts = [];
-    const plannedTools = plannedToolsForRun({ autoConfirm, sendPlanCard, sendEntryMessage, sendRiskCard });
+    const plannedTools = plannedToolsForRun({ autoConfirm, sendPlanCard, sendEntryMessage, pinEntryMessage, sendRiskCard });
     if (plannedTools.length > 0) {
       try {
         this.tools.preflight(plannedTools);
@@ -147,20 +155,38 @@ export class RunOrchestrator {
         await this.skipStep(runId, "step-risk", "risk decision card disabled");
       }
 
-      if (sendEntryMessage) {
+      const shouldSendEntryMessage = sendEntryMessage || pinEntryMessage;
+      let entryMessageArtifact;
+      if (shouldSendEntryMessage) {
         const entryMessageText = buildProjectEntryMessageText({ runId, plan, artifacts });
-        artifacts.push(
-          ...(await this.callTool(runId, 5, "step-entry", "entry.send", {
-            text: entryMessageText
-          }))
-        );
+        const entryArtifacts = await this.callTool(runId, 5, "step-entry", "entry.send", {
+          text: entryMessageText
+        });
+        artifacts.push(...entryArtifacts);
+        entryMessageArtifact = entryArtifacts.find((artifact) => artifact.type === "entry_message");
       } else {
         await this.skipStep(runId, "step-entry", "entry message disabled");
       }
 
+      if (pinEntryMessage) {
+        const messageId = entryMessageArtifact?.external_id || (entryMessageArtifact?.status === "planned" ? entryMessageArtifact.id : "");
+        if (messageId) {
+          artifacts.push(
+            ...(await this.callTool(runId, 6, "step-pin", "entry.pin", {
+              title: "Pinned PilotFlow project entry",
+              messageId
+            }))
+          );
+        } else {
+          await this.skipStep(runId, "step-pin", "entry message id unavailable");
+        }
+      } else {
+        await this.skipStep(runId, "step-pin", "entry pin disabled");
+      }
+
       const summaryText = buildDeliverySummaryText({ runId, plan, artifacts });
       artifacts.push(
-        ...(await this.callTool(runId, 6, "step-summary", "im.send", {
+        ...(await this.callTool(runId, 7, "step-summary", "im.send", {
           text: summaryText
         }))
       );
@@ -264,12 +290,20 @@ export class RunOrchestrator {
   }
 }
 
-function toolsForRun({ sendEntryMessage, sendRiskCard }) {
-  return [...SIDE_EFFECT_TOOLS, ...(sendEntryMessage ? ["entry.send"] : []), ...(sendRiskCard ? ["card.send"] : [])];
+function toolsForRun({ sendEntryMessage, pinEntryMessage, sendRiskCard }) {
+  return [
+    ...SIDE_EFFECT_TOOLS,
+    ...(sendEntryMessage || pinEntryMessage ? ["entry.send"] : []),
+    ...(pinEntryMessage ? ["entry.pin"] : []),
+    ...(sendRiskCard ? ["card.send"] : [])
+  ];
 }
 
-function plannedToolsForRun({ autoConfirm, sendPlanCard, sendEntryMessage, sendRiskCard }) {
-  return [...(sendPlanCard ? ["card.send"] : []), ...(autoConfirm ? toolsForRun({ sendEntryMessage, sendRiskCard }) : [])];
+function plannedToolsForRun({ autoConfirm, sendPlanCard, sendEntryMessage, pinEntryMessage, sendRiskCard }) {
+  return [
+    ...(sendPlanCard ? ["card.send"] : []),
+    ...(autoConfirm ? toolsForRun({ sendEntryMessage, pinEntryMessage, sendRiskCard }) : [])
+  ];
 }
 
 function shouldGuardRun({ autoConfirm, sendPlanCard }) {
