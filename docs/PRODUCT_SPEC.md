@@ -56,6 +56,7 @@ Expected flow:
 | --- | --- | --- |
 | Manual trigger | Start from local command | implemented |
 | Project plan JSON | Extract goal, members, deliverables, deadline, risks | implemented for fixture |
+| Plan validation fallback | Stop unsafe runs when planner output is malformed | prototype implemented |
 | Flight plan card | Show plan before write side effects | dry-run prototype implemented |
 | Confirmation gate | Require approval before writes | dry-run auto-confirm, live text fallback implemented |
 | Doc creation | Create project brief | live validated with returned Doc URL |
@@ -109,6 +110,7 @@ Expected flow:
 | Traceability | Every tool call appears in run log |
 | Feishu-native proof | IM, Card, Doc, Base or Task are visible in Feishu |
 | Human control | At least one confirmation before writes |
+| Unsafe-plan prevention | Invalid planner output enters clarification before Feishu writes |
 | Operational state | Base rows include fallback owner, due date, risk level, source run, source message, and URL fields |
 | Native assignment | Task assignee can come from explicit `open_id` mapping or optional Feishu Contacts lookup |
 | Risk handling | Detected risks appear consistently in run output, Base rows, and risk decision card |

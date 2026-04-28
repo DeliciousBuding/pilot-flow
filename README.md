@@ -170,6 +170,7 @@ PilotFlow is currently in **MVP prototype** stage. The first deliverable is a re
 | Group IM send | ✅ validated |
 | Static interactive card send | ✅ validated |
 | Feishu Doc creation | ✅ validated |
+| Plan schema validation fallback | ✅ prototype |
 | Base state write | ✅ validated |
 | Base owner/deadline fallback fields | ✅ prototype |
 | Task creation | ✅ validated |
@@ -239,6 +240,7 @@ npm run demo:manual -- --owner-open-id-map-json '{"Product Owner":"ou_xxx"}'
 npm run demo:manual -- --auto-lookup-owner-contact
 npm run flight:recorder -- --input tmp/runs/latest-manual-run.jsonl
 npm run test:artifacts
+npm run test:plan
 npm run test:card
 npm run test:guard
 npm run test:entry
@@ -248,6 +250,7 @@ npm run test:state
 npm run test:summary
 npm run test:contact
 npm run test:assignee
+npm run test:orchestrator
 npm run test:config
 ```
 

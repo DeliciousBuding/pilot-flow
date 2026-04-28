@@ -130,6 +130,15 @@ npm run test:assignee
 
 The planner keeps human-readable owner labels. When `--owner-open-id-map-json` or `PILOTFLOW_OWNER_OPEN_ID_MAP_JSON` maps the first task owner label to a Feishu `open_id`, `task.create` receives `--assignee`. If no explicit mapping exists, `--auto-lookup-owner-contact` or `PILOTFLOW_AUTO_LOOKUP_OWNER_CONTACT=1` performs a read-only Contacts search and assigns only exact or unambiguous results. If lookup is blocked, ambiguous, or still dry-run only, PilotFlow keeps the text owner fallback.
 
+Validate planner fallback behavior:
+
+```bash
+npm run test:plan
+npm run test:orchestrator
+```
+
+Plan validation runs before confirmation, preflight, duplicate guard, or Feishu tools. Invalid planner output returns `needs_clarification`, records `plan.validation_failed`, and should contain no `tool.called` event.
+
 Render a local Flight Recorder view from a JSONL run log:
 
 ```bash
@@ -209,6 +218,7 @@ Implemented:
 - `src/demo/manual-trigger.js`
 - `src/demo/setup-feishu-targets.js`
 - `src/core/planner/project-init-planner.js`
+- `src/core/planner/plan-validator.js`
 - `src/core/orchestrator/run-orchestrator.js`
 - `src/core/orchestrator/contact-owner-resolver.js`
 - `src/core/orchestrator/duplicate-run-guard.js`
@@ -228,6 +238,7 @@ Implemented to date:
 
 - `dry-run` / `live` runtime mode
 - explicit `pilotflow-contest` profile support
+- plan schema validation fallback that stops before Feishu side effects and returns `needs_clarification`
 - live-capable `doc.create`, `base.write`, `task.create`, and `im.send` command paths
 - text confirmation fallback with `确认起飞`
 - step status events in JSONL run logs
@@ -262,6 +273,7 @@ Next implementation targets:
 | --- | --- |
 | README/docs only | `git diff --check` |
 | Planner logic | `npm run check`, `npm run demo:manual` |
+| Plan validation fallback | `npm run test:plan`, `npm run test:orchestrator`, inspect `plan.validation_failed` |
 | Orchestrator logic | `npm run check`, `npm run demo:manual`, inspect JSONL |
 | Artifact normalization | `npm run test:artifacts`, `npm run demo:manual`, inspect final artifacts |
 | Flight plan card | `npm run test:card`, `npm run demo:manual -- --send-plan-card --no-auto-confirm` |

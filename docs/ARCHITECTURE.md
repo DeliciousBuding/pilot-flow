@@ -77,6 +77,8 @@ The current schemas live in `src/schemas`.
 
 Artifact normalization currently supports Feishu Doc, Base record batch writes, Task creation, card sends, project entry messages, pinned messages, IM message sends, and local run logs. Dry-run artifacts are marked `planned`; live artifacts are marked `created` once the corresponding `lark-cli` call succeeds. Base record artifacts also expose fallback fields such as `owner`, `due_date`, `risk_level`, `source_run`, `source_message`, and `url` for Flight Recorder and demo inspection.
 
+Plan validation runs immediately after planner output and before confirmation, preflight, duplicate-run guard, or any Feishu tool call. If required project-init fields fail validation, PilotFlow records `plan.validation_failed`, returns `needs_clarification`, and uses a safe fallback plan instead of creating Doc/Base/Task/IM artifacts.
+
 The risk detector runs immediately after the plan is generated. It preserves planner risks and adds derived risks such as missing members, missing deliverables, non-concrete deadlines, and text-only owner mappings. The same detected risk list is used for the run output, Base risk rows, and optional risk decision card, so the product surfaces stay consistent.
 
 Task assignee resolution runs before `task.create`. Planner member labels remain human-readable, while `PILOTFLOW_OWNER_OPEN_ID_MAP_JSON` can map those labels to Feishu `open_id` values. If no explicit map matches and `PILOTFLOW_AUTO_LOOKUP_OWNER_CONTACT` is enabled, PilotFlow performs a read-only `contact +search-user` lookup and assigns the first task only when the result is exact or unambiguous. If lookup is blocked or ambiguous, PilotFlow keeps the text owner fallback in the task description and run trace. The priority order is explicit owner map, optional contact lookup, optional default assignee, then text fallback.
@@ -161,6 +163,7 @@ Live mode requires the confirmation text `确认起飞`. It also preflights requ
 - Every write tool must receive an idempotency key.
 - Live project-init runs must pass duplicate-run protection before visible side effects.
 - Tool failures must stop or degrade the run explicitly.
+- Invalid planner output must become a clarification state before any Feishu side effect.
 - The Agent must never invent a successful Feishu write.
 - Run logs must include planned input and actual output.
 - Human confirmation is required before writing project artifacts.

@@ -14,7 +14,7 @@ Status after the latest implementation pass:
 - Phase 2 should now prioritize stable Feishu-native product surfaces over heavier automation.
 - Card callback remains useful, but it depends on event/callback wiring and permissions. Text confirmation remains the fallback.
 - Group announcement is still a risk area, so the near-term project-entry path is a pinned entry message that can later be upgraded to an announcement.
-- Base owner/deadline fallback, local Flight Recorder view, risk detection, a dry-run risk decision card, a pinned entry-message prototype, explicit Task assignee mapping, and optional Contacts-based owner lookup are now implemented. The next product slice should move toward card callback readiness, group announcement upgrade attempts, and demo hardening while keeping text confirmation, pinned entry fallback, and risk-card dry-run behavior.
+- Base owner/deadline fallback, local Flight Recorder view, risk detection, a dry-run risk decision card, a pinned entry-message prototype, explicit Task assignee mapping, optional Contacts-based owner lookup, and plan-validation fallback are now implemented. The next product slice should move toward card callback readiness, group announcement upgrade attempts, and demo hardening while keeping text confirmation, pinned entry fallback, and risk-card dry-run behavior.
 
 Main loop:
 
@@ -79,7 +79,7 @@ Work items:
 - [x] Add artifact-aware final summary text.
 - [x] Add `demo_success_run.json`.
 - [x] Add `demo_partial_failure_run.json`.
-- [ ] Add fallback plan when plan schema validation fails.
+- [x] Add fallback plan when plan schema validation fails.
 
 Exit condition:
 
@@ -189,10 +189,9 @@ Longer-term direction after competition MVP.
 1. Check event/callback readiness for card button confirmation; keep text confirmation as fallback.
 2. Try full group announcement update only after confirming the API and permission path; keep pinned entry-message fallback as the default stable path.
 3. Prepare the first happy-path recording after a fresh rich Base table is created.
-4. Add a plan-schema validation fallback so malformed planner output degrades into a safe clarification/request state.
-5. Prepare risk-card callback handling after event/callback readiness is verified.
-6. Keep README and docs updated with each implementation step.
-7. Commit and push every completed vertical slice to GitHub.
+4. Prepare risk-card callback handling after event/callback readiness is verified.
+5. Keep README and docs updated with each implementation step.
+6. Commit and push every completed vertical slice to GitHub.
 
 ## Long-Term Roadmap
 

@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { createProjectInitPlan } from "../planner/project-init-planner.js";
+import { buildPlanValidationFallbackPlan, validateProjectInitPlan } from "../planner/plan-validator.js";
 import { FeishuToolExecutor } from "../../tools/feishu/feishu-tool-executor.js";
 import { normalizeFeishuArtifacts } from "../../tools/feishu/artifact-normalizer.js";
 import { buildDeliverySummaryText } from "./summary-builder.js";
@@ -20,13 +21,14 @@ import {
 const SIDE_EFFECT_TOOLS = ["doc.create", "base.write", "task.create", "im.send"];
 
 export class RunOrchestrator {
-  constructor({ recorder, dryRun = true, mode = "dry-run", profile, feishuTargets = {}, duplicateGuard = {} } = {}) {
+  constructor({ recorder, dryRun = true, mode = "dry-run", profile, feishuTargets = {}, duplicateGuard = {}, planner = createProjectInitPlan } = {}) {
     this.recorder = recorder;
     this.mode = mode;
     this.profile = profile;
     this.feishuTargets = feishuTargets;
     this.tools = new FeishuToolExecutor({ dryRun, profile, targets: feishuTargets });
     this.duplicateGuard = new DuplicateRunGuard(duplicateGuard);
+    this.planner = planner;
   }
 
   async startProjectInit(
@@ -47,12 +49,42 @@ export class RunOrchestrator {
     const runId = `run-${randomUUID()}`;
     await this.recorder.record({ run_id: runId, event: "run.created", intent: "project_init", mode: this.mode });
 
-    const plan = createProjectInitPlan(inputText);
-    await this.recorder.record({ run_id: runId, event: "plan.generated", plan });
+    const rawPlan = this.planner(inputText);
+    const planValidation = validateProjectInitPlan(rawPlan);
+    const plan = planValidation.ok ? rawPlan : buildPlanValidationFallbackPlan(inputText, planValidation.errors);
+    await this.recorder.record({ run_id: runId, event: "plan.generated", plan, plan_validation: planValidation });
 
     const risks = detectProjectRisks(plan);
     const riskDecision = summarizeRiskDecision(risks);
     await this.recorder.record({ run_id: runId, event: "risk.detected", risks, risk_decision: riskDecision });
+
+    if (!planValidation.ok) {
+      await this.recorder.record({
+        run_id: runId,
+        event: "plan.validation_failed",
+        validation_errors: planValidation.errors,
+        fallback: {
+          status: "needs_clarification",
+          missing_info: plan.missing_info
+        }
+      });
+      await this.recorder.record({
+        run_id: runId,
+        event: "run.waiting_clarification",
+        missing_info: plan.missing_info,
+        failed_before_side_effects: true
+      });
+      return {
+        runId,
+        status: "needs_clarification",
+        plan,
+        plan_validation: planValidation,
+        risks,
+        risk_decision: riskDecision,
+        artifacts: [],
+        duplicate_guard: { enabled: false, status: "skipped", reason: "invalid_plan" }
+      };
+    }
 
     await this.recorder.record({
       run_id: runId,
