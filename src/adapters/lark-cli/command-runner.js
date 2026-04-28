@@ -103,8 +103,13 @@ function resolveExecutable(bin, args) {
 }
 
 function parseJson(stdout) {
-  const text = stdout.trim();
+  let text = stdout.trim();
   if (!text) return undefined;
+
+  const firstObjectIndex = text.search(/[\[{]/);
+  if (firstObjectIndex > 0) {
+    text = text.slice(firstObjectIndex);
+  }
 
   try {
     return JSON.parse(text);

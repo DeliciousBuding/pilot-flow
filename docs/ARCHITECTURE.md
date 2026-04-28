@@ -37,7 +37,7 @@ flowchart TB
 | Confirmation Gate | Stops side effects until human approval | dry-run auto-confirm and live text fallback implemented |
 | Orchestrator | Owns run lifecycle and tool sequence | Doc/Base/Task/IM sequence implemented |
 | Feishu Tool Executor | Converts tool calls into `lark-cli` commands | dry-run and live-capable command runner implemented |
-| Flight Recorder | Records events, tool calls, artifacts, failures | JSONL with step status events implemented |
+| Flight Recorder | Records events, tool calls, artifacts, failures | JSONL with step status and artifact events implemented |
 | Risk Engine | Detects missing owner, deadline conflict, overload | planned |
 | Cockpit | Shows run state and replay | planned |
 
@@ -72,6 +72,8 @@ The current schemas live in `src/schemas`.
 | `Confirmation` | Human approval gate |
 | `Artifact` | Created Doc, Task, Base record, message, summary, or run log |
 | `Risk` | Risk item detected or entered during planning |
+
+Artifact normalization currently supports Feishu Doc, Base record batch writes, Task creation, IM message sends, and local run logs. Dry-run artifacts are marked `planned`; live artifacts are marked `created` once the corresponding `lark-cli` call succeeds.
 
 ## Tool Routing
 

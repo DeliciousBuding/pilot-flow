@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { createProjectInitPlan } from "../planner/project-init-planner.js";
 import { FeishuToolExecutor } from "../../tools/feishu/feishu-tool-executor.js";
+import { normalizeFeishuArtifacts } from "../../tools/feishu/artifact-normalizer.js";
 
 export class RunOrchestrator {
   constructor({ recorder, dryRun = true, mode = "dry-run", profile, feishuTargets = {} } = {}) {
@@ -53,46 +54,59 @@ export class RunOrchestrator {
     };
     await this.recorder.record({ run_id: runId, event: "confirmation.approved", confirmation: approved });
 
+    const artifacts = [];
+
     try {
-      await this.callTool(runId, 1, "step-doc", "doc.create", {
-        title: "PilotFlow Project Brief",
-        markdown: buildBriefMarkdown(plan)
-      });
+      artifacts.push(
+        ...(await this.callTool(runId, 1, "step-doc", "doc.create", {
+          title: "PilotFlow Project Brief",
+          markdown: buildBriefMarkdown(plan)
+        }))
+      );
 
-      await this.callTool(runId, 2, "step-state", "base.write", {
-        body: {
-          fields: ["type", "title", "status", "source_run"],
-          rows: buildStateRows(plan, runId)
-        }
-      });
+      artifacts.push(
+        ...(await this.callTool(runId, 2, "step-state", "base.write", {
+          body: {
+            fields: ["type", "title", "status", "source_run"],
+            rows: buildStateRows(plan, runId)
+          }
+        }))
+      );
 
-      await this.callTool(runId, 3, "step-task", "task.create", {
-        summary: firstTaskSummary(plan),
-        description: `Created by PilotFlow run ${runId}.\n\nGoal: ${plan.goal}`,
-        due: normalizeDueDate(plan.deadline)
-      });
+      artifacts.push(
+        ...(await this.callTool(runId, 3, "step-task", "task.create", {
+          summary: firstTaskSummary(plan),
+          description: `Created by PilotFlow run ${runId}.\n\nGoal: ${plan.goal}`,
+          due: normalizeDueDate(plan.deadline)
+        }))
+      );
 
-      await this.callTool(runId, 4, "step-summary", "im.send", {
-        text: `PilotFlow run ${runId} completed. Brief, state records, and summary are ready for review.`
-      });
+      artifacts.push(
+        ...(await this.callTool(runId, 4, "step-summary", "im.send", {
+          text: `PilotFlow run ${runId} completed. Brief, state records, and summary are ready for review.`
+        }))
+      );
     } catch (error) {
       await this.recorder.record({ run_id: runId, event: "run.failed", error: { message: error.message } });
       throw error;
     }
 
+    const runLogArtifact = {
+      id: `artifact-${runId}-log`,
+      type: "run_log",
+      title: "JSONL run log",
+      status: "created"
+    };
+    artifacts.push(runLogArtifact);
+
     await this.recorder.record({
       run_id: runId,
       event: "artifact.created",
-      artifact: {
-        id: `artifact-${runId}-log`,
-        type: "run_log",
-        title: "JSONL run log",
-        status: "created"
-      }
+      artifact: runLogArtifact
     });
     await this.recorder.record({ run_id: runId, event: "run.completed" });
 
-    return { runId, status: "completed", plan };
+    return { runId, status: "completed", plan, artifacts };
   }
 
   async callTool(runId, sequence, stepId, tool, input) {
@@ -102,8 +116,17 @@ export class RunOrchestrator {
     try {
       const output = await this.tools.execute(tool, input, { runId, sequence });
       await this.recorder.record({ run_id: runId, event: "tool.succeeded", tool_call_id: toolCallId, tool, output });
+      const artifacts = normalizeFeishuArtifacts(tool, input, output, { runId, sequence });
+      for (const artifact of artifacts) {
+        await this.recorder.record({
+          run_id: runId,
+          event: artifact.status === "planned" ? "artifact.planned" : "artifact.created",
+          tool_call_id: toolCallId,
+          artifact
+        });
+      }
       await this.recorder.record({ run_id: runId, event: "step.status_changed", step_id: stepId, status: "succeeded" });
-      return output;
+      return artifacts;
     } catch (error) {
       await this.recorder.record({
         run_id: runId,

@@ -61,15 +61,16 @@ Work items:
 - [x] Add confirmation text fallback: "确认起飞".
 - [x] Add step status updates in run logs.
 - [x] Add live preflight so missing Base/chat targets fail before side effects.
+- [x] Normalize Doc/Base/Task/IM artifacts into final run output and JSONL logs.
+- [x] Run confirmed live mode against the target test group and Base.
+- [x] Validate live artifact IDs and URLs against real `lark-cli` responses.
 - [ ] Add fallback plan when plan schema validation fails.
-- [ ] Run confirmed live mode against the target test group and Base.
-- [ ] Extract live artifact IDs and URLs into the final run result.
 - [ ] Add `demo_success_run.json`.
 - [ ] Add `demo_partial_failure_run.json`.
 
 Exit condition:
 
-- [ ] One local command creates a real Feishu Doc, writes state, creates at least one Task or Base record, sends a summary to the test group, and records every step.
+- [x] One local command creates a real Feishu Doc, writes state, creates at least one Task or Base record, sends a summary to the test group, and records every step.
 
 ## Phase 2: Standard Feishu-Native MVP
 
@@ -167,7 +168,7 @@ Longer-term direction after competition MVP.
 2. Use `pilotflow-contest` profile by default for project API tests.
 3. Fill target env values for chat, Base, table, and optional tasklist.
 4. Run `npm run demo:manual -- --live --confirm "确认起飞"` against real Feishu targets.
-5. Extract created Doc, Base rows, Task, and IM message links into the run result.
+5. Validate created Doc, Base rows, Task, and IM message links in the run result.
 6. Keep README and docs updated with each implementation step.
 7. Commit and push every completed vertical slice to GitHub.
 
@@ -177,8 +178,8 @@ Longer-term direction after competition MVP.
 
 - [x] Replace dry-run tool outputs with live mode behind an explicit flag.
 - [x] Use environment variables for test chat, Base, table, and profile.
-- [ ] Make `npm run demo:manual -- --live` create real artifacts.
-- [ ] Add idempotency protection for every write.
+- [x] Make `npm run demo:manual -- --live` create real artifacts.
+- [ ] Add idempotency or duplicate-run guard for every write.
 - [ ] Add screenshots or recordings only after the flow is stable.
 
 ### Week 2: Product-Shaped MVP

@@ -1,0 +1,111 @@
+export function normalizeFeishuArtifacts(tool, input, output, context) {
+  const status = output?.dry_run ? "planned" : "created";
+  const runId = context.runId;
+
+  if (tool === "doc.create") {
+    return [normalizeDocArtifact(input, output, runId, status)];
+  }
+
+  if (tool === "base.write") {
+    return normalizeBaseArtifacts(input, output, runId, status);
+  }
+
+  if (tool === "task.create") {
+    return [normalizeTaskArtifact(input, output, runId, status)];
+  }
+
+  if (tool === "im.send") {
+    return [normalizeMessageArtifact(input, output, runId, status)];
+  }
+
+  return [];
+}
+
+function normalizeDocArtifact(input, output, runId, status) {
+  const document = getPath(output, ["json", "data", "document"]) || getPath(output, ["json", "document"]) || {};
+  const externalId = document.document_id || document.documentId || document.token;
+
+  return cleanArtifact({
+    id: externalId ? `doc-${externalId}` : `artifact-${runId}-doc`,
+    type: "doc",
+    title: input.title || markdownTitle(input.markdown) || "Project brief document",
+    status,
+    url: document.url,
+    external_id: externalId
+  });
+}
+
+function normalizeBaseArtifacts(input, output, runId, status) {
+  const body = input.body || {};
+  const fields = body.fields || [];
+  const rows = body.rows || [];
+  const recordIds =
+    getPath(output, ["json", "data", "record_id_list"]) ||
+    getPath(output, ["json", "record_id_list"]) ||
+    getPath(output, ["json", "data", "records"])?.map((record) => record.record_id || record.id) ||
+    [];
+
+  const typeIndex = fields.indexOf("type");
+  const titleIndex = fields.indexOf("title");
+  const statusIndex = fields.indexOf("status");
+  const rowCount = Math.max(rows.length, recordIds.length, 1);
+
+  return Array.from({ length: rowCount }, (_, index) => {
+    const row = rows[index] || [];
+    const externalId = recordIds[index];
+    const title = row[titleIndex] || `Base record ${index + 1}`;
+
+    return cleanArtifact({
+      id: externalId ? `base-record-${externalId}` : `artifact-${runId}-base-${index + 1}`,
+      type: "base_record",
+      title,
+      status: row[statusIndex] === "failed" ? "failed" : status,
+      external_id: externalId,
+      record_type: row[typeIndex]
+    });
+  });
+}
+
+function normalizeTaskArtifact(input, output, runId, status) {
+  const task = getPath(output, ["json", "data", "task"]) || getPath(output, ["json", "task"]) || getPath(output, ["json", "data"]) || {};
+  const externalId = task.guid || task.task_guid || task.task_id || task.id;
+
+  return cleanArtifact({
+    id: externalId ? `task-${externalId}` : `artifact-${runId}-task`,
+    type: "task",
+    title: input.summary || task.summary || "PilotFlow task",
+    status,
+    url: task.url || task.app_link || task.applink,
+    external_id: externalId
+  });
+}
+
+function normalizeMessageArtifact(input, output, runId, status) {
+  const message =
+    getPath(output, ["json", "data", "message"]) ||
+    getPath(output, ["json", "message"]) ||
+    getPath(output, ["json", "data"]) ||
+    {};
+  const externalId = message.message_id || message.messageId || message.id;
+
+  return cleanArtifact({
+    id: externalId ? `message-${externalId}` : `artifact-${runId}-message`,
+    type: "message",
+    title: input.text ? input.text.slice(0, 80) : "PilotFlow summary message",
+    status,
+    external_id: externalId
+  });
+}
+
+function markdownTitle(markdown = "") {
+  const titleLine = markdown.split(/\r?\n/).find((line) => line.startsWith("# "));
+  return titleLine?.replace(/^#\s+/, "").trim();
+}
+
+function getPath(value, path) {
+  return path.reduce((current, key) => (current && current[key] !== undefined ? current[key] : undefined), value);
+}
+
+function cleanArtifact(artifact) {
+  return Object.fromEntries(Object.entries(artifact).filter(([, value]) => value !== undefined && value !== ""));
+}

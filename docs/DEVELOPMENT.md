@@ -144,13 +144,15 @@ Implemented in the current Phase 1 slice:
 - text confirmation fallback with `确认起飞`
 - step status events in JSONL run logs
 - live preflight that blocks partial side effects when Base or chat targets are missing
+- Feishu artifact normalization for Doc, Base records, Task, IM message, and run log
+- confirmed live run against the activity-tenant test group and Base
+- live extraction of Doc URL, Base record IDs, Task URL, IM message ID, and run log artifact
 
 Next implementation targets:
 
-- real live run against target Base/chat IDs
-- extracted artifact IDs and links from live `lark-cli` JSON output
 - `demo_success_run.json`
 - `demo_partial_failure_run.json`
+- richer final IM summary that includes artifact links and IDs
 - card confirmation
 
 ## Validation Matrix
@@ -160,6 +162,7 @@ Next implementation targets:
 | README/docs only | `git diff --check` |
 | Planner logic | `npm run check`, `npm run demo:manual` |
 | Orchestrator logic | `npm run check`, `npm run demo:manual`, inspect JSONL |
+| Artifact normalization | `npm run test:artifacts`, `npm run demo:manual`, inspect final artifacts |
 | Feishu tool wrapper | dry-run command, then live test against `pilotflow-contest` |
 | Live Feishu write | dry-run first, live command second, record returned IDs |
 

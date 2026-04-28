@@ -56,11 +56,11 @@ Expected flow:
 | Manual trigger | Start from local command | implemented |
 | Project plan JSON | Extract goal, members, deliverables, deadline, risks | implemented for fixture |
 | Confirmation gate | Require approval before writes | dry-run auto-confirm, live text fallback implemented |
-| Doc creation | Create project brief | live-capable command path implemented, live validation pending |
-| Base write | Store project state | live-capable command path implemented, live validation pending |
-| Task creation | Create first action item | live-capable command path implemented, live validation pending |
-| IM summary | Send final summary to group | live-capable command path implemented, live validation pending |
-| Run log | JSONL trace | implemented with step status events |
+| Doc creation | Create project brief | live validated with returned Doc URL |
+| Base write | Store project state | live validated with returned record IDs |
+| Task creation | Create first action item | live validated with returned Task URL |
+| IM summary | Send final summary to group | live validated with returned message ID |
+| Run log | JSONL trace | implemented with step status and artifact events |
 
 ## P1 Features
 

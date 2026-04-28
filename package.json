@@ -6,7 +6,9 @@
   "description": "Feishu-native AI project operations officer proof of concept.",
   "scripts": {
     "demo:manual": "node src/demo/manual-trigger.js",
-    "check": "node --check src/config/runtime-config.js && node --check src/demo/manual-trigger.js && node --check src/core/planner/project-init-planner.js && node --check src/core/orchestrator/run-orchestrator.js && node --check src/core/recorder/jsonl-recorder.js && node --check src/tools/feishu/feishu-tool-executor.js && node --check src/adapters/lark-cli/command-runner.js"
+    "setup:feishu": "node src/demo/setup-feishu-targets.js",
+    "check": "node --check src/config/runtime-config.js && node --check src/demo/manual-trigger.js && node --check src/demo/setup-feishu-targets.js && node --check src/core/planner/project-init-planner.js && node --check src/core/orchestrator/run-orchestrator.js && node --check src/core/recorder/jsonl-recorder.js && node --check src/tools/feishu/artifact-normalizer.js && node --check src/tools/feishu/artifact-normalizer.test.js && node --check src/tools/feishu/feishu-tool-executor.js && node --check src/adapters/lark-cli/command-runner.js",
+    "test:artifacts": "node src/tools/feishu/artifact-normalizer.test.js"
   },
   "engines": {
     "node": ">=20"
