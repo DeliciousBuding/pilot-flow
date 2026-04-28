@@ -30,6 +30,13 @@ export function loadRuntimeConfig(argv = process.argv.slice(2), env = process.en
     riskCard: {
       send: booleanValue(args["send-risk-card"]) || booleanEnv(env.PILOTFLOW_SEND_RISK_CARD)
     },
+    taskAssignee: {
+      ownerOpenIdMap: jsonObjectValue(
+        stringValue(args["owner-open-id-map-json"]) || env.PILOTFLOW_OWNER_OPEN_ID_MAP_JSON,
+        "owner open_id map"
+      ),
+      defaultOpenId: stringValue(args["task-assignee-open-id"]) || env.PILOTFLOW_TASK_ASSIGNEE_OPEN_ID || ""
+    },
     duplicateGuard: {
       enabled: mode === "live" && !booleanValue(args["disable-duplicate-guard"]) && !booleanEnv(env.PILOTFLOW_DISABLE_DUPLICATE_GUARD),
       allowDuplicate: booleanValue(args["allow-duplicate-run"]) || booleanEnv(env.PILOTFLOW_ALLOW_DUPLICATE_RUN),
@@ -106,6 +113,8 @@ Options:
   --send-entry-message      Send or dry-run a project entry message after Doc/Base/Task artifacts are created.
   --pin-entry-message       Send the project entry message and pin it in the target chat.
   --send-risk-card          Send or dry-run a risk decision card after state rows are created.
+  --owner-open-id-map-json <json>  Map planner owner labels to Feishu open_id values.
+  --task-assignee-open-id <open_id> Optional default assignee for the first created Task.
   --dedupe-key <key>        Optional stable key for live duplicate-run protection.
   --allow-duplicate-run     Bypass duplicate-run protection for intentional repeated live writes.
   --disable-duplicate-guard Disable live duplicate-run protection.
@@ -127,4 +136,21 @@ function booleanValue(value) {
 
 function booleanEnv(value) {
   return value === "true" || value === "1";
+}
+
+function jsonObjectValue(value, label) {
+  if (!value) return {};
+
+  let parsed;
+  try {
+    parsed = JSON.parse(value);
+  } catch (error) {
+    throw new Error(`Invalid ${label}: ${error.message}`);
+  }
+
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error(`Invalid ${label}: expected a JSON object`);
+  }
+
+  return parsed;
 }

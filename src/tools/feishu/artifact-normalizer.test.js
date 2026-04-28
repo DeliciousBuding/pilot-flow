@@ -60,8 +60,30 @@ assert.deepEqual(
 );
 
 assert.equal(
-  normalizeFeishuArtifacts("task.create", { summary: "Project brief" }, { dry_run: true }, { runId })[0].status,
+  normalizeFeishuArtifacts(
+    "task.create",
+    { summary: "Project brief", owner: "Product Owner", assignee: "ou_product", assignee_source: "owner_open_id_map" },
+    { dry_run: true },
+    { runId }
+  )[0].status,
   "planned"
+);
+assert.deepEqual(
+  normalizeFeishuArtifacts(
+    "task.create",
+    { summary: "Project brief", owner: "Product Owner", assignee: "ou_product", assignee_source: "owner_open_id_map" },
+    { dry_run: true },
+    { runId }
+  )[0],
+  {
+    id: "artifact-run-test-task",
+    type: "task",
+    title: "Project brief",
+    status: "planned",
+    owner: "Product Owner",
+    assignee: "ou_product",
+    assignee_source: "owner_open_id_map"
+  }
 );
 
 assert.equal(

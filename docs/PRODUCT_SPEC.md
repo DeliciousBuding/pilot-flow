@@ -61,7 +61,8 @@ Expected flow:
 | Doc creation | Create project brief | live validated with returned Doc URL |
 | Base write | Store project state | live validated with returned record IDs |
 | Base owner/deadline fallback | Store owner, due date, risk level, source, and URL as text fields | dry-run prototype implemented |
-| Task creation | Create first action item | live validated with returned Task URL; text owner fallback in description |
+| Task creation | Create first action item | live validated with returned Task URL; text owner fallback and optional open_id assignee mapping |
+| Task assignee mapping | Map planner owner labels to Feishu `open_id` values for Task assignment | dry-run prototype implemented |
 | Project entry message | Stable project entrance fallback | dry-run prototype implemented |
 | Pinned project entry | Pin the entry message before full group announcement support | dry-run prototype implemented |
 | Risk detection | Enrich planner risks with derived operational risks | prototype implemented |
@@ -77,7 +78,7 @@ Expected flow:
 - Interactive card confirmation.
 - Card update after confirmation.
 - Base template.
-- Task owner/deadline mapping.
+- Automatic contact lookup for Task owner mapping.
 - Group announcement project entry beyond pinned-entry fallback.
 - Risk decision persistence after card callbacks are wired.
 - Flight Recorder cockpit.

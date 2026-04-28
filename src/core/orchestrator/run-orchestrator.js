@@ -8,9 +8,9 @@ import { buildProjectEntryMessageText } from "./entry-message-builder.js";
 import { buildProjectInitDedupeKey, duplicateGuardSummary, DuplicateRunGuard } from "./duplicate-run-guard.js";
 import { buildRiskDecisionCard } from "./risk-decision-card.js";
 import { detectProjectRisks, summarizeRiskDecision } from "./risk-detector.js";
+import { resolveTaskAssignee } from "./task-assignee-resolver.js";
 import {
   buildProjectStateRows,
-  firstTaskFallbackOwner,
   firstTaskSummary,
   normalizeDueDate,
   PROJECT_STATE_FIELDS
@@ -37,6 +37,8 @@ export class RunOrchestrator {
       sendEntryMessage = false,
       pinEntryMessage = false,
       sendRiskCard = false,
+      ownerOpenIdMap = {},
+      taskAssigneeOpenId = "",
       dedupeKey = ""
     } = {}
   ) {
@@ -136,11 +138,18 @@ export class RunOrchestrator {
         }))
       );
 
+      const taskAssignee = resolveTaskAssignee(plan, {
+        ownerOpenIdMap,
+        defaultOpenId: taskAssigneeOpenId
+      });
       artifacts.push(
         ...(await this.callTool(runId, 3, "step-task", "task.create", {
           summary: firstTaskSummary(plan),
-          description: `Created by PilotFlow run ${runId}.\n\nGoal: ${plan.goal}\nFallback owner: ${firstTaskFallbackOwner(plan)}`,
-          due: normalizeDueDate(plan.deadline)
+          description: buildTaskDescription({ runId, plan, taskAssignee }),
+          due: normalizeDueDate(plan.deadline),
+          owner: taskAssignee.owner,
+          assignee: taskAssignee.assignee || undefined,
+          assignee_source: taskAssignee.source
         }))
       );
 
@@ -333,4 +342,21 @@ ${plan.deadline}
 
 ${plan.risks.map((risk) => `- ${risk.title}`).join("\n") || "- No explicit risks"}
 `;
+}
+
+function buildTaskDescription({ runId, plan, taskAssignee }) {
+  const lines = [
+    `Created by PilotFlow run ${runId}.`,
+    "",
+    `Goal: ${plan.goal}`,
+    `Fallback owner: ${taskAssignee.owner}`
+  ];
+
+  if (taskAssignee.assignee) {
+    lines.push(`Feishu assignee: ${taskAssignee.assignee} (${taskAssignee.source})`);
+  } else {
+    lines.push("Feishu assignee: unmapped; using text owner fallback.");
+  }
+
+  return lines.join("\n");
 }

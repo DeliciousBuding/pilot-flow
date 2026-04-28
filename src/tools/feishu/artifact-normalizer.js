@@ -100,7 +100,10 @@ function normalizeTaskArtifact(input, output, runId, status) {
     title: input.summary || task.summary || "PilotFlow task",
     status,
     url: task.url || task.app_link || task.applink,
-    external_id: externalId
+    external_id: externalId,
+    owner: input.owner,
+    assignee: input.assignee,
+    assignee_source: input.assignee_source
   });
 }
 

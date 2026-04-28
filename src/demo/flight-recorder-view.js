@@ -167,7 +167,7 @@ function renderHtml(model) {
       ${section("Plan", renderPlan(model.plan))}
       ${section("Steps", renderRows(model.steps, ["id", "title", "tool", "status", "reason"]))}
     </div>
-    ${section("Artifacts", renderRows(model.artifacts, ["type", "title", "status", "owner", "due_date", "risk_level", "external_id", "url"]))}
+    ${section("Artifacts", renderRows(model.artifacts, ["type", "title", "status", "owner", "assignee", "due_date", "risk_level", "external_id", "url"]))}
     ${section("Tool Calls", renderRows(model.tools, ["id", "tool", "status"]))}
     ${section("Timeline", renderRows(model.timeline, ["ts", "event", "step_id", "tool", "status"]))}
     ${model.errors.length > 0 ? section("Errors", renderJson(model.errors)) : ""}

@@ -153,7 +153,7 @@ Detailed architecture: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 | Cards | Flight plan, confirmation, risk decision | ✅ flight plan + risk decision prototypes |
 | Docs | Project brief and delivery documents | ✅ creation validated |
 | Base | Tasks, detected risks, artifacts, confirmations | ✅ rich fallback fields prototype |
-| Task | Concrete owner/deadline action items | ✅ creation validated, text owner fallback |
+| Task | Concrete owner/deadline action items | ✅ creation validated, optional open_id assignee mapping |
 | Pinned Entry / Announcement | Stable project entrance | ✅ pinned entry-message prototype, announcement planned |
 | Event subscription | `@PilotFlow` automatic trigger | 🟡 planned |
 | Chat Tab / H5 | Lightweight cockpit and flight recorder | ✅ static recorder prototype |
@@ -173,6 +173,7 @@ PilotFlow is currently in **MVP prototype** stage. The first deliverable is a re
 | Base state write | ✅ validated |
 | Base owner/deadline fallback fields | ✅ prototype |
 | Task creation | ✅ validated |
+| Task assignee open_id mapping | ✅ dry-run prototype |
 | Local Flight Recorder | ✅ prototype |
 | Real one-command Feishu run | ✅ validated |
 | Project flight plan card | ✅ dry-run prototype |
@@ -232,6 +233,7 @@ npm run demo:manual -- --send-plan-card --no-auto-confirm
 npm run demo:manual -- --send-entry-message
 npm run demo:manual -- --pin-entry-message
 npm run demo:manual -- --send-risk-card
+npm run demo:manual -- --owner-open-id-map-json '{"Product Owner":"ou_xxx"}'
 npm run flight:recorder -- --input tmp/runs/latest-manual-run.jsonl
 npm run test:artifacts
 npm run test:card
@@ -241,6 +243,8 @@ npm run test:flight
 npm run test:risk
 npm run test:state
 npm run test:summary
+npm run test:assignee
+npm run test:config
 ```
 
 The current local demo reads a project-init fixture, writes a traceable run log, and returns planned artifacts. Live Feishu execution is available behind an explicit confirmation gate; detailed setup lives in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).

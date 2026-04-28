@@ -119,6 +119,15 @@ npm run test:risk
 
 The risk detector runs in every project-init run. `--send-risk-card` adds an optional card send after Doc/Base/Task artifacts are created; without the flag, the run still records `risk.detected` and skips the risk-card step.
 
+Preview Task assignee mapping:
+
+```bash
+npm run demo:manual -- --owner-open-id-map-json '{"Product Owner":"ou_xxx"}'
+npm run test:assignee
+```
+
+The planner keeps human-readable owner labels. When `--owner-open-id-map-json` or `PILOTFLOW_OWNER_OPEN_ID_MAP_JSON` maps the first task owner label to a Feishu `open_id`, `task.create` receives `--assignee`. If no mapping exists, PilotFlow keeps the text owner fallback.
+
 Render a local Flight Recorder view from a JSONL run log:
 
 ```bash
@@ -152,6 +161,8 @@ Before running the confirmed live command, provide the target Feishu resources t
 | `PILOTFLOW_BASE_TOKEN` | Base token for state rows |
 | `PILOTFLOW_BASE_TABLE_ID` | Base table ID or name |
 | `PILOTFLOW_TASKLIST_ID` | optional tasklist GUID or AppLink |
+| `PILOTFLOW_OWNER_OPEN_ID_MAP_JSON` | JSON object mapping owner labels to Feishu `open_id` values |
+| `PILOTFLOW_TASK_ASSIGNEE_OPEN_ID` | optional default assignee `open_id` for the first created Task |
 | `PILOTFLOW_CONFIRMATION_TEXT` | must equal `确认起飞` for live writes |
 
 ## Development Workflow
@@ -227,6 +238,7 @@ Implemented in the current Phase 1 slice:
 - duplicate live-run guard with stable dedupe key, local ignored guard file, and explicit bypass
 - shared Project State template with owner/deadline/risk/source/url fallback fields
 - Task description text fallback for owner when Feishu assignee mapping is not ready
+- optional owner-label to open_id mapping for the first Feishu Task assignee
 - static Flight Recorder HTML view over JSONL run logs
 - risk detection over planner risks, missing project facts, non-concrete deadlines, and owner text fallbacks
 - optional `--send-risk-card` flow that sends or dry-runs a Feishu-native risk decision card
@@ -253,6 +265,7 @@ Next implementation targets:
 | Pinned entry message | `npm run test:artifacts`, `npm run demo:manual -- --pin-entry-message`, inspect `pinned_message` artifact |
 | Flight Recorder view | `npm run test:flight`, `npm run flight:recorder -- --input <run.jsonl>`, inspect generated HTML |
 | Risk detection/card | `npm run test:risk`, `npm run demo:manual -- --send-risk-card`, inspect `risk.detected` and card artifact |
+| Task assignee mapping | `npm run test:assignee`, `npm run test:config`, `npm run demo:manual -- --owner-open-id-map-json '{"Product Owner":"ou_xxx"}'`, inspect `--assignee` |
 | Project state rows | `npm run test:state`, `npm run setup:feishu -- --dry-run`, inspect Base fields |
 | Summary text | `npm run test:summary`, `npm run demo:manual`, inspect final IM tool input |
 | Feishu tool wrapper | dry-run command, then live test against `pilotflow-contest` |

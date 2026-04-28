@@ -28,6 +28,8 @@ try {
     sendEntryMessage: config.entryMessage.send,
     pinEntryMessage: config.entryMessage.pin,
     sendRiskCard: config.riskCard.send,
+    ownerOpenIdMap: config.taskAssignee.ownerOpenIdMap,
+    taskAssigneeOpenId: config.taskAssignee.defaultOpenId,
     dedupeKey: config.duplicateGuard.key
   });
 
