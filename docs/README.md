@@ -35,6 +35,7 @@ This directory contains the public documentation set for PilotFlow.
 | `demo/CAPTURE_GUIDE.md` | Recording and screenshot capture checklist |
 | `demo/FAILURE_DEMO.md` | Failure-path demo pack workflow and reviewer-facing boundaries |
 | `demo/READINESS.md` | Pre-recording readiness gate for evidence, docs, and manual capture work |
+| `demo/PERMISSIONS.md` | Permission and callback appendix generation workflow |
 
 ## Planned Folders
 

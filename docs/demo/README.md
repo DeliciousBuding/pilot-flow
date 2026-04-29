@@ -29,6 +29,7 @@ The demo should make three things obvious:
 | [`CAPTURE_GUIDE.md`](CAPTURE_GUIDE.md) | Recording and screenshot capture checklist |
 | [`FAILURE_DEMO.md`](FAILURE_DEMO.md) | Failure-path demo pack workflow and reviewer-facing boundaries |
 | [`READINESS.md`](READINESS.md) | Pre-recording readiness gate for evidence, docs, and manual capture work |
+| [`PERMISSIONS.md`](PERMISSIONS.md) | Permission and callback appendix generation workflow |
 
 Generated local evidence artifacts are not committed by default. Create them from a JSONL run log:
 
@@ -39,6 +40,7 @@ npm run demo:eval -- --output tmp/demo-eval/DEMO_EVAL.md
 npm run demo:capture -- --output tmp/demo-capture/CAPTURE_PACK.md
 npm run demo:failure -- --output tmp/demo-failure/FAILURE_DEMO.md
 npm run demo:readiness -- --output tmp/demo-readiness/DEMO_READINESS.md
+npm run demo:permissions -- --collect-version --collect-auth --collect-event-dry-run --output tmp/demo-permissions/PERMISSION_APPENDIX.md
 ```
 
 ## Recommended Screens
@@ -55,6 +57,7 @@ npm run demo:readiness -- --output tmp/demo-readiness/DEMO_READINESS.md
 | Demo Capture Pack | Checklist for recording the happy path, failure evidence, and permission appendix |
 | Failure-Path Demo Pack | Reviewer-facing appendix for callback timeout, announcement fallback, invalid plan, duplicate run, and requirement-risk cases |
 | Demo Readiness Pack | Pre-recording gate that separates ready evidence from manual videos and screenshots |
+| Permission Appendix Pack | Sanitized CLI evidence, required screenshots, and callback configuration boundaries |
 
 ## Current Demo Status
 
@@ -71,3 +74,4 @@ npm run demo:readiness -- --output tmp/demo-readiness/DEMO_READINESS.md
 | Demo capture pack | 7 required captures generated from current evidence paths |
 | Failure-path demo pack | 5 evidence-ready scenarios generated through `npm run demo:failure` |
 | Demo readiness pack | Evidence and docs gate generated through `npm run demo:readiness`; manual recording still pending |
+| Permission appendix pack | Sanitized permission/callback appendix generated through `npm run demo:permissions`; screenshots still pending |

@@ -15,7 +15,7 @@ Status after the latest implementation pass:
 - Card callback action protocol, bounded listener process, and callback-trigger bridge are implemented locally. A live listener connected to Feishu successfully, but no `card.action.trigger` event was received in the two-minute validation window; text confirmation remains the fallback until Open Platform callback configuration is verified.
 - Group announcement has been attempted through the native announcement API. The test group currently returns `232097 Unable to operate docx type chat announcement`, so the product path now records the failed announcement upgrade and keeps the pinned entry message as the stable Feishu-native entrance.
 - Base owner/deadline fallback, local Flight Recorder view, risk detection, live risk decision card send, live pinned entry message, explicit Task assignee mapping, optional Contacts-based owner lookup, plan-validation fallback, card callback action protocol, and a bounded card listener are now implemented. The next product slice should harden the demo, capture evidence, and resolve platform callback configuration.
-- Phase 3 demo hardening has started: the latest live run now has a generated Flight Recorder HTML view and Markdown evidence pack, `docs/demo/` contains the demo playbook, reviewer Q&A, fallback/no-network explanation, local demo evaluation pack, capture pack, failure-path demo pack, and readiness gate for callback timeout, announcement fallback, invalid plan, duplicate run, requirement-risk cases, and manual capture work.
+- Phase 3 demo hardening has started: the latest live run now has a generated Flight Recorder HTML view and Markdown evidence pack, `docs/demo/` contains the demo playbook, reviewer Q&A, fallback/no-network explanation, local demo evaluation pack, capture pack, failure-path demo pack, readiness gate, and permission appendix pack for callback timeout, announcement fallback, invalid plan, duplicate run, requirement-risk cases, scope evidence, and manual capture work.
 
 Main loop:
 
@@ -156,6 +156,7 @@ Goal: make the MVP stable enough for live evaluation.
 - [x] Add demo capture pack for recording order, screenshot checklist, evidence anchors, and boundaries.
 - [x] Add failure-path demo pack for callback timeout, announcement fallback, invalid plan, duplicate run, and requirement-risk scenarios.
 - [x] Add demo readiness pack for evidence/docs gatekeeping before manual recording and screenshot capture.
+- [x] Add permission appendix pack for sanitized CLI evidence, scope coverage, screenshot checklist, and callback configuration boundaries.
 - [x] Keep a pre-generated Feishu Doc/Base/Task set for backup.
 
 Exit condition:
@@ -200,12 +201,13 @@ Longer-term direction after competition MVP.
 1. Generate the Demo Readiness Pack before each recording attempt and confirm it reports `ready_for_manual_capture`.
 2. Record the first happy-path walkthrough using the generated Capture Pack: rich Base fields, risk card, pinned entry, announcement fallback, Flight Recorder, Evidence Pack, and Eval Pack.
 3. Record or screenshot the failure-path walkthrough from the Failure-Path Demo Pack: callback timeout, announcement fallback, invalid plan, duplicate-run guard, and unclear-requirement risks.
-4. Capture API permission and callback configuration screenshots for the evaluation appendix.
-5. Verify Open Platform card callback configuration so `card.action.trigger` reaches the listener; keep text confirmation as fallback.
-6. Treat group announcement as a documented platform limitation for this test group and keep pinned entry-message fallback as the default stable path.
-7. Prepare risk-card callback persistence after live event wiring is verified.
-8. Keep README and docs updated with each implementation step.
-9. Commit and push every completed vertical slice to GitHub.
+4. Generate the Permission Appendix Pack and use it as the capture checklist for API permission and callback configuration screenshots.
+5. Capture API permission and callback configuration screenshots for the evaluation appendix.
+6. Verify Open Platform card callback configuration so `card.action.trigger` reaches the listener; keep text confirmation as fallback.
+7. Treat group announcement as a documented platform limitation for this test group and keep pinned entry-message fallback as the default stable path.
+8. Prepare risk-card callback persistence after live event wiring is verified.
+9. Keep README and docs updated with each implementation step.
+10. Commit and push every completed vertical slice to GitHub.
 
 ## Long-Term Roadmap
 
@@ -243,6 +245,7 @@ Longer-term direction after competition MVP.
 - [x] Add capture pack generation for recording and screenshot planning.
 - [x] Add failure-path demo pack.
 - [x] Add demo readiness gate.
+- [x] Add permission appendix pack.
 - [ ] Record failure-path demo video.
 - [ ] Harden docs and README for judges and GitHub visitors.
 - [ ] Push all repo updates promptly.

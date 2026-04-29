@@ -231,6 +231,7 @@ Full roadmap: [docs/ROADMAP.md](docs/ROADMAP.md).
 | [Demo Capture Guide](docs/demo/CAPTURE_GUIDE.md) | Recording and screenshot checklist |
 | [Failure-Path Demo](docs/demo/FAILURE_DEMO.md) | Reviewer-facing failure-path appendix |
 | [Demo Readiness](docs/demo/READINESS.md) | Pre-recording evidence and manual-capture gate |
+| [Permission Appendix](docs/demo/PERMISSIONS.md) | Sanitized permission and callback configuration appendix |
 | [Documentation Plan](docs/DOCUMENTATION_PLAN.md) | Documentation governance |
 
 ## ⚡ Prototype Demo
@@ -252,6 +253,7 @@ npm run demo:eval -- --output tmp/demo-eval/DEMO_EVAL.md
 npm run demo:capture -- --output tmp/demo-capture/CAPTURE_PACK.md
 npm run demo:failure -- --output tmp/demo-failure/FAILURE_DEMO.md
 npm run demo:readiness -- --output tmp/demo-readiness/DEMO_READINESS.md
+npm run demo:permissions -- --collect-version --collect-auth --collect-event-dry-run --output tmp/demo-permissions/PERMISSION_APPENDIX.md
 npm run test:artifacts
 npm run test:plan
 npm run test:callback
@@ -259,6 +261,7 @@ npm run test:listener
 npm run test:trigger
 npm run test:failure
 npm run test:readiness
+npm run test:permissions
 npm run listen:cards -- --dry-run --max-events 1 --timeout 30s
 npm run test:card
 npm run test:guard
