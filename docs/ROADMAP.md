@@ -21,6 +21,7 @@ Status after the latest implementation pass:
 - Submission reports now include file size, SHA-256, and optional reviewer metadata for captures listed in the manifest, making external media traceable without moving it into Git.
 - Demo delivery index generation is available as a local review-packaging start page across public docs, generated evidence, trace artifacts, and manual capture state.
 - Demo safety audit generation is available as a pattern-based gate for public docs, generated review material, Flight Recorder output, and source files.
+- Project cleanup pass is now part of demo hardening: generated evidence pack scripts are isolated under `src/demo/packs/`, while `pilot:*` commands provide a small product-facing command surface.
 
 Main loop:
 
@@ -171,6 +172,8 @@ Goal: make the MVP stable enough for live evaluation.
 - [x] Add capture reviewer metadata display for submission manifests.
 - [x] Add demo delivery index for review-packaging navigation and evidence status.
 - [x] Add demo safety audit pack for secret-like value and private identifier scanning.
+- [x] Separate demo/evidence pack scripts from the product demo runtime.
+- [x] Add `pilot:*` command facade for the common validation, demo, package, status, and audit flows.
 - [x] Keep a pre-generated Feishu Doc/Base/Task set for backup.
 
 Exit condition:
@@ -213,12 +216,12 @@ Longer-term direction after competition MVP.
 ## Immediate Next Actions
 
 1. Generate the Demo Readiness Pack before each recording attempt and confirm it reports `ready_for_manual_capture`.
-2. Record the first happy-path walkthrough using the generated Capture Pack: rich Base fields, risk card, pinned entry, announcement fallback, Flight Recorder, Evidence Pack, and Eval Pack.
-3. Record or screenshot the failure-path walkthrough from the Failure-Path Demo Pack: callback timeout, announcement fallback, invalid plan, duplicate-run guard, and unclear-requirement risks.
-4. Generate the Permission Appendix Pack and use it as the capture checklist for API permission and callback configuration screenshots.
-5. Generate the Callback Verification Pack after each listener attempt so callback status has one consistent report.
-6. Generate the Judge Review Pack after the readiness, permission, and callback verification packs so reviewers have one entry document for claims, evidence, commands, and boundaries.
-7. Generate the Demo Submission Pack to separate machine-ready evidence from missing manual media.
+2. Use `npm run pilot:package`, `npm run pilot:status`, and `npm run pilot:audit` as the default review-material flow; keep individual `demo:*` commands for advanced regeneration only.
+3. Record the first happy-path walkthrough using the generated Capture Pack: rich Base fields, risk card, pinned entry, announcement fallback, Flight Recorder, Evidence Pack, and Eval Pack.
+4. Record or screenshot the failure-path walkthrough from the Failure-Path Demo Pack: callback timeout, announcement fallback, invalid plan, duplicate-run guard, and unclear-requirement risks.
+5. Generate the Permission Appendix Pack and use it as the capture checklist for API permission and callback configuration screenshots.
+6. Generate the Callback Verification Pack after each listener attempt so callback status has one consistent report.
+7. Generate the Judge Review Pack after the readiness, permission, and callback verification packs so reviewers have one entry document for claims, evidence, commands, and boundaries.
 8. Capture API permission and callback configuration screenshots for the evaluation appendix.
 9. Verify Open Platform card callback configuration so `card.action.trigger` reaches the listener; keep text confirmation as fallback.
 10. Treat group announcement as a documented platform limitation for this test group and keep pinned entry-message fallback as the default stable path.

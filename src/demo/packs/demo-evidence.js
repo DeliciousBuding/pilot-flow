@@ -1,7 +1,7 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import { buildFlightRecorderModel } from "./flight-recorder-view.js";
+import { buildFlightRecorderModel } from "../flight-recorder-view.js";
 
 if (isMainModule()) {
   const config = parseArgs(process.argv.slice(2));

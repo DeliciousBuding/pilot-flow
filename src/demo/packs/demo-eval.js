@@ -2,9 +2,9 @@ import { rm } from "node:fs/promises";
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import { validateProjectInitPlan, buildPlanValidationFallbackPlan } from "../core/planner/plan-validator.js";
-import { detectProjectRisks, summarizeRiskDecision } from "../core/orchestrator/risk-detector.js";
-import { DuplicateRunGuard, buildProjectInitDedupeKey, duplicateGuardSummary } from "../core/orchestrator/duplicate-run-guard.js";
+import { validateProjectInitPlan, buildPlanValidationFallbackPlan } from "../../core/planner/plan-validator.js";
+import { detectProjectRisks, summarizeRiskDecision } from "../../core/orchestrator/risk-detector.js";
+import { DuplicateRunGuard, buildProjectInitDedupeKey, duplicateGuardSummary } from "../../core/orchestrator/duplicate-run-guard.js";
 import { buildDemoEvidenceModel } from "./demo-evidence.js";
 
 if (isMainModule()) {

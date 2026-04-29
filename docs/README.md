@@ -19,6 +19,7 @@ This directory contains the public documentation set for PilotFlow.
 | `PROJECT_BRIEF.md` | Short product and competition brief | Positioning or scope changes |
 | `PRODUCT_SPEC.md` | User promise, MVP boundary, feature tiers | Product decisions change |
 | `ARCHITECTURE.md` | Core components, state, tool routing | Runtime or module design changes |
+| `PROJECT_STRUCTURE.md` | Runtime layers, command surface, and placement rules | Files move or command boundaries change |
 | `DEVELOPMENT.md` | Local setup, validation, GitHub sync | Commands, profiles, validation, or workflows change |
 | `VISUAL_DESIGN.md` | Feishu-native UX and visual rules | Cards, cockpit, or demo surfaces change |
 | `ROADMAP.md` | Immediate and long-term plan | Any phase completes or priorities shift |
@@ -42,6 +43,17 @@ This directory contains the public documentation set for PilotFlow.
 | `demo/SUBMISSION.md` | Final local gate for machine evidence and manual capture manifest status |
 | `demo/DELIVERY_INDEX.md` | Local review-packaging start page across docs, generated evidence, traces, and manual capture state |
 | `demo/SAFETY_AUDIT.md` | Pattern-based safety gate for public docs, generated review packs, and trace material |
+
+## Command Surface
+
+| Need | Command |
+| --- | --- |
+| Validate the repo | `npm run pilot:check` |
+| Run the manual product loop | `npm run pilot:demo` |
+| Render a run trace | `npm run pilot:recorder -- --input <run.jsonl> --output <html>` |
+| Rebuild review materials | `npm run pilot:package` |
+| Check submission status | `npm run pilot:status` |
+| Scan before sharing | `npm run pilot:audit` |
 
 ## Planned Folders
 

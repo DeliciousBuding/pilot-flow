@@ -39,6 +39,14 @@ The demo should make three things obvious:
 Generated local evidence artifacts are not committed by default. Create them from a JSONL run log:
 
 ```bash
+npm run pilot:package
+npm run pilot:status
+npm run pilot:audit
+```
+
+For individual pack regeneration, use the advanced commands below. These scripts live in `src/demo/packs/` and are separated from the product demo runtime on purpose:
+
+```bash
 npm run flight:recorder -- --input tmp/runs/latest-manual-run.jsonl --output tmp/flight-recorder/latest.html
 npm run demo:evidence -- --input tmp/runs/latest-manual-run.jsonl --output tmp/demo-evidence/DEMO_EVIDENCE.md
 npm run demo:eval -- --output tmp/demo-eval/DEMO_EVAL.md

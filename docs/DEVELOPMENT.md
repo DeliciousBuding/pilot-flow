@@ -43,16 +43,29 @@ Install dependencies:
 npm install
 ```
 
-Run syntax checks:
+### Main Commands
+
+Use `pilot:*` commands for the common path. They are the stable command facade for people who do not need to remember every generated evidence pack.
+
+| Command | Purpose |
+| --- | --- |
+| `npm run pilot:check` | Run the full local validation suite |
+| `npm run pilot:demo` | Run the manual dry-run demo |
+| `npm run pilot:recorder -- --input <run.jsonl> --output <html>` | Render a local Flight Recorder view |
+| `npm run pilot:package` | Regenerate readiness, judge, submission, and delivery-index materials |
+| `npm run pilot:status` | Regenerate the delivery index status page |
+| `npm run pilot:audit` | Run the safety audit before sharing material |
+
+Run validation:
 
 ```bash
-npm run check
+npm run pilot:check
 ```
 
 Run the manual dry-run demo:
 
 ```bash
-npm run demo:manual
+npm run pilot:demo
 ```
 
 Expected output:
@@ -161,10 +174,14 @@ Plan validation runs before confirmation, preflight, duplicate guard, or Feishu 
 Render a local Flight Recorder view from a JSONL run log:
 
 ```bash
-npm run flight:recorder -- --input tmp/runs/latest-manual-run.jsonl --output tmp/flight-recorder/latest.html
+npm run pilot:recorder -- --input tmp/runs/latest-manual-run.jsonl --output tmp/flight-recorder/latest.html
 ```
 
 The generated HTML is local-only by default and lives under ignored `tmp/`.
+
+### Advanced Evidence Commands
+
+The `demo:*` commands below are still supported, but they are evidence and competition-material tooling, not the main product entry. Their source files live under `src/demo/packs/` so they do not obscure the core demo runtime.
 
 Generate a Markdown demo evidence pack from the same JSONL run log:
 
@@ -252,7 +269,7 @@ Generate a demo delivery index:
 
 ```bash
 npm run test:delivery-index
-npm run demo:delivery-index -- --output tmp/demo-delivery/DELIVERY_INDEX.md
+npm run pilot:status
 ```
 
 The delivery index is the local start page for review packaging. It checks public docs, generated evidence packs, the Flight Recorder HTML, the live run log, and the current submission/manual-capture status, then prints a recommended opening order for reviewers or demo operators.
@@ -261,7 +278,7 @@ Generate a demo safety audit pack:
 
 ```bash
 npm run test:safety-audit
-npm run demo:safety-audit -- --output tmp/demo-safety/SAFETY_AUDIT.md
+npm run pilot:audit
 ```
 
 The safety audit scans public docs, source files, generated review packs, and the Flight Recorder HTML for secret-like values and private identifiers. Run it before publishing docs, screenshots, recordings, or callback proof.
@@ -336,19 +353,12 @@ If push fails, record the error and keep the local commit.
 Implemented:
 
 - `src/config/runtime-config.js`
+- `src/demo/pilot-cli.js`
 - `src/demo/flight-recorder-view.js`
-- `src/demo/demo-evidence.js`
-- `src/demo/demo-eval.js`
-- `src/demo/demo-capture-pack.js`
-- `src/demo/demo-failure-pack.js`
-- `src/demo/demo-readiness-pack.js`
-- `src/demo/demo-permission-pack.js`
-- `src/demo/demo-callback-verification-pack.js`
-- `src/demo/demo-judge-pack.js`
-- `src/demo/demo-submission-pack.js`
 - `src/demo/card-listener.js`
 - `src/demo/manual-trigger.js`
 - `src/demo/setup-feishu-targets.js`
+- `src/demo/packs/*.js`
 - `src/core/events/card-event-listener.js`
 - `src/core/events/callback-run-trigger.js`
 - `src/core/planner/project-init-planner.js`
@@ -368,6 +378,14 @@ Implemented:
 - `src/tools/feishu/feishu-tool-executor.js`
 - `src/adapters/lark-cli/command-runner.js`
 - `src/schemas/*.schema.json`
+
+Runtime ownership is intentionally split:
+
+| Layer | Path | Role |
+| --- | --- | --- |
+| Product core | `src/core/`, `src/tools/feishu/`, `src/adapters/`, `src/config/`, `src/schemas/` | Planner, orchestrator, risk, Feishu tool execution, config, schemas |
+| Demo runtime | `src/demo/manual-trigger.js`, `src/demo/card-listener.js`, `src/demo/flight-recorder-view.js`, `src/demo/setup-feishu-targets.js`, `src/demo/pilot-cli.js` | Manual entry, bounded listener, recorder view, target setup, command facade |
+| Evidence packs | `src/demo/packs/` | Generated review, readiness, submission, delivery, and safety materials |
 
 Implemented to date:
 

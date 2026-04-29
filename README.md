@@ -223,6 +223,7 @@ Full roadmap: [docs/ROADMAP.md](docs/ROADMAP.md).
 | [Project Brief](docs/PROJECT_BRIEF.md) | Product and competition brief |
 | [Product Spec](docs/PRODUCT_SPEC.md) | User promise, feature tiers, non-goals |
 | [Architecture](docs/ARCHITECTURE.md) | Components, state model, tool routing |
+| [Project Structure](docs/PROJECT_STRUCTURE.md) | Runtime layers, command surface, and placement rules |
 | [Development Guide](docs/DEVELOPMENT.md) | Local setup, validation, profiles, GitHub sync |
 | [Visual Design](docs/VISUAL_DESIGN.md) | Feishu-native cards, cockpit, UX rules |
 | [Roadmap](docs/ROADMAP.md) | Long-term plan and immediate next actions |
@@ -244,51 +245,17 @@ Full roadmap: [docs/ROADMAP.md](docs/ROADMAP.md).
 For local development and reviewer reproduction:
 
 ```bash
-npm run check
-npm run demo:manual
-npm run demo:manual -- --send-plan-card --no-auto-confirm
-npm run demo:manual -- --send-entry-message
-npm run demo:manual -- --pin-entry-message
-npm run demo:manual -- --send-risk-card
-npm run demo:manual -- --owner-open-id-map-json '{"Product Owner":"ou_xxx"}'
-npm run demo:manual -- --auto-lookup-owner-contact
-npm run flight:recorder -- --input tmp/runs/latest-manual-run.jsonl
-npm run demo:evidence -- --input tmp/runs/latest-manual-run.jsonl
-npm run demo:eval -- --output tmp/demo-eval/DEMO_EVAL.md
-npm run demo:capture -- --output tmp/demo-capture/CAPTURE_PACK.md
-npm run demo:failure -- --output tmp/demo-failure/FAILURE_DEMO.md
-npm run demo:readiness -- --output tmp/demo-readiness/DEMO_READINESS.md
-npm run demo:permissions -- --collect-version --collect-auth --collect-event-dry-run --output tmp/demo-permissions/PERMISSION_APPENDIX.md
-npm run demo:callback-verification -- --output tmp/demo-callback/CALLBACK_VERIFICATION.md
-npm run demo:judge -- --output tmp/demo-judge/JUDGE_REVIEW.md
-npm run demo:submission -- --output tmp/demo-submission/SUBMISSION_PACK.md
-npm run demo:submission -- --write-capture-template tmp/demo-submission/capture-manifest.template.json
-npm run test:artifacts
-npm run test:plan
-npm run test:callback
-npm run test:listener
-npm run test:trigger
-npm run test:failure
-npm run test:readiness
-npm run test:permissions
-npm run test:callback-pack
-npm run test:judge
-npm run test:submission
-npm run listen:cards -- --dry-run --max-events 1 --timeout 30s
-npm run test:card
-npm run test:guard
-npm run test:entry
-npm run test:flight
-npm run test:risk
-npm run test:state
-npm run test:summary
-npm run test:contact
-npm run test:assignee
-npm run test:orchestrator
-npm run test:config
+npm run pilot:check
+npm run pilot:demo
+npm run pilot:demo -- --send-plan-card --no-auto-confirm
+npm run pilot:demo -- --pin-entry-message --send-risk-card
+npm run pilot:recorder -- --input tmp/runs/latest-manual-run.jsonl --output tmp/flight-recorder/latest.html
+npm run pilot:package
+npm run pilot:status
+npm run pilot:audit
 ```
 
-The current local demo reads a project-init fixture, writes a traceable run log, and returns planned artifacts. Live Feishu execution is available behind an explicit confirmation gate; detailed setup lives in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
+The current local demo reads a project-init fixture, writes a traceable run log, and returns planned artifacts. Live Feishu execution is available behind an explicit confirmation gate. Detailed setup, advanced `demo:*` evidence commands, and individual test commands live in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) and [docs/demo/README.md](docs/demo/README.md).
 
 ## 🔐 Safety Principles
 
