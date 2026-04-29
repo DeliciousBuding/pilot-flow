@@ -257,6 +257,15 @@ npm run demo:delivery-index -- --output tmp/demo-delivery/DELIVERY_INDEX.md
 
 The delivery index is the local start page for review packaging. It checks public docs, generated evidence packs, the Flight Recorder HTML, the live run log, and the current submission/manual-capture status, then prints a recommended opening order for reviewers or demo operators.
 
+Generate a demo safety audit pack:
+
+```bash
+npm run test:safety-audit
+npm run demo:safety-audit -- --output tmp/demo-safety/SAFETY_AUDIT.md
+```
+
+The safety audit scans public docs, source files, generated review packs, and the Flight Recorder HTML for secret-like values and private identifiers. Run it before publishing docs, screenshots, recordings, or callback proof.
+
 Live project-init runs are guarded against accidental duplicates. If you intentionally need to repeat a visible Feishu write, pass an explicit key or bypass flag:
 
 ```bash
@@ -435,6 +444,7 @@ Next implementation targets:
 | Judge review pack | `npm run test:judge`, `npm run demo:judge`, inspect generated Markdown |
 | Demo submission pack | `npm run test:submission`, `npm run demo:submission`, inspect generated Markdown |
 | Demo delivery index | `npm run test:delivery-index`, `npm run demo:delivery-index`, inspect generated Markdown |
+| Demo safety audit pack | `npm run test:safety-audit`, `npm run demo:safety-audit`, inspect generated Markdown |
 | Risk detection/card | `npm run test:risk`, `npm run demo:manual -- --send-risk-card`, inspect `risk.detected` and card artifact |
 | Task assignee mapping | `npm run test:assignee`, `npm run test:config`, `npm run demo:manual -- --owner-open-id-map-json '{"Product Owner":"ou_xxx"}'`, inspect `--assignee` |
 | Contact owner lookup | `npm run test:contact`, `npm run demo:manual -- --auto-lookup-owner-contact`, inspect `contact.search` and `owner.lookup_completed` |

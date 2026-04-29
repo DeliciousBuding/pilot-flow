@@ -236,6 +236,7 @@ Full roadmap: [docs/ROADMAP.md](docs/ROADMAP.md).
 | [Judge Review Pack](docs/demo/JUDGE_REVIEW.md) | Reviewer entry pack for product story, evidence, boundaries, and reproduction |
 | [Demo Submission Pack](docs/demo/SUBMISSION.md) | Final local gate for machine evidence and manual capture status |
 | [Demo Delivery Index](docs/demo/DELIVERY_INDEX.md) | Local review-packaging index for docs, generated evidence, trace artifacts, and manual capture state |
+| [Demo Safety Audit](docs/demo/SAFETY_AUDIT.md) | Pattern-based safety gate for public docs, generated review packs, and trace material |
 | [Documentation Plan](docs/DOCUMENTATION_PLAN.md) | Documentation governance |
 
 ## ⚡ Prototype Demo

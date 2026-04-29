@@ -41,6 +41,7 @@ This directory contains the public documentation set for PilotFlow.
 | `demo/JUDGE_REVIEW.md` | Reviewer-facing entry pack for product story, evidence sources, boundaries, and reproduction commands |
 | `demo/SUBMISSION.md` | Final local gate for machine evidence and manual capture manifest status |
 | `demo/DELIVERY_INDEX.md` | Local review-packaging start page across docs, generated evidence, traces, and manual capture state |
+| `demo/SAFETY_AUDIT.md` | Pattern-based safety gate for public docs, generated review packs, and trace material |
 
 ## Planned Folders
 
