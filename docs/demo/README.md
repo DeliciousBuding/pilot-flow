@@ -79,7 +79,7 @@ npm run demo:judge -- --output tmp/demo-judge/JUDGE_REVIEW.md
 | Demo evaluation cases | 5 local cases pass through `npm run test:eval` |
 | Demo capture pack | 7 required captures generated from current evidence paths |
 | Failure-path demo pack | 5 evidence-ready scenarios generated through `npm run demo:failure` |
-| Demo readiness pack | Evidence and docs gate generated through `npm run demo:readiness`; manual recording still pending |
+| Demo readiness pack | Evidence and docs gate generated through `npm run demo:readiness`; now checks 8 evidence files and 8 docs, manual recording still pending |
 | Permission appendix pack | Sanitized permission/callback appendix generated through `npm run demo:permissions`; screenshots still pending |
 | Callback verification pack | Payload and listener evidence generated through `npm run demo:callback-verification`; real callback event still pending |
 | Judge review pack | Reviewer entry pack generated through `npm run demo:judge`; depends on current local evidence packs |

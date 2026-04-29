@@ -13,6 +13,8 @@ try {
   const evaluation = join(tempDir, "eval.md");
   const capture = join(tempDir, "capture.md");
   const failure = join(tempDir, "failure.md");
+  const permissions = join(tempDir, "permissions.md");
+  const callback = join(tempDir, "callback.md");
   const docsDir = join(tempDir, "docs");
   await mkdir(docsDir, { recursive: true });
 
@@ -22,6 +24,8 @@ try {
   await writeFile(evaluation, "# Demo Eval\n\nAPI error: [232097] Unable to operate docx type chat announcement.", "utf8");
   await writeFile(capture, "# Capture\n\n## Required Captures\n", "utf8");
   await writeFile(failure, "# Failure\n\nDUPLICATE_RUN_BLOCKED\n", "utf8");
+  await writeFile(permissions, "# Permission Appendix\n\n| Event subscribe dry-run | ready | ok |", "utf8");
+  await writeFile(callback, "# Callback Verification\n\n- Verification status: `blocked_on_platform_callback_event`", "utf8");
 
   const docOverrides = {
     "Demo playbook": await writeDoc(docsDir, "playbook.md", "6 to 8 minute walkthrough"),
@@ -29,7 +33,9 @@ try {
     "Failure paths": await writeDoc(docsDir, "failure-paths.md", "fallback paths"),
     "Evaluation workflow": await writeDoc(docsDir, "evaluation.md", "npm run demo:eval"),
     "Capture guide": await writeDoc(docsDir, "capture-guide.md", "npm run demo:capture"),
-    "Failure demo guide": await writeDoc(docsDir, "failure-demo.md", "npm run demo:failure")
+    "Failure demo guide": await writeDoc(docsDir, "failure-demo.md", "npm run demo:failure"),
+    "Permission appendix guide": await writeDoc(docsDir, "permissions.md", "npm run demo:permissions"),
+    "Callback verification guide": await writeDoc(docsDir, "callback.md", "npm run demo:callback-verification")
   };
 
   const pack = await buildDemoReadinessPack({
@@ -39,15 +45,17 @@ try {
       evidence,
       evaluation,
       capture,
-      failure
+      failure,
+      permissions,
+      callback
     },
     docOverrides,
     output: join(tempDir, "DEMO_READINESS_TEST.md")
   });
 
   assert.equal(pack.status, "ready_for_manual_capture");
-  assert.equal(pack.summary.evidenceReady, 6);
-  assert.equal(pack.summary.docsReady, 6);
+  assert.equal(pack.summary.evidenceReady, 8);
+  assert.equal(pack.summary.docsReady, 8);
   assert.equal(pack.manualCaptures.length, 4);
 
   const markdown = renderDemoReadinessMarkdown(pack);

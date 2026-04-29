@@ -6,8 +6,8 @@ The purpose is to avoid an unclear demo state. A generated readiness report shou
 
 | Question | Readiness answer |
 | --- | --- |
-| Are the live-run evidence files ready? | Run log, Flight Recorder, Evidence Pack, Evaluation Pack, Capture Pack, and Failure-Path Pack |
-| Are the public demo docs ready? | Playbook, Q&A, fallback notes, evaluation guide, capture guide, and failure demo guide |
+| Are the live-run evidence files ready? | Run log, Flight Recorder, Evidence Pack, Evaluation Pack, Capture Pack, Failure-Path Pack, Permission Appendix Pack, and Callback Verification Pack |
+| Are the public demo docs ready? | Playbook, Q&A, fallback notes, evaluation guide, capture guide, failure demo guide, permission appendix guide, and callback verification guide |
 | What still needs human capture? | Happy-path video, failure-path video or screenshots, permission screenshots, callback configuration proof |
 
 ## Generate The Pack
@@ -29,6 +29,8 @@ The generated file is local-only by default and lives under ignored `tmp/`.
 | Demo Evaluation Pack | `tmp/demo-eval/DEMO_EVAL_20260429.md` |
 | Demo Capture Pack | `tmp/demo-capture/CAPTURE_PACK_20260429.md` |
 | Failure-Path Demo Pack | `tmp/demo-failure/FAILURE_DEMO_20260429.md` |
+| Permission Appendix Pack | `tmp/demo-permissions/PERMISSION_APPENDIX_20260429.md` |
+| Callback Verification Pack | `tmp/demo-callback/CALLBACK_VERIFICATION_20260429.md` |
 
 ## Manual Capture Items
 
@@ -56,6 +58,15 @@ ready_for_manual_capture
 ```
 
 This status means the evidence and docs are ready enough to record. It does not mean the recording or screenshots already exist.
+
+After callback or permission evidence changes, regenerate in this order:
+
+```bash
+npm run demo:permissions -- --collect-version --collect-auth --collect-event-dry-run --output tmp/demo-permissions/PERMISSION_APPENDIX_20260429.md
+npm run demo:callback-verification -- --output tmp/demo-callback/CALLBACK_VERIFICATION_20260429.md
+npm run demo:readiness -- --output tmp/demo-readiness/DEMO_READINESS_20260429.md
+npm run demo:judge -- --output tmp/demo-judge/JUDGE_REVIEW_20260429.md
+```
 
 ## Scope Boundary
 

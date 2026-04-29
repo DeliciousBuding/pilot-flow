@@ -209,6 +209,7 @@ npm run demo:readiness -- --output tmp/demo-readiness/DEMO_READINESS.md
 ```
 
 The readiness pack checks whether the current evidence files and demo docs are ready, then keeps happy-path recording, failure-path recording, permission screenshots, and callback configuration proof as explicit manual capture work.
+It now includes the Permission Appendix Pack and Callback Verification Pack in the required machine-ready evidence set, so regenerate those first after any scope or callback listener attempt.
 
 Generate a permission appendix pack:
 

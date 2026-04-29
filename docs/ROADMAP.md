@@ -158,6 +158,7 @@ Goal: make the MVP stable enough for live evaluation.
 - [x] Add demo readiness pack for evidence/docs gatekeeping before manual recording and screenshot capture.
 - [x] Add permission appendix pack for sanitized CLI evidence, scope coverage, screenshot checklist, and callback configuration boundaries.
 - [x] Add callback verification pack for card payload readiness, listener connection evidence, and real callback-event status.
+- [x] Fold permission and callback verification evidence into the demo readiness gate.
 - [x] Add judge review pack for reviewer-facing product story, evidence sources, boundaries, reproduction commands, and next actions.
 - [x] Keep a pre-generated Feishu Doc/Base/Task set for backup.
 
@@ -251,6 +252,7 @@ Longer-term direction after competition MVP.
 - [x] Add demo readiness gate.
 - [x] Add permission appendix pack.
 - [x] Add callback verification pack.
+- [x] Add permission and callback evidence to readiness gate.
 - [x] Add judge review pack.
 - [ ] Record failure-path demo video.
 - [ ] Harden docs and README for judges and GitHub visitors.

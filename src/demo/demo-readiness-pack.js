@@ -51,6 +51,22 @@ const DEFAULT_EVIDENCE_FILES = [
     required: true,
     anchor: "DUPLICATE_RUN_BLOCKED",
     purpose: "Failure-path appendix for callback timeout, announcement fallback, invalid plan, duplicate run, and unclear requirements."
+  },
+  {
+    key: "permissions",
+    label: "Permission Appendix Pack",
+    path: "tmp/demo-permissions/PERMISSION_APPENDIX_20260429.md",
+    required: true,
+    anchor: "Event subscribe dry-run",
+    purpose: "Sanitized CLI, scope, screenshot, and callback-configuration evidence."
+  },
+  {
+    key: "callback",
+    label: "Callback Verification Pack",
+    path: "tmp/demo-callback/CALLBACK_VERIFICATION_20260429.md",
+    required: true,
+    anchor: "blocked_on_platform_callback_event",
+    purpose: "Card payload, bounded listener, and real callback-event status."
   }
 ];
 
@@ -90,6 +106,18 @@ const DEFAULT_DOC_FILES = [
     path: "docs/demo/FAILURE_DEMO.md",
     anchor: "demo:failure",
     purpose: "Failure-path demo workflow and boundaries."
+  },
+  {
+    label: "Permission appendix guide",
+    path: "docs/demo/PERMISSIONS.md",
+    anchor: "demo:permissions",
+    purpose: "Permission and callback appendix workflow."
+  },
+  {
+    label: "Callback verification guide",
+    path: "docs/demo/CALLBACK_VERIFICATION.md",
+    anchor: "demo:callback-verification",
+    purpose: "Callback readiness report workflow and status meanings."
   }
 ];
 
@@ -269,6 +297,8 @@ function buildRecommendedCommands({ status }) {
     "npm run demo:eval -- --output tmp/demo-eval/DEMO_EVAL_20260429.md",
     "npm run demo:capture -- --output tmp/demo-capture/CAPTURE_PACK_20260429.md",
     "npm run demo:failure -- --output tmp/demo-failure/FAILURE_DEMO_20260429.md",
+    "npm run demo:permissions -- --collect-version --collect-auth --collect-event-dry-run --output tmp/demo-permissions/PERMISSION_APPENDIX_20260429.md",
+    "npm run demo:callback-verification -- --output tmp/demo-callback/CALLBACK_VERIFICATION_20260429.md",
     "npm run demo:readiness -- --output tmp/demo-readiness/DEMO_READINESS_20260429.md"
   ];
 
@@ -337,7 +367,9 @@ function parseArgs(argv) {
       evidence: typeof args.evidence === "string" ? args.evidence : undefined,
       evaluation: typeof args.evaluation === "string" ? args.evaluation : undefined,
       capture: typeof args.capture === "string" ? args.capture : undefined,
-      failure: typeof args.failure === "string" ? args.failure : undefined
+      failure: typeof args.failure === "string" ? args.failure : undefined,
+      permissions: typeof args.permissions === "string" ? args.permissions : undefined,
+      callback: typeof args.callback === "string" ? args.callback : undefined
     }
   };
 }
@@ -354,6 +386,8 @@ Options:
   --evaluation <path>       Demo Evaluation Pack markdown.
   --capture <path>          Demo Capture Pack markdown.
   --failure <path>          Failure-Path Demo Pack markdown.
+  --permissions <path>      Permission Appendix Pack markdown.
+  --callback <path>         Callback Verification Pack markdown.
   --output <path>           Readiness markdown output path.
 `;
 }
