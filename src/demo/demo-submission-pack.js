@@ -180,9 +180,9 @@ export function renderDemoSubmissionMarkdown(pack) {
     "",
     "## Manual Capture Manifest",
     "",
-    "| Capture | Status | Type | Redacted | File | SHA-256 | Notes |",
-    "| --- | --- | --- | --- | --- | --- | --- |",
-    ...pack.manualCaptures.map((item) => `| ${item.label} | ${item.ready ? "Ready" : item.status} | ${item.type || "unknown"} | ${item.redacted ? "yes" : "no"} | ${formatFileCell(item)} | ${item.sha256 ? `\`${item.sha256}\`` : "not available"} | ${escapeCell(item.notes)} |`),
+    "| Capture | Status | Type | Redacted | File | SHA-256 | Review | Notes |",
+    "| --- | --- | --- | --- | --- | --- | --- | --- |",
+    ...pack.manualCaptures.map((item) => `| ${item.label} | ${item.ready ? "Ready" : item.status} | ${item.type || "unknown"} | ${item.redacted ? "yes" : "no"} | ${formatFileCell(item)} | ${item.sha256 ? `\`${item.sha256}\`` : "not available"} | ${formatReviewCell(item)} | ${escapeCell(item.notes)} |`),
     "",
     "## Recommended Commands",
     "",
@@ -349,6 +349,12 @@ function formatFileCell(item) {
   if (!item.path) return item.missingReason || "not provided";
   const detail = item.exists ? `${item.sizeBytes} bytes` : item.missingReason || "missing";
   return escapeCell(`\`${item.path}\`<br>${detail}`);
+}
+
+function formatReviewCell(item) {
+  const reviewer = item.reviewer ? `reviewer: ${item.reviewer}` : "";
+  const reviewedAt = item.reviewed_at ? `at: ${item.reviewed_at}` : "";
+  return escapeCell([reviewer, reviewedAt].filter(Boolean).join("<br>") || "not recorded");
 }
 
 async function readOptionalText(filePath) {

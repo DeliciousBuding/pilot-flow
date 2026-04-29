@@ -47,7 +47,9 @@ After recording videos or collecting screenshots, fill a local JSON manifest out
       "label": "Happy-path walkthrough recording",
       "status": "ready",
       "path": "D:/Code/LarkProject/materials/captures/happy-path.mp4",
-      "redacted": true
+      "redacted": true,
+      "reviewed_at": "2026-04-29T00:00:00.000Z",
+      "reviewer": "Name or team role"
     }
   ]
 }
@@ -65,6 +67,7 @@ Rules:
 - `path` must point to an existing local file.
 - `redacted` must be `true` after reviewing secrets and private fields.
 - The generated report records file size and SHA-256 so the reviewed capture version can be identified later.
+- `reviewed_at` and `reviewer` are optional but recommended; they are shown in the report to make manual evidence review auditable.
 
 Required capture labels:
 

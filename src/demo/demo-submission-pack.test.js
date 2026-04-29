@@ -66,6 +66,7 @@ try {
   assert.match(markdown, /ready_for_submission_review/);
   assert.match(markdown, /Manual Capture Manifest/);
   assert.match(markdown, /SHA-256/);
+  assert.match(markdown, /reviewer: PilotFlow reviewer/);
   assert.match(markdown, /Do not include App Secret/);
 
   const template = buildCaptureManifestTemplate();
@@ -92,7 +93,9 @@ function capture(label, filePath) {
     label,
     status: "ready",
     path: filePath,
-    redacted: true
+    redacted: true,
+    reviewed_at: "2026-04-29T00:00:00.000Z",
+    reviewer: "PilotFlow reviewer"
   };
 }
 

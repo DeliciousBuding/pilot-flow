@@ -18,7 +18,7 @@ Status after the latest implementation pass:
 - Phase 3 demo hardening has started: the latest live run now has a generated Flight Recorder HTML view and Markdown evidence pack, `docs/demo/` contains the demo playbook, reviewer Q&A, fallback/no-network explanation, local demo evaluation pack, capture pack, failure-path demo pack, readiness gate, permission appendix pack, callback verification pack, and judge review pack for callback timeout, announcement fallback, invalid plan, duplicate run, requirement-risk cases, scope evidence, product claims, and manual capture work.
 - Submission readiness is now split into machine evidence and manual media: the generated submission pack can report whether evidence is ready while keeping videos and screenshots outside Git.
 - Capture manifest template generation is available so manual videos and screenshots can be tracked without committing raw media.
-- Submission reports now include file size and SHA-256 for captures listed in the manifest, making external media traceable without moving it into Git.
+- Submission reports now include file size, SHA-256, and optional reviewer metadata for captures listed in the manifest, making external media traceable without moving it into Git.
 
 Main loop:
 
@@ -166,6 +166,7 @@ Goal: make the MVP stable enough for live evaluation.
 - [x] Add demo submission pack for machine evidence and manual capture manifest status.
 - [x] Add capture manifest template generation for manual recordings and screenshots.
 - [x] Add capture file size and SHA-256 reporting for submission manifests.
+- [x] Add capture reviewer metadata display for submission manifests.
 - [x] Keep a pre-generated Feishu Doc/Base/Task set for backup.
 
 Exit condition:
