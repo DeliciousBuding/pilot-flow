@@ -16,6 +16,7 @@ Status after the latest implementation pass:
 - Group announcement has been attempted through the native announcement API. The test group currently returns `232097 Unable to operate docx type chat announcement`, so the product path now records the failed announcement upgrade and keeps the pinned entry message as the stable Feishu-native entrance.
 - Base owner/deadline fallback, local Flight Recorder view, risk detection, live risk decision card send, live pinned entry message, explicit Task assignee mapping, optional Contacts-based owner lookup, plan-validation fallback, card callback action protocol, and a bounded card listener are now implemented. The next product slice should harden the demo, capture evidence, and resolve platform callback configuration.
 - Phase 3 demo hardening has started: the latest live run now has a generated Flight Recorder HTML view and Markdown evidence pack, `docs/demo/` contains the demo playbook, reviewer Q&A, fallback/no-network explanation, local demo evaluation pack, capture pack, failure-path demo pack, readiness gate, permission appendix pack, callback verification pack, and judge review pack for callback timeout, announcement fallback, invalid plan, duplicate run, requirement-risk cases, scope evidence, product claims, and manual capture work.
+- Submission readiness is now split into machine evidence and manual media: the generated submission pack can report whether evidence is ready while keeping videos and screenshots outside Git.
 
 Main loop:
 
@@ -160,6 +161,7 @@ Goal: make the MVP stable enough for live evaluation.
 - [x] Add callback verification pack for card payload readiness, listener connection evidence, and real callback-event status.
 - [x] Fold permission and callback verification evidence into the demo readiness gate.
 - [x] Add judge review pack for reviewer-facing product story, evidence sources, boundaries, reproduction commands, and next actions.
+- [x] Add demo submission pack for machine evidence and manual capture manifest status.
 - [x] Keep a pre-generated Feishu Doc/Base/Task set for backup.
 
 Exit condition:
@@ -207,12 +209,13 @@ Longer-term direction after competition MVP.
 4. Generate the Permission Appendix Pack and use it as the capture checklist for API permission and callback configuration screenshots.
 5. Generate the Callback Verification Pack after each listener attempt so callback status has one consistent report.
 6. Generate the Judge Review Pack after the readiness, permission, and callback verification packs so reviewers have one entry document for claims, evidence, commands, and boundaries.
-7. Capture API permission and callback configuration screenshots for the evaluation appendix.
-8. Verify Open Platform card callback configuration so `card.action.trigger` reaches the listener; keep text confirmation as fallback.
-9. Treat group announcement as a documented platform limitation for this test group and keep pinned entry-message fallback as the default stable path.
-10. Prepare risk-card callback persistence after live event wiring is verified.
-11. Keep README and docs updated with each implementation step.
-12. Commit and push every completed vertical slice to GitHub.
+7. Generate the Demo Submission Pack to separate machine-ready evidence from missing manual media.
+8. Capture API permission and callback configuration screenshots for the evaluation appendix.
+9. Verify Open Platform card callback configuration so `card.action.trigger` reaches the listener; keep text confirmation as fallback.
+10. Treat group announcement as a documented platform limitation for this test group and keep pinned entry-message fallback as the default stable path.
+11. Prepare risk-card callback persistence after live event wiring is verified.
+12. Keep README and docs updated with each implementation step.
+13. Commit and push every completed vertical slice to GitHub.
 
 ## Long-Term Roadmap
 
@@ -254,6 +257,7 @@ Longer-term direction after competition MVP.
 - [x] Add callback verification pack.
 - [x] Add permission and callback evidence to readiness gate.
 - [x] Add judge review pack.
+- [x] Add demo submission pack.
 - [ ] Record failure-path demo video.
 - [ ] Harden docs and README for judges and GitHub visitors.
 - [ ] Push all repo updates promptly.

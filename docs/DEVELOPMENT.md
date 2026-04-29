@@ -238,6 +238,15 @@ npm run demo:judge -- --output tmp/demo-judge/JUDGE_REVIEW.md
 
 The judge pack connects README, Roadmap, Demo Playbook, Q&A, Readiness Pack, Permission Appendix, Callback Verification Pack, Evidence Pack, and Failure-Path Pack into a single reviewer-facing entry document. It is a local generated artifact and should keep pending callback delivery, announcement fallback, and manual recording work explicit.
 
+Generate a demo submission pack:
+
+```bash
+npm run test:submission
+npm run demo:submission -- --output tmp/demo-submission/SUBMISSION_PACK.md
+```
+
+The submission pack checks the current readiness, judge, callback, capture, permission, and failure packs, then optionally reads a local `--capture-manifest` JSON for videos and screenshots. Without a manifest it should report `machine_ready_manual_capture_pending`.
+
 Live project-init runs are guarded against accidental duplicates. If you intentionally need to repeat a visible Feishu write, pass an explicit key or bypass flag:
 
 ```bash
@@ -317,6 +326,7 @@ Implemented:
 - `src/demo/demo-permission-pack.js`
 - `src/demo/demo-callback-verification-pack.js`
 - `src/demo/demo-judge-pack.js`
+- `src/demo/demo-submission-pack.js`
 - `src/demo/card-listener.js`
 - `src/demo/manual-trigger.js`
 - `src/demo/setup-feishu-targets.js`
@@ -375,6 +385,7 @@ Implemented to date:
 - local Permission Appendix Pack for sanitized CLI evidence, scope coverage, screenshot checklist, and callback configuration boundaries
 - local Callback Verification Pack for card payload readiness, bounded listener evidence, and real callback event status
 - local Judge Review Pack for reviewer-facing product story, evidence sources, boundaries, commands, and next actions
+- local Demo Submission Pack for final machine-evidence and manual-capture status
 - risk detection over planner risks, missing project facts, non-concrete deadlines, and owner text fallbacks
 - optional `--send-risk-card` flow that sends or dry-runs a Feishu-native risk decision card
 - callback action protocol and parser for risk decisions: assign owner, adjust deadline, accept risk, defer
@@ -412,6 +423,7 @@ Next implementation targets:
 | Permission appendix pack | `npm run test:permissions`, `npm run demo:permissions -- --collect-version --collect-auth --collect-event-dry-run`, inspect generated Markdown |
 | Callback verification pack | `npm run test:callback-pack`, `npm run demo:callback-verification`, inspect generated Markdown |
 | Judge review pack | `npm run test:judge`, `npm run demo:judge`, inspect generated Markdown |
+| Demo submission pack | `npm run test:submission`, `npm run demo:submission`, inspect generated Markdown |
 | Risk detection/card | `npm run test:risk`, `npm run demo:manual -- --send-risk-card`, inspect `risk.detected` and card artifact |
 | Task assignee mapping | `npm run test:assignee`, `npm run test:config`, `npm run demo:manual -- --owner-open-id-map-json '{"Product Owner":"ou_xxx"}'`, inspect `--assignee` |
 | Contact owner lookup | `npm run test:contact`, `npm run demo:manual -- --auto-lookup-owner-contact`, inspect `contact.search` and `owner.lookup_completed` |

@@ -38,6 +38,7 @@ This directory contains the public documentation set for PilotFlow.
 | `demo/PERMISSIONS.md` | Permission and callback appendix generation workflow |
 | `demo/CALLBACK_VERIFICATION.md` | Callback readiness report for card payloads, bounded listener, and real event delivery |
 | `demo/JUDGE_REVIEW.md` | Reviewer-facing entry pack for product story, evidence sources, boundaries, and reproduction commands |
+| `demo/SUBMISSION.md` | Final local gate for machine evidence and manual capture manifest status |
 
 ## Planned Folders
 
