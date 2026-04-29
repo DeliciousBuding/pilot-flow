@@ -100,11 +100,18 @@ if (isMainModule()) {
   await mkdir(dirname(config.output), { recursive: true });
   await writeFile(config.output, markdown, "utf8");
 
+  if (config.writeCaptureTemplate) {
+    const template = buildCaptureManifestTemplate();
+    await mkdir(dirname(config.writeCaptureTemplate), { recursive: true });
+    await writeFile(config.writeCaptureTemplate, `${JSON.stringify(template, null, 2)}\n`, "utf8");
+  }
+
   console.log(
     JSON.stringify(
       {
         status: "created",
         output: config.output,
+        capture_template: config.writeCaptureTemplate || "",
         submission_status: pack.status,
         source_ready_count: pack.summary.sourceReady,
         source_count: pack.summary.sourceTotal,
@@ -193,6 +200,27 @@ export function renderDemoSubmissionMarkdown(pack) {
   ];
 
   return `${lines.filter(Boolean).join("\n")}\n`;
+}
+
+export function buildCaptureManifestTemplate() {
+  return {
+    version: 1,
+    updated_at: new Date().toISOString(),
+    instructions: [
+      "Keep this manifest under ignored tmp/ or outside the repository.",
+      "Set status to ready only after the file exists and has been reviewed.",
+      "Set redacted to true only after secrets, request URLs, tokens, and private contact details are hidden."
+    ],
+    captures: DEFAULT_MANUAL_CAPTURES.map((item) => ({
+      label: item.label,
+      type: item.type,
+      required: item.required,
+      status: "pending",
+      path: "",
+      redacted: false,
+      notes: item.notes
+    }))
+  };
 }
 
 async function inspectSource(item) {
@@ -313,6 +341,7 @@ function parseArgs(argv) {
   return {
     help: args.help === true || args.h === true,
     captureManifest: typeof args["capture-manifest"] === "string" ? args["capture-manifest"] : "",
+    writeCaptureTemplate: typeof args["write-capture-template"] === "string" ? resolve(args["write-capture-template"]) : "",
     output: resolve(typeof args.output === "string" ? args.output : "tmp/demo-submission/SUBMISSION_PACK.md"),
     sourceOverrides: {
       readiness: typeof args.readiness === "string" ? args.readiness : undefined,
@@ -328,10 +357,13 @@ function parseArgs(argv) {
 function buildUsage() {
   return `Usage:
   npm run demo:submission
+  npm run demo:submission -- --write-capture-template tmp/demo-submission/capture-manifest.template.json
   npm run demo:submission -- --capture-manifest tmp/demo-submission/capture-manifest.json --output tmp/demo-submission/SUBMISSION_PACK.md
 
 Options:
   --capture-manifest <path>  Optional JSON manifest for manual recordings and screenshots.
+  --write-capture-template <path>
+                             Write a JSON capture manifest template while generating the pack.
   --readiness <path>         Demo Readiness Pack markdown.
   --judge <path>             Judge Review Pack markdown.
   --callback <path>          Callback Verification Pack markdown.

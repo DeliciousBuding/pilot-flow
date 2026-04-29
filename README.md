@@ -260,6 +260,7 @@ npm run demo:permissions -- --collect-version --collect-auth --collect-event-dry
 npm run demo:callback-verification -- --output tmp/demo-callback/CALLBACK_VERIFICATION.md
 npm run demo:judge -- --output tmp/demo-judge/JUDGE_REVIEW.md
 npm run demo:submission -- --output tmp/demo-submission/SUBMISSION_PACK.md
+npm run demo:submission -- --write-capture-template tmp/demo-submission/capture-manifest.template.json
 npm run test:artifacts
 npm run test:plan
 npm run test:callback

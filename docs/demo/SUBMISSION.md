@@ -9,6 +9,12 @@ npm run test:submission
 npm run demo:submission -- --output tmp/demo-submission/SUBMISSION_PACK.md
 ```
 
+Generate a fillable capture manifest template:
+
+```bash
+npm run demo:submission -- --write-capture-template tmp/demo-submission/capture-manifest.template.json --output tmp/demo-submission/SUBMISSION_PACK.md
+```
+
 For the current dated evidence set:
 
 ```bash
@@ -30,7 +36,7 @@ By default, the pack checks these local generated artifacts:
 
 ## Manual Capture Manifest
 
-After recording videos or collecting screenshots, create a local JSON manifest outside Git or under ignored `tmp/`:
+After recording videos or collecting screenshots, fill a local JSON manifest outside Git or under ignored `tmp/`:
 
 ```json
 {
@@ -50,6 +56,12 @@ Run:
 ```bash
 npm run demo:submission -- --capture-manifest tmp/demo-submission/capture-manifest.json --output tmp/demo-submission/SUBMISSION_PACK.md
 ```
+
+Rules:
+
+- `status` must be `ready`.
+- `path` must point to an existing local file.
+- `redacted` must be `true` after reviewing secrets and private fields.
 
 Required capture labels:
 

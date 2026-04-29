@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { buildDemoSubmissionPack, renderDemoSubmissionMarkdown } from "./demo-submission-pack.js";
+import { buildCaptureManifestTemplate, buildDemoSubmissionPack, renderDemoSubmissionMarkdown } from "./demo-submission-pack.js";
 
 const tempDir = await mkdtemp(join(tmpdir(), "pilotflow-submission-pack-"));
 
@@ -63,6 +63,12 @@ try {
   assert.match(markdown, /ready_for_submission_review/);
   assert.match(markdown, /Manual Capture Manifest/);
   assert.match(markdown, /Do not include App Secret/);
+
+  const template = buildCaptureManifestTemplate();
+  assert.equal(template.version, 1);
+  assert.equal(template.captures.length, 4);
+  assert.equal(template.captures.every((item) => item.status === "pending"), true);
+  assert.equal(template.captures.every((item) => item.redacted === false), true);
 } finally {
   await rm(tempDir, { recursive: true, force: true });
 }

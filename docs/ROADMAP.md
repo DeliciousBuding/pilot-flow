@@ -17,6 +17,7 @@ Status after the latest implementation pass:
 - Base owner/deadline fallback, local Flight Recorder view, risk detection, live risk decision card send, live pinned entry message, explicit Task assignee mapping, optional Contacts-based owner lookup, plan-validation fallback, card callback action protocol, and a bounded card listener are now implemented. The next product slice should harden the demo, capture evidence, and resolve platform callback configuration.
 - Phase 3 demo hardening has started: the latest live run now has a generated Flight Recorder HTML view and Markdown evidence pack, `docs/demo/` contains the demo playbook, reviewer Q&A, fallback/no-network explanation, local demo evaluation pack, capture pack, failure-path demo pack, readiness gate, permission appendix pack, callback verification pack, and judge review pack for callback timeout, announcement fallback, invalid plan, duplicate run, requirement-risk cases, scope evidence, product claims, and manual capture work.
 - Submission readiness is now split into machine evidence and manual media: the generated submission pack can report whether evidence is ready while keeping videos and screenshots outside Git.
+- Capture manifest template generation is available so manual videos and screenshots can be tracked without committing raw media.
 
 Main loop:
 
@@ -162,6 +163,7 @@ Goal: make the MVP stable enough for live evaluation.
 - [x] Fold permission and callback verification evidence into the demo readiness gate.
 - [x] Add judge review pack for reviewer-facing product story, evidence sources, boundaries, reproduction commands, and next actions.
 - [x] Add demo submission pack for machine evidence and manual capture manifest status.
+- [x] Add capture manifest template generation for manual recordings and screenshots.
 - [x] Keep a pre-generated Feishu Doc/Base/Task set for backup.
 
 Exit condition:

@@ -246,6 +246,7 @@ npm run demo:submission -- --output tmp/demo-submission/SUBMISSION_PACK.md
 ```
 
 The submission pack checks the current readiness, judge, callback, capture, permission, and failure packs, then optionally reads a local `--capture-manifest` JSON for videos and screenshots. Without a manifest it should report `machine_ready_manual_capture_pending`.
+Use `--write-capture-template tmp/demo-submission/capture-manifest.template.json` to generate the fillable manifest shape before recording.
 
 Live project-init runs are guarded against accidental duplicates. If you intentionally need to repeat a visible Feishu write, pass an explicit key or bypass flag:
 
