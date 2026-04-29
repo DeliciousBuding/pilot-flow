@@ -228,6 +228,7 @@ Full roadmap: [docs/ROADMAP.md](docs/ROADMAP.md).
 | [Roadmap](docs/ROADMAP.md) | Long-term plan and immediate next actions |
 | [Demo Kit](docs/demo/README.md) | Demo playbook, Q&A, fallback notes, evidence workflow |
 | [Demo Evaluation](docs/demo/EVALUATION.md) | Runnable demo-risk cases and generated-report workflow |
+| [Demo Capture Guide](docs/demo/CAPTURE_GUIDE.md) | Recording and screenshot checklist |
 | [Documentation Plan](docs/DOCUMENTATION_PLAN.md) | Documentation governance |
 
 ## ⚡ Prototype Demo
@@ -246,6 +247,7 @@ npm run demo:manual -- --auto-lookup-owner-contact
 npm run flight:recorder -- --input tmp/runs/latest-manual-run.jsonl
 npm run demo:evidence -- --input tmp/runs/latest-manual-run.jsonl
 npm run demo:eval -- --output tmp/demo-eval/DEMO_EVAL.md
+npm run demo:capture -- --output tmp/demo-capture/CAPTURE_PACK.md
 npm run test:artifacts
 npm run test:plan
 npm run test:callback
