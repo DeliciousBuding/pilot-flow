@@ -248,6 +248,15 @@ npm run demo:submission -- --output tmp/demo-submission/SUBMISSION_PACK.md
 The submission pack checks the current readiness, judge, callback, capture, permission, and failure packs, then optionally reads a local `--capture-manifest` JSON for videos and screenshots. Without a manifest it should report `machine_ready_manual_capture_pending`.
 Use `--write-capture-template tmp/demo-submission/capture-manifest.template.json` to generate the fillable manifest shape before recording. When capture paths exist, the generated report records file size, SHA-256, and optional reviewer metadata without committing the raw media.
 
+Generate a demo delivery index:
+
+```bash
+npm run test:delivery-index
+npm run demo:delivery-index -- --output tmp/demo-delivery/DELIVERY_INDEX.md
+```
+
+The delivery index is the local start page for review packaging. It checks public docs, generated evidence packs, the Flight Recorder HTML, the live run log, and the current submission/manual-capture status, then prints a recommended opening order for reviewers or demo operators.
+
 Live project-init runs are guarded against accidental duplicates. If you intentionally need to repeat a visible Feishu write, pass an explicit key or bypass flag:
 
 ```bash
@@ -425,6 +434,7 @@ Next implementation targets:
 | Callback verification pack | `npm run test:callback-pack`, `npm run demo:callback-verification`, inspect generated Markdown |
 | Judge review pack | `npm run test:judge`, `npm run demo:judge`, inspect generated Markdown |
 | Demo submission pack | `npm run test:submission`, `npm run demo:submission`, inspect generated Markdown |
+| Demo delivery index | `npm run test:delivery-index`, `npm run demo:delivery-index`, inspect generated Markdown |
 | Risk detection/card | `npm run test:risk`, `npm run demo:manual -- --send-risk-card`, inspect `risk.detected` and card artifact |
 | Task assignee mapping | `npm run test:assignee`, `npm run test:config`, `npm run demo:manual -- --owner-open-id-map-json '{"Product Owner":"ou_xxx"}'`, inspect `--assignee` |
 | Contact owner lookup | `npm run test:contact`, `npm run demo:manual -- --auto-lookup-owner-contact`, inspect `contact.search` and `owner.lookup_completed` |

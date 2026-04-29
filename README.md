@@ -235,6 +235,7 @@ Full roadmap: [docs/ROADMAP.md](docs/ROADMAP.md).
 | [Callback Verification](docs/demo/CALLBACK_VERIFICATION.md) | Callback readiness report for card payloads, listener, and real event delivery |
 | [Judge Review Pack](docs/demo/JUDGE_REVIEW.md) | Reviewer entry pack for product story, evidence, boundaries, and reproduction |
 | [Demo Submission Pack](docs/demo/SUBMISSION.md) | Final local gate for machine evidence and manual capture status |
+| [Demo Delivery Index](docs/demo/DELIVERY_INDEX.md) | Local review-packaging index for docs, generated evidence, trace artifacts, and manual capture state |
 | [Documentation Plan](docs/DOCUMENTATION_PLAN.md) | Documentation governance |
 
 ## ⚡ Prototype Demo

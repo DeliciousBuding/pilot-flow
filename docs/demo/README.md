@@ -33,6 +33,7 @@ The demo should make three things obvious:
 | [`CALLBACK_VERIFICATION.md`](CALLBACK_VERIFICATION.md) | Callback readiness report for card payload, listener, and real event delivery |
 | [`JUDGE_REVIEW.md`](JUDGE_REVIEW.md) | Reviewer-facing entry pack that connects product story, evidence sources, boundaries, and next actions |
 | [`SUBMISSION.md`](SUBMISSION.md) | Final local gate for machine evidence and manual capture manifest status |
+| [`DELIVERY_INDEX.md`](DELIVERY_INDEX.md) | Local review-packaging start page that links public docs, generated evidence, traces, and manual capture state |
 
 Generated local evidence artifacts are not committed by default. Create them from a JSONL run log:
 
@@ -47,6 +48,7 @@ npm run demo:permissions -- --collect-version --collect-auth --collect-event-dry
 npm run demo:callback-verification -- --output tmp/demo-callback/CALLBACK_VERIFICATION.md
 npm run demo:judge -- --output tmp/demo-judge/JUDGE_REVIEW.md
 npm run demo:submission -- --output tmp/demo-submission/SUBMISSION_PACK.md
+npm run demo:delivery-index -- --output tmp/demo-delivery/DELIVERY_INDEX.md
 ```
 
 ## Recommended Screens
@@ -67,6 +69,7 @@ npm run demo:submission -- --output tmp/demo-submission/SUBMISSION_PACK.md
 | Callback Verification Pack | Separates card payload readiness, listener connection, and real callback delivery |
 | Judge Review Pack | Single reviewer entry point for product claims, evidence sources, commands, and boundaries |
 | Demo Submission Pack | Final local status for machine evidence and required manual media |
+| Demo Delivery Index | Local operator start page for all public docs, generated evidence, trace artifacts, and manual capture state |
 
 ## Current Demo Status
 
@@ -87,3 +90,4 @@ npm run demo:submission -- --output tmp/demo-submission/SUBMISSION_PACK.md
 | Callback verification pack | Payload and listener evidence generated through `npm run demo:callback-verification`; real callback event still pending |
 | Judge review pack | Reviewer entry pack generated through `npm run demo:judge`; depends on current local evidence packs |
 | Demo submission pack | Machine evidence can be checked through `npm run demo:submission`; manual media remains external to Git |
+| Demo delivery index | Material navigation can be generated through `npm run demo:delivery-index`; current status should stay `ready_for_manual_capture` until manual media is collected |

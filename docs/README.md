@@ -9,6 +9,7 @@ This directory contains the public documentation set for PilotFlow.
 | Judge or product reviewer | `README.md` -> `PROJECT_BRIEF.md` -> `PRODUCT_SPEC.md` -> `ROADMAP.md` |
 | Engineer | `README.md` -> `DEVELOPMENT.md` -> `ARCHITECTURE.md` |
 | Designer or demo owner | `VISUAL_DESIGN.md` -> `demo/README.md` -> `ROADMAP.md` |
+| Demo reviewer package owner | `demo/DELIVERY_INDEX.md` -> generated Delivery Index -> generated Judge Review Pack -> generated Submission Pack |
 | Future agent session | workspace `AGENTS.md` -> `PERSONAL_PROGRESS.md` -> repo README -> this index |
 
 ## Documents
@@ -39,6 +40,7 @@ This directory contains the public documentation set for PilotFlow.
 | `demo/CALLBACK_VERIFICATION.md` | Callback readiness report for card payloads, bounded listener, and real event delivery |
 | `demo/JUDGE_REVIEW.md` | Reviewer-facing entry pack for product story, evidence sources, boundaries, and reproduction commands |
 | `demo/SUBMISSION.md` | Final local gate for machine evidence and manual capture manifest status |
+| `demo/DELIVERY_INDEX.md` | Local review-packaging start page across docs, generated evidence, traces, and manual capture state |
 
 ## Planned Folders
 

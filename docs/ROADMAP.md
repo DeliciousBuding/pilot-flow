@@ -15,10 +15,11 @@ Status after the latest implementation pass:
 - Card callback action protocol, bounded listener process, and callback-trigger bridge are implemented locally. A live listener connected to Feishu successfully, but no `card.action.trigger` event was received in the two-minute validation window; text confirmation remains the fallback until Open Platform callback configuration is verified.
 - Group announcement has been attempted through the native announcement API. The test group currently returns `232097 Unable to operate docx type chat announcement`, so the product path now records the failed announcement upgrade and keeps the pinned entry message as the stable Feishu-native entrance.
 - Base owner/deadline fallback, local Flight Recorder view, risk detection, live risk decision card send, live pinned entry message, explicit Task assignee mapping, optional Contacts-based owner lookup, plan-validation fallback, card callback action protocol, and a bounded card listener are now implemented. The next product slice should harden the demo, capture evidence, and resolve platform callback configuration.
-- Phase 3 demo hardening has started: the latest live run now has a generated Flight Recorder HTML view and Markdown evidence pack, `docs/demo/` contains the demo playbook, reviewer Q&A, fallback/no-network explanation, local demo evaluation pack, capture pack, failure-path demo pack, readiness gate, permission appendix pack, callback verification pack, and judge review pack for callback timeout, announcement fallback, invalid plan, duplicate run, requirement-risk cases, scope evidence, product claims, and manual capture work.
+- Phase 3 demo hardening has started: the latest live run now has a generated Flight Recorder HTML view and Markdown evidence pack, `docs/demo/` contains the demo playbook, reviewer Q&A, fallback/no-network explanation, local demo evaluation pack, capture pack, failure-path demo pack, readiness gate, permission appendix pack, callback verification pack, judge review pack, submission pack, and delivery index for callback timeout, announcement fallback, invalid plan, duplicate run, requirement-risk cases, scope evidence, product claims, manual capture work, and review packaging.
 - Submission readiness is now split into machine evidence and manual media: the generated submission pack can report whether evidence is ready while keeping videos and screenshots outside Git.
 - Capture manifest template generation is available so manual videos and screenshots can be tracked without committing raw media.
 - Submission reports now include file size, SHA-256, and optional reviewer metadata for captures listed in the manifest, making external media traceable without moving it into Git.
+- Demo delivery index generation is available as a local review-packaging start page across public docs, generated evidence, trace artifacts, and manual capture state.
 
 Main loop:
 
@@ -167,6 +168,7 @@ Goal: make the MVP stable enough for live evaluation.
 - [x] Add capture manifest template generation for manual recordings and screenshots.
 - [x] Add capture file size and SHA-256 reporting for submission manifests.
 - [x] Add capture reviewer metadata display for submission manifests.
+- [x] Add demo delivery index for review-packaging navigation and evidence status.
 - [x] Keep a pre-generated Feishu Doc/Base/Task set for backup.
 
 Exit condition:
@@ -263,9 +265,10 @@ Longer-term direction after competition MVP.
 - [x] Add permission and callback evidence to readiness gate.
 - [x] Add judge review pack.
 - [x] Add demo submission pack.
+- [x] Add demo delivery index.
 - [ ] Record failure-path demo video.
-- [ ] Harden docs and README for judges and GitHub visitors.
-- [ ] Push all repo updates promptly.
+- [x] Harden docs and README for judges and GitHub visitors with demo delivery index.
+- [x] Push all repo updates promptly.
 
 ### Week 4+: Expansion
 
