@@ -27,6 +27,7 @@ The demo should make three things obvious:
 | [`FAILURE_PATHS.md`](FAILURE_PATHS.md) | Known platform limits, fallback behavior, and how to explain them |
 | [`EVALUATION.md`](EVALUATION.md) | Runnable demo-risk evaluation cases and generated-report workflow |
 | [`CAPTURE_GUIDE.md`](CAPTURE_GUIDE.md) | Recording and screenshot capture checklist |
+| [`FAILURE_DEMO.md`](FAILURE_DEMO.md) | Failure-path demo pack workflow and reviewer-facing boundaries |
 
 Generated local evidence artifacts are not committed by default. Create them from a JSONL run log:
 
@@ -35,6 +36,7 @@ npm run flight:recorder -- --input tmp/runs/latest-manual-run.jsonl --output tmp
 npm run demo:evidence -- --input tmp/runs/latest-manual-run.jsonl --output tmp/demo-evidence/DEMO_EVIDENCE.md
 npm run demo:eval -- --output tmp/demo-eval/DEMO_EVAL.md
 npm run demo:capture -- --output tmp/demo-capture/CAPTURE_PACK.md
+npm run demo:failure -- --output tmp/demo-failure/FAILURE_DEMO.md
 ```
 
 ## Recommended Screens
@@ -49,6 +51,7 @@ npm run demo:capture -- --output tmp/demo-capture/CAPTURE_PACK.md
 | Evidence Pack Markdown | Backup narrative if network or UI switching is unreliable |
 | Demo Evaluation Pack | Shows missing-owner, vague-deadline, invalid-plan, duplicate-run, and tool-failure cases |
 | Demo Capture Pack | Checklist for recording the happy path, failure evidence, and permission appendix |
+| Failure-Path Demo Pack | Reviewer-facing appendix for callback timeout, announcement fallback, invalid plan, duplicate run, and requirement-risk cases |
 
 ## Current Demo Status
 
@@ -63,3 +66,4 @@ npm run demo:capture -- --output tmp/demo-capture/CAPTURE_PACK.md
 | Card callback delivery | Listener connects; real callback event still needs Open Platform configuration verification |
 | Demo evaluation cases | 5 local cases pass through `npm run test:eval` |
 | Demo capture pack | 7 required captures generated from current evidence paths |
+| Failure-path demo pack | 5 evidence-ready scenarios generated through `npm run demo:failure` |

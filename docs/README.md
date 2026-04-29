@@ -33,6 +33,7 @@ This directory contains the public documentation set for PilotFlow.
 | `demo/FAILURE_PATHS.md` | Fallback behavior, known platform limits, and no-network explanation |
 | `demo/EVALUATION.md` | Runnable demo-risk evaluation cases and generated-report workflow |
 | `demo/CAPTURE_GUIDE.md` | Recording and screenshot capture checklist |
+| `demo/FAILURE_DEMO.md` | Failure-path demo pack workflow and reviewer-facing boundaries |
 
 ## Planned Folders
 

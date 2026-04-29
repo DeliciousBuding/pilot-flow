@@ -192,6 +192,15 @@ npm run demo:capture -- --output tmp/demo-capture/CAPTURE_PACK.md
 
 The capture pack checks the latest run log, Flight Recorder, Evidence Pack, and Eval Pack paths, then produces a concrete recording order and screenshot checklist. It is a capture plan, not proof that screenshots or videos already exist.
 
+Generate a failure-path demo pack:
+
+```bash
+npm run test:failure
+npm run demo:failure -- --output tmp/demo-failure/FAILURE_DEMO.md
+```
+
+The failure pack turns the current callback listener log, live announcement fallback run, and demo evaluation report into a reviewer-facing appendix. It covers callback timeout, announcement fallback, invalid planner output, duplicate-run protection, and unclear-requirement risks.
+
 Live project-init runs are guarded against accidental duplicates. If you intentionally need to repeat a visible Feishu write, pass an explicit key or bypass flag:
 
 ```bash
@@ -266,6 +275,7 @@ Implemented:
 - `src/demo/demo-evidence.js`
 - `src/demo/demo-eval.js`
 - `src/demo/demo-capture-pack.js`
+- `src/demo/demo-failure-pack.js`
 - `src/demo/card-listener.js`
 - `src/demo/manual-trigger.js`
 - `src/demo/setup-feishu-targets.js`
@@ -319,6 +329,7 @@ Implemented to date:
 - Markdown Demo Evidence Pack generator over JSONL run logs
 - local Demo Evaluation Pack for missing owner, vague deadline, invalid plan, duplicate run, and optional tool failure
 - local Demo Capture Pack for recording order, screenshot checklist, evidence anchors, and demo boundaries
+- local Failure-Path Demo Pack for callback timeout, announcement fallback, invalid plan, duplicate run, and requirement-risk appendix
 - risk detection over planner risks, missing project facts, non-concrete deadlines, and owner text fallbacks
 - optional `--send-risk-card` flow that sends or dry-runs a Feishu-native risk decision card
 - callback action protocol and parser for risk decisions: assign owner, adjust deadline, accept risk, defer
@@ -351,6 +362,7 @@ Next implementation targets:
 | Demo evidence pack | `npm run test:evidence`, `npm run demo:evidence -- --input <run.jsonl>`, inspect generated Markdown |
 | Demo evaluation pack | `npm run test:eval`, `npm run demo:eval`, inspect generated Markdown |
 | Demo capture pack | `npm run test:capture`, `npm run demo:capture`, inspect generated Markdown |
+| Failure-path demo pack | `npm run test:failure`, `npm run demo:failure`, inspect generated Markdown |
 | Risk detection/card | `npm run test:risk`, `npm run demo:manual -- --send-risk-card`, inspect `risk.detected` and card artifact |
 | Task assignee mapping | `npm run test:assignee`, `npm run test:config`, `npm run demo:manual -- --owner-open-id-map-json '{"Product Owner":"ou_xxx"}'`, inspect `--assignee` |
 | Contact owner lookup | `npm run test:contact`, `npm run demo:manual -- --auto-lookup-owner-contact`, inspect `contact.search` and `owner.lookup_completed` |
