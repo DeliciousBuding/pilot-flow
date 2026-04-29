@@ -47,7 +47,7 @@ npm run pilot:audit
 For individual pack regeneration, use the advanced commands below. These scripts live in `src/demo/packs/` and are separated from the product demo runtime on purpose:
 
 ```bash
-npm run flight:recorder -- --input tmp/runs/latest-manual-run.jsonl --output tmp/flight-recorder/latest.html
+npm run pilot:recorder -- --input tmp/runs/latest-manual-run.jsonl --output tmp/flight-recorder/latest.html
 npm run demo:evidence -- --input tmp/runs/latest-manual-run.jsonl --output tmp/demo-evidence/DEMO_EVIDENCE.md
 npm run demo:eval -- --output tmp/demo-eval/DEMO_EVAL.md
 npm run demo:capture -- --output tmp/demo-capture/CAPTURE_PACK.md

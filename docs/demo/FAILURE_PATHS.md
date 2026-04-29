@@ -62,7 +62,7 @@ Current demo stance:
 For each important demo run, keep local evidence under ignored `tmp/`:
 
 ```bash
-npm run flight:recorder -- --input tmp/runs/<run>.jsonl --output tmp/flight-recorder/<run>.html
+npm run pilot:recorder -- --input tmp/runs/<run>.jsonl --output tmp/flight-recorder/<run>.html
 npm run demo:evidence -- --input tmp/runs/<run>.jsonl --output tmp/demo-evidence/<run>.md
 ```
 

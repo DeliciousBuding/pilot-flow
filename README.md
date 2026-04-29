@@ -11,8 +11,8 @@ Turn group-chat discussion into confirmed plans, executable tasks, traceable sta
 [![Status](https://img.shields.io/badge/status-MVP%20prototype-orange)](#-mvp-progress)
 [![Feishu](https://img.shields.io/badge/Feishu-native-00A4FF)](#-feishu-native-surfaces)
 [![Agent](https://img.shields.io/badge/Agent-as%20Pilot-6f42c1)](#-product-experience)
-[![Node](https://img.shields.io/badge/node-%3E%3D20-339933)](docs/DEVELOPMENT.md)
-[![lark-cli](https://img.shields.io/badge/lark--cli-1.0.21-blue)](docs/DEVELOPMENT.md)
+[![Node](https://img.shields.io/badge/node-%3E%3D20-339933)](docs/OPERATOR_RUNBOOK.md)
+[![lark-cli](https://img.shields.io/badge/lark--cli-1.0.21-blue)](docs/OPERATOR_RUNBOOK.md)
 [![GitHub stars](https://img.shields.io/github/stars/DeliciousBuding/pilot-flow?style=social)](https://github.com/DeliciousBuding/pilot-flow/stargazers)
 [![GitHub last commit](https://img.shields.io/github/last-commit/DeliciousBuding/pilot-flow)](https://github.com/DeliciousBuding/pilot-flow/commits/main)
 
@@ -224,7 +224,8 @@ Full roadmap: [docs/ROADMAP.md](docs/ROADMAP.md).
 | [Product Spec](docs/PRODUCT_SPEC.md) | User promise, feature tiers, non-goals |
 | [Architecture](docs/ARCHITECTURE.md) | Components, state model, tool routing |
 | [Project Structure](docs/PROJECT_STRUCTURE.md) | Runtime layers, command surface, and placement rules |
-| [Development Guide](docs/DEVELOPMENT.md) | Local setup, validation, profiles, GitHub sync |
+| [Operator Runbook](docs/OPERATOR_RUNBOOK.md) | Local operation, live run, evidence regeneration, troubleshooting |
+| [Development Guide](docs/DEVELOPMENT.md) | Contributor workflow, module boundaries, validation matrix |
 | [Visual Design](docs/VISUAL_DESIGN.md) | Feishu-native cards, cockpit, UX rules |
 | [Roadmap](docs/ROADMAP.md) | Long-term plan and immediate next actions |
 | [Demo Kit](docs/demo/README.md) | Demo playbook, Q&A, fallback notes, evidence workflow |
@@ -256,7 +257,7 @@ npm run pilot:status
 npm run pilot:audit
 ```
 
-The current local demo reads a project-init fixture, writes a traceable run log, and returns planned artifacts. Live Feishu execution is available behind an explicit confirmation gate. Detailed setup, advanced `demo:*` evidence commands, and individual test commands live in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) and [docs/demo/README.md](docs/demo/README.md).
+The current local demo reads a project-init fixture, writes a traceable run log, and returns planned artifacts. Live Feishu execution is available behind an explicit confirmation gate. Operational setup lives in [docs/OPERATOR_RUNBOOK.md](docs/OPERATOR_RUNBOOK.md); contributor workflow lives in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
 
 ## 🔐 Safety Principles
 

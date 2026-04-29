@@ -21,7 +21,7 @@ Status after the 2026-04-29 cleanup pass:
 - Submission reports now include file size, SHA-256, and optional reviewer metadata for captures listed in the manifest, making external media traceable without moving it into Git.
 - Demo delivery index generation is available as a local review-packaging start page across public docs, generated evidence, trace artifacts, and manual capture state.
 - Demo safety audit generation is available as a pattern-based gate for public docs, generated review material, Flight Recorder output, and source files.
-- Project cleanup pass is now part of demo hardening: generated evidence pack scripts are isolated under `src/demo/packs/`, while `pilot:*` commands provide a small product-facing command surface.
+- Project cleanup pass is now part of demo hardening: generated evidence pack scripts are isolated under `src/demo/packs/`, `pilot:*` commands provide a small product-facing command surface, and operator runbook content is separated from contributor development guidance.
 
 Main loop:
 
@@ -174,6 +174,7 @@ Goal: make the MVP stable enough for live evaluation.
 - [x] Add demo safety audit pack for secret-like value and private identifier scanning.
 - [x] Separate demo/evidence pack scripts from the product demo runtime.
 - [x] Add `pilot:*` command facade for the common validation, demo, package, status, and audit flows.
+- [x] Split operator runbook from contributor development guide so setup, live runs, troubleshooting, and validation ownership are easier to find.
 - [x] Keep a pre-generated Feishu Doc/Base/Task set for backup.
 
 Exit condition:

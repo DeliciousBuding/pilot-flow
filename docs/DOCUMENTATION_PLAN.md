@@ -10,7 +10,8 @@ PilotFlow documentation should evolve with the product. The README is the front 
 | `docs/PROJECT_BRIEF.md` | Competition and product brief | product positioning changes |
 | `docs/PRODUCT_SPEC.md` | Product scope and user value | feature boundary changes |
 | `docs/ARCHITECTURE.md` | System design | state, tool, adapter, storage changes |
-| `docs/DEVELOPMENT.md` | Local development workflow | command, profile, validation changes |
+| `docs/OPERATOR_RUNBOOK.md` | Local operation and troubleshooting | command, profile, live run, evidence, fallback changes |
+| `docs/DEVELOPMENT.md` | Contributor workflow | module boundary, validation policy, Git workflow changes |
 | `docs/VISUAL_DESIGN.md` | UX and visual standards | card, cockpit, demo UI changes |
 | `docs/ROADMAP.md` | Long-term plan | completed phases or priority shifts |
 | `docs/adr/` | Architecture decisions | irreversible or debated decisions |
@@ -33,7 +34,7 @@ Every major doc should answer:
 - Keep the first screen clear enough for a judge or GitHub visitor.
 - Treat README as product packaging and project front door, not an internal development log.
 - Do not include meta text like "the user asked for README style X" or "this README was inspired by template Y" in the product-facing README.
-- Put README references, maintenance constraints, and detailed development workflow in this file or `DEVELOPMENT.md`.
+- Put README references and maintenance constraints in this file, operator workflow in `OPERATOR_RUNBOOK.md`, and contributor workflow in `DEVELOPMENT.md`.
 - Do not overclaim production readiness.
 - Keep diagrams in Mermaid so they are reviewable in Git.
 - Link to deeper docs instead of making the README unbounded.

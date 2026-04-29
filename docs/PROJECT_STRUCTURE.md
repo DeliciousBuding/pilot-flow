@@ -12,7 +12,7 @@ PilotFlow keeps product runtime, demo operation, and generated review tooling in
 | Demo runtime | `src/demo/manual-trigger.js`, `src/demo/card-listener.js`, `src/demo/flight-recorder-view.js`, `src/demo/setup-feishu-targets.js`, `src/demo/pilot-cli.js` | runnable entry points, listener wrapper, recorder view, setup, command facade | generated review pack logic |
 | Evidence packs | `src/demo/packs/` | readiness, submission, delivery, callback, permission, safety, and other generated Markdown materials | core product flow |
 | Dev automation | `scripts/` | repo checks and grouped local test runners | product runtime behavior |
-| Public docs | `docs/` | product, architecture, development, roadmap, demo guidance | private official document cache, raw secrets, raw logs |
+| Public docs | `docs/` | product, architecture, operator runbook, development, roadmap, demo guidance | private official document cache, raw secrets, raw logs |
 | Local generated output | `tmp/` | run logs, generated reports, recorder HTML, local capture manifests | committed source |
 
 ## Command Policy
@@ -36,7 +36,7 @@ npm run test:core
 npm run test:packs
 ```
 
-Use `demo:*` only when regenerating one specific evidence pack or debugging a pack in isolation. Use fine-grained `test:*` commands only when isolating a specific module.
+Use `demo:*` only when regenerating one specific evidence pack or debugging a pack in isolation. Use `npm run test:one -- <alias>` when isolating a specific module.
 
 ## Placement Rules
 

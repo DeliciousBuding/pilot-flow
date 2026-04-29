@@ -1,0 +1,204 @@
+# Operator Runbook
+
+This runbook is for people operating the PilotFlow prototype: local validation, dry-run checks, live Feishu runs, evidence regeneration, and known fallback handling.
+
+For product scope, read [`PRODUCT_SPEC.md`](PRODUCT_SPEC.md). For module boundaries, read [`PROJECT_STRUCTURE.md`](PROJECT_STRUCTURE.md). For implementation details, read [`DEVELOPMENT.md`](DEVELOPMENT.md).
+
+## Required Environment
+
+| Requirement | Expected value |
+| --- | --- |
+| Node.js | `>=20` |
+| Feishu CLI | global `lark-cli >=1.0.21` |
+| Demo profile | `pilotflow-contest` |
+| Progress sync profile | `cli_a935d47f8138dcd2` |
+
+Check the local toolchain:
+
+```powershell
+node --version
+npm --version
+lark-cli --version
+lark-cli profile list
+lark-cli auth status --verify
+```
+
+## Main Commands
+
+| Need | Command |
+| --- | --- |
+| Syntax check every JS file | `npm run pilot:check` |
+| Run all grouped tests | `npm test` |
+| Run core tests | `npm run test:core` |
+| Run evidence-pack tests | `npm run test:packs` |
+| Run one focused test | `npm run test:one -- <alias>` |
+| Run manual dry-run demo | `npm run pilot:demo` |
+| Render Flight Recorder | `npm run pilot:recorder -- --input <run.jsonl> --output <html>` |
+| Rebuild review package | `npm run pilot:package` |
+| Rebuild delivery status | `npm run pilot:status` |
+| Run safety audit | `npm run pilot:audit` |
+
+Focused test aliases are maintained in [`scripts/run-tests.js`](../scripts/run-tests.js). Examples:
+
+```bash
+npm run test:one -- plan
+npm run test:one -- risk
+npm run test:one -- submission
+```
+
+## Dry-Run Operation
+
+Run the basic local demo:
+
+```bash
+npm run pilot:demo
+```
+
+Expected result:
+
+- a `project_init` plan
+- status `completed`
+- JSONL run log under `tmp/runs/`
+
+Preview Feishu target setup:
+
+```bash
+npm run setup:feishu -- --dry-run
+```
+
+The current `Project State` table template is:
+
+```text
+type, title, owner, due_date, status, risk_level, source_run, source_message, url
+```
+
+## Live Feishu Operation
+
+Live writes require explicit confirmation:
+
+```bash
+npm run demo:manual -- --live --confirm "确认起飞"
+```
+
+Useful live flags:
+
+| Flag | Purpose |
+| --- | --- |
+| `--send-plan-card` | Send the project flight-plan card before confirmation |
+| `--send-entry-message` | Send a stable project entry after artifacts are created |
+| `--pin-entry-message` | Pin the project entry message in the group |
+| `--update-announcement` | Try native group announcement update and fall back to pinned entry on failure |
+| `--send-risk-card` | Send the risk decision card after state rows are created |
+| `--owner-open-id-map-json <json>` | Map planner owner labels to Feishu `open_id` |
+| `--auto-lookup-owner-contact` | Search Feishu Contacts when no explicit owner map matches |
+| `--allow-duplicate-run` | Bypass duplicate-run protection intentionally |
+
+Show all runtime options:
+
+```bash
+npm run demo:manual -- --help
+```
+
+## Runtime Variables
+
+| Variable | Meaning |
+| --- | --- |
+| `PILOTFLOW_FEISHU_MODE` | `dry-run` or `live` |
+| `PILOTFLOW_LARK_PROFILE` | lark-cli profile, default `pilotflow-contest` |
+| `PILOTFLOW_TEST_CHAT_ID` | group chat ID for cards and summary |
+| `PILOTFLOW_BASE_TOKEN` | Base token for state rows |
+| `PILOTFLOW_BASE_TABLE_ID` | Base table ID or name |
+| `PILOTFLOW_TASKLIST_ID` | optional tasklist GUID or AppLink |
+| `PILOTFLOW_CONFIRMATION_TEXT` | must equal `确认起飞` for live writes |
+| `PILOTFLOW_SEND_PLAN_CARD` | `true` or `1` to send the flight-plan card |
+| `PILOTFLOW_SEND_ENTRY_MESSAGE` | `true` or `1` to send a project entry message |
+| `PILOTFLOW_PIN_ENTRY_MESSAGE` | `true` or `1` to pin the project entry |
+| `PILOTFLOW_UPDATE_ANNOUNCEMENT` | `true` or `1` to try announcement update |
+| `PILOTFLOW_SEND_RISK_CARD` | `true` or `1` to send a risk decision card |
+| `PILOTFLOW_DEDUPE_KEY` | optional stable key for duplicate-run protection |
+| `PILOTFLOW_ALLOW_DUPLICATE_RUN` | `true` or `1` to bypass duplicate-run protection |
+| `PILOTFLOW_DISABLE_DUPLICATE_GUARD` | `true` or `1` to disable duplicate-run protection |
+| `PILOTFLOW_DUPLICATE_GUARD_PATH` | local guard file path, default `tmp/run-guard/project-init-runs.json` |
+| `PILOTFLOW_OWNER_OPEN_ID_MAP_JSON` | JSON object mapping owner labels to Feishu `open_id` |
+| `PILOTFLOW_AUTO_LOOKUP_OWNER_CONTACT` | `true` or `1` to search Feishu Contacts |
+| `PILOTFLOW_TASK_ASSIGNEE_OPEN_ID` | optional default assignee `open_id` for the first created Task |
+| `PILOTFLOW_LISTENER_MAX_EVENTS` | max event count for `listen:cards` |
+| `PILOTFLOW_LISTENER_TIMEOUT` | listener timeout such as `30s` or `2m` |
+
+Do not commit `.env`; it is intentionally ignored.
+
+## Evidence And Review Package
+
+Use the facade for the normal review flow:
+
+```bash
+npm run pilot:package
+npm run pilot:status
+npm run pilot:audit
+```
+
+Individual pack commands remain available for targeted regeneration:
+
+```bash
+npm run demo:evidence -- --input tmp/runs/latest-manual-run.jsonl --output tmp/demo-evidence/DEMO_EVIDENCE.md
+npm run demo:eval -- --output tmp/demo-eval/DEMO_EVAL.md
+npm run demo:capture -- --output tmp/demo-capture/CAPTURE_PACK.md
+npm run demo:failure -- --output tmp/demo-failure/FAILURE_DEMO.md
+npm run demo:readiness -- --output tmp/demo-readiness/DEMO_READINESS.md
+npm run demo:permissions -- --collect-version --collect-auth --collect-event-dry-run --output tmp/demo-permissions/PERMISSION_APPENDIX.md
+npm run demo:callback-verification -- --output tmp/demo-callback/CALLBACK_VERIFICATION.md
+npm run demo:judge -- --output tmp/demo-judge/JUDGE_REVIEW.md
+npm run demo:submission -- --output tmp/demo-submission/SUBMISSION_PACK.md
+npm run demo:delivery-index -- --output tmp/demo-delivery/DELIVERY_INDEX.md
+npm run demo:safety-audit -- --output tmp/demo-safety/SAFETY_AUDIT.md
+```
+
+Generated reports and run logs stay under ignored `tmp/`.
+
+## Known Platform Edges
+
+| Edge | Current behavior |
+| --- | --- |
+| Card callback delivery | Code-level listener and trigger bridge exist; the 2026-04-29 live listener attempt connected but did not receive a real `card.action.trigger` event |
+| Group announcement | Native announcement update was attempted; the current test group returns `232097 Unable to operate docx type chat announcement` |
+| Manual media | Submission/readiness packs separate machine evidence from videos, screenshots, and callback configuration proof |
+
+Stable fallback paths:
+
+- text confirmation with `确认起飞`
+- pinned project entry message
+- generated Flight Recorder and evidence packs
+
+## Progress Document Sync
+
+The local progress file is `D:\Code\LarkProject\PERSONAL_PROGRESS.md`.
+
+Always fetch before overwriting the Feishu document:
+
+```powershell
+lark-cli docs +fetch --api-version v2 --profile cli_a935d47f8138dcd2 --doc "<progress-doc>" --as user --format json --doc-format markdown --scope outline --max-depth 2
+lark-cli docs +update --api-version v2 --profile cli_a935d47f8138dcd2 --doc "<progress-doc>" --as user --command overwrite --doc-format markdown --content "@PERSONAL_PROGRESS.md"
+```
+
+Run the update from `D:\Code\LarkProject` because `--content @PERSONAL_PROGRESS.md` is relative to the current directory.
+
+## Troubleshooting
+
+| Symptom | Check |
+| --- | --- |
+| Live mode stops before side effects | Confirm `PILOTFLOW_TEST_CHAT_ID`, `PILOTFLOW_BASE_TOKEN`, and `PILOTFLOW_BASE_TABLE_ID` |
+| Duplicate live run blocked | Use a new `PILOTFLOW_DEDUPE_KEY` or intentionally pass `--allow-duplicate-run` |
+| Card sends but button does not trigger | Regenerate Callback Verification Pack and inspect Open Platform callback configuration |
+| Announcement update fails | Keep pinned entry fallback; do not claim native announcement success for this group |
+| Contact lookup cannot assign owner | Use explicit `PILOTFLOW_OWNER_OPEN_ID_MAP_JSON` or keep text owner fallback |
+| Generated report mentions old commands | Search for the legacy check command, legacy focused-test aliases, or old flat demo-pack paths, then update source generators |
+
+## Safety Checks
+
+Before sharing docs, screenshots, recordings, or generated reports:
+
+```bash
+npm run pilot:audit
+```
+
+Also search local source and docs for known secret patterns when credentials have been handled during the session. Secrets belong outside the repository, preferably under `C:\Users\Ding\.config\local-secrets`.
