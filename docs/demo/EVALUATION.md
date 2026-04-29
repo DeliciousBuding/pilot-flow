@@ -5,7 +5,7 @@ PilotFlow keeps a small demo evaluation pack for the risk and fallback cases tha
 ## Run The Evaluation
 
 ```bash
-npm run test:eval
+npm run test:one -- eval
 npm run demo:eval -- --output tmp/demo-eval/DEMO_EVAL.md
 ```
 
@@ -39,7 +39,7 @@ API error: [232097] Unable to operate docx type chat announcement.
 
 Use this pack before recording:
 
-1. Run `npm run test:eval`.
+1. Run `npm run test:one -- eval`.
 2. Generate `tmp/demo-eval/DEMO_EVAL.md`.
 3. Confirm all cases pass.
 4. Use the report as the failure-path appendix for the demo owner.

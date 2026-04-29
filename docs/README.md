@@ -49,6 +49,7 @@ This directory contains the public documentation set for PilotFlow.
 | Need | Command |
 | --- | --- |
 | Validate the repo | `npm run pilot:check` |
+| Run grouped tests | `npm test` |
 | Run the manual product loop | `npm run pilot:demo` |
 | Render a run trace | `npm run pilot:recorder -- --input <run.jsonl> --output <html>` |
 | Rebuild review materials | `npm run pilot:package` |

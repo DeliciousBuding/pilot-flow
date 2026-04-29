@@ -7,7 +7,7 @@ When a capture manifest points to existing files, the pack records file size and
 ## Generate
 
 ```bash
-npm run test:submission
+npm run test:one -- submission
 npm run demo:submission -- --output tmp/demo-submission/SUBMISSION_PACK.md
 ```
 

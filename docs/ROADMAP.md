@@ -8,14 +8,14 @@ PilotFlow is a project operations officer inside Feishu group chats. It should h
 
 ## Current Planning Update
 
-Status after the latest implementation pass:
+Status after the 2026-04-29 cleanup pass:
 
 - Phase 1 is effectively closed: the manual trigger can create real Feishu artifacts and return a traceable run.
 - Phase 2 should now prioritize stable Feishu-native product surfaces over heavier automation.
 - Card callback action protocol, bounded listener process, and callback-trigger bridge are implemented locally. A live listener connected to Feishu successfully, but no `card.action.trigger` event was received in the two-minute validation window; text confirmation remains the fallback until Open Platform callback configuration is verified.
 - Group announcement has been attempted through the native announcement API. The test group currently returns `232097 Unable to operate docx type chat announcement`, so the product path now records the failed announcement upgrade and keeps the pinned entry message as the stable Feishu-native entrance.
 - Base owner/deadline fallback, local Flight Recorder view, risk detection, live risk decision card send, live pinned entry message, explicit Task assignee mapping, optional Contacts-based owner lookup, plan-validation fallback, card callback action protocol, and a bounded card listener are now implemented. The next product slice should harden the demo, capture evidence, and resolve platform callback configuration.
-- Phase 3 demo hardening has started: the latest live run now has a generated Flight Recorder HTML view and Markdown evidence pack, `docs/demo/` contains the demo playbook, reviewer Q&A, fallback/no-network explanation, local demo evaluation pack, capture pack, failure-path demo pack, readiness gate, permission appendix pack, callback verification pack, judge review pack, submission pack, delivery index, and safety audit pack for callback timeout, announcement fallback, invalid plan, duplicate run, requirement-risk cases, scope evidence, product claims, manual capture work, review packaging, and leak prevention.
+- Phase 3 demo hardening has started: the 2026-04-29 live run has a generated Flight Recorder HTML view and Markdown evidence pack, `docs/demo/` contains the demo playbook, reviewer Q&A, fallback/no-network explanation, local demo evaluation pack, capture pack, failure-path demo pack, readiness gate, permission appendix pack, callback verification pack, judge review pack, submission pack, delivery index, and safety audit pack for callback timeout, announcement fallback, invalid plan, duplicate run, requirement-risk cases, scope evidence, product claims, manual capture work, review packaging, and leak prevention.
 - Submission readiness is now split into machine evidence and manual media: the generated submission pack can report whether evidence is ready while keeping videos and screenshots outside Git.
 - Capture manifest template generation is available so manual videos and screenshots can be tracked without committing raw media.
 - Submission reports now include file size, SHA-256, and optional reviewer metadata for captures listed in the manifest, making external media traceable without moving it into Git.

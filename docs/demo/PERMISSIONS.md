@@ -7,7 +7,7 @@ It deliberately keeps secrets out of the report. App secrets, access tokens, ver
 ## Generate The Pack
 
 ```bash
-npm run test:permissions
+npm run test:one -- permissions
 npm run demo:permissions -- --collect-version --collect-auth --collect-event-dry-run --output tmp/demo-permissions/PERMISSION_APPENDIX.md
 ```
 

@@ -7,7 +7,7 @@ Use it after generating the Delivery Index and before packaging material for jud
 ## Generate
 
 ```bash
-npm run test:safety-audit
+npm run test:one -- safety-audit
 npm run demo:safety-audit -- --output tmp/demo-safety/SAFETY_AUDIT.md
 ```
 

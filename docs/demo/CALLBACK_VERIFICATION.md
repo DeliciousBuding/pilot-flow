@@ -10,7 +10,7 @@ The Callback Verification Pack turns the current card-callback status into a rep
 ## Generate
 
 ```bash
-npm run test:callback-pack
+npm run test:one -- callback-pack
 npm run demo:callback-verification -- --output tmp/demo-callback/CALLBACK_VERIFICATION.md
 ```
 

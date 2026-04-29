@@ -7,7 +7,7 @@ Use it when the demo material starts to spread across README, docs, generated re
 ## Generate
 
 ```bash
-npm run test:delivery-index
+npm run test:one -- delivery-index
 npm run demo:delivery-index -- --output tmp/demo-delivery/DELIVERY_INDEX.md
 ```
 

@@ -23,7 +23,8 @@ Before a live recording or live presentation:
 
 - Confirm `lark-cli auth status --verify` reports a valid token for `pilotflow-contest`.
 - Confirm `.env` contains the local-only demo targets and is not committed.
-- Run `npm run check`.
+- Run `npm run pilot:check`.
+- Run `npm test` when the code changed, not just the recording material.
 - Keep the latest successful JSONL run log available.
 - Generate a local Flight Recorder HTML and Evidence Pack Markdown.
 
@@ -102,7 +103,8 @@ Use the roadmap language:
 
 Before demo:
 
-- [ ] `npm run check` passes.
+- [ ] `npm run pilot:check` passes.
+- [ ] `npm test` passes after code changes.
 - [ ] Latest live run log exists.
 - [ ] Flight Recorder HTML generated.
 - [ ] Evidence Pack Markdown generated.

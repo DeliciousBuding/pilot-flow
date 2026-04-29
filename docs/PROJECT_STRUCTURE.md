@@ -11,6 +11,7 @@ PilotFlow keeps product runtime, demo operation, and generated review tooling in
 | Runtime config and schemas | `src/config/`, `src/schemas/` | environment parsing, runtime options, JSON schemas | Feishu side effects |
 | Demo runtime | `src/demo/manual-trigger.js`, `src/demo/card-listener.js`, `src/demo/flight-recorder-view.js`, `src/demo/setup-feishu-targets.js`, `src/demo/pilot-cli.js` | runnable entry points, listener wrapper, recorder view, setup, command facade | generated review pack logic |
 | Evidence packs | `src/demo/packs/` | readiness, submission, delivery, callback, permission, safety, and other generated Markdown materials | core product flow |
+| Dev automation | `scripts/` | repo checks and grouped local test runners | product runtime behavior |
 | Public docs | `docs/` | product, architecture, development, roadmap, demo guidance | private official document cache, raw secrets, raw logs |
 | Local generated output | `tmp/` | run logs, generated reports, recorder HTML, local capture manifests | committed source |
 
@@ -27,7 +28,15 @@ npm run pilot:status
 npm run pilot:audit
 ```
 
-Use `demo:*` only when regenerating one specific evidence pack or debugging a pack in isolation.
+Use grouped validation commands for local maintenance:
+
+```bash
+npm test
+npm run test:core
+npm run test:packs
+```
+
+Use `demo:*` only when regenerating one specific evidence pack or debugging a pack in isolation. Use fine-grained `test:*` commands only when isolating a specific module.
 
 ## Placement Rules
 
@@ -35,6 +44,7 @@ Use `demo:*` only when regenerating one specific evidence pack or debugging a pa
 - New Feishu API behavior belongs in `src/tools/feishu/` or `src/adapters/lark-cli/`, then gets called by core.
 - New demo operation entry points can live in `src/demo/` only if they are directly runnable by a human.
 - New generated review or competition material belongs in `src/demo/packs/`.
+- New repo-wide maintenance automation belongs in `scripts/`; do not turn `package.json` into a long command registry.
 - New public explanation belongs in `docs/`; raw official document caches, screenshots, recordings, secrets, and private logs stay outside the repository or under ignored local folders.
 
 ## Current Product Boundary

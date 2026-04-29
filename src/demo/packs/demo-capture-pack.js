@@ -163,8 +163,8 @@ function buildRequiredCaptures() {
 
 function buildOperatorChecklist() {
   return [
-    "`npm run check` passes before recording.",
-    "`npm run test:eval` passes before recording.",
+    "`npm run pilot:check` passes before recording.",
+    "`npm run test:one -- eval` passes before recording.",
     "Latest Evidence Pack, Eval Pack, and Flight Recorder are generated.",
     "Feishu group, Doc, Base, Task, and local Flight Recorder are opened in tabs before recording.",
     "Secrets, app secret fields, access tokens, and private contact details are hidden.",
@@ -180,7 +180,7 @@ function buildTalkingPoints({ evalText }) {
     "PilotFlow is Feishu-native: IM, card, Doc, Base, Task, pinned entry, and summary are the main surfaces.",
     "PilotFlow is controllable: human confirmation is required before visible write actions.",
     "PilotFlow is traceable: every run has JSONL, Flight Recorder, Evidence Pack, and Eval Pack evidence.",
-    evalPass ? "The current local eval pack has five passing demo-risk cases." : "Run `npm run test:eval` and regenerate the eval pack before presenting.",
+    evalPass ? "The current local eval pack has five passing demo-risk cases." : "Run `npm run test:one -- eval` and regenerate the eval pack before presenting.",
     "Known limits are explicit: card callback delivery still needs platform configuration verification, and announcement update falls back on pinned entry for the current group."
   ];
 }

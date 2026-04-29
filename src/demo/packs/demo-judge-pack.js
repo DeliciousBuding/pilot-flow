@@ -238,7 +238,7 @@ function buildKnownBoundaries() {
 
 function buildRecommendedCommands() {
   return [
-    "npm run check",
+    "npm run pilot:check",
     "npm run demo:manual",
     "npm run demo:evidence -- --input tmp/runs/announcement-upgrade-live-20260429-fixed.jsonl --output tmp/demo-evidence/DEMO_EVIDENCE_20260429.md",
     "npm run demo:eval -- --output tmp/demo-eval/DEMO_EVAL_20260429.md",

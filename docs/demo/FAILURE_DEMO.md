@@ -7,7 +7,7 @@ The goal is practical: show that PilotFlow does not hide platform limits, unclea
 ## Generate The Pack
 
 ```bash
-npm run test:failure
+npm run test:one -- failure
 npm run demo:failure -- --output tmp/demo-failure/FAILURE_DEMO.md
 ```
 

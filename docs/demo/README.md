@@ -93,7 +93,7 @@ npm run demo:safety-audit -- --output tmp/demo-safety/SAFETY_AUDIT.md
 | Project entry pinned in group | Validated |
 | Native group announcement | Attempted; current test group returns docx announcement API block |
 | Card callback delivery | Listener connects; real callback event still needs Open Platform configuration verification |
-| Demo evaluation cases | 5 local cases pass through `npm run test:eval` |
+| Demo evaluation cases | 5 local cases pass through `npm run test:one -- eval` |
 | Demo capture pack | 7 required captures generated from current evidence paths |
 | Failure-path demo pack | 5 evidence-ready scenarios generated through `npm run demo:failure` |
 | Demo readiness pack | Evidence and docs gate generated through `npm run demo:readiness`; now checks 8 evidence files and 8 docs, manual recording still pending |

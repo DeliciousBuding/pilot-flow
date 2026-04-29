@@ -246,6 +246,7 @@ For local development and reviewer reproduction:
 
 ```bash
 npm run pilot:check
+npm test
 npm run pilot:demo
 npm run pilot:demo -- --send-plan-card --no-auto-confirm
 npm run pilot:demo -- --pin-entry-message --send-risk-card

@@ -13,7 +13,7 @@ The purpose is to avoid an unclear demo state. A generated readiness report shou
 ## Generate The Pack
 
 ```bash
-npm run test:readiness
+npm run test:one -- readiness
 npm run demo:readiness -- --output tmp/demo-readiness/DEMO_READINESS.md
 ```
 

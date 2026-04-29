@@ -55,11 +55,16 @@ Use `pilot:*` commands for the common path. They are the stable command facade f
 | `npm run pilot:package` | Regenerate readiness, judge, submission, and delivery-index materials |
 | `npm run pilot:status` | Regenerate the delivery index status page |
 | `npm run pilot:audit` | Run the safety audit before sharing material |
+| `npm test` | Run all grouped local test files |
+| `npm run test:core` | Run core/config/event/tool tests |
+| `npm run test:packs` | Run generated evidence-pack tests |
+| `npm run test:one -- <alias>` | Run one focused test alias, such as `plan`, `risk`, or `submission` |
 
 Run validation:
 
 ```bash
 npm run pilot:check
+npm test
 ```
 
 Run the manual dry-run demo:
@@ -110,12 +115,12 @@ Preview the Feishu-native flight plan card without continuing into side effects:
 
 ```bash
 npm run demo:manual -- --send-plan-card --no-auto-confirm
-npm run test:callback
+npm run test:one -- callback
 ```
 
 In live mode, `--send-plan-card` sends the flight plan card to the configured test group, then waits unless the confirmation phrase is also provided. Sending a live card is visible in Feishu, so use it only against the test group.
 
-The flight plan card now includes four action values: `confirm_takeoff`, `edit_plan`, `doc_only`, and `cancel`. `src/core/orchestrator/card-callback-handler.js` parses Feishu-style callback payloads and returns the next PilotFlow decision. PilotFlow has a bounded listener bridge; the latest live listener connected to Feishu but received no `card.action.trigger` event in the validation window, so platform callback configuration remains the next verification target.
+The flight plan card now includes four action values: `confirm_takeoff`, `edit_plan`, `doc_only`, and `cancel`. `src/core/orchestrator/card-callback-handler.js` parses Feishu-style callback payloads and returns the next PilotFlow decision. PilotFlow has a bounded listener bridge; the 2026-04-29 live listener attempt connected to Feishu but received no `card.action.trigger` event in the validation window, so platform callback configuration remains the next verification target.
 
 Listen for Feishu card callback events with a bounded local process:
 
@@ -146,7 +151,7 @@ Preview the risk decision card:
 
 ```bash
 npm run demo:manual -- --send-risk-card
-npm run test:risk
+npm run test:one -- risk
 ```
 
 The risk detector runs in every project-init run. `--send-risk-card` adds an optional card send after Doc/Base/Task artifacts are created; without the flag, the run still records `risk.detected` and skips the risk-card step.
@@ -156,8 +161,8 @@ Preview Task assignee mapping:
 ```bash
 npm run demo:manual -- --owner-open-id-map-json '{"Product Owner":"ou_xxx"}'
 npm run demo:manual -- --auto-lookup-owner-contact
-npm run test:contact
-npm run test:assignee
+npm run test:one -- contact
+npm run test:one -- assignee
 ```
 
 The planner keeps human-readable owner labels. When `--owner-open-id-map-json` or `PILOTFLOW_OWNER_OPEN_ID_MAP_JSON` maps the first task owner label to a Feishu `open_id`, `task.create` receives `--assignee`. If no explicit mapping exists, `--auto-lookup-owner-contact` or `PILOTFLOW_AUTO_LOOKUP_OWNER_CONTACT=1` performs a read-only Contacts search and assigns only exact or unambiguous results. If lookup is blocked, ambiguous, or still dry-run only, PilotFlow keeps the text owner fallback.
@@ -165,8 +170,8 @@ The planner keeps human-readable owner labels. When `--owner-open-id-map-json` o
 Validate planner fallback behavior:
 
 ```bash
-npm run test:plan
-npm run test:orchestrator
+npm run test:one -- plan
+npm run test:one -- orchestrator
 ```
 
 Plan validation runs before confirmation, preflight, duplicate guard, or Feishu tools. Invalid planner output returns `needs_clarification`, records `plan.validation_failed`, and should contain no `tool.called` event.
@@ -178,6 +183,17 @@ npm run pilot:recorder -- --input tmp/runs/latest-manual-run.jsonl --output tmp/
 ```
 
 The generated HTML is local-only by default and lives under ignored `tmp/`.
+
+### Maintenance Scripts
+
+Repo-wide maintenance automation lives in `scripts/`:
+
+| File | Purpose |
+| --- | --- |
+| `scripts/check-js.js` | Discovers JavaScript files under `scripts/` and `src/`, then runs `node --check` on each file |
+| `scripts/run-tests.js` | Runs grouped test files through `all`, `core`, `demo`, or `packs` groups |
+
+`package.json` should stay as a readable command surface. Do not add another very long shell chain there; put repeatable repo automation in `scripts/` and expose a short npm command.
 
 ### Advanced Evidence Commands
 
@@ -194,7 +210,7 @@ The evidence pack summarizes the scenario, evidence checklist, Feishu artifacts,
 Generate a local demo evaluation pack:
 
 ```bash
-npm run test:eval
+npm run test:one -- eval
 npm run demo:eval -- --output tmp/demo-eval/DEMO_EVAL.md
 ```
 
@@ -203,7 +219,7 @@ The eval pack covers missing owner/scope, vague deadline, invalid planner schema
 Generate a recording and screenshot capture pack:
 
 ```bash
-npm run test:capture
+npm run test:one -- capture
 npm run demo:capture -- --output tmp/demo-capture/CAPTURE_PACK.md
 ```
 
@@ -212,7 +228,7 @@ The capture pack checks the latest run log, Flight Recorder, Evidence Pack, and 
 Generate a failure-path demo pack:
 
 ```bash
-npm run test:failure
+npm run test:one -- failure
 npm run demo:failure -- --output tmp/demo-failure/FAILURE_DEMO.md
 ```
 
@@ -221,7 +237,7 @@ The failure pack turns the current callback listener log, live announcement fall
 Generate a demo readiness pack:
 
 ```bash
-npm run test:readiness
+npm run test:one -- readiness
 npm run demo:readiness -- --output tmp/demo-readiness/DEMO_READINESS.md
 ```
 
@@ -231,7 +247,7 @@ It now includes the Permission Appendix Pack and Callback Verification Pack in t
 Generate a permission appendix pack:
 
 ```bash
-npm run test:permissions
+npm run test:one -- permissions
 npm run demo:permissions -- --collect-version --collect-auth --collect-event-dry-run --output tmp/demo-permissions/PERMISSION_APPENDIX.md
 ```
 
@@ -240,7 +256,7 @@ The permission pack sanitizes local CLI evidence, checks scope groups, validates
 Generate a callback verification pack:
 
 ```bash
-npm run test:callback-pack
+npm run test:one -- callback-pack
 npm run demo:callback-verification -- --output tmp/demo-callback/CALLBACK_VERIFICATION.md
 ```
 
@@ -249,7 +265,7 @@ The callback verification pack checks the latest flight-plan card send log, boun
 Generate a judge review pack:
 
 ```bash
-npm run test:judge
+npm run test:one -- judge
 npm run demo:judge -- --output tmp/demo-judge/JUDGE_REVIEW.md
 ```
 
@@ -258,7 +274,7 @@ The judge pack connects README, Roadmap, Demo Playbook, Q&A, Readiness Pack, Per
 Generate a demo submission pack:
 
 ```bash
-npm run test:submission
+npm run test:one -- submission
 npm run demo:submission -- --output tmp/demo-submission/SUBMISSION_PACK.md
 ```
 
@@ -268,7 +284,7 @@ Use `--write-capture-template tmp/demo-submission/capture-manifest.template.json
 Generate a demo delivery index:
 
 ```bash
-npm run test:delivery-index
+npm run test:one -- delivery-index
 npm run pilot:status
 ```
 
@@ -277,7 +293,7 @@ The delivery index is the local start page for review packaging. It checks publi
 Generate a demo safety audit pack:
 
 ```bash
-npm run test:safety-audit
+npm run test:one -- safety-audit
 npm run pilot:audit
 ```
 
@@ -440,34 +456,35 @@ Next implementation targets:
 | Change type | Minimum validation |
 | --- | --- |
 | README/docs only | `git diff --check` |
-| Planner logic | `npm run check`, `npm run demo:manual` |
-| Plan validation fallback | `npm run test:plan`, `npm run test:orchestrator`, inspect `plan.validation_failed` |
-| Card callback action protocol | `npm run test:callback`, inspect `pilotflow_action` values in card JSONL |
-| Card callback listener | `npm run test:listener`, `npm run test:trigger`, `npm run listen:cards -- --dry-run --max-events 1 --timeout 30s` |
-| Orchestrator logic | `npm run check`, `npm run demo:manual`, inspect JSONL |
-| Artifact normalization | `npm run test:artifacts`, `npm run demo:manual`, inspect final artifacts |
-| Flight plan card | `npm run test:card`, `npm run demo:manual -- --send-plan-card --no-auto-confirm` |
-| Duplicate-run guard | `npm run test:guard`, live missing-config check, inspect guard events in JSONL |
-| Entry message fallback | `npm run test:entry`, `npm run demo:manual -- --send-entry-message`, inspect entry artifact |
-| Pinned entry message | `npm run test:artifacts`, `npm run demo:manual -- --pin-entry-message`, inspect `pinned_message` artifact |
-| Group announcement fallback | `npm run test:entry`, `npm run test:summary`, `npm run demo:manual -- --update-announcement`, inspect `announcement` artifact |
-| Flight Recorder view | `npm run test:flight`, `npm run flight:recorder -- --input <run.jsonl>`, inspect generated HTML |
-| Demo evidence pack | `npm run test:evidence`, `npm run demo:evidence -- --input <run.jsonl>`, inspect generated Markdown |
-| Demo evaluation pack | `npm run test:eval`, `npm run demo:eval`, inspect generated Markdown |
-| Demo capture pack | `npm run test:capture`, `npm run demo:capture`, inspect generated Markdown |
-| Failure-path demo pack | `npm run test:failure`, `npm run demo:failure`, inspect generated Markdown |
-| Demo readiness pack | `npm run test:readiness`, `npm run demo:readiness`, inspect generated Markdown |
-| Permission appendix pack | `npm run test:permissions`, `npm run demo:permissions -- --collect-version --collect-auth --collect-event-dry-run`, inspect generated Markdown |
-| Callback verification pack | `npm run test:callback-pack`, `npm run demo:callback-verification`, inspect generated Markdown |
-| Judge review pack | `npm run test:judge`, `npm run demo:judge`, inspect generated Markdown |
-| Demo submission pack | `npm run test:submission`, `npm run demo:submission`, inspect generated Markdown |
-| Demo delivery index | `npm run test:delivery-index`, `npm run demo:delivery-index`, inspect generated Markdown |
-| Demo safety audit pack | `npm run test:safety-audit`, `npm run demo:safety-audit`, inspect generated Markdown |
-| Risk detection/card | `npm run test:risk`, `npm run demo:manual -- --send-risk-card`, inspect `risk.detected` and card artifact |
-| Task assignee mapping | `npm run test:assignee`, `npm run test:config`, `npm run demo:manual -- --owner-open-id-map-json '{"Product Owner":"ou_xxx"}'`, inspect `--assignee` |
-| Contact owner lookup | `npm run test:contact`, `npm run demo:manual -- --auto-lookup-owner-contact`, inspect `contact.search` and `owner.lookup_completed` |
-| Project state rows | `npm run test:state`, `npm run setup:feishu -- --dry-run`, inspect Base fields |
-| Summary text | `npm run test:summary`, `npm run demo:manual`, inspect final IM tool input |
+| Planner logic | `npm run pilot:check`, `npm run test:core`, `npm run pilot:demo` |
+| Plan validation fallback | `npm run test:one -- plan`, `npm run test:one -- orchestrator`, inspect `plan.validation_failed` |
+| Card callback action protocol | `npm run test:one -- callback`, inspect `pilotflow_action` values in card JSONL |
+| Card callback listener | `npm run test:one -- listener`, `npm run test:one -- trigger`, `npm run listen:cards -- --dry-run --max-events 1 --timeout 30s` |
+| Orchestrator logic | `npm run pilot:check`, `npm run test:core`, `npm run pilot:demo`, inspect JSONL |
+| Artifact normalization | `npm run test:one -- artifacts`, `npm run demo:manual`, inspect final artifacts |
+| Flight plan card | `npm run test:one -- card`, `npm run demo:manual -- --send-plan-card --no-auto-confirm` |
+| Duplicate-run guard | `npm run test:one -- guard`, live missing-config check, inspect guard events in JSONL |
+| Entry message fallback | `npm run test:one -- entry`, `npm run demo:manual -- --send-entry-message`, inspect entry artifact |
+| Pinned entry message | `npm run test:one -- artifacts`, `npm run demo:manual -- --pin-entry-message`, inspect `pinned_message` artifact |
+| Group announcement fallback | `npm run test:one -- entry`, `npm run test:one -- summary`, `npm run demo:manual -- --update-announcement`, inspect `announcement` artifact |
+| Flight Recorder view | `npm run test:one -- flight`, `npm run flight:recorder -- --input <run.jsonl>`, inspect generated HTML |
+| Demo evidence pack | `npm run test:one -- evidence`, `npm run demo:evidence -- --input <run.jsonl>`, inspect generated Markdown |
+| Demo evaluation pack | `npm run test:one -- eval`, `npm run demo:eval`, inspect generated Markdown |
+| Demo capture pack | `npm run test:one -- capture`, `npm run demo:capture`, inspect generated Markdown |
+| Failure-path demo pack | `npm run test:one -- failure`, `npm run demo:failure`, inspect generated Markdown |
+| Demo readiness pack | `npm run test:one -- readiness`, `npm run demo:readiness`, inspect generated Markdown |
+| Permission appendix pack | `npm run test:one -- permissions`, `npm run demo:permissions -- --collect-version --collect-auth --collect-event-dry-run`, inspect generated Markdown |
+| Callback verification pack | `npm run test:one -- callback-pack`, `npm run demo:callback-verification`, inspect generated Markdown |
+| Judge review pack | `npm run test:one -- judge`, `npm run demo:judge`, inspect generated Markdown |
+| Demo submission pack | `npm run test:one -- submission`, `npm run demo:submission`, inspect generated Markdown |
+| Demo delivery index | `npm run test:one -- delivery-index`, `npm run demo:delivery-index`, inspect generated Markdown |
+| Demo safety audit pack | `npm run test:one -- safety-audit`, `npm run demo:safety-audit`, inspect generated Markdown |
+| Any broad refactor | `npm run pilot:check`, `npm test`, `npm run pilot:status`, `npm run pilot:audit` |
+| Risk detection/card | `npm run test:one -- risk`, `npm run demo:manual -- --send-risk-card`, inspect `risk.detected` and card artifact |
+| Task assignee mapping | `npm run test:one -- assignee`, `npm run test:one -- config`, `npm run demo:manual -- --owner-open-id-map-json '{"Product Owner":"ou_xxx"}'`, inspect `--assignee` |
+| Contact owner lookup | `npm run test:one -- contact`, `npm run demo:manual -- --auto-lookup-owner-contact`, inspect `contact.search` and `owner.lookup_completed` |
+| Project state rows | `npm run test:one -- state`, `npm run setup:feishu -- --dry-run`, inspect Base fields |
+| Summary text | `npm run test:one -- summary`, `npm run demo:manual`, inspect final IM tool input |
 | Feishu tool wrapper | dry-run command, then live test against `pilotflow-contest` |
 | Live Feishu write | dry-run first, live command second, record returned IDs |
 

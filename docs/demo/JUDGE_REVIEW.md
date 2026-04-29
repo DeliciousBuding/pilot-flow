@@ -7,7 +7,7 @@ It is designed for final review preparation: one document should tell a judge wh
 ## Generate
 
 ```bash
-npm run test:judge
+npm run test:one -- judge
 npm run demo:judge -- --output tmp/demo-judge/JUDGE_REVIEW.md
 ```
 
@@ -40,7 +40,7 @@ Generated files under `tmp/` remain local and ignored by Git unless they are scr
 | Reviewer Path | The recommended reading and demo order |
 | Capability Snapshot | Which Feishu-native surfaces are validated, prototyped, or pending |
 | Evidence Sources | Whether required source materials exist and contain expected anchors |
-| Proof Points | The strongest claims that can be made today |
+| Proof Points | The strongest claims that can be made in the current 2026-04-29 prototype |
 | Known Boundaries | What must remain clearly described as pending or limited |
 | Reproduction Commands | Commands for local validation and evidence regeneration |
 | Next Actions | Manual recording, screenshot, and callback validation tasks |
