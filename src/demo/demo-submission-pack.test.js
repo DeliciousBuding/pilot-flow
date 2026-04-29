@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -57,11 +58,14 @@ try {
 
   assert.equal(readyPack.status, "ready_for_submission_review");
   assert.equal(readyPack.summary.manualReady, 4);
+  assert.equal(readyPack.manualCaptures[0].sizeBytes, 5);
+  assert.equal(readyPack.manualCaptures[0].sha256, sha256("video"));
 
   const markdown = renderDemoSubmissionMarkdown(readyPack);
   assert.match(markdown, /PilotFlow Demo Submission Pack/);
   assert.match(markdown, /ready_for_submission_review/);
   assert.match(markdown, /Manual Capture Manifest/);
+  assert.match(markdown, /SHA-256/);
   assert.match(markdown, /Do not include App Secret/);
 
   const template = buildCaptureManifestTemplate();
@@ -69,6 +73,7 @@ try {
   assert.equal(template.captures.length, 4);
   assert.equal(template.captures.every((item) => item.status === "pending"), true);
   assert.equal(template.captures.every((item) => item.redacted === false), true);
+  assert.equal(template.captures.every((item) => item.reviewed_at === ""), true);
 } finally {
   await rm(tempDir, { recursive: true, force: true });
 }
@@ -89,4 +94,8 @@ function capture(label, filePath) {
     path: filePath,
     redacted: true
   };
+}
+
+function sha256(value) {
+  return createHash("sha256").update(value).digest("hex");
 }

@@ -1,5 +1,6 @@
-import { access, mkdir, readFile, writeFile } from "node:fs/promises";
-import { constants } from "node:fs";
+import { access, mkdir, readFile, stat, writeFile } from "node:fs/promises";
+import { constants, createReadStream } from "node:fs";
+import { createHash } from "node:crypto";
 import { dirname, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -179,9 +180,9 @@ export function renderDemoSubmissionMarkdown(pack) {
     "",
     "## Manual Capture Manifest",
     "",
-    "| Capture | Status | Type | Redacted | Path | Notes |",
-    "| --- | --- | --- | --- | --- | --- |",
-    ...pack.manualCaptures.map((item) => `| ${item.label} | ${item.ready ? "Ready" : item.status} | ${item.type || "unknown"} | ${item.redacted ? "yes" : "no"} | ${item.path ? `\`${item.path}\`` : "not provided"} | ${escapeCell(item.notes)} |`),
+    "| Capture | Status | Type | Redacted | File | SHA-256 | Notes |",
+    "| --- | --- | --- | --- | --- | --- | --- |",
+    ...pack.manualCaptures.map((item) => `| ${item.label} | ${item.ready ? "Ready" : item.status} | ${item.type || "unknown"} | ${item.redacted ? "yes" : "no"} | ${formatFileCell(item)} | ${item.sha256 ? `\`${item.sha256}\`` : "not available"} | ${escapeCell(item.notes)} |`),
     "",
     "## Recommended Commands",
     "",
@@ -218,6 +219,8 @@ export function buildCaptureManifestTemplate() {
       status: "pending",
       path: "",
       redacted: false,
+      reviewed_at: "",
+      reviewer: "",
       notes: item.notes
     }))
   };
@@ -250,12 +253,15 @@ async function loadManualCaptures(captureManifest) {
         path: override.path ? resolve(override.path) : "",
         redacted: override.redacted === true
       };
-      const exists = item.path ? await fileExists(item.path) : false;
-      const ready = item.status === "ready" && exists && item.redacted;
+      const file = item.path ? await inspectCaptureFile(item.path) : { exists: false, sizeBytes: 0, sha256: "" };
+      const ready = item.status === "ready" && file.exists && item.redacted;
       return {
         ...item,
-        exists,
+        exists: file.exists,
+        sizeBytes: file.sizeBytes,
+        sha256: file.sha256,
         ready,
+        missingReason: getManualCaptureMissingReason({ ...item, exists: file.exists, ready }),
         notes: item.notes || requiredItem.notes
       };
     })
@@ -302,13 +308,47 @@ function buildNextActions({ status }) {
   ];
 }
 
-async function fileExists(filePath) {
+async function inspectCaptureFile(filePath) {
   try {
     await access(filePath, constants.R_OK);
-    return true;
+    const [stats, sha256] = await Promise.all([stat(filePath), hashFile(filePath)]);
+    return {
+      exists: true,
+      sizeBytes: stats.size,
+      sha256
+    };
   } catch {
-    return false;
+    return {
+      exists: false,
+      sizeBytes: 0,
+      sha256: ""
+    };
   }
+}
+
+function hashFile(filePath) {
+  return new Promise((resolveHash, reject) => {
+    const hash = createHash("sha256");
+    const stream = createReadStream(filePath);
+    stream.on("data", (chunk) => hash.update(chunk));
+    stream.on("error", reject);
+    stream.on("end", () => resolveHash(hash.digest("hex")));
+  });
+}
+
+function getManualCaptureMissingReason(item) {
+  if (item.ready) return "";
+  if (item.status !== "ready") return "status is not ready";
+  if (!item.path) return "path is missing";
+  if (!item.exists) return "file does not exist";
+  if (!item.redacted) return "redacted is not true";
+  return "not ready";
+}
+
+function formatFileCell(item) {
+  if (!item.path) return item.missingReason || "not provided";
+  const detail = item.exists ? `${item.sizeBytes} bytes` : item.missingReason || "missing";
+  return escapeCell(`\`${item.path}\`<br>${detail}`);
 }
 
 async function readOptionalText(filePath) {

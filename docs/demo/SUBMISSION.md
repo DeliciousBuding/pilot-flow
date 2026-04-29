@@ -2,6 +2,8 @@
 
 The Demo Submission Pack is the final local gate before review packaging. It separates machine-generated evidence from manual recordings and screenshots, so the team can see whether PilotFlow is ready for submission review or still waiting on human-captured media.
 
+When a capture manifest points to existing files, the pack records file size and SHA-256 hashes. This keeps media traceable without committing raw videos or screenshots.
+
 ## Generate
 
 ```bash
@@ -62,6 +64,7 @@ Rules:
 - `status` must be `ready`.
 - `path` must point to an existing local file.
 - `redacted` must be `true` after reviewing secrets and private fields.
+- The generated report records file size and SHA-256 so the reviewed capture version can be identified later.
 
 Required capture labels:
 
