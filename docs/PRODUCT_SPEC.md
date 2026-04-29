@@ -19,6 +19,15 @@ When a team discusses a project in Feishu, PilotFlow helps turn the conversation
 
 Teams that already coordinate in Feishu group chats and need lightweight project operations without adopting a heavy project-management tool.
 
+## Ideal Customer Profile
+
+| Segment | Situation | PilotFlow value |
+| --- | --- | --- |
+| Student competition teams | Work is fast, cross-functional, and presentation-driven | Turns group discussion into a visible plan, task state, risk list, and demo evidence |
+| Product or operations groups | Decisions happen in IM but execution state lives elsewhere | Keeps Feishu-native artifacts aligned without forcing a separate PM tool |
+| Prototype and hackathon teams | Scope and owners change quickly | Creates a repeatable project-launch loop with traceable automation |
+| AI-native teams | Agents need to do real collaboration work, not just answer questions | Adds confirmation gates, idempotency, and run logs around tool execution |
+
 ## Product Principles
 
 | Principle | Meaning |
@@ -28,6 +37,40 @@ Teams that already coordinate in Feishu group chats and need lightweight project
 | Feishu Native | Use IM, Cards, Docs, Base, Tasks, and announcements first |
 | Traceable | Every run records tool calls, artifacts, errors, and fallbacks |
 | Practical | The MVP should solve a real workflow before adding agent theater |
+
+## Product Maturity Model
+
+PilotFlow should be described by its maturity level, not as a finished enterprise platform.
+
+| Level | Meaning | Current state |
+| --- | --- | --- |
+| Concept | Product positioning and target workflow are defined | complete |
+| Validated prototype | Real Feishu APIs can create visible artifacts | current |
+| Demo-ready MVP | Main path is stable enough for evaluation with captured proof | in progress |
+| Team pilot | Real group trigger, callback confirmation, and repeated team use | planned |
+| Productized service | Deployment, tenancy, audit, permissions, and support model | later |
+
+## Product Surface Map
+
+| Surface | User-facing role | Current boundary |
+| --- | --- | --- |
+| Feishu IM | Main entry point and final summary channel | validated through manual/live runs; automatic group trigger is later |
+| Message Cards | Flight plan confirmation and risk decisions | live send and local action protocol ready; real callback delivery pending |
+| Feishu Docs | Project brief and delivery document | live creation validated |
+| Feishu Base | Project state, risk rows, artifacts, source links | live rich table validated |
+| Feishu Task | Concrete first action item with optional assignee mapping | live creation validated; owner lookup remains guarded |
+| Pinned entry / announcement | Stable project entrance | pinned entry live validated; native announcement can fall back when API blocks docx announcements |
+| Flight Recorder | Trace viewer for explainability and review | static local prototype |
+
+## Trust Model
+
+| Trust requirement | Product rule |
+| --- | --- |
+| Human control | Live writes pass through a confirmation gate |
+| No silent success | Tool errors and fallback paths are recorded |
+| Duplicate safety | Repeated visible Feishu writes are blocked unless explicitly bypassed |
+| Explainability | Plans, state transitions, artifacts, and tool calls are captured |
+| Honest packaging | README and docs separate validated, prototype, pending, and later capabilities |
 
 ## MVP Scenario
 

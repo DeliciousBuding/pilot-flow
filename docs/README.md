@@ -17,8 +17,8 @@ This directory contains the public documentation set for PilotFlow.
 
 | File | Purpose | Update when |
 | --- | --- | --- |
-| `PROJECT_BRIEF.md` | Short product and competition brief | Positioning or scope changes |
-| `PRODUCT_SPEC.md` | User promise, MVP boundary, feature tiers | Product decisions change |
+| `PROJECT_BRIEF.md` | Short product narrative, competition brief, and MVP scope | Positioning or scope changes |
+| `PRODUCT_SPEC.md` | User promise, target users, maturity model, trust model, MVP boundary | Product decisions change |
 | `ARCHITECTURE.md` | Core components, state, tool routing | Runtime or module design changes |
 | `PROJECT_STRUCTURE.md` | Runtime layers, command surface, and placement rules | Files move or command boundaries change |
 | `OPERATOR_RUNBOOK.md` | Local operation, live run, evidence regeneration, troubleshooting | Commands, profiles, run targets, or fallback behavior change |

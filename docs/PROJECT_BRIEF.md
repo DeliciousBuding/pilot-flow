@@ -14,6 +14,31 @@ Team work often starts from an IM conversation, but the important project signal
 
 PilotFlow uses an AI Agent as the primary workflow driver. The user gives natural language instructions from IM. The Agent understands intent, creates a flight plan, asks for missing information, requests human confirmation, invokes Feishu tools, writes project artifacts, tracks risk, and sends a delivery summary back to the group.
 
+## Product Narrative
+
+PilotFlow should be presented as a Feishu-native operating layer for lightweight project work:
+
+```text
+Discussion -> Flight Plan -> Confirmation -> Feishu Artifacts -> Trace -> Delivery Summary
+```
+
+The product is mature in its workflow design even while the implementation remains an MVP prototype. The public story should emphasize:
+
+- the team works where it already works: Feishu IM, Cards, Docs, Base, and Tasks
+- the Agent drives the project run, but humans keep approval over side effects
+- every run leaves evidence: plan, artifacts, fallbacks, and trace
+- pending platform edges are explicit, especially real card callback delivery and announcement fallback behavior
+
+## Product Scope
+
+| Layer | In scope for MVP | Out of scope for MVP |
+| --- | --- | --- |
+| Entry | Manual trigger and Feishu group workflow | Fully autonomous bot across all group history |
+| Planning | Project-init flight plan with risks and deliverables | General-purpose enterprise planning suite |
+| Execution | Doc, Base, Task, IM, cards, pinned entry, announcement fallback | Heavy standalone project-management dashboard |
+| Control | Confirmation gate, preflight checks, duplicate-run guard | Silent bulk writes without human approval |
+| Evidence | JSONL run log, Flight Recorder, demo evidence packs | Production observability platform |
+
 ## Design Principles
 
 - Agent-first: the Agent plans and executes the core workflow.

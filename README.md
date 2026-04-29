@@ -2,11 +2,11 @@
 
 # ✈️ PilotFlow
 
-**飞书群里的 AI 项目运行官**<br/>
-**A Feishu-native AI project operations officer inside your group chat**
+**飞书项目协作的 AI 运行层**<br/>
+**An AI operating layer for Feishu project work**
 
-把群聊里的目标、承诺、风险和材料，推进成确认过的计划、可执行任务、可追踪状态和交付总结。<br/>
-Turn group-chat discussion into confirmed plans, executable tasks, traceable state, and delivery summaries.
+从群聊讨论开始，把目标、负责人、风险和材料推进成确认过的计划、可执行任务、可追踪状态和交付总结。<br/>
+Start from group-chat discussion and turn intent into confirmed plans, executable tasks, traceable state, and delivery summaries.
 
 [![Status](https://img.shields.io/badge/status-MVP%20prototype-orange)](#-mvp-progress)
 [![Feishu](https://img.shields.io/badge/Feishu-native-00A4FF)](#-feishu-native-surfaces)
@@ -16,7 +16,11 @@ Turn group-chat discussion into confirmed plans, executable tasks, traceable sta
 [![GitHub stars](https://img.shields.io/github/stars/DeliciousBuding/pilot-flow?style=social)](https://github.com/DeliciousBuding/pilot-flow/stargazers)
 [![GitHub last commit](https://img.shields.io/github/last-commit/DeliciousBuding/pilot-flow)](https://github.com/DeliciousBuding/pilot-flow/commits/main)
 
-[中文](#-中文) · [English](#-english) · [Product](docs/PRODUCT_SPEC.md) · [Architecture](docs/ARCHITECTURE.md) · [Roadmap](docs/ROADMAP.md) · [Docs](docs/README.md)
+[Product Spec](docs/PRODUCT_SPEC.md) · [Architecture](docs/ARCHITECTURE.md) · [Operator Runbook](docs/OPERATOR_RUNBOOK.md) · [Roadmap](docs/ROADMAP.md) · [Docs](docs/README.md)
+
+| Stage | Primary surface | Current focus |
+| --- | --- | --- |
+| MVP prototype | Feishu IM + Cards + Doc + Base + Task | Demo hardening, callback proof, capture materials |
 
 </div>
 
@@ -27,14 +31,18 @@ Turn group-chat discussion into confirmed plans, executable tasks, traceable sta
 - [📌 中文](#-中文)
 - [🌍 English](#-english)
 - [🎯 Why PilotFlow](#-why-pilotflow)
+- [👥 Who It Is For](#-who-it-is-for)
 - [🧭 Product Experience](#-product-experience)
+- [🛫 Operating Model](#-operating-model)
 - [🔁 Product Loop](#-product-loop)
 - [🧠 Architecture](#-architecture)
+- [🧱 Product-Grade Foundations](#-product-grade-foundations)
 - [🧩 Feishu-Native Surfaces](#-feishu-native-surfaces)
 - [🧪 MVP Progress](#-mvp-progress)
 - [🗺️ Roadmap Snapshot](#-roadmap-snapshot)
 - [📚 Documentation](#-documentation)
 - [⚡ Prototype Demo](#-prototype-demo)
+- [🛡️ Trust Model](#-trust-model)
 - [🔐 Safety Principles](#-safety-principles)
 - [📈 Star History](#-star-history)
 - [🤝 Contributing](#-contributing)
@@ -42,23 +50,23 @@ Turn group-chat discussion into confirmed plans, executable tasks, traceable sta
 
 ## 📌 中文
 
-PilotFlow 不是普通聊天机器人，不是文档生成器，也不是只面向程序员的代码 Agent。它的产品定位是：
+PilotFlow 不是普通聊天机器人，不是文档生成器，也不是只面向程序员的代码 Agent。它的产品定位是一个面向飞书协作场景的 **AI 项目运行官**：
 
 > **像一个项目经理一样，在飞书群里推动团队从讨论走向交付。**
 
-在真实协作里，项目的关键信息经常散落在群聊中：目标、负责人、截止时间、风险、材料、确认意见、临时承诺。PilotFlow 让 AI Agent 成为主驾驶，负责理解讨论、生成项目飞行计划、请求人类确认、调用飞书原生工具，并把结果沉淀到 Doc、Base、Task、群公告和总结消息中。
+在真实协作里，项目的关键信息经常散落在群聊中：目标、负责人、截止时间、风险、材料、确认意见、临时承诺。PilotFlow 让 AI Agent 成为主驾驶，负责理解讨论、生成项目飞行计划、请求人类确认、调用飞书原生工具，并把结果沉淀到 Doc、Base、Task、群入口消息和总结消息中。
 
 GUI 或 Chat Tab 不是主流程，它只是仪表盘和辅助操作台。真正的产品体验应该发生在团队已经工作的地方：**飞书 IM、卡片、文档、多维表格和任务系统**。
 
 ## 🌍 English
 
-PilotFlow is a Feishu-native AI project operations officer. It lives inside a group chat, understands project intent, proposes a flight plan, asks for human confirmation, executes through Feishu tools, records every step, and sends a delivery summary back to the team.
+PilotFlow is a Feishu-native AI operating layer for project work. It lives inside the collaboration flow, understands project intent, proposes a flight plan, asks for human confirmation, executes through Feishu tools, records every step, and sends a delivery summary back to the team.
 
 The product principle is simple:
 
 > **Agent as Pilot. GUI as cockpit. Humans stay in control.**
 
-PilotFlow is designed for practical team operations first: fewer lost decisions, fewer forgotten tasks, clearer project state, and a traceable AI workflow.
+PilotFlow is designed for practical team operations first: fewer lost decisions, fewer forgotten tasks, clearer project state, and a traceable AI workflow that fits Feishu instead of replacing it.
 
 ## 🎯 Why PilotFlow
 
@@ -69,6 +77,17 @@ PilotFlow is designed for practical team operations first: fewer lost decisions,
 | Tasks and risks disappear in chat history | Write structured project state | Base records and Tasks |
 | Project entry points are hard to find | Publish a stable project entry | Pinned entry message or group announcement |
 | AI actions are hard to trust | Record plans, tool calls, artifacts, fallbacks, and errors | Flight Recorder |
+
+## 👥 Who It Is For
+
+| Team type | Typical job | Why PilotFlow fits |
+| --- | --- | --- |
+| Student competition teams | Turn brainstorming into a deliverable plan | Lightweight enough for fast project cycles, traceable enough for review |
+| Product and operations groups | Convert group decisions into documents, tasks, and status | Works inside Feishu where decisions already happen |
+| Hackathon or prototype teams | Keep scope, owners, risks, and demo assets aligned | Gives one visible project spine without a heavy PM tool |
+| AI-native teams | Let agents perform real collaboration work with guardrails | Confirmation, idempotency, and run traces keep automation explainable |
+
+PilotFlow is not limited to campus projects. The current prototype uses a competition scenario because it is concrete and easy to evaluate, but the product model is a general Feishu-native project operations assistant.
 
 ## 🧭 Product Experience
 
@@ -88,6 +107,19 @@ journey
     section Trace
       Team opens Doc, Base, Task, and Flight Recorder: 4: Team
 ```
+
+## 🛫 Operating Model
+
+PilotFlow turns a vague group discussion into a managed project run:
+
+| Step | Product behavior | Control point |
+| --- | --- | --- |
+| Observe | Read the incoming project intent and extract goal, members, deliverables, deadline, and risks | No write side effects |
+| Plan | Generate a structured project flight plan | Schema validation before execution |
+| Confirm | Ask a human to approve, edit, restrict to doc-only, or cancel | Confirmation gate |
+| Execute | Create Feishu-native artifacts through a tool router | Preflight checks and duplicate-run guard |
+| Record | Capture every step, tool call, artifact, fallback, and error | JSONL run log and Flight Recorder |
+| Report | Send the final summary back to the group | Artifact-aware summary |
 
 ## 🔁 Product Loop
 
@@ -145,6 +177,19 @@ flowchart TB
 
 Detailed architecture: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
+## 🧱 Product-Grade Foundations
+
+PilotFlow is still an MVP prototype, but it is packaged around product-grade foundations rather than a one-off script:
+
+| Foundation | Current implementation |
+| --- | --- |
+| Native surface strategy | IM, Cards, Docs, Base, Task, pinned entry, and optional announcement path |
+| Human control | Text confirmation fallback and card action protocol before side effects |
+| Run safety | Live preflight, duplicate-run guard, short idempotency keys, unsafe-plan fallback |
+| Traceability | JSONL run log, artifact normalizer, generated evidence packs, local Flight Recorder |
+| Failure handling | Tool failures are recorded; announcement and callback edges have explicit fallback stories |
+| Packaging | Product README, product spec, architecture, operator runbook, development guide, demo kit |
+
 ## 🧩 Feishu-Native Surfaces
 
 | Surface | Product role | MVP status |
@@ -161,7 +206,7 @@ Detailed architecture: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## 🧪 MVP Progress
 
-PilotFlow is currently in **MVP prototype** stage. The first deliverable is a reliable Feishu-native project launch loop, not a separate project-management SaaS.
+PilotFlow is currently in **MVP prototype** stage. The first deliverable is a reliable Feishu-native project launch loop, not a separate project-management SaaS and not an unattended production bot.
 
 | Capability | Status |
 | --- | --- |
@@ -258,6 +303,16 @@ npm run pilot:audit
 ```
 
 The current local demo reads a project-init fixture, writes a traceable run log, and returns planned artifacts. Live Feishu execution is available behind an explicit confirmation gate. Operational setup lives in [docs/OPERATOR_RUNBOOK.md](docs/OPERATOR_RUNBOOK.md); contributor workflow lives in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
+
+## 🛡️ Trust Model
+
+| Question | PilotFlow answer |
+| --- | --- |
+| Can the agent write to Feishu without approval? | No. The live write path requires explicit confirmation. |
+| Can a failed tool call look successful? | It should not. Tool errors are recorded and surfaced as run events and fallback artifacts. |
+| Can the same demo accidentally create duplicate artifacts? | Live runs are guarded by a duplicate-run key unless the operator explicitly bypasses it. |
+| Can reviewers inspect what happened? | Yes. Run logs, generated packs, Flight Recorder, and final summaries expose the execution path. |
+| Is the current prototype production-ready? | No. It is a validated MVP prototype with known pending work around real card callback delivery and manual capture evidence. |
 
 ## 🔐 Safety Principles
 
