@@ -28,6 +28,7 @@ The demo should make three things obvious:
 | [`EVALUATION.md`](EVALUATION.md) | Runnable demo-risk evaluation cases and generated-report workflow |
 | [`CAPTURE_GUIDE.md`](CAPTURE_GUIDE.md) | Recording and screenshot capture checklist |
 | [`FAILURE_DEMO.md`](FAILURE_DEMO.md) | Failure-path demo pack workflow and reviewer-facing boundaries |
+| [`READINESS.md`](READINESS.md) | Pre-recording readiness gate for evidence, docs, and manual capture work |
 
 Generated local evidence artifacts are not committed by default. Create them from a JSONL run log:
 
@@ -37,6 +38,7 @@ npm run demo:evidence -- --input tmp/runs/latest-manual-run.jsonl --output tmp/d
 npm run demo:eval -- --output tmp/demo-eval/DEMO_EVAL.md
 npm run demo:capture -- --output tmp/demo-capture/CAPTURE_PACK.md
 npm run demo:failure -- --output tmp/demo-failure/FAILURE_DEMO.md
+npm run demo:readiness -- --output tmp/demo-readiness/DEMO_READINESS.md
 ```
 
 ## Recommended Screens
@@ -52,6 +54,7 @@ npm run demo:failure -- --output tmp/demo-failure/FAILURE_DEMO.md
 | Demo Evaluation Pack | Shows missing-owner, vague-deadline, invalid-plan, duplicate-run, and tool-failure cases |
 | Demo Capture Pack | Checklist for recording the happy path, failure evidence, and permission appendix |
 | Failure-Path Demo Pack | Reviewer-facing appendix for callback timeout, announcement fallback, invalid plan, duplicate run, and requirement-risk cases |
+| Demo Readiness Pack | Pre-recording gate that separates ready evidence from manual videos and screenshots |
 
 ## Current Demo Status
 
@@ -67,3 +70,4 @@ npm run demo:failure -- --output tmp/demo-failure/FAILURE_DEMO.md
 | Demo evaluation cases | 5 local cases pass through `npm run test:eval` |
 | Demo capture pack | 7 required captures generated from current evidence paths |
 | Failure-path demo pack | 5 evidence-ready scenarios generated through `npm run demo:failure` |
+| Demo readiness pack | Evidence and docs gate generated through `npm run demo:readiness`; manual recording still pending |
