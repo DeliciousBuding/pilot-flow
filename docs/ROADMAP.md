@@ -15,7 +15,7 @@ Status after the latest implementation pass:
 - Card callback action protocol, bounded listener process, and callback-trigger bridge are implemented locally. A live listener connected to Feishu successfully, but no `card.action.trigger` event was received in the two-minute validation window; text confirmation remains the fallback until Open Platform callback configuration is verified.
 - Group announcement has been attempted through the native announcement API. The test group currently returns `232097 Unable to operate docx type chat announcement`, so the product path now records the failed announcement upgrade and keeps the pinned entry message as the stable Feishu-native entrance.
 - Base owner/deadline fallback, local Flight Recorder view, risk detection, live risk decision card send, live pinned entry message, explicit Task assignee mapping, optional Contacts-based owner lookup, plan-validation fallback, card callback action protocol, and a bounded card listener are now implemented. The next product slice should harden the demo, capture evidence, and resolve platform callback configuration.
-- Phase 3 demo hardening has started: the latest live run now has a generated Flight Recorder HTML view and Markdown evidence pack, and `docs/demo/` contains the demo playbook, reviewer Q&A, and fallback/no-network explanation.
+- Phase 3 demo hardening has started: the latest live run now has a generated Flight Recorder HTML view and Markdown evidence pack, `docs/demo/` contains the demo playbook, reviewer Q&A, fallback/no-network explanation, and a local demo evaluation pack now covers missing owner, vague deadline, invalid plan, duplicate run, and optional tool failure.
 
 Main loop:
 
@@ -152,6 +152,7 @@ Goal: make the MVP stable enough for live evaluation.
 - [x] Prepare demo script.
 - [x] Prepare Q&A answers.
 - [x] Prepare failure-path and no-network fallback explanation.
+- [x] Add local demo evaluation cases for missing owner, vague deadline, invalid plan, duplicate writes, and optional tool failure.
 - [x] Keep a pre-generated Feishu Doc/Base/Task set for backup.
 
 Exit condition:
@@ -193,7 +194,7 @@ Longer-term direction after competition MVP.
 
 ## Immediate Next Actions
 
-1. Record the first happy-path walkthrough from the latest live run with rich Base fields, risk card, pinned entry, announcement fallback, Flight Recorder, and evidence pack.
+1. Record the first happy-path walkthrough from the latest live run with rich Base fields, risk card, pinned entry, announcement fallback, Flight Recorder, evidence pack, and eval pack.
 2. Capture API permission and callback configuration screenshots for the evaluation appendix.
 3. Verify Open Platform card callback configuration so `card.action.trigger` reaches the listener; keep text confirmation as fallback.
 4. Treat group announcement as a documented platform limitation for this test group and keep pinned entry-message fallback as the default stable path.
@@ -233,7 +234,7 @@ Longer-term direction after competition MVP.
 - [x] Prepare a complete 6 to 8 minute demo script.
 - [x] Add demo Q&A and fallback explanation docs.
 - [x] Add evidence pack generation for latest live run logs.
-- [ ] Add eval cases for missing owner, deadline conflict, duplicate writes, and tool failure.
+- [x] Add eval cases for missing owner, vague deadline, duplicate writes, invalid plan, and tool failure.
 - [ ] Add failure-path demo.
 - [ ] Harden docs and README for judges and GitHub visitors.
 - [ ] Push all repo updates promptly.

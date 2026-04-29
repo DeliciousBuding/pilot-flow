@@ -31,6 +31,7 @@ This directory contains the public documentation set for PilotFlow.
 | `demo/DEMO_PLAYBOOK.md` | 6 to 8 minute demo script and operator checklist |
 | `demo/DEMO_QA.md` | Reviewer-facing product and technical Q&A |
 | `demo/FAILURE_PATHS.md` | Fallback behavior, known platform limits, and no-network explanation |
+| `demo/EVALUATION.md` | Runnable demo-risk evaluation cases and generated-report workflow |
 
 ## Planned Folders
 

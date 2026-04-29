@@ -25,12 +25,14 @@ The demo should make three things obvious:
 | [`DEMO_PLAYBOOK.md`](DEMO_PLAYBOOK.md) | 6 to 8 minute product demo script and operator checklist |
 | [`DEMO_QA.md`](DEMO_QA.md) | Reviewer-facing Q&A for product, Feishu integration, safety, and roadmap |
 | [`FAILURE_PATHS.md`](FAILURE_PATHS.md) | Known platform limits, fallback behavior, and how to explain them |
+| [`EVALUATION.md`](EVALUATION.md) | Runnable demo-risk evaluation cases and generated-report workflow |
 
 Generated local evidence artifacts are not committed by default. Create them from a JSONL run log:
 
 ```bash
 npm run flight:recorder -- --input tmp/runs/latest-manual-run.jsonl --output tmp/flight-recorder/latest.html
 npm run demo:evidence -- --input tmp/runs/latest-manual-run.jsonl --output tmp/demo-evidence/DEMO_EVIDENCE.md
+npm run demo:eval -- --output tmp/demo-eval/DEMO_EVAL.md
 ```
 
 ## Recommended Screens
@@ -43,6 +45,7 @@ npm run demo:evidence -- --input tmp/runs/latest-manual-run.jsonl --output tmp/d
 | Feishu Task | Shows concrete action item and optional assignee mapping |
 | Flight Recorder HTML | Shows tool calls, artifacts, failures, and fallback decisions |
 | Evidence Pack Markdown | Backup narrative if network or UI switching is unreliable |
+| Demo Evaluation Pack | Shows missing-owner, vague-deadline, invalid-plan, duplicate-run, and tool-failure cases |
 
 ## Current Demo Status
 
@@ -55,3 +58,4 @@ npm run demo:evidence -- --input tmp/runs/latest-manual-run.jsonl --output tmp/d
 | Project entry pinned in group | Validated |
 | Native group announcement | Attempted; current test group returns docx announcement API block |
 | Card callback delivery | Listener connects; real callback event still needs Open Platform configuration verification |
+| Demo evaluation cases | 5 local cases pass through `npm run test:eval` |

@@ -174,6 +174,15 @@ npm run demo:evidence -- --input tmp/runs/latest-manual-run.jsonl --output tmp/d
 
 The evidence pack summarizes the scenario, evidence checklist, Feishu artifacts, tool calls, fallback notes, and demo talking points. It is intended for presentation backup and review, not for committing raw private run logs.
 
+Generate a local demo evaluation pack:
+
+```bash
+npm run test:eval
+npm run demo:eval -- --output tmp/demo-eval/DEMO_EVAL.md
+```
+
+The eval pack covers missing owner/scope, vague deadline, invalid planner schema, duplicate live run protection, and optional tool failure fallback. It does not trigger live Feishu writes.
+
 Live project-init runs are guarded against accidental duplicates. If you intentionally need to repeat a visible Feishu write, pass an explicit key or bypass flag:
 
 ```bash
@@ -246,6 +255,7 @@ Implemented:
 - `src/config/runtime-config.js`
 - `src/demo/flight-recorder-view.js`
 - `src/demo/demo-evidence.js`
+- `src/demo/demo-eval.js`
 - `src/demo/card-listener.js`
 - `src/demo/manual-trigger.js`
 - `src/demo/setup-feishu-targets.js`
@@ -297,6 +307,7 @@ Implemented to date:
 - optional read-only Feishu Contacts lookup for first-task owner assignment, with explicit-map priority and ambiguity fallback
 - static Flight Recorder HTML view over JSONL run logs
 - Markdown Demo Evidence Pack generator over JSONL run logs
+- local Demo Evaluation Pack for missing owner, vague deadline, invalid plan, duplicate run, and optional tool failure
 - risk detection over planner risks, missing project facts, non-concrete deadlines, and owner text fallbacks
 - optional `--send-risk-card` flow that sends or dry-runs a Feishu-native risk decision card
 - callback action protocol and parser for risk decisions: assign owner, adjust deadline, accept risk, defer
@@ -327,6 +338,7 @@ Next implementation targets:
 | Group announcement fallback | `npm run test:entry`, `npm run test:summary`, `npm run demo:manual -- --update-announcement`, inspect `announcement` artifact |
 | Flight Recorder view | `npm run test:flight`, `npm run flight:recorder -- --input <run.jsonl>`, inspect generated HTML |
 | Demo evidence pack | `npm run test:evidence`, `npm run demo:evidence -- --input <run.jsonl>`, inspect generated Markdown |
+| Demo evaluation pack | `npm run test:eval`, `npm run demo:eval`, inspect generated Markdown |
 | Risk detection/card | `npm run test:risk`, `npm run demo:manual -- --send-risk-card`, inspect `risk.detected` and card artifact |
 | Task assignee mapping | `npm run test:assignee`, `npm run test:config`, `npm run demo:manual -- --owner-open-id-map-json '{"Product Owner":"ou_xxx"}'`, inspect `--assignee` |
 | Contact owner lookup | `npm run test:contact`, `npm run demo:manual -- --auto-lookup-owner-contact`, inspect `contact.search` and `owner.lookup_completed` |
