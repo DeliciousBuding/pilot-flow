@@ -8,7 +8,7 @@ This directory contains the public documentation set for PilotFlow.
 | --- | --- |
 | Judge or product reviewer | `README.md` -> `PROJECT_BRIEF.md` -> `PRODUCT_SPEC.md` -> `ROADMAP.md` |
 | Engineer | `README.md` -> `DEVELOPMENT.md` -> `ARCHITECTURE.md` |
-| Designer or demo owner | `VISUAL_DESIGN.md` -> `PRODUCT_SPEC.md` -> `ROADMAP.md` |
+| Designer or demo owner | `VISUAL_DESIGN.md` -> `demo/README.md` -> `ROADMAP.md` |
 | Future agent session | workspace `AGENTS.md` -> `PERSONAL_PROGRESS.md` -> repo README -> this index |
 
 ## Documents
@@ -23,13 +23,22 @@ This directory contains the public documentation set for PilotFlow.
 | `ROADMAP.md` | Immediate and long-term plan | Any phase completes or priorities shift |
 | `DOCUMENTATION_PLAN.md` | Documentation governance | README/docs conventions change |
 
+## Demo Kit
+
+| File | Purpose |
+| --- | --- |
+| `demo/README.md` | Demo material index and current validation status |
+| `demo/DEMO_PLAYBOOK.md` | 6 to 8 minute demo script and operator checklist |
+| `demo/DEMO_QA.md` | Reviewer-facing product and technical Q&A |
+| `demo/FAILURE_PATHS.md` | Fallback behavior, known platform limits, and no-network explanation |
+
 ## Planned Folders
 
 ```text
 docs/
 ├─ adr/              # architecture decision records
 ├─ api-validation/   # public distilled Feishu API validation notes
-├─ demo/             # demo scripts, Q&A, recording notes
+├─ demo/             # demo playbook, Q&A, fallback notes
 └─ images/           # screenshots and visual assets after UI is real
 ```
 
