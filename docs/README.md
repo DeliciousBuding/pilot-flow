@@ -36,6 +36,7 @@ This directory contains the public documentation set for PilotFlow.
 | `demo/FAILURE_DEMO.md` | Failure-path demo pack workflow and reviewer-facing boundaries |
 | `demo/READINESS.md` | Pre-recording readiness gate for evidence, docs, and manual capture work |
 | `demo/PERMISSIONS.md` | Permission and callback appendix generation workflow |
+| `demo/JUDGE_REVIEW.md` | Reviewer-facing entry pack for product story, evidence sources, boundaries, and reproduction commands |
 
 ## Planned Folders
 

@@ -30,6 +30,7 @@ The demo should make three things obvious:
 | [`FAILURE_DEMO.md`](FAILURE_DEMO.md) | Failure-path demo pack workflow and reviewer-facing boundaries |
 | [`READINESS.md`](READINESS.md) | Pre-recording readiness gate for evidence, docs, and manual capture work |
 | [`PERMISSIONS.md`](PERMISSIONS.md) | Permission and callback appendix generation workflow |
+| [`JUDGE_REVIEW.md`](JUDGE_REVIEW.md) | Reviewer-facing entry pack that connects product story, evidence sources, boundaries, and next actions |
 
 Generated local evidence artifacts are not committed by default. Create them from a JSONL run log:
 
@@ -41,6 +42,7 @@ npm run demo:capture -- --output tmp/demo-capture/CAPTURE_PACK.md
 npm run demo:failure -- --output tmp/demo-failure/FAILURE_DEMO.md
 npm run demo:readiness -- --output tmp/demo-readiness/DEMO_READINESS.md
 npm run demo:permissions -- --collect-version --collect-auth --collect-event-dry-run --output tmp/demo-permissions/PERMISSION_APPENDIX.md
+npm run demo:judge -- --output tmp/demo-judge/JUDGE_REVIEW.md
 ```
 
 ## Recommended Screens
@@ -58,6 +60,7 @@ npm run demo:permissions -- --collect-version --collect-auth --collect-event-dry
 | Failure-Path Demo Pack | Reviewer-facing appendix for callback timeout, announcement fallback, invalid plan, duplicate run, and requirement-risk cases |
 | Demo Readiness Pack | Pre-recording gate that separates ready evidence from manual videos and screenshots |
 | Permission Appendix Pack | Sanitized CLI evidence, required screenshots, and callback configuration boundaries |
+| Judge Review Pack | Single reviewer entry point for product claims, evidence sources, commands, and boundaries |
 
 ## Current Demo Status
 
@@ -75,3 +78,4 @@ npm run demo:permissions -- --collect-version --collect-auth --collect-event-dry
 | Failure-path demo pack | 5 evidence-ready scenarios generated through `npm run demo:failure` |
 | Demo readiness pack | Evidence and docs gate generated through `npm run demo:readiness`; manual recording still pending |
 | Permission appendix pack | Sanitized permission/callback appendix generated through `npm run demo:permissions`; screenshots still pending |
+| Judge review pack | Reviewer entry pack generated through `npm run demo:judge`; depends on current local evidence packs |
