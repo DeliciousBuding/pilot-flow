@@ -54,6 +54,13 @@ const DEFAULT_INPUTS = [
     purpose: "Happy-path artifact evidence."
   },
   {
+    key: "callback",
+    label: "Callback Verification Pack",
+    path: "tmp/demo-callback/CALLBACK_VERIFICATION_20260429.md",
+    anchor: "blocked_on_platform_callback_event",
+    purpose: "Callback readiness and pending-platform-event boundary."
+  },
+  {
     key: "failure",
     label: "Failure-Path Demo Pack",
     path: "tmp/demo-failure/FAILURE_DEMO_20260429.md",
@@ -203,6 +210,7 @@ function buildReviewerPath() {
     "Use the Demo Playbook for the 6 to 8 minute story.",
     "Open the Demo Readiness Pack to confirm evidence and docs are ready before recording.",
     "Open the Permission Appendix Pack for sanitized scope and callback-configuration evidence.",
+    "Open the Callback Verification Pack to separate payload readiness, listener connection, and real event delivery.",
     "Use the Evidence Pack and Flight Recorder to explain live artifacts and fallback decisions.",
     "Use the Failure-Path Demo Pack for callback timeout, announcement fallback, invalid plan, duplicate run, and unclear-requirement cases."
   ];
@@ -238,6 +246,7 @@ function buildRecommendedCommands() {
     "npm run demo:failure -- --output tmp/demo-failure/FAILURE_DEMO_20260429.md",
     "npm run demo:readiness -- --output tmp/demo-readiness/DEMO_READINESS_20260429.md",
     "npm run demo:permissions -- --collect-version --collect-auth --collect-event-dry-run --output tmp/demo-permissions/PERMISSION_APPENDIX_20260429.md",
+    "npm run demo:callback-verification -- --output tmp/demo-callback/CALLBACK_VERIFICATION_20260429.md",
     "npm run demo:judge -- --output tmp/demo-judge/JUDGE_REVIEW_20260429.md"
   ];
 }
@@ -247,6 +256,7 @@ function buildNextActions() {
     "Record happy-path walkthrough from the Feishu group.",
     "Record or screenshot failure-path appendix.",
     "Capture Open Platform permission and callback configuration screenshots.",
+    "Regenerate Callback Verification Pack after each listener attempt.",
     "Run a bounded listener attempt after callback configuration changes.",
     "Keep README and docs updated when real callback delivery or recordings are added."
   ];
@@ -300,6 +310,7 @@ function parseArgs(argv) {
       qa: typeof args.qa === "string" ? args.qa : undefined,
       readiness: typeof args.readiness === "string" ? args.readiness : undefined,
       permissions: typeof args.permissions === "string" ? args.permissions : undefined,
+      callback: typeof args.callback === "string" ? args.callback : undefined,
       evidence: typeof args.evidence === "string" ? args.evidence : undefined,
       failure: typeof args.failure === "string" ? args.failure : undefined
     }
@@ -318,6 +329,7 @@ Options:
   --qa <path>           Demo Q&A path.
   --readiness <path>    Demo Readiness Pack path.
   --permissions <path>  Permission Appendix Pack path.
+  --callback <path>     Callback Verification Pack path.
   --evidence <path>     Demo Evidence Pack path.
   --failure <path>      Failure-Path Demo Pack path.
   --output <path>       Judge Review markdown output path.

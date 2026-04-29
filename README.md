@@ -232,6 +232,7 @@ Full roadmap: [docs/ROADMAP.md](docs/ROADMAP.md).
 | [Failure-Path Demo](docs/demo/FAILURE_DEMO.md) | Reviewer-facing failure-path appendix |
 | [Demo Readiness](docs/demo/READINESS.md) | Pre-recording evidence and manual-capture gate |
 | [Permission Appendix](docs/demo/PERMISSIONS.md) | Sanitized permission and callback configuration appendix |
+| [Callback Verification](docs/demo/CALLBACK_VERIFICATION.md) | Callback readiness report for card payloads, listener, and real event delivery |
 | [Judge Review Pack](docs/demo/JUDGE_REVIEW.md) | Reviewer entry pack for product story, evidence, boundaries, and reproduction |
 | [Documentation Plan](docs/DOCUMENTATION_PLAN.md) | Documentation governance |
 
@@ -255,6 +256,7 @@ npm run demo:capture -- --output tmp/demo-capture/CAPTURE_PACK.md
 npm run demo:failure -- --output tmp/demo-failure/FAILURE_DEMO.md
 npm run demo:readiness -- --output tmp/demo-readiness/DEMO_READINESS.md
 npm run demo:permissions -- --collect-version --collect-auth --collect-event-dry-run --output tmp/demo-permissions/PERMISSION_APPENDIX.md
+npm run demo:callback-verification -- --output tmp/demo-callback/CALLBACK_VERIFICATION.md
 npm run demo:judge -- --output tmp/demo-judge/JUDGE_REVIEW.md
 npm run test:artifacts
 npm run test:plan
@@ -264,6 +266,7 @@ npm run test:trigger
 npm run test:failure
 npm run test:readiness
 npm run test:permissions
+npm run test:callback-pack
 npm run test:judge
 npm run listen:cards -- --dry-run --max-events 1 --timeout 30s
 npm run test:card

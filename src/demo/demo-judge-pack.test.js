@@ -14,6 +14,7 @@ try {
     qa: await writeTemp("DEMO_QA.md", "PilotFlow answers"),
     readiness: await writeTemp("DEMO_READINESS.md", "- Status: `ready_for_manual_capture`"),
     permissions: await writeTemp("PERMISSION_APPENDIX.md", "# Permission Appendix Pack\n\n| Event subscribe dry-run | ready | ok |"),
+    callback: await writeTemp("CALLBACK_VERIFICATION.md", "# Callback Verification Pack\n\n- Verification status: `blocked_on_platform_callback_event`"),
     evidence: await writeTemp("DEMO_EVIDENCE.md", "## Evidence Checklist"),
     failure: await writeTemp("FAILURE_DEMO.md", "DUPLICATE_RUN_BLOCKED")
   };
@@ -32,6 +33,7 @@ try {
   assert.match(markdown, /PilotFlow Judge Review Pack/);
   assert.match(markdown, /One-Line Product/);
   assert.match(markdown, /Capability Snapshot/);
+  assert.match(markdown, /Callback Verification Pack/);
   assert.match(markdown, /card callback delivery remains pending/i);
   assert.match(markdown, /npm run demo:judge/);
 } finally {
