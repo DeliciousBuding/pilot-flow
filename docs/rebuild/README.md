@@ -54,6 +54,10 @@ Verified local files used as design references:
 
 These numbers are local snapshot facts, not permanent upstream claims.
 
+## Evolution Direction
+
+The first rebuild has delivered the durable runtime primitives. The next product layer is documented in [`../AGENT_EVOLUTION.md`](../AGENT_EVOLUTION.md): self-evolution through run traces, evals, improvement proposals, human approval, and typed manager-worker orchestration. This keeps the Hermes ambition without turning PilotFlow into an uncontrolled generic agent framework.
+
 ## Document Index
 
 | File | Purpose |

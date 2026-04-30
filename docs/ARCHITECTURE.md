@@ -206,3 +206,15 @@ flowchart LR
     Artifact --> Confirm["Human Confirmation"]
     Confirm --> Publish["Publish to Doc/Base"]
 ```
+
+## Self-Evolution Boundary
+
+PilotFlow should evolve from traces, not from hidden self-modification. The Hermes-inspired runtime gives the building blocks: bounded sessions, tool-call records, error classification, retry hints, and hermetic tests. The product evolution loop is:
+
+```text
+Flight Recorder -> Evaluation -> Improvement proposal -> Human approval -> Updated workflow/template/test
+```
+
+The first implementation should generate retrospectives and eval cases from JSONL logs. Later versions can add project memory, context compression, worker previews, and Feishu approval cards. Code, prompt, template, and Feishu publishing changes must remain review-gated.
+
+Detailed plan: [AGENT_EVOLUTION.md](AGENT_EVOLUTION.md).

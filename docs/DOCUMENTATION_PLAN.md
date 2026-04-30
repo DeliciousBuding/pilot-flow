@@ -14,6 +14,7 @@ PilotFlow documentation should evolve with the product. The README is the front 
 | `docs/DEVELOPMENT.md` | Contributor workflow | module boundary, validation policy, Git workflow changes |
 | `docs/VISUAL_DESIGN.md` | UX and visual standards | card, cockpit, demo UI changes |
 | `docs/ROADMAP.md` | Long-term plan | completed phases or priority shifts |
+| `docs/AGENT_EVOLUTION.md` | Self-evolution, memory, evaluation, and worker orchestration | Agent runtime, worker, or learning-loop direction changes |
 | `docs/adr/` | Architecture decisions | irreversible or debated decisions |
 | `docs/api-validation/` | Feishu capability tests | new API validation tests |
 | `docs/demo/` | Demo scripts and Q&A | demo flow changes |

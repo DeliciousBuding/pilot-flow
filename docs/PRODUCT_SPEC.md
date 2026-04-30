@@ -138,12 +138,15 @@ Expected flow:
 - Worker artifact preview.
 - Persistent project memory.
 - Multi-group project spaces.
+- Run retrospective and improvement proposal loop.
+- Controlled manager-worker orchestration for documents, tables, research, scripts, and review.
 
 ## Non-Goals for MVP
 
 - Heavy H5 project management dashboard.
 - Full multi-agent runtime.
 - Code worker as the main product story.
+- Hidden self-modification or unreviewed prompt/tool changes.
 - Automatic bulk writes without confirmation.
 - Reading all historical group messages by default.
 - Replacing Feishu native collaboration surfaces.

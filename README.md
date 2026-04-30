@@ -16,7 +16,7 @@ Start from group-chat discussion and turn intent into confirmed plans, executabl
 [![GitHub stars](https://img.shields.io/github/stars/DeliciousBuding/pilot-flow?style=social)](https://github.com/DeliciousBuding/pilot-flow/stargazers)
 [![GitHub last commit](https://img.shields.io/github/last-commit/DeliciousBuding/pilot-flow)](https://github.com/DeliciousBuding/pilot-flow/commits/main)
 
-[Product Spec](docs/PRODUCT_SPEC.md) · [Architecture](docs/ARCHITECTURE.md) · [Operator Runbook](docs/OPERATOR_RUNBOOK.md) · [Roadmap](docs/ROADMAP.md) · [Docs](docs/README.md)
+[Product Spec](docs/PRODUCT_SPEC.md) · [Architecture](docs/ARCHITECTURE.md) · [Agent Evolution](docs/AGENT_EVOLUTION.md) · [Operator Runbook](docs/OPERATOR_RUNBOOK.md) · [Roadmap](docs/ROADMAP.md) · [Docs](docs/README.md)
 
 | Stage | Primary surface | Current focus |
 | --- | --- | --- |
@@ -37,6 +37,7 @@ Start from group-chat discussion and turn intent into confirmed plans, executabl
 - [🔁 Product Loop](#-product-loop)
 - [🧠 Architecture](#-architecture)
 - [🧱 Product-Grade Foundations](#-product-grade-foundations)
+- [🧬 Agent Evolution](#-agent-evolution)
 - [🧩 Feishu-Native Surfaces](#-feishu-native-surfaces)
 - [🧪 MVP Progress](#-mvp-progress)
 - [🗺️ Roadmap Snapshot](#-roadmap-snapshot)
@@ -190,6 +191,18 @@ PilotFlow is still an MVP prototype, but it is packaged around product-grade fou
 | Failure handling | Tool failures are recorded; announcement and callback edges have explicit fallback stories |
 | Packaging | Product README, product spec, architecture, operator runbook, development guide, demo kit |
 
+## 🧬 Agent Evolution
+
+PilotFlow is learning from Hermes at the runtime level: Agent loop, ToolRegistry, Feishu gateway, session queues, error classification, retry, hermetic tests, and trace-first operation. The next product layer is controlled self-evolution:
+
+```text
+Run trace -> Evaluation -> Improvement proposal -> Human approval -> Updated workflow/template/test
+```
+
+Multi-agent work is planned as a manager-worker model, not uncontrolled parallel autonomy. The Pilot remains accountable; workers produce preview artifacts for documents, tables, research, scripts, or review, and Feishu writes still go through confirmation.
+
+Detailed plan: [docs/AGENT_EVOLUTION.md](docs/AGENT_EVOLUTION.md).
+
 ## 🧩 Feishu-Native Surfaces
 
 | Surface | Product role | MVP status |
@@ -273,6 +286,7 @@ Full roadmap: [docs/ROADMAP.md](docs/ROADMAP.md).
 | [Project Brief](docs/PROJECT_BRIEF.md) | Product and competition brief |
 | [Product Spec](docs/PRODUCT_SPEC.md) | User promise, feature tiers, non-goals |
 | [Architecture](docs/ARCHITECTURE.md) | Components, state model, tool routing |
+| [Agent Evolution](docs/AGENT_EVOLUTION.md) | Hermes-inspired self-evolution, memory, evaluation, and worker orchestration |
 | [Project Structure](docs/PROJECT_STRUCTURE.md) | Runtime layers, command surface, and placement rules |
 | [Operator Runbook](docs/OPERATOR_RUNBOOK.md) | Local operation, live run, evidence regeneration, troubleshooting |
 | [Development Guide](docs/DEVELOPMENT.md) | Contributor workflow, module boundaries, validation matrix |

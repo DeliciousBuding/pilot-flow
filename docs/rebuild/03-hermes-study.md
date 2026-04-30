@@ -205,14 +205,36 @@ classify_api_error(exception) → ClassifiedError:
 | 模式 | 原因 |
 |------|------|
 | SQLite session DB | JSONL 够用 |
-| Memory provider 抽象 | Map + TTL 够用 |
-| Context compressor LLM 总结 | 对话短不需要 |
+| Full external memory provider | First use bounded local/project memory; external providers are unnecessary for MVP |
+| Full LLM context-compressor pipeline | Start with tool-output summarization and project-session compaction |
 | Multi-platform gateway | 只有飞书 |
 | Skills marketplace | 3-5 个固定 skill |
 | Plugin 系统 | 工具集固定且小 |
 | Credential pool 轮转 | 第一版 defer；先保留单 provider env，后续再做 key pool / model routing |
 | TUI / Ink | Feishu cards 是 UI |
-| Subagent 委托 | 增加并发复杂度 |
+| Unbounded subagent delegation | Replace with typed manager-worker orchestration and human approval before publishing |
+
+## Self-Evolution Takeaway
+
+Hermes is valuable because it treats an Agent as a durable runtime: every turn has session state, tool contracts, error classes, retry policy, compression policy, and test isolation. PilotFlow should translate that into a product-visible evolution loop:
+
+```text
+Flight Recorder -> Evaluation -> Improvement proposal -> Human approval -> Updated workflow/template/test
+```
+
+This is different from hidden self-modifying code. PilotFlow can propose a better prompt, workflow template, eval case, Feishu card, or tool behavior, but it should cite the run trace that motivated the change and wait for human approval before the change becomes default.
+
+## Worker Orchestration Takeaway
+
+The earlier decision to avoid subagents still applies to the first live demo, but it should not block the product direction. The right adaptation is a manager-worker model:
+
+- PilotFlow remains the accountable manager in the Feishu group.
+- Workers are typed executors for documents, Base/data, research, scripts, and review.
+- Workers return previews and proposed writes, not direct Feishu side effects.
+- Confirmation gate remains the only path to publish worker artifacts.
+- Flight Recorder records worker requests, results, risks, and approvals.
+
+The detailed PilotFlow-specific plan lives in [`../AGENT_EVOLUTION.md`](../AGENT_EVOLUTION.md).
 
 ## 关键技术细节
 
