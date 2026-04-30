@@ -136,143 +136,101 @@ export async function runAgentGateway(options: AgentGatewayOptions = {}): Promis
   const timeoutMs = durationMs(stringFlag(parsed.flags.timeout));
   const command = options.runCommand ?? runCommand;
 
-  let processedMessages = 0;
-  let processedCards = 0;
-  let ignoredEvents = 0;
-  let unsupportedEvents = 0;
-  let seenEvents = 0;
-  let timedOut = false;
+  const counters: GatewayCounters = {
+    processedMessages: 0,
+    processedCards: 0,
+    ignoredEvents: 0,
+    unsupportedEvents: 0,
+    seenEvents: 0,
+    timedOut: false,
+  };
   let failure: AgentGatewayResult["failure"] | undefined;
   let probe: AgentGatewayProbeResult = { status: "not_sent" };
 
   try {
-    const iterator = source.events()[Symbol.asyncIterator]();
-    let nextEvent = nextWithTimeout(iterator, timeoutMs);
     if (parsed.flags["send-probe-message"] === true) {
       const probeRunId = stringFlag(parsed.flags["probe-run-id"]) ?? buildProbeRunId(options.now);
-      const probeMessage = buildProbeMessage({
-        bot,
-        runId: probeRunId,
-        customText: stringFlag(parsed.flags["probe-text"]),
-      });
-      if (probeMessage.status === "failed") {
+      const eventScope = runtime.mode === "live"
+        ? await checkProbeEventReceiveScope({ profile: runtime.profile, command })
+        : { status: "ok" as const };
+      if (eventScope.status === "failed") {
         probe = {
           status: "failed",
           runId: probeRunId,
-          error: probeMessage.error,
+          error: eventScope.error,
         };
         await recorder.record({
           type: "gateway.probe_message_failed",
           runId: probeRunId,
-          error: probeMessage.error,
+          error: eventScope.error,
         } as never);
       } else {
-      probe = await sendProbeMessage({
-        chatId: stringFlag(parsed.flags["probe-chat-id"]) ?? runtime.feishuTargets.chatId,
-        profile: runtime.profile,
-        dryRun: runtime.mode === "dry-run",
-          text: probeMessage.text,
-          mentionMode: probeMessage.mentionMode,
+        const probeMessage = buildProbeMessage({
+          bot,
           runId: probeRunId,
-        command,
-        recorder,
-      });
-      }
-    }
-
-    while (true) {
-      const next = await nextEvent;
-      if (isTimeoutResult(next)) {
-        timedOut = true;
-        await recorder.record({
-          type: "gateway.timeout",
-          runId: "gateway",
-          timeoutMs,
-          processedMessages,
-          processedCards,
-          ignoredEvents,
-          unsupportedEvents,
-        } as never);
-        break;
-      }
-      if (next.done) break;
-      const event = next.value;
-      nextEvent = nextWithTimeout(iterator, timeoutMs);
-      seenEvents += 1;
-      await recorder.record({
-        type: "gateway.event_received",
-        gateway_kind: event.kind,
-        gateway_event_id: event.id,
-      } as never);
-
-      if (event.kind === "message") {
-        const resumed = await resumePendingRunFromTextConfirmation(event, {
-          bot,
-          dedupe,
-          queue,
-          recorder,
-          store,
-          run: async (pending) => orchestrator.run(pending.inputText, buildApprovedRunOptions(pending.options)),
+          customText: stringFlag(parsed.flags["probe-text"]),
         });
-        if (resumed.status === "processed") {
-          processedMessages += 1;
-        } else if (resumed.status === "ignored_confirmation") {
-          ignoredEvents += 1;
+        if (probeMessage.status === "failed") {
+          probe = {
+            status: "failed",
+            runId: probeRunId,
+            error: probeMessage.error,
+          };
+          await recorder.record({
+            type: "gateway.probe_message_failed",
+            runId: probeRunId,
+            error: probeMessage.error,
+          } as never);
         } else {
-        const result = await handleMessageEvent(event, {
-          bot,
-          sessions,
-          dedupe,
-          queue,
-          runAgent: async (text: string, session: Session): Promise<AgentLoopResult> => {
-            const runResult = await orchestrator.run(text, buildMessageRunOptions(parsed.flags, runtime.mode, text));
-            if (runResult.status === "waiting_confirmation" && runResult.plan) {
-              await store.save({
-                runId: runResult.runId,
-                chatId: event.chatId,
-                inputText: text,
-                options: toPendingRunOptions(buildContinuationOptions(parsed.flags, text)),
-                createdAt: new Date().toISOString(),
-              });
-            }
-            return toGatewayResponse(runResult, session.chatId);
-          },
-        });
-        if (result.status === "processed") processedMessages += 1;
-        else ignoredEvents += 1;
+          const iterator = source.events()[Symbol.asyncIterator]();
+          const nextEvent = nextWithTimeout(iterator, timeoutMs);
+          probe = await sendProbeMessage({
+            chatId: stringFlag(parsed.flags["probe-chat-id"]) ?? runtime.feishuTargets.chatId,
+            profile: runtime.profile,
+            dryRun: runtime.mode === "dry-run",
+            text: probeMessage.text,
+            mentionMode: probeMessage.mentionMode,
+            runId: probeRunId,
+            command,
+            recorder,
+          });
+          await processGatewayEvents({
+            iterator,
+            firstNextEvent: nextEvent,
+            timeoutMs,
+            maxEvents,
+            bot,
+            sessions,
+            dedupe,
+            queue,
+            recorder,
+            store,
+            orchestrator,
+            parsedFlags: parsed.flags,
+            runtimeMode: runtime.mode,
+            counters,
+          });
         }
-      } else if (event.kind === "card") {
-        const continuation = await handleCardEvent(event, {
-          dedupe,
-          queue,
-          onAction: async (action) => {
-            const pending = await store.get(action.runId);
-            if (!pending) {
-              await recorder.record({
-                type: "gateway.card_missing_pending_run",
-                runId: action.runId,
-                card: action.card,
-                action: action.action,
-              } as never);
-              return;
-            }
-            const result = await orchestrator.run(pending.inputText, buildApprovedRunOptions(pending.options));
-            await store.delete(action.runId);
-            await recorder.record({
-              type: "gateway.card_continuation_completed",
-              originalRunId: action.runId,
-              continuedRunId: result.runId,
-              status: result.status,
-            } as never);
-          },
-        });
-        if (continuation.status === "processed") processedCards += 1;
-        else ignoredEvents += 1;
-      } else {
-        unsupportedEvents += 1;
       }
-
-      if (maxEvents > 0 && seenEvents >= maxEvents) break;
+    } else {
+      const iterator = source.events()[Symbol.asyncIterator]();
+      const nextEvent = nextWithTimeout(iterator, timeoutMs);
+      await processGatewayEvents({
+        iterator,
+        firstNextEvent: nextEvent,
+        timeoutMs,
+        maxEvents,
+        bot,
+        sessions,
+        dedupe,
+        queue,
+        recorder,
+        store,
+        orchestrator,
+        parsedFlags: parsed.flags,
+        runtimeMode: runtime.mode,
+        counters,
+      });
     }
   } catch (error) {
     failure = subscribeFailure(error);
@@ -289,16 +247,138 @@ export async function runAgentGateway(options: AgentGatewayOptions = {}): Promis
   }
 
   return {
-    status: failure ? "subscribe_failed" : timedOut ? "timeout" : "completed",
-    processedMessages,
-    processedCards,
-    ignoredEvents,
-    unsupportedEvents,
+    status: failure ? "subscribe_failed" : counters.timedOut ? "timeout" : "completed",
+    processedMessages: counters.processedMessages,
+    processedCards: counters.processedCards,
+    ignoredEvents: counters.ignoredEvents,
+    unsupportedEvents: counters.unsupportedEvents,
     pendingRuns: await store.count(),
     output: options.recorder ? undefined : output,
     probe,
     failure,
   };
+}
+
+interface GatewayCounters {
+  processedMessages: number;
+  processedCards: number;
+  ignoredEvents: number;
+  unsupportedEvents: number;
+  seenEvents: number;
+  timedOut: boolean;
+}
+
+async function processGatewayEvents(config: {
+  readonly iterator: AsyncIterator<FeishuGatewayEvent>;
+  readonly firstNextEvent: Promise<IteratorResult<FeishuGatewayEvent> | { readonly timeout: true }>;
+  readonly timeoutMs: number;
+  readonly maxEvents: number;
+  readonly bot: BotIdentity;
+  readonly sessions: SessionManager;
+  readonly dedupe: EventDedupe;
+  readonly queue: ChatQueue;
+  readonly recorder: Recorder;
+  readonly store: PendingRunStore;
+  readonly orchestrator: Orchestrator;
+  readonly parsedFlags: Record<string, string | boolean>;
+  readonly runtimeMode: "dry-run" | "live";
+  readonly counters: GatewayCounters;
+}): Promise<void> {
+  let nextEvent = config.firstNextEvent;
+  while (true) {
+    const next = await nextEvent;
+    if (isTimeoutResult(next)) {
+      config.counters.timedOut = true;
+      await config.recorder.record({
+        type: "gateway.timeout",
+        runId: "gateway",
+        timeoutMs: config.timeoutMs,
+        processedMessages: config.counters.processedMessages,
+        processedCards: config.counters.processedCards,
+        ignoredEvents: config.counters.ignoredEvents,
+        unsupportedEvents: config.counters.unsupportedEvents,
+      } as never);
+      break;
+    }
+    if (next.done) break;
+    const event = next.value;
+    nextEvent = nextWithTimeout(config.iterator, config.timeoutMs);
+    config.counters.seenEvents += 1;
+    await config.recorder.record({
+      type: "gateway.event_received",
+      gateway_kind: event.kind,
+      gateway_event_id: event.id,
+    } as never);
+
+    if (event.kind === "message") {
+      const resumed = await resumePendingRunFromTextConfirmation(event, {
+        bot: config.bot,
+        dedupe: config.dedupe,
+        queue: config.queue,
+        recorder: config.recorder,
+        store: config.store,
+        run: async (pending) => config.orchestrator.run(pending.inputText, buildApprovedRunOptions(pending.options)),
+      });
+      if (resumed.status === "processed") {
+        config.counters.processedMessages += 1;
+      } else if (resumed.status === "ignored_confirmation") {
+        config.counters.ignoredEvents += 1;
+      } else {
+        const result = await handleMessageEvent(event, {
+          bot: config.bot,
+          sessions: config.sessions,
+          dedupe: config.dedupe,
+          queue: config.queue,
+          runAgent: async (text: string, session: Session): Promise<AgentLoopResult> => {
+            const runResult = await config.orchestrator.run(text, buildMessageRunOptions(config.parsedFlags, config.runtimeMode, text));
+            if (runResult.status === "waiting_confirmation" && runResult.plan) {
+              await config.store.save({
+                runId: runResult.runId,
+                chatId: event.chatId,
+                inputText: text,
+                options: toPendingRunOptions(buildContinuationOptions(config.parsedFlags, text)),
+                createdAt: new Date().toISOString(),
+              });
+            }
+            return toGatewayResponse(runResult, session.chatId);
+          },
+        });
+        if (result.status === "processed") config.counters.processedMessages += 1;
+        else config.counters.ignoredEvents += 1;
+      }
+    } else if (event.kind === "card") {
+      const continuation = await handleCardEvent(event, {
+        dedupe: config.dedupe,
+        queue: config.queue,
+        onAction: async (action) => {
+          const pending = await config.store.get(action.runId);
+          if (!pending) {
+            await config.recorder.record({
+              type: "gateway.card_missing_pending_run",
+              runId: action.runId,
+              card: action.card,
+              action: action.action,
+            } as never);
+            return;
+          }
+          const result = await config.orchestrator.run(pending.inputText, buildApprovedRunOptions(pending.options));
+          await config.store.delete(action.runId);
+          await config.recorder.record({
+            type: "gateway.card_continuation_completed",
+            originalRunId: action.runId,
+            continuedRunId: result.runId,
+            status: result.status,
+          } as never);
+        },
+      });
+      if (continuation.status === "processed") config.counters.processedCards += 1;
+      else config.counters.ignoredEvents += 1;
+    } else {
+      config.counters.unsupportedEvents += 1;
+    }
+
+    if (config.maxEvents > 0 && config.counters.seenEvents >= config.maxEvents) break;
+  }
 }
 
 interface TextConfirmationConfig {
@@ -401,6 +481,24 @@ Options:
   --json                            Print JSON result.
   --help                            Show this help.
 `;
+}
+
+async function checkProbeEventReceiveScope(options: {
+  readonly profile?: string;
+  readonly command: typeof runCommand;
+}): Promise<{ readonly status: "ok" } | { readonly status: "failed"; readonly error: string }> {
+  try {
+    await options.command("lark-cli", ["auth", "check", "--scope", "im:message.p2p_msg:readonly"], {
+      profile: options.profile,
+      timeoutMs: 15_000,
+    });
+    return { status: "ok" };
+  } catch {
+    return {
+      status: "failed",
+      error: "Missing im:message.p2p_msg:readonly; refusing to send gateway IM probe because im.message.receive_v1 cannot be delivered until the app scope and user authorization are updated.",
+    };
+  }
 }
 
 async function sendProbeMessage(options: {

@@ -291,6 +291,48 @@ test("runAgentGateway loads probe chat id from local env when cwd is provided", 
   }
 });
 
+test("runAgentGateway refuses live IM probes when receive scope is missing", async () => {
+  const dir = join(process.cwd(), "tmp", "tests", `pilotflow-agent-gateway-missing-scope-${Date.now()}`);
+  await mkdir(dir, { recursive: true });
+  const calls: string[][] = [];
+
+  try {
+    const recorder = new MemoryRecorder();
+    const registry = createGatewayRegistry();
+    const result = await runAgentGateway({
+      argv: [
+        "--live",
+        "--send-probe-message",
+        "--chat-id", "oc_probe",
+        "--base-token", "base_live",
+        "--base-table-id", "tbl_live",
+        "--bot-user-id", "u_real_bot",
+        "--pending-store", join(dir, "pending.json"),
+      ],
+      env: {},
+      source: eventSource([]),
+      registry,
+      recorder,
+      runCommand: async (bin, args) => {
+        calls.push([bin, ...args]);
+        if (args.join(" ") === "auth check --scope im:message.p2p_msg:readonly") {
+          throw new Error("missing scope");
+        }
+        return okResult([bin, ...args]);
+      },
+    });
+
+    assert.equal(result.probe.status, "failed");
+    assert.match(result.probe.error ?? "", /im:message\.p2p_msg:readonly/u);
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0]?.join(" "), "lark-cli auth check --scope im:message.p2p_msg:readonly");
+    assert.equal(recorder.ofType("gateway.probe_message_failed").length, 1);
+    assert.equal(recorder.ofType("gateway.probe_message_sent").length, 0);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 test("runAgentGateway fails the default IM probe when bot user id is missing", async () => {
   const dir = join(process.cwd(), "tmp", "tests", `pilotflow-agent-gateway-missing-bot-${Date.now()}`);
   await mkdir(dir, { recursive: true });
