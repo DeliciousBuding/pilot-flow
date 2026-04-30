@@ -20,6 +20,11 @@ export function loadLocalEnv(options: LoadLocalEnvOptions = {}): NodeJS.ProcessE
   return env;
 }
 
+export function loadCliEnv(env: NodeJS.ProcessEnv | undefined, cwd: string | undefined): NodeJS.ProcessEnv {
+  if (cwd || env === undefined) return loadLocalEnv({ cwd, env: env ?? process.env });
+  return env;
+}
+
 export function parseEnvFile(text: string): Record<string, string> {
   const result: Record<string, string> = {};
   for (const line of text.split(/\r?\n/)) {

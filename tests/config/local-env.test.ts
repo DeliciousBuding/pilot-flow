@@ -3,7 +3,7 @@ import test from "node:test";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { loadLocalEnv } from "../../src/config/local-env.js";
+import { loadCliEnv, loadLocalEnv } from "../../src/config/local-env.js";
 
 test("loadLocalEnv merges .env values without overriding explicit env", async () => {
   const dir = await mkdtemp(join(tmpdir(), "pilotflow-local-env-"));
@@ -33,4 +33,22 @@ test("loadLocalEnv merges .env values without overriding explicit env", async ()
 test("loadLocalEnv returns input env when .env is absent", () => {
   const env = loadLocalEnv({ cwd: join(tmpdir(), "pilotflow-missing-env"), env: { PILOTFLOW_LARK_PROFILE: "explicit" } });
   assert.equal(env.PILOTFLOW_LARK_PROFILE, "explicit");
+});
+
+test("loadCliEnv avoids reading repo .env when callers provide isolated env", () => {
+  const env = { PILOTFLOW_LARK_PROFILE: "test-profile" };
+  assert.equal(loadCliEnv(env, undefined), env);
+});
+
+test("loadCliEnv reads local .env when cwd is explicit", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "pilotflow-cli-env-"));
+  try {
+    await writeFile(join(dir, ".env"), "PILOTFLOW_TEST_CHAT_ID=oc_from_cli_env\n", "utf8");
+
+    const env = loadCliEnv({}, dir);
+
+    assert.equal(env.PILOTFLOW_TEST_CHAT_ID, "oc_from_cli_env");
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
 });

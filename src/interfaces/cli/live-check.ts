@@ -1,7 +1,7 @@
 import { pathToFileURL } from "node:url";
 import { runCommand, type CommandResult, type RunOptions } from "../../infrastructure/command-runner.js";
 import { loadRuntimeConfig } from "../../config/runtime-config.js";
-import { loadLocalEnv } from "../../config/local-env.js";
+import { loadCliEnv } from "../../config/local-env.js";
 import { parseArgs } from "../../shared/parse-args.js";
 
 export interface LiveCheckOptions {
@@ -32,7 +32,7 @@ export interface LiveCheckReport {
 
 export async function buildLiveCheckReport(options: LiveCheckOptions = {}): Promise<LiveCheckReport> {
   const argv = options.argv ?? [];
-  const env = feishuOnlyEnv(loadCommandEnv(options.env, options.cwd));
+  const env = feishuOnlyEnv(loadCliEnv(options.env, options.cwd));
   const command = options.runCommand ?? runCommand;
   const runtime = loadRuntimeConfig(["--live", ...argv], env);
   const targets = runtime.feishuTargets;
@@ -78,11 +78,6 @@ function feishuOnlyEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
     if (key.startsWith("PILOTFLOW_LLM_")) delete next[key];
   }
   return next;
-}
-
-function loadCommandEnv(env: NodeJS.ProcessEnv | undefined, cwd: string | undefined): NodeJS.ProcessEnv {
-  if (cwd || env === undefined) return loadLocalEnv({ cwd, env: env ?? process.env });
-  return env;
 }
 
 export function renderLiveCheckReport(report: LiveCheckReport): string {
