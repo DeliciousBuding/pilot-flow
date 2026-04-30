@@ -81,6 +81,7 @@ export class Orchestrator {
     const dedupeKey = buildProjectInitDedupeKey({ plan, explicitKey: options.dedupeKey, scope: { profile: this.config.runtime.profile, targets: targetScope(this.config.runtime.feishuTargets) } });
     let guardState: Record<string, unknown> = { enabled: false, key: dedupeKey, status: "skipped", reason: "no_live_side_effects" };
     let mainGuardStarted = false;
+    let activeGuardKey = "";
 
     try {
       if (options.sendPlanCard) {
@@ -90,6 +91,7 @@ export class Orchestrator {
           preflightToolSequence(this.registry, planCardSequence, this.config.runtime.feishuTargets);
           planCardKey = `${dedupeKey}:plan-card`;
           guardState = await this.startGuard(runId, planCardKey, plan);
+          activeGuardKey = planCardKey;
         }
         const planCardArtifacts = await executeToolSequence({
           runId,
@@ -104,6 +106,7 @@ export class Orchestrator {
         });
         artifacts.splice(0, artifacts.length, ...planCardArtifacts);
         if (planCardKey) await this.config.duplicateGuard.complete({ key: planCardKey, runId, artifactCount: planCardArtifacts.length });
+        if (activeGuardKey === planCardKey) activeGuardKey = "";
       }
 
       await this.record({ type: "confirmation.requested", event: "confirmation.requested", runId, run_id: runId, confirmation: plan.confirmations[0] });
@@ -124,6 +127,7 @@ export class Orchestrator {
         if (!mainGuardStarted) {
           guardState = await this.startGuard(runId, dedupeKey, plan);
           mainGuardStarted = true;
+          activeGuardKey = dedupeKey;
         }
       }
       const runArtifacts = await executeToolSequence({
@@ -142,10 +146,11 @@ export class Orchestrator {
       artifacts.push(runLogArtifact);
       await this.record({ type: "artifact.created", event: "artifact.created", runId, run_id: runId, artifact: runLogArtifact });
       await this.config.duplicateGuard.complete({ key: dedupeKey, runId, artifactCount: artifacts.length });
+      if (activeGuardKey === dedupeKey) activeGuardKey = "";
       await this.record({ type: "run.completed", event: "run.completed", runId, run_id: runId });
       return { runId, status: "completed", plan, risks, riskDecision, risk_decision: riskDecision, artifacts, duplicateGuard: guardState, duplicate_guard: guardState };
     } catch (error) {
-      await this.config.duplicateGuard.fail({ key: dedupeKey, runId, artifactCount: artifacts.length });
+      await this.config.duplicateGuard.fail({ key: activeGuardKey || dedupeKey, runId, artifactCount: artifacts.length });
       await this.record({ type: "run.failed", event: "run.failed", runId, run_id: runId, error: { message: safeErrorMessage(error) }, failed_before_side_effects: artifacts.length === 0 });
       throw error;
     }

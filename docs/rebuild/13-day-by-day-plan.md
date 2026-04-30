@@ -11,7 +11,7 @@
 - [x] Day 3 complete: `src/orchestrator/` split is implemented with confirmation gate, deterministic sequence, duplicate guard, card/message/state helpers, callback bridge, and tests while keeping the JS prototype runnable.
 - [x] Day 4 complete: Feishu gateway boundary, OpenAI-compatible LLM client, retry/error classifier, Agent loop, and session manager are implemented without deleting the JS public CLI path.
 - [x] Day 5 complete: CLI migration bridge, public command hardening, and a dry-run Feishu gateway smoke path are implemented without replacing the JS live path.
-- [ ] Day 6 next: live-guarded TS project-init bridge and old-runtime removal decision.
+- [x] Day 6 complete: live-guarded TS project-init bridge is implemented while old-runtime removal remains a later decision.
 
 ## Day 0：合同核验 + 迁移闸门（~2 小时）
 
@@ -342,3 +342,24 @@ npm run pilot:demo          # dry-run demo
 - `npm run pilot:agent-smoke`：可直接运行 mock Feishu event -> mention gate -> session -> Agent loop -> ToolRegistry -> dry-run Feishu tools。
 - `tests/interfaces/agent-smoke.test.ts`：覆盖默认输入、显式 lark-cli NDJSON event line 和未 @bot 的群消息过滤。
 - README、Operator Runbook、Architecture、Project Structure、Roadmap 和 rebuild docs 已同步新命令和 Day 5 状态。
+
+---
+
+## Day 6：Live-Guarded TS Project Init Bridge（~3 小时）
+
+Day 6 不删除旧 JS live path，而是新增一个可独立验证的 TS project-init bridge：
+
+- `src/interfaces/cli/agent-project-init.ts`：`DeterministicPlanner -> Orchestrator -> ToolRegistry -> Feishu tools -> JsonlRecorder`。
+- `npm run pilot:project-init-ts` / `node src/interfaces/cli/pilot-cli.js project-init-ts`：默认 dry-run；live 必须显式 `--live --confirm "确认起飞"`。
+- live confirmed runs 复用 TS orchestrator 的 plan validation、batch preflight、confirmation gate、duplicate guard、optional fallback 和 artifact reporting。
+- `agent-smoke` 保持 hermetic mock LLM + dry-run gateway/session/Agent smoke，不扩展成 live。
+- 旧 JS `pilot:demo` 继续作为稳定 live demo path，直到 TS bridge 通过真实飞书 live run、card callback 平台验证和提交材料复核后再讨论删除。
+
+Day 6 tests:
+
+- dry-run bridge 写出 JSONL 并完成 planned artifacts。
+- live 无确认时返回 `waiting_confirmation`，且不出现 `tool.called`。
+- live confirmed 但缺 Feishu targets 时在副作用前 preflight fail。
+- partial `PILOTFLOW_LLM_*` 不影响 deterministic bridge。
+
+**Day 6 完成标志**：`npm run pilot:project-init-ts` 可 dry-run，live path 有确认/target/preflight/duplicate guard 闸门，JS live path 未被破坏。
