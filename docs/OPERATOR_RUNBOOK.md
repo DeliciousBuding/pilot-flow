@@ -167,7 +167,7 @@ Current boundary:
 
 ## Callback Proof
 
-Use `pilot:callback-proof` after changing Open Platform callback settings or before a live presentation. It listens only for `card.action.trigger`, records sanitized JSONL proof under `tmp/proof/callback-proof.jsonl`, and does not run the project orchestrator.
+Use `pilot:callback-proof` after changing Open Platform callback settings or before a live presentation. It listens only for `card.action.trigger`, records sanitized JSONL proof under `tmp/proof/callback-proof.jsonl`, and does not run the project orchestrator. Its JSON result includes `nextActions` for timeout and subscription failure cases.
 
 ```bash
 npm run pilot:callback-proof -- --timeout 60s

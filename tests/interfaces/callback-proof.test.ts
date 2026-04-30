@@ -44,6 +44,7 @@ test("runCallbackProof records timeout and fails only in strict mode", async () 
     });
     assert.equal(loose.status, "timeout_no_callback");
     assert.equal(loose.exitCode, 0);
+    assert.match(loose.nextActions[0]?.action ?? "", /--send-probe-card/u);
 
     const strict = await runCallbackProof({
       argv: ["--output", output, "--max-events", "0", "--strict"],
@@ -52,6 +53,7 @@ test("runCallbackProof records timeout and fails only in strict mode", async () 
     });
     assert.equal(strict.status, "timeout_no_callback");
     assert.equal(strict.exitCode, 1);
+    assert.match(renderCallbackProof(strict), /next_actions:/u);
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
@@ -82,6 +84,8 @@ test("runCallbackProof can send a callback probe card before listening", async (
     });
 
     assert.equal(result.probe.status, "dry_run");
+    assert.equal(result.status, "timeout_no_callback");
+    assert.match(result.nextActions[0]?.action ?? "", /without --dry-run/u);
     assert.equal(result.probe.runId, "callback-proof-test");
     assert.equal(result.probe.messageId, "om_probe");
     assert.match(renderCallbackProof(result), /probe_status: dry_run/u);
@@ -139,6 +143,7 @@ test("runCallbackProof returns structured subscribe failures", async () => {
     assert.equal(result.status, "subscribe_failed");
     assert.equal(result.exitCode, 2);
     assert.equal(result.failure?.exitCode, 2);
+    assert.match(result.nextActions[0]?.action ?? "", /card\.action\.trigger --dry-run/u);
     assert.match(renderCallbackProof(result), /failure: lark-cli event subscription failed/u);
 
     const log = await readFile(output, "utf8");

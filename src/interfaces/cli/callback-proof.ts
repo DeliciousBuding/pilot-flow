@@ -26,6 +26,11 @@ export interface CallbackProofProbeResult {
   readonly messageId?: string;
 }
 
+export interface CallbackProofAction {
+  readonly reason: string;
+  readonly action: string;
+}
+
 export interface CallbackProofResult {
   readonly status: "observed" | "timeout_no_callback" | "subscribe_failed";
   readonly observedCallbacks: number;
@@ -33,6 +38,7 @@ export interface CallbackProofResult {
   readonly unsupportedEvents: number;
   readonly output: string;
   readonly probe: CallbackProofProbeResult;
+  readonly nextActions: readonly CallbackProofAction[];
   readonly failure?: {
     readonly message: string;
     readonly exitCode?: number | null;
@@ -142,6 +148,7 @@ export async function runCallbackProof(options: CallbackProofOptions = {}): Prom
   if (timedOut || status === "timeout_no_callback") {
     await recorder.record({ type: "callback_proof.timeout_no_callback", runId: "callback-proof", observedCallbacks, ignoredEvents, unsupportedEvents, timestamp: now() });
   }
+  const nextActions = buildNextActions({ status, probe, failure, strict });
 
   return {
     status,
@@ -150,6 +157,7 @@ export async function runCallbackProof(options: CallbackProofOptions = {}): Prom
     unsupportedEvents,
     output,
     probe,
+    nextActions,
     failure,
     exitCode: status === "subscribe_failed" ? 2 : status === "timeout_no_callback" && strict ? 1 : 0,
   };
@@ -231,6 +239,7 @@ export function renderCallbackProof(result: CallbackProofResult): string {
     result.probe.runId ? `probe_run_id: ${result.probe.runId}` : undefined,
     result.probe.messageId ? `probe_message_id: ${result.probe.messageId}` : undefined,
     result.failure ? `failure: ${result.failure.message}` : undefined,
+    ...renderNextActions(result.nextActions),
     `output: ${result.output}`,
   ].filter((line): line is string => typeof line === "string").join("\n");
 }
@@ -310,6 +319,53 @@ function subscribeFailure(error: unknown): NonNullable<CallbackProofResult["fail
   return {
     message: error instanceof Error ? error.message : String(error),
   };
+}
+
+function buildNextActions(input: {
+  readonly status: CallbackProofResult["status"];
+  readonly probe: CallbackProofProbeResult;
+  readonly failure?: CallbackProofResult["failure"];
+  readonly strict: boolean;
+}): readonly CallbackProofAction[] {
+  if (input.status === "observed") return [];
+  if (input.status === "subscribe_failed") {
+    return [
+      {
+        reason: "The callback listener did not stay up.",
+        action: "Run lark-cli event +subscribe --as bot --event-types card.action.trigger --dry-run, then fix the CLI profile, event permission, or Open Platform event subscription error shown in the proof log.",
+      },
+    ];
+  }
+  if (input.probe.status === "sent") {
+    return [
+      {
+        reason: "A probe card was sent, but no card.action.trigger event reached PilotFlow during the timeout window.",
+        action: "Click the probe card button from Feishu, then inspect Open Platform event subscription, callback/long-connection mode, bot installation state, and app publication state before rerunning with --strict.",
+      },
+    ];
+  }
+  if (input.probe.status === "dry_run") {
+    return [
+      {
+        reason: "The probe card was only dry-run, so no real callback can arrive.",
+        action: "Rerun without --dry-run when you want a real card.action.trigger proof.",
+      },
+    ];
+  }
+  return [
+    {
+      reason: "No probe card was sent, so timeout only proves that no existing card callback arrived.",
+      action: "Rerun with --send-probe-card --timeout 60s, click the button in Feishu, and use --strict when collecting pass/fail evidence.",
+    },
+  ];
+}
+
+function renderNextActions(actions: readonly CallbackProofAction[]): readonly string[] {
+  if (actions.length === 0) return [];
+  return [
+    "next_actions:",
+    ...actions.map((item, index) => `${index + 1}. ${item.action} (${item.reason})`),
+  ];
 }
 
 function buildProbeRunId(now: () => string): string {
