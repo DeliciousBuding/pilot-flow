@@ -22,19 +22,19 @@ Start from group-chat discussion and turn intent into confirmed plans, executabl
 
 ## Product Positioning
 
-PilotFlow is an **AI project operations officer** for Feishu collaboration:
+PilotFlow is an **AI project operations officer** for Feishu.
 
 > **Like a project manager that pushes teams from discussion to delivery — right inside the Feishu group chat.**
 
-In real collaboration, key project signals are scattered across group messages: goals, owners, deadlines, risks, materials, and confirmations. PilotFlow lets an AI Agent act as the primary driver — understanding discussion, generating execution plans, requesting human confirmation, invoking Feishu-native tools, and writing results into Docs, Base, Tasks, pinned entries, and delivery summaries.
+Project discussions happen in group chats, and key decisions get lost. PilotFlow lets an AI Agent understand the discussion, generate a plan, ask for confirmation, and execute through Feishu tools — writing results into Docs, Base, and Tasks.
 
-The product experience happens where teams already work: **Feishu IM, cards, documents, Base, and Tasks**.
+The product lives where teams already work: **Feishu IM, cards, documents, Base, and Tasks**.
 
 > **Agent as Pilot. GUI as cockpit. Humans stay in control.**
 
 ## Core Capabilities
 
-Starting from a single project requirement in the group chat, PilotFlow completes the full loop:
+Starting from a single requirement in the group chat, PilotFlow completes the loop:
 
 1. Extract goals, owners, deadlines, deliverables, and risks
 2. Generate a structured execution plan and send it as a Feishu card
@@ -113,7 +113,7 @@ Detailed architecture: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## Feishu-Native Capabilities
 
-All validated with real Feishu APIs, not mock data:
+All real Feishu APIs, validated in practice:
 
 | Capability | Product role |
 | --- | --- |
