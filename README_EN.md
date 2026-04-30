@@ -2,9 +2,9 @@
 
 # ✈️ PilotFlow
 
-**AI project operations officer for Feishu group chats**
+**An AI operating layer for Feishu project work**
 
-Discuss in chat, get a plan, confirm once — docs, tasks, and status are created automatically.
+Start from group-chat discussion and turn intent into confirmed plans, executable tasks, traceable state, and delivery summaries.
 
 [中文版](README.md)
 
@@ -20,37 +20,47 @@ Discuss in chat, get a plan, confirm once — docs, tasks, and status are create
 
 ---
 
-## What PilotFlow Does
+## Product Positioning
 
-Project discussions happen in group chats, but the decisions often get lost — who owns what, when it's due, what the risks are. PilotFlow fixes that.
+PilotFlow is an **AI project operations officer** for Feishu collaboration:
 
-It runs inside a Feishu group. You describe what you need in plain language, and it:
+> **Like a project manager that pushes teams from discussion to delivery — right inside the Feishu group chat.**
 
-1. Extracts goals, owners, deadlines, deliverables, and risks
-2. Generates a structured execution plan and posts it to the group
-3. After you confirm, creates Feishu Docs, Base records, and Tasks
-4. Sends a summary back to the group and pins the project entry
+In real collaboration, key project signals are scattered across group messages: goals, owners, deadlines, risks, materials, and confirmations. PilotFlow lets an AI Agent act as the primary driver — understanding discussion, generating execution plans, requesting human confirmation, invoking Feishu-native tools, and writing results into Docs, Base, Tasks, pinned entries, and delivery summaries.
 
-Every step is logged, so you always know what happened and where things went wrong.
+The product experience happens where teams already work: **Feishu IM, cards, documents, Base, and Tasks**.
 
-> **Agent drives. Humans steer.**
+> **Agent as Pilot. GUI as cockpit. Humans stay in control.**
+
+## Core Capabilities
+
+Starting from a single project requirement in the group chat, PilotFlow completes the full loop:
+
+1. Extract goals, owners, deadlines, deliverables, and risks
+2. Generate a structured execution plan and send it as a Feishu card
+3. Wait for human confirmation — approve, edit, restrict to doc-only, or cancel
+4. After confirmation, create Feishu Docs, Base state records, and Tasks
+5. Send risk-decision cards, deploy a pinned project entry in the group
+6. Aggregate all artifact links and send a delivery summary to the chat
+
+Every step is logged in JSONL run logs with Flight Recorder visual replay support.
 
 ## Who Uses It
 
-| Team | Scenario | Why it fits |
+| Team type | Typical scenario | Why it fits |
 | --- | --- | --- |
-| Student teams | Brainstorm to deliverable | Lightweight, fits fast cycles |
-| Product & ops | Turn chat decisions into docs and tasks | Works where decisions already happen |
-| Hackathon teams | Align scope and owners | One spine, no heavy PM tool |
-| AI teams | Let agents do real work | Confirmation and logs keep it safe |
+| Student teams | Brainstorming to deliverable plan | Lightweight, fits fast project cycles |
+| Product and operations | Group decisions into docs and tasks | Works where decisions already happen |
+| Hackathon teams | Align scope, owners, and demo assets | One visible project spine, no heavy PM tool |
+| AI-native teams | Let agents do real collaboration work | Confirmation and run traces keep automation explainable |
 
 ## Product Experience
 
 ```mermaid
 flowchart LR
-    A["Feishu group chat"] --> B["Generate plan"]
-    B --> C["Human confirms"]
-    C --> D["Auto-execute"]
+    A["Feishu group chat<br/>text or voice intent"] --> B["Agent Planner<br/>project execution plan"]
+    B --> C["Human confirmation"]
+    C --> D["Feishu Tool Router"]
     D --> E["Doc"]
     D --> F["Base / Task"]
     D --> G["Message / Card"]
@@ -61,34 +71,34 @@ flowchart LR
     H --> I
 ```
 
-## How It Works
+## Operating Model
 
-| Step | What happens | Safety |
+| Step | Product behavior | Control point |
 | --- | --- | --- |
-| Observe | Read the chat, extract intent | No writes |
-| Plan | Generate structured execution plan | Schema validation first |
-| Confirm | Wait for human approval | No confirm, no execute |
+| Observe | Read the chat, extract goal, members, deliverables, deadline, and risks | No write side effects |
+| Plan | Generate a structured execution plan | Schema validation |
+| Confirm | Request human approval, edit, or cancel | No confirm, no execute |
 | Execute | Create Feishu artifacts via tool router | Preflight checks, duplicate guard |
-| Record | Log every step | JSONL trace + visual replay |
-| Report | Send summary to group | Includes artifact links |
+| Record | Log every tool call, artifact, fallback, and error | JSONL run log + Flight Recorder |
+| Report | Aggregate artifact links, send delivery summary | Artifact-aware summary |
 
 ## Architecture
 
 ```mermaid
 flowchart TB
-    subgraph "Feishu"
-        IM["Group chat"]
+    subgraph "Feishu Native Surfaces"
+        IM["Group Chat"]
         Card["Cards"]
         Doc["Docs"]
         Base["Base"]
         Task["Tasks"]
     end
 
-    subgraph "PilotFlow"
-        Planner["Planner"]
-        Confirm["Confirmation"]
-        Router["Tool Router"]
-        Recorder["Run Trace"]
+    subgraph "PilotFlow Core"
+        Planner["Agent Planner"]
+        Confirm["Confirmation Gate"]
+        Router["Feishu Tool Router"]
+        Recorder["Flight Recorder"]
     end
 
     IM --> Planner
@@ -106,27 +116,27 @@ Detailed architecture: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## Feishu-Native Capabilities
 
-All real Feishu APIs, no mock data:
+All validated with real Feishu APIs, not mock data:
 
-| Capability | What it does |
+| Capability | Product role |
 | --- | --- |
-| Group messages | Project initiation and summary delivery |
-| Interactive cards | Plan display, confirmation, risk decisions |
-| Feishu Docs | Auto-generated project brief |
-| Base | Structured state: owner, deadline, risk, status |
-| Tasks | Action items with optional assignee |
-| Pinned entry | Stable project navigation in the group |
+| Group messages | Project initiation and delivery-summary channel |
+| Interactive cards | Execution-plan display, confirmation, risk decisions |
+| Feishu Docs | Auto-generated project brief and delivery documents |
+| Base | Structured project state: owner, deadline, risk level, status, links |
+| Tasks | Action items with optional assignee mapping |
+| Pinned entry | Stable project navigation in the group chat |
 
 ## Roadmap
 
 | Phase | Goal | Status |
 | --- | --- | --- |
 | Phase 0 | CLI, Feishu API validation, local skeleton | Done |
-| Phase 1 | Doc, Base, Task, IM, run log loop | Done |
-| Phase 2 | Plan cards, risk cards, pinned entry, owner mapping | Done |
-| Phase 3 | Demo hardening, recording, submission | In progress |
-| Phase 4 | Mobile confirmation, memory, worker preview | Planned |
-| Phase 5 | Event subscription, multi-project, self-evolution | Planned |
+| Phase 1 | Doc, Base, Task, IM, run log complete loop | Done |
+| Phase 2 | Plan cards, risk cards, pinned entry, owner mapping, duplicate guard | Done |
+| Phase 3 | Demo hardening, recording, submission materials | In progress |
+| Phase 4 | Mobile confirmation, project memory, worker preview | Planned |
+| Phase 5 | Event subscription, multi-project spaces, self-evolution | Planned |
 
 Full roadmap: [docs/ROADMAP.md](docs/ROADMAP.md).
 
@@ -136,34 +146,36 @@ Full roadmap: [docs/ROADMAP.md](docs/ROADMAP.md).
 | --- | --- |
 | [Docs Index](docs/README.md) | Complete documentation map |
 | [Project Brief](docs/PROJECT_BRIEF.md) | Product and competition brief |
-| [Product Spec](docs/PRODUCT_SPEC.md) | User promise, feature tiers |
+| [Product Spec](docs/PRODUCT_SPEC.md) | User promise, feature tiers, non-goals |
 | [Architecture](docs/ARCHITECTURE.md) | Components, state model, tool routing |
-| [Project Structure](docs/PROJECT_STRUCTURE.md) | Runtime layers, command surface |
-| [Operator Runbook](docs/OPERATOR_RUNBOOK.md) | Local operation, live run, evidence |
+| [Agent Evolution](docs/AGENT_EVOLUTION.md) | Self-evolution, evaluation, and worker orchestration |
+| [Project Structure](docs/PROJECT_STRUCTURE.md) | Runtime layers, command surface, and placement rules |
+| [Operator Runbook](docs/OPERATOR_RUNBOOK.md) | Local operation, live run, evidence regeneration |
 | [Development Guide](docs/DEVELOPMENT.md) | Contributor workflow, module boundaries |
-| [Visual Design](docs/VISUAL_DESIGN.md) | Feishu-native cards, UX rules |
+| [Visual Design](docs/VISUAL_DESIGN.md) | Feishu-native cards, cockpit, UX rules |
 | [Roadmap](docs/ROADMAP.md) | Long-term plan and next actions |
 | [Demo Kit](docs/demo/README.md) | Demo playbook, capture guide, failure paths |
-| [Reality Check](docs/PRODUCT_REALITY_CHECK.md) | Capability assessment and claim boundaries |
+| [Reality Check](docs/PRODUCT_REALITY_CHECK.md) | Honest capability assessment and claim boundaries |
 
 ## Quick Start
 
 ```bash
+# Install and validate
 npm install
 npm run pilot:check
 
-# Dry-run the product loop
+# Run the product loop (dry-run mode)
 npm run pilot:run -- --dry-run
 
-# With custom input
+# Run with custom input
 npm run pilot:run -- --dry-run --input "目标: 建立答辩项目空间 成员: 产品, 技术 交付物: Brief, Task 截止时间: 2026-05-03"
 ```
 
 <details>
-<summary>All commands</summary>
+<summary>Full command reference</summary>
 
 ```bash
-# Environment
+# Environment validation
 npm run pilot:check
 npm run pilot:doctor
 npm test
@@ -171,6 +183,7 @@ npm test
 # Product loop
 npm run pilot:run -- --dry-run
 npm run pilot:gateway -- --dry-run --max-events 1
+npm run pilot:agent-smoke
 
 # Demo and evidence
 npm run pilot:recorder -- --input tmp/runs/latest-manual-run.jsonl --output tmp/flight-recorder/latest.html
@@ -179,22 +192,35 @@ npm run pilot:status
 npm run pilot:audit
 ```
 
-Operational setup: [docs/OPERATOR_RUNBOOK.md](docs/OPERATOR_RUNBOOK.md).
+Operational setup: [docs/OPERATOR_RUNBOOK.md](docs/OPERATOR_RUNBOOK.md). Contributor workflow: [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
 
 </details>
 
-## Safety
+## Safety Principles
 
-- Confirmation required before any Feishu write.
-- Failures are logged, never hidden.
-- Every write path has idempotency or duplicate detection.
-- Secrets stay out of the repo.
+- Human confirmation is required before publishing project artifacts.
+- Tool failures are recorded and surfaced; the Agent never pretends a failed write succeeded.
+- Every write path is designed for idempotency or duplicate detection.
+- Secrets never belong in the repository, public docs, screenshots, or chat logs.
 
 ## Star History
 
 [![Star History Chart](https://api.star-history.com/svg?repos=DeliciousBuding/pilot-flow&type=Date)](https://star-history.com/#DeliciousBuding/pilot-flow&Date)
 
+## Contributing
+
+Changes should keep the main loop stable:
+
+```text
+Group chat -> Execution plan -> Confirmation -> Feishu tools -> State -> Risk decision -> Delivery summary
+```
+
+1. Run the relevant validation.
+2. Update the affected docs.
+3. Keep local secrets out of the repo.
+
 ## Acknowledgments
 
 - Feishu / Lark Open Platform and `lark-cli`.
-- Feishu AI Campus Challenge.
+- Feishu AI Campus Challenge materials and challenge brief.
+- Agent engineering tools that influenced the worker-artifact roadmap.
