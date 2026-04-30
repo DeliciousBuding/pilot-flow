@@ -18,7 +18,7 @@ The areas still in progress include: the automatic IM-to-agent loop, real card b
 | Feishu API proof | Real but partial | IM, Card send, Doc, Base, Task, pinned entry, risk card, and final summary have been validated through live paths. |
 | End-user flow | Operator-driven prototype | A local operator command can run the loop; normal user flow through a production bot is in progress. |
 | `pilot:run` TS path | Single live run validated | Product facade and safer defaults exist; 2026-05-01 live run created Doc/Base/Task/cards/pinned entry/summary/trace. Repeated parity and callback checks are still needed. |
-| `pilot:gateway` TS path | Local bridge implemented | It can consume message/card events and resume stored confirmation runs locally through card callbacks or a same-chat `确认执行`. Live probes now return structured `timeout` or `subscribe_failed`, but real tenant validation is still pending. |
+| `pilot:gateway` TS path | Local bridge implemented | It can consume message/card events and resume stored confirmation runs locally through card callbacks or a same-chat `确认执行`. On 2026-05-01 a gateway probe message was sent, but no IM event reached the listener within 30 seconds. |
 | Card callback | Not complete | Payload, parser, listener, trigger bridge, and self-sent probe card exist. On 2026-05-01 the probe card was sent, but no `card.action.trigger` reached the listener within 30 seconds. |
 | Group announcement | Fallback only | Native announcement was attempted, but the current group returns a docx announcement API block; pinned entry is the reliable route. |
 | LLM planning | Scaffolding | OpenAI-compatible client and Agent loop exist, but real planning success is not a product claim yet. |
@@ -39,7 +39,7 @@ The areas still in progress include: the automatic IM-to-agent loop, real card b
 
 ## What Is Not Done
 
-- No reliable production-style Feishu group bot loop yet.
+- No reliable production-style Feishu group bot loop yet; the self-sent IM probe currently times out without an event.
 - No proven real card button callback execution path yet.
 - No repeated team pilot with real users yet.
 - No persistent project memory or context compression yet.

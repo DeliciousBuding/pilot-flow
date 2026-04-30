@@ -69,7 +69,9 @@ Exit condition: a confirmed local command can create real Feishu artifacts and p
 - [x] Native group announcement attempt with pinned-entry fallback.
 - [x] Local TS IM mention gateway bridge with pending-run continuation for approved card callbacks and same-chat text confirmation.
 - [x] Add bounded gateway probes with structured `timeout` and `subscribe_failed` results.
+- [x] Add `--send-probe-message` to start the gateway listener and send a repeatable IM smoke request.
 - [ ] Verify a real Feishu card button click reaches the listener and triggers the orchestrator; the 2026-05-01 probe card send succeeded, but no callback arrived within 30 seconds.
+- [ ] Verify `im.message.receive_v1` delivery; the 2026-05-01 gateway probe message send succeeded, but no IM event arrived within 30 seconds.
 - [ ] Capture a polished 6 to 8 minute happy-path walkthrough.
 - [ ] Capture a focused failure-path walkthrough or screenshot set.
 - [ ] Capture Open Platform permission and callback configuration screenshots.
@@ -139,7 +141,7 @@ Exit condition: PilotFlow feels useful beyond the first project-launch flow whil
 
 1. Repeat `npm run pilot:run -- --live --confirm "确认执行"` with fresh dedupe keys, then compare the live artifacts with the older JS live proof.
 2. Inspect Open Platform callback/event settings for the `card.action.trigger` gap, then rerun `npm run pilot:callback-proof -- --send-probe-card --timeout 60s`.
-3. Validate the new `pilot:gateway -- --live --timeout 60s --json` path against the real tenant, then convert it into an allowlisted IM mention trigger after callback proof is understood.
+3. Validate `pilot:gateway -- --live --send-probe-message --timeout 60s --max-events 1 --json` after event subscription settings are checked.
 4. Promote Retrospective Eval cases into snapshot-backed fixtures from real successful and degraded runs.
 5. Capture happy-path and failure-path media outside Git, then rerun `pilot:status` until the package is no longer `needs_regeneration`.
 6. Only after the main Feishu loop is stable, design the first artifact approval card for worker previews.

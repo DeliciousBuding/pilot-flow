@@ -1,5 +1,6 @@
 import { pathToFileURL } from "node:url";
 import { JsonlRecorder } from "../../infrastructure/jsonl-recorder.js";
+import { runCommand, type CommandResult } from "../../infrastructure/command-runner.js";
 import { SessionManager } from "../../agent/session-manager.js";
 import { ChatQueue } from "../../gateway/feishu/chat-queue.js";
 import { EventDedupe } from "../../gateway/feishu/dedupe.js";
@@ -11,6 +12,7 @@ import { handleMessageEvent } from "../../gateway/feishu/message-handler.js";
 import { stripSelfMention } from "../../gateway/feishu/mention-gate.js";
 import { PendingRunStore, toPendingRunOptions, type PendingRunRecord, type PendingRunOptions } from "../../gateway/feishu/pending-run-store.js";
 import { createProjectInitPlannerProvider } from "../../domain/plan.js";
+import { loadCliEnv } from "../../config/local-env.js";
 import { loadRuntimeConfig } from "../../config/runtime-config.js";
 import { DuplicateGuard } from "../../orchestrator/duplicate-guard.js";
 import { Orchestrator, type RunOptions, type RunResult } from "../../orchestrator/orchestrator.js";
@@ -18,6 +20,7 @@ import { PRIMARY_CONFIRMATION_TEXT, isAcceptedConfirmationText } from "../../orc
 import { TextConfirmationGate } from "../../orchestrator/confirmation-gate.js";
 import { parseArgs } from "../../shared/parse-args.js";
 import { registerFeishuTools } from "../../tools/feishu/index.js";
+import { buildToolIdempotencyKey } from "../../tools/idempotency.js";
 import { ToolRegistry } from "../../tools/registry.js";
 import type { Recorder } from "../../types/recorder.js";
 import type { Session } from "../../types/session.js";
@@ -30,10 +33,19 @@ const DEFAULT_EVENT_TYPES = ["im.message.receive_v1", "card.action.trigger"] as 
 export interface AgentGatewayOptions {
   readonly argv?: readonly string[];
   readonly env?: NodeJS.ProcessEnv;
+  readonly cwd?: string;
   readonly source?: EventSource<FeishuGatewayEvent>;
   readonly registry?: ToolRegistry;
   readonly recorder?: Recorder;
+  readonly runCommand?: typeof runCommand;
   readonly now?: () => number;
+}
+
+export interface AgentGatewayProbeResult {
+  readonly status: "not_sent" | "sent" | "dry_run" | "failed";
+  readonly runId?: string;
+  readonly messageId?: string;
+  readonly error?: string;
 }
 
 export interface AgentGatewayResult {
@@ -44,6 +56,7 @@ export interface AgentGatewayResult {
   readonly unsupportedEvents: number;
   readonly pendingRuns: number;
   readonly output?: string;
+  readonly probe: AgentGatewayProbeResult;
   readonly failure?: {
     readonly message: string;
     readonly exitCode?: number | null;
@@ -53,7 +66,7 @@ export interface AgentGatewayResult {
 
 export async function runAgentGateway(options: AgentGatewayOptions = {}): Promise<AgentGatewayResult> {
   const argv = options.argv ?? [];
-  const env = deterministicGatewayEnv(options.env ?? process.env);
+  const env = deterministicGatewayEnv(loadCliEnv(options.env ?? process.env, options.cwd));
   const parsed = parseArgs(argv, {
     boolean: [
       "json",
@@ -69,6 +82,7 @@ export async function runAgentGateway(options: AgentGatewayOptions = {}): Promis
       "auto-lookup-owner-contact",
       "auto-confirm",
       "no-auto-confirm",
+      "send-probe-message",
     ],
     string: [
       "output",
@@ -86,6 +100,9 @@ export async function runAgentGateway(options: AgentGatewayOptions = {}): Promis
       "bot-name",
       "max-events",
       "timeout",
+      "probe-text",
+      "probe-run-id",
+      "probe-chat-id",
       "mode",
     ],
   });
@@ -115,6 +132,7 @@ export async function runAgentGateway(options: AgentGatewayOptions = {}): Promis
   const source = options.source ?? new LarkCliEventSource({ profile: runtime.profile, as: "bot", eventTypes: DEFAULT_EVENT_TYPES });
   const maxEvents = numberFlag(parsed.flags["max-events"]) ?? 0;
   const timeoutMs = durationMs(stringFlag(parsed.flags.timeout));
+  const command = options.runCommand ?? runCommand;
 
   let processedMessages = 0;
   let processedCards = 0;
@@ -123,11 +141,25 @@ export async function runAgentGateway(options: AgentGatewayOptions = {}): Promis
   let seenEvents = 0;
   let timedOut = false;
   let failure: AgentGatewayResult["failure"] | undefined;
+  let probe: AgentGatewayProbeResult = { status: "not_sent" };
 
   try {
     const iterator = source.events()[Symbol.asyncIterator]();
+    let nextEvent = nextWithTimeout(iterator, timeoutMs);
+    if (parsed.flags["send-probe-message"] === true) {
+      probe = await sendProbeMessage({
+        chatId: stringFlag(parsed.flags["probe-chat-id"]) ?? runtime.feishuTargets.chatId,
+        profile: runtime.profile,
+        dryRun: runtime.mode === "dry-run",
+        text: stringFlag(parsed.flags["probe-text"]) ?? buildProbeMessageText(bot, stringFlag(parsed.flags["probe-run-id"])),
+        runId: stringFlag(parsed.flags["probe-run-id"]) ?? buildProbeRunId(options.now),
+        command,
+        recorder,
+      });
+    }
+
     while (true) {
-      const next = await nextWithTimeout(iterator, timeoutMs);
+      const next = await nextEvent;
       if (isTimeoutResult(next)) {
         timedOut = true;
         await recorder.record({
@@ -143,6 +175,7 @@ export async function runAgentGateway(options: AgentGatewayOptions = {}): Promis
       }
       if (next.done) break;
       const event = next.value;
+      nextEvent = nextWithTimeout(iterator, timeoutMs);
       seenEvents += 1;
       await recorder.record({
         type: "gateway.event_received",
@@ -241,6 +274,7 @@ export async function runAgentGateway(options: AgentGatewayOptions = {}): Promis
     unsupportedEvents,
     pendingRuns: await store.count(),
     output: options.recorder ? undefined : output,
+    probe,
     failure,
   };
 }
@@ -305,6 +339,10 @@ export function renderAgentGateway(result: AgentGatewayResult): string {
     `ignored_events: ${result.ignoredEvents}`,
     `unsupported_events: ${result.unsupportedEvents}`,
     `pending_runs: ${result.pendingRuns}`,
+    `probe_status: ${result.probe.status}`,
+    result.probe.runId ? `probe_run_id: ${result.probe.runId}` : undefined,
+    result.probe.messageId ? `probe_message_id: ${result.probe.messageId}` : undefined,
+    result.probe.error ? `probe_error: ${result.probe.error}` : undefined,
     result.failure ? `failure: ${result.failure.message}` : undefined,
     result.output ? `output: ${result.output}` : undefined,
   ].filter((line): line is string => typeof line === "string").join("\n");
@@ -323,6 +361,10 @@ Options:
   --timeout <duration>              Stop after duration, for example 60s or 2m.
   --output <path>                   JSONL gateway run log path.
   --pending-store <path>            Local store for waiting confirmation runs.
+  --send-probe-message              Send a real IM probe message after the listener starts.
+  --probe-text <text>               Probe message body; defaults to a safe smoke request.
+  --probe-run-id <id>               Stable id used in the probe message and idempotency key.
+  --probe-chat-id <chat>            Probe chat; defaults to --chat-id or PILOTFLOW_TEST_CHAT_ID.
   --send-plan-card                  Send or dry-run an execution-plan card.
   --send-entry-message              Send or dry-run the project entry message after approval.
   --pin-entry-message               Pin or dry-run the project entry message after approval.
@@ -338,6 +380,75 @@ Options:
 `;
 }
 
+async function sendProbeMessage(options: {
+  readonly chatId?: string;
+  readonly profile?: string;
+  readonly dryRun: boolean;
+  readonly text: string;
+  readonly runId: string;
+  readonly command: typeof runCommand;
+  readonly recorder: Recorder;
+}): Promise<AgentGatewayProbeResult> {
+  if (!options.chatId) {
+    const error = "--send-probe-message requires --probe-chat-id, --chat-id, or PILOTFLOW_TEST_CHAT_ID";
+    await options.recorder.record({ type: "gateway.probe_message_failed", runId: options.runId, error } as never);
+    return { status: "failed", runId: options.runId, error };
+  }
+
+  try {
+    const result = await options.command("lark-cli", [
+      "im", "+messages-send",
+      "--as", "user",
+      "--chat-id", options.chatId,
+      "--msg-type", "text",
+      "--content", JSON.stringify({ text: options.text }),
+      "--idempotency-key", buildToolIdempotencyKey({ runId: options.runId, tool: "gateway.probe", sequence: 1 }),
+    ], { dryRun: options.dryRun, profile: options.profile, timeoutMs: 30_000 });
+    const messageId = extractMessageId(result);
+    await options.recorder.record({
+      type: "gateway.probe_message_sent",
+      runId: options.runId,
+      dry_run: options.dryRun,
+      message_id: messageId,
+    } as never);
+    return {
+      status: options.dryRun ? "dry_run" : "sent",
+      runId: options.runId,
+      messageId,
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    await options.recorder.record({ type: "gateway.probe_message_failed", runId: options.runId, error: message } as never);
+    return { status: "failed", runId: options.runId, error: message };
+  }
+}
+
+function buildProbeMessageText(bot: BotIdentity, runId?: string): string {
+  const currentRunId = runId ?? buildProbeRunId();
+  const mention = isPlaceholderBotUserId(bot.userId) ? `@${bot.name}` : `<at user_id="${bot.userId}">${bot.name}</at>`;
+  return `${mention} 目标: PilotFlow gateway IM probe ${currentRunId} 成员: 产品, 技术 交付物: 网关探针 截止时间: 2026-05-01 风险: 仅验证事件触发`;
+}
+
+function buildProbeRunId(now?: () => number): string {
+  return `gateway-probe-${new Date(now ? now() : Date.now()).toISOString().replace(/[^0-9A-Za-z]/g, "").slice(0, 20)}`;
+}
+
+function isPlaceholderBotUserId(userId: string): boolean {
+  return userId === "u_pilotflow_bot" || userId.length === 0;
+}
+
+function extractMessageId(result: CommandResult): string | undefined {
+  return getString(result.json ?? {}, ["data", "message", "message_id"]) ||
+    getString(result.json ?? {}, ["data", "message_id"]) ||
+    getString(result.json ?? {}, ["message_id"]) ||
+    undefined;
+}
+
+function getString(value: Record<string, unknown>, path: readonly string[]): string {
+  const found = path.reduce<unknown>((current, key) => current && typeof current === "object" && !Array.isArray(current) ? (current as Record<string, unknown>)[key] : undefined, value);
+  return typeof found === "string" ? found : "";
+}
+
 async function main(argv = process.argv.slice(2)): Promise<void> {
   const parsed = parseArgs(argv, { boolean: ["json", "help", "h"] });
   if (parsed.flags.help === true || parsed.flags.h === true) {
@@ -345,7 +456,7 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
     return;
   }
 
-  const result = await runAgentGateway({ argv });
+  const result = await runAgentGateway({ argv, cwd: process.cwd() });
   if (parsed.flags.json === true) {
     console.log(JSON.stringify(result, null, 2));
   } else {

@@ -187,7 +187,7 @@ npm test
 
 # 产品闭环
 npm run pilot:run -- --dry-run
-npm run pilot:gateway -- --dry-run --max-events 1
+npm run pilot:gateway -- --dry-run --timeout 30s --max-events 1
 npm run pilot:agent-smoke
 
 # 演示与证据

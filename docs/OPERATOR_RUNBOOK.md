@@ -150,6 +150,7 @@ The TypeScript gateway can subscribe to `im.message.receive_v1` and `card.action
 ```bash
 npm run pilot:gateway -- --dry-run --timeout 30s --max-events 1
 npm run pilot:gateway -- --live --timeout 60s --chat-id <chat> --base-token <base> --base-table-id <table>
+npm run pilot:gateway -- --live --send-probe-message --timeout 60s --max-events 1
 ```
 
 Current boundary:
@@ -159,6 +160,7 @@ Current boundary:
 - An approved `card.action.trigger` can resume the stored run through the same TS orchestrator path.
 - A plain-text `确认执行` sent later in the same chat can also resume the latest pending run for that chat.
 - `--timeout` exits cleanly with `status: timeout` when no event arrives, so live probes do not hang forever.
+- `--send-probe-message` starts the listener first, then sends a one-line IM smoke request to the test chat. It loads `PILOTFLOW_TEST_CHAT_ID`, `PILOTFLOW_BOT_USER_ID`, and `PILOTFLOW_BOT_NAME` from local `.env`.
 - Subscription failures return `status: subscribe_failed` and write sanitized stderr to the gateway JSONL log.
 - Real tenant validation is still required before this path replaces the older JS live proof.
 
@@ -272,6 +274,7 @@ The TypeScript rebuild is active. Day 0 through Day 7 are complete: strict TS fo
 | Edge | Current behavior |
 | --- | --- |
 | Card callback delivery | Code-level listener and trigger bridge exist; on 2026-05-01 a probe card was sent successfully, but the listener did not receive `card.action.trigger` within 30 seconds |
+| IM event delivery | On 2026-05-01 a gateway probe message was sent successfully, but the listener did not receive `im.message.receive_v1` within 30 seconds |
 | Group announcement | Native announcement update was attempted; the current test group returns `232097 Unable to operate docx type chat announcement` |
 | Manual media | Submission/readiness review separate machine evidence from videos, screenshots, and callback configuration proof |
 
@@ -302,6 +305,7 @@ Run the update from the workspace root because `--content @PERSONAL_PROGRESS.md`
 | Duplicate live run blocked | Use a new `PILOTFLOW_DEDUPE_KEY` or intentionally pass `--allow-duplicate-run` |
 | Card sends but button does not trigger | Regenerate Callback Verification Pack and inspect Open Platform callback configuration |
 | Gateway live probe appears stuck | Re-run with `--timeout 60s --json`; `timeout` means no event arrived, while `subscribe_failed` points to subscription, permission, or profile setup |
+| Gateway probe message sends but no event arrives | Check Open Platform event subscription for `im.message.receive_v1`, bot availability, app publication state, and long-connection/event settings |
 | Callback proof returns `subscribe_failed` | Inspect the sanitized stderr in `tmp/proof/callback-proof.jsonl`, then check event subscription permissions and profile auth |
 | Announcement update fails | Keep pinned entry fallback; do not claim native announcement success for this group |
 | Contact lookup cannot assign owner | Use explicit `PILOTFLOW_OWNER_OPEN_ID_MAP_JSON` or keep text owner fallback |

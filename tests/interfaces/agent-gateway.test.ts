@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mkdir, rm } from "node:fs/promises";
+import { mkdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { FeishuGatewayEvent } from "../../src/gateway/feishu/event-source.js";
 import { LarkCliSubscribeError } from "../../src/gateway/feishu/lark-cli-source.js";
 import { PendingRunStore } from "../../src/gateway/feishu/pending-run-store.js";
 import { runAgentGateway } from "../../src/interfaces/cli/agent-gateway.js";
+import type { CommandResult } from "../../src/infrastructure/command-runner.js";
 import type { ToolDefinition } from "../../src/types/tool.js";
 import { ToolRegistry } from "../../src/tools/registry.js";
 import { MemoryRecorder } from "../helpers/memory-recorder.js";
@@ -22,6 +23,7 @@ test("runAgentGateway completes a dry-run mention path", async () => {
       source: eventSource([
         messageEvent("@PilotFlow 帮我建立项目空间", "om_1", "oc_1"),
       ]),
+      env: {},
       registry,
       recorder,
     });
@@ -55,6 +57,7 @@ test("runAgentGateway stores waiting live runs and resumes them from card callba
         "--send-plan-card",
       ],
       source: eventSource([messageEvent("@PilotFlow 建一个项目", "om_live_1", "oc_live")]),
+      env: {},
       registry: firstRegistry,
       recorder: firstRecorder,
     });
@@ -81,6 +84,7 @@ test("runAgentGateway stores waiting live runs and resumes them from card callba
         "--storage-path", join(dir, "guard-live-2"),
       ],
       source: eventSource([cardEvent(runId)]),
+      env: {},
       registry: secondRegistry,
       recorder: secondRecorder,
     });
@@ -114,6 +118,7 @@ test("runAgentGateway resumes pending live runs from plain text confirmation in 
         "--send-plan-card",
       ],
       source: eventSource([messageEvent("@PilotFlow 建一个项目", "om_live_2", "oc_live")]),
+      env: {},
       registry: firstRegistry,
       recorder: firstRecorder,
     });
@@ -134,6 +139,7 @@ test("runAgentGateway resumes pending live runs from plain text confirmation in 
         "--storage-path", join(dir, "guard-live-2"),
       ],
       source: eventSource([plainMessageEvent("确认执行", "om_live_3", "oc_live")]),
+      env: {},
       registry: secondRegistry,
       recorder: secondRecorder,
     });
@@ -165,6 +171,7 @@ test("runAgentGateway ignores confirmation text without a pending run", async ()
         "--storage-path", join(dir, "guard-live"),
       ],
       source: eventSource([plainMessageEvent("确认执行", "om_live_4", "oc_live")]),
+      env: {},
       registry,
       recorder,
     });
@@ -194,6 +201,7 @@ test("runAgentGateway returns timeout when no gateway event arrives before the d
         "--output", join(dir, "gateway.jsonl"),
       ],
       source: hangingEventSource(),
+      env: {},
       registry,
       recorder,
     });
@@ -202,6 +210,80 @@ test("runAgentGateway returns timeout when no gateway event arrives before the d
     assert.equal(result.processedMessages, 0);
     assert.equal(result.pendingRuns, 0);
     assert.equal(recorder.ofType("gateway.timeout").length, 1);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("runAgentGateway can send an IM probe message after starting the listener", async () => {
+  const dir = join(process.cwd(), "tmp", "tests", `pilotflow-agent-gateway-probe-${Date.now()}`);
+  await mkdir(dir, { recursive: true });
+  const calls: string[][] = [];
+
+  try {
+    const recorder = new MemoryRecorder();
+    const registry = createGatewayRegistry();
+    const result = await runAgentGateway({
+      argv: [
+        "--dry-run",
+        "--send-probe-message",
+        "--probe-run-id", "gateway-probe-test",
+        "--chat-id", "oc_probe",
+        "--bot-user-id", "u_real_bot",
+        "--pending-store", join(dir, "pending.json"),
+      ],
+      source: eventSource([]),
+      env: {},
+      registry,
+      recorder,
+      runCommand: async (bin, args, options = {}) => {
+        calls.push([bin, ...args, `dryRun=${String(options.dryRun)}`]);
+        return okResult([bin, ...args]);
+      },
+    });
+
+    assert.equal(result.probe.status, "dry_run");
+    assert.equal(result.probe.messageId, "om_probe");
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0]?.includes("--as"), true);
+    assert.equal(calls[0]?.includes("user"), true);
+    assert.equal(calls[0]?.some((arg) => arg.includes("<at user_id=\\\"u_real_bot\\\">PilotFlow</at>")), true);
+    assert.equal(recorder.ofType("gateway.probe_message_sent").length, 1);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("runAgentGateway loads probe chat id from local env when cwd is provided", async () => {
+  const dir = join(process.cwd(), "tmp", "tests", `pilotflow-agent-gateway-env-${Date.now()}`);
+  await mkdir(dir, { recursive: true });
+  const calls: string[][] = [];
+
+  try {
+    await writeFile(join(dir, ".env"), "PILOTFLOW_TEST_CHAT_ID=oc_from_env\nPILOTFLOW_LARK_PROFILE=pilotflow-test\n", "utf8");
+    const recorder = new MemoryRecorder();
+    const registry = createGatewayRegistry();
+    const result = await runAgentGateway({
+      argv: [
+        "--dry-run",
+        "--send-probe-message",
+        "--probe-run-id", "gateway-probe-env",
+        "--pending-store", join(dir, "pending.json"),
+      ],
+      cwd: dir,
+      env: {},
+      source: eventSource([]),
+      registry,
+      recorder,
+      runCommand: async (bin, args, options = {}) => {
+        calls.push([bin, ...args, `profile=${options.profile ?? ""}`]);
+        return okResult([bin, ...args]);
+      },
+    });
+
+    assert.equal(result.probe.status, "dry_run");
+    assert.equal(calls[0]?.includes("oc_from_env"), true);
+    assert.equal(calls[0]?.includes("profile=pilotflow-test"), true);
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
@@ -223,6 +305,7 @@ test("runAgentGateway surfaces subscribe failures without leaking stderr secrets
         "--base-table-id", "tbl_live",
       ],
       source: failingEventSource(),
+      env: {},
       registry,
       recorder,
     });
@@ -251,6 +334,18 @@ function createGatewayRegistry(): ToolRegistry {
     })));
   }
   return registry;
+}
+
+function okResult(command: readonly string[]): CommandResult {
+  return {
+    ok: true,
+    exitCode: 0,
+    exit_code: 0,
+    stdout: JSON.stringify({ data: { message: { message_id: "om_probe" } } }),
+    stderr: "",
+    command,
+    json: { data: { message: { message_id: "om_probe" } } },
+  };
 }
 
 function fakeTool(name: string, handler: ToolDefinition["handler"]): ToolDefinition {
