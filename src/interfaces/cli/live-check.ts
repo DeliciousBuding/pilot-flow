@@ -21,6 +21,8 @@ export interface LiveCheckItem {
 }
 
 export interface LiveCheckAction {
+  readonly severity: "warn" | "fail";
+  readonly owner: "local_operator" | "open_platform_admin";
   readonly reason: string;
   readonly action: string;
 }
@@ -262,6 +264,8 @@ function buildNextActions(checks: readonly LiveCheckItem[], profile: string): re
 
   if (imScope?.status === "warn") {
     actions.push({
+      severity: "warn",
+      owner: "open_platform_admin",
       reason: "IM event delivery is blocked before runtime code can receive group mentions.",
       action: `Open Feishu Open Platform for this app, enable im:message.p2p_msg:readonly, publish or make the permission effective, then run: lark-cli auth login --profile ${profile} --scope "im:message.p2p_msg:readonly"`,
     });
@@ -269,6 +273,8 @@ function buildNextActions(checks: readonly LiveCheckItem[], profile: string): re
 
   if (subscribe?.status === "fail") {
     actions.push({
+      severity: "fail",
+      owner: "local_operator",
       reason: "The local event subscription command cannot be constructed.",
       action: "Run lark-cli event +subscribe --as bot --event-types im.message.receive_v1 --dry-run and fix the CLI/profile error before sending probes.",
     });
@@ -276,6 +282,8 @@ function buildNextActions(checks: readonly LiveCheckItem[], profile: string): re
 
   if (cardSubscribe?.status === "fail") {
     actions.push({
+      severity: "fail",
+      owner: "local_operator",
       reason: "The local card callback subscription command cannot be constructed.",
       action: "Run lark-cli event +subscribe --as bot --event-types card.action.trigger --dry-run and fix the CLI/profile or Open Platform event subscription error before running pilot:callback-proof.",
     });
@@ -283,6 +291,8 @@ function buildNextActions(checks: readonly LiveCheckItem[], profile: string): re
 
   if (probeCard?.status === "fail") {
     actions.push({
+      severity: "fail",
+      owner: "local_operator",
       reason: "The callback probe card command cannot be constructed.",
       action: "Run npm run pilot:callback-proof -- --send-probe-card --dry-run --json and fix the profile, chat id, message permission, or lark-cli interactive card send error before a real callback probe.",
     });
@@ -290,6 +300,8 @@ function buildNextActions(checks: readonly LiveCheckItem[], profile: string): re
 
   if (bus?.status === "warn") {
     actions.push({
+      severity: "warn",
+      owner: "local_operator",
       reason: "Another event subscriber may consume or compete with gateway probes.",
       action: "Stop the existing event bus or intentionally run a single subscriber before testing pilot:gateway.",
     });
@@ -297,6 +309,8 @@ function buildNextActions(checks: readonly LiveCheckItem[], profile: string): re
 
   if (bot?.status === "warn") {
     actions.push({
+      severity: "warn",
+      owner: "local_operator",
       reason: "Default gateway probes need a structured bot mention.",
       action: "Set PILOTFLOW_BOT_USER_ID locally or pass --bot-user-id before running pilot:gateway -- --live --send-probe-message.",
     });
@@ -307,11 +321,19 @@ function buildNextActions(checks: readonly LiveCheckItem[], profile: string): re
 
 function renderNextActions(actions: readonly LiveCheckAction[]): readonly string[] {
   if (actions.length === 0) return [];
-  return [
-    "Next actions:",
-    ...actions.map((item, index) => `${index + 1}. ${redactDetail(item.action)} (${item.reason})`),
-    "",
+  const groups: Array<[LiveCheckAction["owner"], string]> = [
+    ["open_platform_admin", "Open Platform admin"],
+    ["local_operator", "Local operator"],
   ];
+  const lines = ["Next actions:"];
+  for (const [owner, label] of groups) {
+    const owned = actions.filter((item) => item.owner === owner);
+    if (owned.length === 0) continue;
+    lines.push(`${label}:`);
+    lines.push(...owned.map((item, index) => `${index + 1}. [${item.severity}] ${redactDetail(item.action)} (${item.reason})`));
+  }
+  lines.push("");
+  return lines;
 }
 
 function redactReport(report: LiveCheckReport): LiveCheckReport {
@@ -319,6 +341,8 @@ function redactReport(report: LiveCheckReport): LiveCheckReport {
     ...report,
     checks: report.checks.map((item) => ({ ...item, detail: redactDetail(item.detail) })),
     nextActions: report.nextActions.map((item) => ({
+      severity: item.severity,
+      owner: item.owner,
       reason: redactDetail(item.reason),
       action: redactDetail(item.action),
     })),

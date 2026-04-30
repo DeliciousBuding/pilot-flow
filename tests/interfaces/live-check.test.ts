@@ -84,8 +84,11 @@ test("buildLiveCheckReport warns when the IM event receive scope is missing", as
   assert.equal(scopeCheck?.status, "warn");
   assert.match(scopeCheck?.detail ?? "", /im:message\.p2p_msg:readonly/u);
   assert.equal(report.nextActions.length, 2);
+  assert.equal(report.nextActions[0]?.owner, "open_platform_admin");
+  assert.equal(report.nextActions[0]?.severity, "warn");
   assert.match(report.nextActions[0]?.action ?? "", /lark-cli auth login --profile pilotflow-contest --scope "im:message\.p2p_msg:readonly"/u);
   assert.match(renderLiveCheckReport(report), /Next actions:/u);
+  assert.match(renderLiveCheckReport(report), /Open Platform admin:/u);
 });
 
 test("buildLiveCheckReport fails when the IM event subscribe command cannot be constructed", async () => {
@@ -103,6 +106,7 @@ test("buildLiveCheckReport fails when the IM event subscribe command cannot be c
   assert.equal(subscribeCheck?.status, "fail");
   assert.match(subscribeCheck?.detail ?? "", /subscribe dry-run failed/u);
   assert.equal(report.nextActions.some((item) => /event subscription command/u.test(item.reason)), true);
+  assert.equal(report.nextActions.some((item) => item.owner === "local_operator" && item.severity === "fail"), true);
 });
 
 test("buildLiveCheckReport fails when the card callback subscribe command cannot be constructed", async () => {
@@ -158,6 +162,7 @@ test("buildLiveCheckReport warns when the event bus is already running", async (
   assert.equal(busCheck?.status, "warn");
   assert.match(busCheck?.detail ?? "", /avoid multiple event subscribers/u);
   assert.equal(report.nextActions.some((item) => /single subscriber/u.test(item.action)), true);
+  assert.match(renderLiveCheckReport(report), /Local operator:/u);
 });
 
 test("buildLiveCheckReport ignores partial LLM env because it only checks Feishu live targets", async () => {
