@@ -29,6 +29,7 @@ test("buildLiveCheckReport checks live targets with redacted details", async () 
   assert.equal(checkStatus(report.checks, "IM event receive scope"), "pass");
   assert.equal(checkStatus(report.checks, "IM event subscribe dry-run"), "pass");
   assert.equal(checkStatus(report.checks, "card callback subscribe dry-run"), "pass");
+  assert.equal(checkStatus(report.checks, "callback probe card dry-run"), "pass");
   assert.equal(checkStatus(report.checks, "event bus status"), "pass");
   assert.equal(checkStatus(report.checks, "chat readable"), "pass");
   assert.equal(checkStatus(report.checks, "base table readable"), "pass");
@@ -42,6 +43,8 @@ test("buildLiveCheckReport checks live targets with redacted details", async () 
   assert.doesNotMatch(rendered, /tbl_secret_table_123456/u);
   assert.doesNotMatch(rendered, /Bearer|sk-/iu);
   assert.equal(calls.some((call) => call.includes("/open-apis/im/v1/chats/oc_secret_chat_123456")), true);
+  assert.equal(calls.some((call) => call.join(" ").includes("im +messages-send --as user --chat-id oc_secret_chat_123456 --msg-type interactive")), true);
+  assert.equal(calls.some((call) => call.some((arg) => arg.includes('"pilotflow_action":"confirm_execute"'))), true);
   assert.equal(calls.some((call) => call.join(" ") === "lark-cli base +table-get --base-token bascn_secret_base_123456 --table-id tbl_secret_table_123456 --as user"), true);
   assert.equal(calls.some((call) => call.includes("--format")), false);
   assert.equal(profiles.includes("pilotflow-contest"), true);
@@ -61,6 +64,7 @@ test("buildLiveCheckReport reports missing env without live API calls", async ()
   assert.equal(report.summary.warned > 0, true);
   assert.equal(checkStatus(report.checks, "chat readable"), "warn");
   assert.equal(checkStatus(report.checks, "base table readable"), "warn");
+  assert.equal(checkStatus(report.checks, "callback probe card dry-run"), "warn");
   assert.equal(checkStatus(report.checks, "bot mention identity"), "warn");
   assert.equal(commandCount, 6);
 });
@@ -117,6 +121,26 @@ test("buildLiveCheckReport fails when the card callback subscribe command cannot
   assert.match(subscribeCheck?.detail ?? "", /card subscribe dry-run failed/u);
   assert.equal(report.nextActions.some((item) => /card callback subscription/u.test(item.reason)), true);
   assert.equal(report.nextActions.some((item) => /card\.action\.trigger/u.test(item.action)), true);
+});
+
+test("buildLiveCheckReport fails when the callback probe card command cannot be constructed", async () => {
+  const report = await buildLiveCheckReport({
+    env: {
+      PILOTFLOW_TEST_CHAT_ID: "oc_probe_chat_123456",
+    },
+    runCommand: async (bin: string, args: readonly string[]) => {
+      if (args.join(" ").includes("im +messages-send --as user --chat-id oc_probe_chat_123456 --msg-type interactive")) {
+        throw new Error("probe card dry-run failed");
+      }
+      return okResult([bin, ...args]);
+    },
+  });
+
+  const probeCheck = report.checks.find((item) => item.name === "callback probe card dry-run");
+  assert.equal(probeCheck?.status, "fail");
+  assert.match(probeCheck?.detail ?? "", /probe card dry-run failed/u);
+  assert.equal(report.nextActions.some((item) => /probe card command/u.test(item.reason)), true);
+  assert.equal(report.nextActions.some((item) => /pilot:callback-proof/u.test(item.action)), true);
 });
 
 test("buildLiveCheckReport warns when the event bus is already running", async () => {

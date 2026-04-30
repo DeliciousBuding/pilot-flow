@@ -3,6 +3,7 @@ import { runCommand, type CommandResult, type RunOptions } from "../../infrastru
 import { loadRuntimeConfig } from "../../config/runtime-config.js";
 import { loadCliEnv } from "../../config/local-env.js";
 import { parseArgs } from "../../shared/parse-args.js";
+import { buildToolIdempotencyKey } from "../../tools/idempotency.js";
 
 export interface LiveCheckOptions {
   readonly argv?: readonly string[];
@@ -54,8 +55,10 @@ export async function buildLiveCheckReport(options: LiveCheckOptions = {}): Prom
 
   if (targets.chatId) {
     checks.push(await commandCheck("lark-cli", "chat readable", ["api", "GET", `/open-apis/im/v1/chats/${targets.chatId}`, "--as", "bot"], command, commandOptions));
+    checks.push(await callbackProbeCardDryRunCheck(targets.chatId, command, commandOptions));
   } else {
     checks.push({ name: "chat readable", status: "warn", detail: "missing PILOTFLOW_TEST_CHAT_ID" });
+    checks.push({ name: "callback probe card dry-run", status: "warn", detail: "missing PILOTFLOW_TEST_CHAT_ID" });
   }
 
   if (targets.baseToken && targets.baseTableId) {
@@ -201,6 +204,44 @@ async function eventBusStatusCheck(command: CommandRunner, options: RunOptions):
   }
 }
 
+async function callbackProbeCardDryRunCheck(chatId: string, command: CommandRunner, options: RunOptions): Promise<LiveCheckItem> {
+  const runId = "live-check-callback-probe";
+  const content = JSON.stringify({
+    config: { wide_screen_mode: true },
+    header: { template: "blue", title: { tag: "plain_text", content: "PilotFlow callback probe dry-run" } },
+    elements: [
+      {
+        tag: "action",
+        actions: [
+          {
+            tag: "button",
+            text: { tag: "plain_text", content: "确认执行" },
+            type: "primary",
+            value: {
+              pilotflow_card: "execution_plan",
+              pilotflow_action: "confirm_execute",
+              pilotflow_run_id: runId,
+            },
+          },
+        ],
+      },
+    ],
+  });
+  try {
+    await command("lark-cli", [
+      "im", "+messages-send",
+      "--as", "user",
+      "--chat-id", chatId,
+      "--msg-type", "interactive",
+      "--content", content,
+      "--idempotency-key", buildToolIdempotencyKey({ runId, tool: "callback.probe.live-check", sequence: 1 }),
+    ], { ...options, dryRun: true });
+    return { name: "callback probe card dry-run", status: "pass", detail: "interactive callback probe card send command can be constructed" };
+  } catch (error) {
+    return { name: "callback probe card dry-run", status: "fail", detail: error instanceof Error ? error.message : String(error) };
+  }
+}
+
 function summarizeEventBusStatus(stdout = ""): string {
   const text = stdout.trim();
   if (!text) return "event bus status unavailable";
@@ -215,6 +256,7 @@ function buildNextActions(checks: readonly LiveCheckItem[], profile: string): re
   const imScope = byName.get("IM event receive scope");
   const subscribe = byName.get("IM event subscribe dry-run");
   const cardSubscribe = byName.get("card callback subscribe dry-run");
+  const probeCard = byName.get("callback probe card dry-run");
   const bus = byName.get("event bus status");
   const bot = byName.get("bot mention identity");
 
@@ -236,6 +278,13 @@ function buildNextActions(checks: readonly LiveCheckItem[], profile: string): re
     actions.push({
       reason: "The local card callback subscription command cannot be constructed.",
       action: "Run lark-cli event +subscribe --as bot --event-types card.action.trigger --dry-run and fix the CLI/profile or Open Platform event subscription error before running pilot:callback-proof.",
+    });
+  }
+
+  if (probeCard?.status === "fail") {
+    actions.push({
+      reason: "The callback probe card command cannot be constructed.",
+      action: "Run npm run pilot:callback-proof -- --send-probe-card --dry-run --json and fix the profile, chat id, message permission, or lark-cli interactive card send error before a real callback probe.",
     });
   }
 
