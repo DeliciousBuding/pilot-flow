@@ -73,6 +73,7 @@ Exit condition: a confirmed local command can create real Feishu artifacts and p
 - [x] Make the default IM probe require a real bot `user_id` so it sends a structured mention.
 - [x] Add a live-check warning when `PILOTFLOW_BOT_USER_ID` is missing.
 - [x] Add a live-check warning when the IM receive event scope is missing.
+- [x] Add a live-check dry-run check for the `im.message.receive_v1` subscription command.
 - [ ] Verify a real Feishu card button click reaches the listener and triggers the orchestrator; the 2026-05-01 probe card send succeeded, but no callback arrived within 30 seconds.
 - [ ] Verify `im.message.receive_v1` delivery; the structured mention probe now sends, but no IM event arrived within 60 seconds.
 - [ ] Capture a polished 6 to 8 minute happy-path walkthrough.

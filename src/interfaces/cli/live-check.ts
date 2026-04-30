@@ -42,6 +42,7 @@ export async function buildLiveCheckReport(options: LiveCheckOptions = {}): Prom
   checks.push(await commandCheck("lark-cli", "lark-cli version", ["--version"], command, { timeoutMs: 10_000 }));
   checks.push(await commandCheck("lark-cli", "lark auth", ["auth", "status", "--verify"], command, commandOptions));
   checks.push(await eventScopeCheck("im:message.p2p_msg:readonly", command, commandOptions));
+  checks.push(await eventSubscribeDryRunCheck("im.message.receive_v1", command, commandOptions));
 
   if (targets.chatId) {
     checks.push(await commandCheck("lark-cli", "chat readable", ["api", "GET", `/open-apis/im/v1/chats/${targets.chatId}`, "--as", "bot"], command, commandOptions));
@@ -159,6 +160,19 @@ async function eventScopeCheck(scope: string, command: CommandRunner, options: R
       name: "IM event receive scope",
       status: "warn",
       detail: `missing ${scope}; im.message.receive_v1 may not be delivered until the app scope and user authorization are updated`,
+    };
+  }
+}
+
+async function eventSubscribeDryRunCheck(eventType: string, command: CommandRunner, options: RunOptions): Promise<LiveCheckItem> {
+  try {
+    await command("lark-cli", ["event", "+subscribe", "--as", "bot", "--event-types", eventType, "--dry-run"], options);
+    return { name: "IM event subscribe dry-run", status: "pass", detail: `${eventType} subscribe command can be constructed` };
+  } catch (error) {
+    return {
+      name: "IM event subscribe dry-run",
+      status: "fail",
+      detail: error instanceof Error ? error.message : String(error),
     };
   }
 }

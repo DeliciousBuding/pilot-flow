@@ -27,6 +27,7 @@ test("buildLiveCheckReport checks live targets with redacted details", async () 
 
   assert.equal(report.summary.failed, 0);
   assert.equal(checkStatus(report.checks, "IM event receive scope"), "pass");
+  assert.equal(checkStatus(report.checks, "IM event subscribe dry-run"), "pass");
   assert.equal(checkStatus(report.checks, "chat readable"), "pass");
   assert.equal(checkStatus(report.checks, "base table readable"), "pass");
   assert.equal(checkStatus(report.checks, "bot mention identity"), "warn");
@@ -59,7 +60,7 @@ test("buildLiveCheckReport reports missing env without live API calls", async ()
   assert.equal(checkStatus(report.checks, "chat readable"), "warn");
   assert.equal(checkStatus(report.checks, "base table readable"), "warn");
   assert.equal(checkStatus(report.checks, "bot mention identity"), "warn");
-  assert.equal(commandCount, 3);
+  assert.equal(commandCount, 4);
 });
 
 test("buildLiveCheckReport warns when the IM event receive scope is missing", async () => {
@@ -76,6 +77,22 @@ test("buildLiveCheckReport warns when the IM event receive scope is missing", as
   const scopeCheck = report.checks.find((item) => item.name === "IM event receive scope");
   assert.equal(scopeCheck?.status, "warn");
   assert.match(scopeCheck?.detail ?? "", /im:message\.p2p_msg:readonly/u);
+});
+
+test("buildLiveCheckReport fails when the IM event subscribe command cannot be constructed", async () => {
+  const report = await buildLiveCheckReport({
+    env: {},
+    runCommand: async (bin: string, args: readonly string[]) => {
+      if (args.join(" ") === "event +subscribe --as bot --event-types im.message.receive_v1 --dry-run") {
+        throw new Error("subscribe dry-run failed");
+      }
+      return okResult([bin, ...args]);
+    },
+  });
+
+  const subscribeCheck = report.checks.find((item) => item.name === "IM event subscribe dry-run");
+  assert.equal(subscribeCheck?.status, "fail");
+  assert.match(subscribeCheck?.detail ?? "", /subscribe dry-run failed/u);
 });
 
 test("buildLiveCheckReport ignores partial LLM env because it only checks Feishu live targets", async () => {
