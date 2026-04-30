@@ -19,10 +19,16 @@ export interface LiveCheckItem {
   readonly detail: string;
 }
 
+export interface LiveCheckAction {
+  readonly reason: string;
+  readonly action: string;
+}
+
 export interface LiveCheckReport {
   readonly generatedAt: string;
   readonly profile: string;
   readonly checks: readonly LiveCheckItem[];
+  readonly nextActions: readonly LiveCheckAction[];
   readonly summary: {
     readonly passed: number;
     readonly warned: number;
@@ -75,6 +81,7 @@ export async function buildLiveCheckReport(options: LiveCheckOptions = {}): Prom
     generatedAt: new Date().toISOString(),
     profile: runtime.profile,
     checks,
+    nextActions: buildNextActions(checks, runtime.profile),
     summary: {
       passed: checks.filter((item) => item.status === "pass").length,
       warned: checks.filter((item) => item.status === "warn").length,
@@ -101,6 +108,7 @@ export function renderLiveCheckReport(report: LiveCheckReport): string {
     "| --- | --- | --- |",
     ...report.checks.map((item) => `| ${item.name} | ${item.status} | ${escapeCell(redactDetail(item.detail))} |`),
     "",
+    ...renderNextActions(report.nextActions),
     `Summary: ${report.summary.passed} passed, ${report.summary.warned} warned, ${report.summary.failed} failed.`,
   ].join("\n");
 }
@@ -200,10 +208,62 @@ function summarizeEventBusStatus(stdout = ""): string {
   return text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean).slice(0, 2).join(" ");
 }
 
+function buildNextActions(checks: readonly LiveCheckItem[], profile: string): readonly LiveCheckAction[] {
+  const actions: LiveCheckAction[] = [];
+  const byName = new Map(checks.map((item) => [item.name, item]));
+  const imScope = byName.get("IM event receive scope");
+  const subscribe = byName.get("IM event subscribe dry-run");
+  const bus = byName.get("event bus status");
+  const bot = byName.get("bot mention identity");
+
+  if (imScope?.status === "warn") {
+    actions.push({
+      reason: "IM event delivery is blocked before runtime code can receive group mentions.",
+      action: `Open Feishu Open Platform for this app, enable im:message.p2p_msg:readonly, publish or make the permission effective, then run: lark-cli auth login --profile ${profile} --scope "im:message.p2p_msg:readonly"`,
+    });
+  }
+
+  if (subscribe?.status === "fail") {
+    actions.push({
+      reason: "The local event subscription command cannot be constructed.",
+      action: "Run lark-cli event +subscribe --as bot --event-types im.message.receive_v1 --dry-run and fix the CLI/profile error before sending probes.",
+    });
+  }
+
+  if (bus?.status === "warn") {
+    actions.push({
+      reason: "Another event subscriber may consume or compete with gateway probes.",
+      action: "Stop the existing event bus or intentionally run a single subscriber before testing pilot:gateway.",
+    });
+  }
+
+  if (bot?.status === "warn") {
+    actions.push({
+      reason: "Default gateway probes need a structured bot mention.",
+      action: "Set PILOTFLOW_BOT_USER_ID locally or pass --bot-user-id before running pilot:gateway -- --live --send-probe-message.",
+    });
+  }
+
+  return actions;
+}
+
+function renderNextActions(actions: readonly LiveCheckAction[]): readonly string[] {
+  if (actions.length === 0) return [];
+  return [
+    "Next actions:",
+    ...actions.map((item, index) => `${index + 1}. ${redactDetail(item.action)} (${item.reason})`),
+    "",
+  ];
+}
+
 function redactReport(report: LiveCheckReport): LiveCheckReport {
   return {
     ...report,
     checks: report.checks.map((item) => ({ ...item, detail: redactDetail(item.detail) })),
+    nextActions: report.nextActions.map((item) => ({
+      reason: redactDetail(item.reason),
+      action: redactDetail(item.action),
+    })),
   };
 }
 

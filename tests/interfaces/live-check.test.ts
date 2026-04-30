@@ -78,6 +78,9 @@ test("buildLiveCheckReport warns when the IM event receive scope is missing", as
   const scopeCheck = report.checks.find((item) => item.name === "IM event receive scope");
   assert.equal(scopeCheck?.status, "warn");
   assert.match(scopeCheck?.detail ?? "", /im:message\.p2p_msg:readonly/u);
+  assert.equal(report.nextActions.length, 2);
+  assert.match(report.nextActions[0]?.action ?? "", /lark-cli auth login --profile pilotflow-contest --scope "im:message\.p2p_msg:readonly"/u);
+  assert.match(renderLiveCheckReport(report), /Next actions:/u);
 });
 
 test("buildLiveCheckReport fails when the IM event subscribe command cannot be constructed", async () => {
@@ -94,6 +97,7 @@ test("buildLiveCheckReport fails when the IM event subscribe command cannot be c
   const subscribeCheck = report.checks.find((item) => item.name === "IM event subscribe dry-run");
   assert.equal(subscribeCheck?.status, "fail");
   assert.match(subscribeCheck?.detail ?? "", /subscribe dry-run failed/u);
+  assert.equal(report.nextActions.some((item) => /event subscription command/u.test(item.reason)), true);
 });
 
 test("buildLiveCheckReport warns when the event bus is already running", async () => {
@@ -110,6 +114,7 @@ test("buildLiveCheckReport warns when the event bus is already running", async (
   const busCheck = report.checks.find((item) => item.name === "event bus status");
   assert.equal(busCheck?.status, "warn");
   assert.match(busCheck?.detail ?? "", /avoid multiple event subscribers/u);
+  assert.equal(report.nextActions.some((item) => /single subscriber/u.test(item.action)), true);
 });
 
 test("buildLiveCheckReport ignores partial LLM env because it only checks Feishu live targets", async () => {

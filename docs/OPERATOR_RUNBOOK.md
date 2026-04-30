@@ -65,7 +65,7 @@ npm run pilot:doctor
 npm run pilot:doctor -- --verify-auth
 ```
 
-Use `pilot:live-check` before a real write run. It performs read-only checks for `lark-cli`, profile auth, IM event receive scope, event subscribe dry-run, event bus status, chat visibility, Base table visibility, and bot mention identity. It ignores `PILOTFLOW_LLM_*` because this command only validates Feishu live targets.
+Use `pilot:live-check` before a real write run. It performs read-only checks for `lark-cli`, profile auth, IM event receive scope, event subscribe dry-run, event bus status, chat visibility, Base table visibility, and bot mention identity. It also returns `nextActions` when a check points to a known operator fix. It ignores `PILOTFLOW_LLM_*` because this command only validates Feishu live targets.
 When run from the repository root, `pilot:live-check` loads local `.env` values for target IDs but redacts them from the report.
 
 ```bash
