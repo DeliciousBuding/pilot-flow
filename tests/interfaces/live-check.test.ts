@@ -28,6 +28,7 @@ test("buildLiveCheckReport checks live targets with redacted details", async () 
   assert.equal(report.summary.failed, 0);
   assert.equal(checkStatus(report.checks, "IM event receive scope"), "pass");
   assert.equal(checkStatus(report.checks, "IM event subscribe dry-run"), "pass");
+  assert.equal(checkStatus(report.checks, "card callback subscribe dry-run"), "pass");
   assert.equal(checkStatus(report.checks, "event bus status"), "pass");
   assert.equal(checkStatus(report.checks, "chat readable"), "pass");
   assert.equal(checkStatus(report.checks, "base table readable"), "pass");
@@ -61,7 +62,7 @@ test("buildLiveCheckReport reports missing env without live API calls", async ()
   assert.equal(checkStatus(report.checks, "chat readable"), "warn");
   assert.equal(checkStatus(report.checks, "base table readable"), "warn");
   assert.equal(checkStatus(report.checks, "bot mention identity"), "warn");
-  assert.equal(commandCount, 5);
+  assert.equal(commandCount, 6);
 });
 
 test("buildLiveCheckReport warns when the IM event receive scope is missing", async () => {
@@ -98,6 +99,24 @@ test("buildLiveCheckReport fails when the IM event subscribe command cannot be c
   assert.equal(subscribeCheck?.status, "fail");
   assert.match(subscribeCheck?.detail ?? "", /subscribe dry-run failed/u);
   assert.equal(report.nextActions.some((item) => /event subscription command/u.test(item.reason)), true);
+});
+
+test("buildLiveCheckReport fails when the card callback subscribe command cannot be constructed", async () => {
+  const report = await buildLiveCheckReport({
+    env: {},
+    runCommand: async (bin: string, args: readonly string[]) => {
+      if (args.join(" ") === "event +subscribe --as bot --event-types card.action.trigger --dry-run") {
+        throw new Error("card subscribe dry-run failed");
+      }
+      return okResult([bin, ...args]);
+    },
+  });
+
+  const subscribeCheck = report.checks.find((item) => item.name === "card callback subscribe dry-run");
+  assert.equal(subscribeCheck?.status, "fail");
+  assert.match(subscribeCheck?.detail ?? "", /card subscribe dry-run failed/u);
+  assert.equal(report.nextActions.some((item) => /card callback subscription/u.test(item.reason)), true);
+  assert.equal(report.nextActions.some((item) => /card\.action\.trigger/u.test(item.action)), true);
 });
 
 test("buildLiveCheckReport warns when the event bus is already running", async () => {

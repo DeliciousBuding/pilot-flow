@@ -48,7 +48,8 @@ export async function buildLiveCheckReport(options: LiveCheckOptions = {}): Prom
   checks.push(await commandCheck("lark-cli", "lark-cli version", ["--version"], command, { timeoutMs: 10_000 }));
   checks.push(await commandCheck("lark-cli", "lark auth", ["auth", "status", "--verify"], command, commandOptions));
   checks.push(await eventScopeCheck("im:message.p2p_msg:readonly", command, commandOptions));
-  checks.push(await eventSubscribeDryRunCheck("im.message.receive_v1", command, commandOptions));
+  checks.push(await eventSubscribeDryRunCheck("IM event subscribe dry-run", "im.message.receive_v1", command, commandOptions));
+  checks.push(await eventSubscribeDryRunCheck("card callback subscribe dry-run", "card.action.trigger", command, commandOptions));
   checks.push(await eventBusStatusCheck(command, commandOptions));
 
   if (targets.chatId) {
@@ -173,13 +174,13 @@ async function eventScopeCheck(scope: string, command: CommandRunner, options: R
   }
 }
 
-async function eventSubscribeDryRunCheck(eventType: string, command: CommandRunner, options: RunOptions): Promise<LiveCheckItem> {
+async function eventSubscribeDryRunCheck(name: string, eventType: string, command: CommandRunner, options: RunOptions): Promise<LiveCheckItem> {
   try {
     await command("lark-cli", ["event", "+subscribe", "--as", "bot", "--event-types", eventType, "--dry-run"], options);
-    return { name: "IM event subscribe dry-run", status: "pass", detail: `${eventType} subscribe command can be constructed` };
+    return { name, status: "pass", detail: `${eventType} subscribe command can be constructed` };
   } catch (error) {
     return {
-      name: "IM event subscribe dry-run",
+      name,
       status: "fail",
       detail: error instanceof Error ? error.message : String(error),
     };
@@ -213,6 +214,7 @@ function buildNextActions(checks: readonly LiveCheckItem[], profile: string): re
   const byName = new Map(checks.map((item) => [item.name, item]));
   const imScope = byName.get("IM event receive scope");
   const subscribe = byName.get("IM event subscribe dry-run");
+  const cardSubscribe = byName.get("card callback subscribe dry-run");
   const bus = byName.get("event bus status");
   const bot = byName.get("bot mention identity");
 
@@ -227,6 +229,13 @@ function buildNextActions(checks: readonly LiveCheckItem[], profile: string): re
     actions.push({
       reason: "The local event subscription command cannot be constructed.",
       action: "Run lark-cli event +subscribe --as bot --event-types im.message.receive_v1 --dry-run and fix the CLI/profile error before sending probes.",
+    });
+  }
+
+  if (cardSubscribe?.status === "fail") {
+    actions.push({
+      reason: "The local card callback subscription command cannot be constructed.",
+      action: "Run lark-cli event +subscribe --as bot --event-types card.action.trigger --dry-run and fix the CLI/profile or Open Platform event subscription error before running pilot:callback-proof.",
     });
   }
 
