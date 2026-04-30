@@ -58,17 +58,11 @@ Every step is logged in JSONL run logs with Flight Recorder visual replay suppor
 
 ```mermaid
 flowchart LR
-    A["Feishu group chat<br/>text or voice intent"] --> B["Agent Planner<br/>project execution plan"]
-    B --> C["Human confirmation"]
-    C --> D["Feishu Tool Router"]
-    D --> E["Doc"]
-    D --> F["Base / Task"]
-    D --> G["Message / Card"]
-    D --> H["Pinned entry"]
-    E --> I["Delivery summary"]
-    F --> I
-    G --> I
-    H --> I
+    A["Group chat"] --> B["Generate plan"]
+    B --> C["Human confirms"]
+    C --> D["Execute Feishu tools"]
+    D --> E["Doc + Base\nTask + Card + Entry"]
+    E --> F["Delivery summary"]
 ```
 
 ## Operating Model
