@@ -26,6 +26,7 @@ This directory contains the public documentation set for PilotFlow. It should re
 | `VISUAL_DESIGN.md` | Feishu-native UX and visual rules | Cards, cockpit, or demo surfaces change |
 | `ROADMAP.md` | Forward-looking plan and unchecked work | Any phase completes or priorities shift |
 | `DOCUMENTATION_PLAN.md` | Documentation governance | README/docs conventions change |
+| `rebuild/README.md` | Hermes-style TypeScript Agent kernel rebuild plan and execution status | Runtime kernel, tool registry, gateway, or Agent loop changes |
 
 ## Demo Kit
 
@@ -44,6 +45,7 @@ Generated review reports are created under ignored `tmp/` and are not tracked as
 | --- | --- |
 | Validate the repo | `npm run pilot:check` |
 | Run grouped tests | `npm test` |
+| Run TypeScript tests only | `npm run test:ts` |
 | Check local environment | `npm run pilot:doctor` |
 | Run the manual product loop | `npm run pilot:demo` |
 | Render a run trace | `npm run pilot:recorder -- --input <run.jsonl> --output <html>` |

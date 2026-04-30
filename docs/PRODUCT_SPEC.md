@@ -80,7 +80,7 @@ Demo input:
 Help us launch a project. Goal: PilotFlow MVP demo.
 Members: product, integration, demo owner.
 Deliverables: project brief, task board, risk list, final summary.
-Deadline: this week.
+Deadline: 2026-05-03.
 ```
 
 Expected flow:

@@ -28,7 +28,8 @@ flowchart LR
 | Human confirmation | Stable fallback | Text confirmation is reliable; real card callback delivery is still pending platform configuration proof |
 | Traceability | Implemented | JSONL run log, Flight Recorder, and review-pack generators are available |
 | Review packaging | Implemented | Machine evidence can be regenerated locally; manual videos and screenshots remain outside Git |
-| Product cleanup | In progress | Runtime entrypoints and review tooling are being separated from old demo-oriented paths |
+| Product cleanup | Implemented for JS prototype | Runtime entrypoints, review tooling, command facade, and public demo docs are separated |
+| TypeScript kernel rebuild | In progress | Day 0 through Day 2 complete; Day 3 orchestrator split is next |
 
 ## Phase 0: Foundation
 
@@ -73,16 +74,27 @@ Exit condition: PilotFlow can be demonstrated as a Feishu-native project operati
 ## Phase 3: Productization Cleanup
 
 - [x] Write the productization refactor plan.
-- [ ] Freeze public product claims in README, Product Spec, and Roadmap.
-- [ ] Consolidate `docs/demo/` into a compact demo kit.
+- [x] Freeze public product claims in README, Product Spec, and Roadmap.
+- [x] Consolidate `docs/demo/` into a compact demo kit.
 - [x] Move product CLI entrypoints out of `src/demo/`.
 - [x] Move review/evidence generators into `src/review-packs/`.
 - [x] Replace public `demo:*` commands with `pilot:*` and `review:*` commands.
 - [x] Split `run-orchestrator.js` into smaller runtime and domain modules.
 - [x] Add `pilot:doctor` for local environment checks.
-- [ ] Re-run full validation and update workspace progress records.
+- [x] Re-run full validation and update workspace progress records.
 
 Exit condition: product runtime, review packaging, and documentation are visibly separated.
+
+## Phase 3B: Hermes-Style TypeScript Kernel Rebuild
+
+- [x] Day 0: external contracts checked and recorded in `docs/rebuild/CONTRACT_NOTES.md`.
+- [x] Day 1: strict TS foundation, shared utilities, safety layer, infrastructure, runtime config, and TS test bridge.
+- [x] Day 2: TS domain modules, ToolRegistry, tool idempotency, and 9 Feishu tool definitions.
+- [ ] Day 3: split the orchestrator into confirmation gate, tool sequence, duplicate guard, cards, project state, entry, summary, and resolver modules.
+- [ ] Day 4: add Feishu gateway, session queue, Agent loop, and mock-tested LLM provider.
+- [ ] Day 5: migrate review packs/tests and remove old JS runtime only after the TS path passes.
+
+Exit condition: TypeScript path can run the same dry-run and live-guarded project launch loop as the current JS prototype.
 
 ## Phase 4: Strong MVP Enhancements
 
@@ -108,8 +120,8 @@ Exit condition: PilotFlow feels useful beyond the first project-launch flow whil
 
 ## Immediate Next Actions
 
-1. Finish the productization cleanup phases in [`PRODUCTIZATION_REFACTOR_PLAN.md`](PRODUCTIZATION_REFACTOR_PLAN.md).
-2. Regenerate review packs with the new `review:*` command surface.
-3. Run `pilot:doctor`, `pilot:check`, tests, review package generation, status, and safety audit.
-4. Capture happy-path and failure-path media outside Git.
-5. Verify Open Platform card callback delivery or keep it explicitly marked as pending.
+1. Implement TypeScript rebuild Day 3: orchestrator modules and regression tests.
+2. Keep the current JS prototype runnable while the TS orchestrator is being wired.
+3. Capture happy-path and failure-path media outside Git.
+4. Verify Open Platform card callback delivery or keep it explicitly marked as pending.
+5. Run `pilot:doctor`, `pilot:check`, tests, review package generation, status, and safety audit before any public handoff.

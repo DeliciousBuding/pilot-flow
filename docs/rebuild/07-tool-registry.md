@@ -45,6 +45,13 @@ export class ToolAlreadyRegisteredError extends PilotFlowError {
   }
 }
 
+export class ToolConfirmationRequiredError extends PilotFlowError {
+  constructor(public readonly toolName: string) {
+    super(`Tool ${toolName} requires confirmation before live execution`, "TOOL_CONFIRMATION_REQUIRED");
+    this.name = "ToolConfirmationRequiredError";
+  }
+}
+
 export class ToolRegistry {
   private tools = new Map<string, ToolDefinition>();
   private llmNameToName = new Map<string, string>();
@@ -69,6 +76,12 @@ export class ToolRegistry {
     if (tool.requiresTargets && !ctx.dryRun) {
       const missing = tool.requiresTargets.filter((t) => !ctx.targets?.[t]);
       if (missing.length > 0) throw new ToolPreflightError(internalName, missing);
+    }
+
+    // confirmation: live side-effect tools cannot run through registry unless the caller
+    // has passed an explicit confirmation result.
+    if (!ctx.dryRun && tool.confirmationRequired && !tool.safeWithoutConfirmation && ctx.confirmed !== true) {
+      throw new ToolConfirmationRequiredError(internalName);
     }
 
     // 记录 tool.called（脱敏输入，防止敏感内容泄露到 JSONL）

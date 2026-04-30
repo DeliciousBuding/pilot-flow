@@ -29,6 +29,7 @@ lark-cli auth status --verify
 | --- | --- |
 | Syntax check every JS file | `npm run pilot:check` |
 | Run all grouped tests | `npm test` |
+| Run TypeScript tests only | `npm run test:ts` |
 | Run core tests | `npm run test:core` |
 | Run evidence-pack tests | `npm run test:review` |
 | Run one focused test | `npm run test:one -- <alias>` |
@@ -163,6 +164,10 @@ npm run review:safety-audit -- --output tmp/demo-safety/SAFETY_AUDIT.md
 ```
 
 Generated reports and run logs stay under ignored `tmp/`.
+
+## TypeScript Kernel Rebuild Status
+
+The TypeScript rebuild is active but not yet the live CLI path. As of commit `4353182`, Day 0 through Day 2 are complete: strict TS foundation, domain modules, ToolRegistry, tool idempotency, and 9 Feishu tool definitions are implemented and covered by TS tests. Operators should still use the `pilot:*` commands above for live and dry-run demos until the TS orchestrator and CLI entrypoints are wired.
 
 ## Known Platform Edges
 

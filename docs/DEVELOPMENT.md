@@ -27,10 +27,11 @@ npm test
 
 | Layer | Path | Responsibility |
 | --- | --- | --- |
-| Product core | `src/core/` | planner, orchestration, confirmation, risk, event handling, run state |
-| Domain helpers | `src/domain/` | product-facing pure renderers such as brief markdown and task description |
+| Product core | `src/core/` | current JS planner, orchestration, confirmation, risk, event handling, run state |
+| Domain layer | `src/domain/` | TS deterministic planner, validation fallback, risk logic, risk card data, brief markdown, task description |
 | Runtime helpers | `src/runtime/` | reusable execution primitives such as tool-step recording and optional fallback handling |
-| Feishu integration | `src/tools/feishu/`, `src/adapters/lark-cli/` | tool execution, artifact normalization, lark-cli wrapping |
+| Tool registry | `src/tools/registry.ts`, `src/tools/idempotency.ts` | LLM-safe registry, confirmation enforcement, preflight, recorder redaction, idempotency |
+| Feishu integration | `src/tools/feishu/`, `src/adapters/lark-cli/` | JS live executor, TS Feishu tool definitions, artifact normalization, lark-cli wrapping |
 | Runtime config and schemas | `src/config/`, `src/schemas/` | environment parsing and structured plan schemas |
 | CLI interfaces | `src/interfaces/cli/` | direct runnable entry points and local doctor |
 | Review packs | `src/review-packs/` | generated review, readiness, submission, delivery, callback, permission, and safety reports |
@@ -44,8 +45,10 @@ Keep `package.json` readable. Long or repeatable automation belongs in `scripts/
 
 | Command | Purpose |
 | --- | --- |
-| `npm run pilot:check` | Syntax-check JavaScript through `scripts/check-js.js` |
-| `npm test` | Run every grouped test file through `scripts/run-tests.js` |
+| `npm run pilot:check` | Syntax-check JavaScript and run TypeScript `tsc --noEmit` |
+| `npm test` | Run legacy JS tests and compiled TypeScript tests |
+| `npm run test:legacy` | Run legacy JS test files |
+| `npm run test:ts` | Compile TS and run compiled TypeScript tests |
 | `npm run test:core` | Run core/config/event/tool tests |
 | `npm run test:interfaces` | Run CLI interface tests |
 | `npm run test:review` | Run evidence-pack tests |
@@ -93,7 +96,8 @@ Implemented runtime capabilities:
 - Flight Recorder HTML rendering over JSONL run logs
 - generated review packs under `src/review-packs/`
 - deterministic prototype planner provider boundary in `src/core/planner/project-init-planner.js`
-- product text renderers in `src/domain/`
+- TypeScript domain modules in `src/domain/` for deterministic planning, plan validation fallback, risk detection, risk card data, brief markdown, and task description
+- TypeScript `ToolRegistry` in `src/tools/registry.ts` with LLM-safe tool names, JSON-string argument parsing, live preflight, live confirmation enforcement, recorder redaction, and self-registering Feishu tools
 - tool-step recording and optional fallback in `src/runtime/tool-step-runner.js`
 
 Known product boundary:
@@ -128,6 +132,7 @@ Known product boundary:
 | --- | --- |
 | README/docs only | `git diff --check` |
 | Broad refactor | `npm run pilot:check`, `npm test`, `npm run pilot:status`, `npm run pilot:audit` |
+| TypeScript domain or tools | `npm run ts:check`, `npm run test:ts`, `npm test` |
 | CLI/environment surface | `npm run test:one -- doctor`, `npm run pilot:doctor` |
 | Planner logic | `npm run pilot:check`, `npm run test:one -- plan`, `npm run pilot:demo` |
 | Orchestrator logic | `npm run pilot:check`, `npm run test:one -- orchestrator`, `npm run pilot:demo` |

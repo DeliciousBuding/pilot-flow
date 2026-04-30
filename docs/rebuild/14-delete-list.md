@@ -4,10 +4,12 @@
 
 ## 整个删除的目录
 
+Do not execute this list until the TypeScript path has passed the same dry-run/live-guarded checks as the current JS prototype. Day 2 only adds the replacement domain and tool-registry layers; it does not authorize deleting `src/core/`, `src/runtime/`, or the JS Feishu executor yet.
+
 | 旧路径 | 新替代 | 原因 |
 |--------|--------|------|
-| `src/core/` 整个目录 | `src/orchestrator/` + `src/domain/` | 拆分 God Object |
-| `src/runtime/` 整个目录 | `src/tools/registry.ts` | 替换为工具注册表 |
+| `src/core/` 整个目录 | `src/orchestrator/` + `src/domain/` | 仅在 Day 5 TS path 完全接管后删除 |
+| `src/runtime/` 整个目录 | `src/tools/registry.ts` | 仅在 TS orchestrator 不再依赖旧 helper 后删除 |
 | `src/adapters/` 整个目录 | `src/infrastructure/command-runner.ts` | 合并 |
 
 Do not delete `src/interfaces/` as a directory. The new product gateway lives in `src/gateway/feishu/`, while human-operated CLI entrypoints continue to live in `src/interfaces/cli/`.
@@ -34,7 +36,7 @@ Do not delete `src/interfaces/` as a directory. The new product gateway lives in
 | `src/core/events/callback-run-trigger.js` | `src/gateway/feishu/card-handler.ts` | 回调触发逻辑进入 gateway |
 | `src/runtime/tool-step-runner.js` | `src/tools/registry.ts`（execute 方法） | 替换 |
 | `src/tools/feishu/feishu-tool-executor.js` | `src/tools/feishu/*.ts`（9 个独立文件） | 拆分 |
-| `src/tools/feishu/artifact-normalizer.js` | 合并到 `tools/registry.ts` | 消除 |
+| `src/tools/feishu/artifact-normalizer.js` | TS Feishu tools inline artifact summaries; JS normalizer remains until old runtime is removed | 延后删除 |
 | `src/adapters/lark-cli/command-runner.js` | `src/infrastructure/command-runner.ts` | 迁移+加超时 |
 | `src/config/runtime-config.js` | `src/config/runtime-config.ts` | 重写+去依赖 |
 | `src/interfaces/cli/manual-trigger.js` | `src/interfaces/cli/cli-trigger.ts` | 改名 |
@@ -74,9 +76,9 @@ Do not delete `src/interfaces/` as a directory. The new product gateway lives in
 ## 删除顺序
 
 1. 先删测试文件（`.test.js`）— 不影响运行
-2. 再删 `src/core/` — 已被 `src/orchestrator/` + `src/domain/` 替代
-3. 再删 `src/runtime/` + `src/adapters/` — 已被 tools/registry + infrastructure 替代
-4. 再删 `src/tools/feishu/feishu-tool-executor.js` + `artifact-normalizer.js` — 已被 9 个独立文件替代
+2. 再删 `src/core/` — 必须等 TS orchestrator + gateway + CLI path 完成并通过验证
+3. 再删 `src/runtime/` + `src/adapters/` — 必须等 tools/registry + infrastructure 完全接管旧调用点
+4. 再删 `src/tools/feishu/feishu-tool-executor.js` + `artifact-normalizer.js` — 必须等 9 个独立 TS 工具进入实际运行路径
 5. 新增 `src/gateway/feishu/` 并验证 IM/card/webhook 单测
 6. 再删 `src/interfaces/cli/` 中的旧 `.js` — 已被同目录 `.ts` 替代
 7. 最后删 `scripts/check-js.js`

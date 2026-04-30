@@ -23,11 +23,13 @@ Generated review material, capture checklists, and judge-facing reports are usef
 
 ## Target Structure
 
+This structure describes the cleaned JS prototype. The active Hermes-style TypeScript rebuild extends it with `src/tools/registry.ts`, `src/tools/idempotency.ts`, and future `src/orchestrator/`, `src/gateway/feishu/`, and `src/agent/` modules. Do not use this document to delete JS runtime files; use `docs/rebuild/14-delete-list.md` and only after the TS path passes.
+
 ```text
 pilot-flow/
 ├─ src/
 │  ├─ core/              # planner, orchestration, risk, events, run state
-│  ├─ domain/            # product text and pure domain renderers
+│  ├─ domain/            # product domain logic and renderers
 │  ├─ runtime/           # reusable run helpers
 │  ├─ tools/feishu/      # Feishu tool executor and artifact normalization
 │  ├─ adapters/lark-cli/ # command runner boundary
@@ -101,19 +103,22 @@ pilot-flow/
 
 ### Phase 7: Final Product Review
 
-- [ ] Run:
+- [x] Run core validation used for the Day 2 handoff:
   ```bash
   npm run pilot:check
   npm test
+  npm run pilot:audit
+  git diff --check
+  ```
+- [ ] Run full operator validation before public submission:
+  ```bash
   npm run pilot:doctor
   npm run pilot:demo
   npm run pilot:package
   npm run pilot:status
-  npm run pilot:audit
-  git diff --check
   ```
-- [ ] Run stale-surface and secret scans from the implementation request.
-- [ ] Update workspace `AGENTS.md` and `PERSONAL_PROGRESS.md`.
+- [x] Run stale-surface and secret scans for the Day 2 docs sync.
+- [x] Update workspace `AGENTS.md` and `PERSONAL_PROGRESS.md`.
 - [ ] Sync the Feishu personal progress document if `PERSONAL_PROGRESS.md` changes.
 - [ ] Commit and push.
 

@@ -34,13 +34,14 @@ flowchart TB
 | Component | Responsibility | Current status |
 | --- | --- | --- |
 | Trigger | Starts a run from manual input now, IM event later | manual trigger implemented |
-| Planner | Converts input into project plan JSON | deterministic prototype planner implemented behind a provider boundary |
+| Planner | Converts input into project plan JSON | deterministic prototype planner implemented behind JS and TS provider boundaries |
 | Confirmation Gate | Stops side effects until human approval | flight plan card, dry-run auto-confirm, live text fallback, callback action protocol, and bounded callback listener implemented |
 | Duplicate Run Guard | Blocks accidental repeated live runs for the same project target | local guard file implemented under `tmp/run-guard/` |
 | Orchestrator | Owns run lifecycle and tool sequence | Doc/Base/Task/risk/entry/announcement/pin/IM sequence implemented with artifact-aware messages and state rows |
-| Domain Renderers | Render project brief and task descriptions | pure helpers split into `src/domain/` |
+| Domain Layer | Owns deterministic planning, validation fallback, risk logic, card data, and product text rendering | TS domain modules added in `src/domain/`; old JS prototype remains until the TS path is fully wired |
 | Tool Step Runner | Records tool calls, artifacts, skipped steps, and optional fallbacks | shared runtime helper split into `src/runtime/` |
-| Feishu Tool Executor | Converts tool calls into `lark-cli` commands | dry-run and live-capable command runner implemented with short Feishu-safe idempotency keys |
+| Feishu Tool Executor | Converts tool calls into `lark-cli` commands | current JS executor remains live-capable; TS Feishu tools and ToolRegistry are implemented for the rebuild path |
+| Tool Registry | Maps internal tool names to LLM-safe schemas, validates live targets, records tool events, and enforces confirmation for live side effects | TS `ToolRegistry` implemented with 9 self-registering Feishu tool definitions |
 | Flight Recorder | Records events, tool calls, artifacts, failures | JSONL with step status and artifact events implemented |
 | Risk Engine | Enriches planner risks and creates a decision summary | initial detector and risk decision card implemented |
 | Cockpit | Shows run state and replay | static Flight Recorder HTML view implemented |
@@ -79,6 +80,8 @@ The current schemas live in `src/schemas`. The current planner is deterministic 
 | `Risk` | Risk item detected or entered during planning |
 
 Artifact normalization currently supports Feishu Doc, Base record batch writes, Task creation, card sends, project entry messages, announcement update attempts, pinned messages, IM message sends, and local run logs. Dry-run artifacts are marked `planned`; live artifacts are marked `created` once the corresponding `lark-cli` call succeeds. Optional announcement failures are marked `failed` and do not abort the run. Base record artifacts also expose fallback fields such as `owner`, `due_date`, `risk_level`, `source_run`, `source_message`, and `url` for Flight Recorder and demo inspection.
+
+The TypeScript rebuild path now has `src/tools/registry.ts`, `src/tools/idempotency.ts`, and self-registering Feishu tool definitions under `src/tools/feishu/*.ts`. The registry maps dotted internal names such as `doc.create` to LLM-safe names such as `doc_create`, accepts JSON-string tool arguments, redacts sensitive inputs before recorder writes, blocks missing live targets, and rejects unconfirmed live side-effect tools unless `ToolContext.confirmed` is true. The existing JS runtime remains the live product path until the TS orchestrator and CLI entrypoints are wired.
 
 Plan validation runs immediately after planner output and before confirmation, preflight, duplicate-run guard, or any Feishu tool call. If required project-init fields fail validation, PilotFlow records `plan.validation_failed`, returns `needs_clarification`, and uses a safe fallback plan instead of creating Doc/Base/Task/IM artifacts.
 
@@ -169,11 +172,13 @@ Live mode requires the confirmation text `确认起飞`. It also preflights requ
 ## Reliability Rules
 
 - Every write tool must receive a Feishu-safe idempotency key no longer than the message API field limit.
+- TypeScript registry live calls must pass explicit confirmation for tools marked `confirmationRequired`.
 - Live project-init runs must pass duplicate-run protection before visible side effects.
 - Tool failures must stop or degrade the run explicitly.
 - Invalid planner output must become a clarification state before any Feishu side effect.
 - The Agent must never invent a successful Feishu write.
 - Run logs must include planned input and actual output.
+- Run logs must redact tool inputs, command arguments, and failure output summaries.
 - Human confirmation is required before writing project artifacts.
 - Local Windows execution bypasses shell string concatenation by invoking the installed `lark-cli` Node entrypoint with an argument array.
 

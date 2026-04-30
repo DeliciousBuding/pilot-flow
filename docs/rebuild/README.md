@@ -1,7 +1,7 @@
 # PilotFlow Hermes-Style Agent Kernel Rebuild
 
 > Created: 2026-04-30
-> Status: plan hardening in progress
+> Status: Day 0 through Day 2 implemented; Day 3 orchestrator rebuild is next
 > Intent: rebuild PilotFlow around an Agent kernel instead of continuing to pile features onto the current script-shaped prototype.
 
 This folder is the rebuild blueprint for turning PilotFlow into a Feishu-native Agent product kernel.
@@ -19,6 +19,15 @@ The decision is now intentionally stronger than the previous cleanup plan: Pilot
 | LLM integration | Real minimal OpenAI-compatible loop | Add a usable provider, tool calling, retry, and error classification. Keep side effects behind confirmation. |
 | TypeScript | Strict from day one | `strict: true`; local escape hatches must be explicit. |
 | Public commands | May break once | Rename command internals once, then update README, docs, package scripts, AGENTS, and progress records in the same migration. |
+
+## Execution Status
+
+| Day | Status | Commit / evidence |
+| --- | --- | --- |
+| Day 0 | Done | `docs/rebuild/CONTRACT_NOTES.md` records lark-cli docs/event contracts, webhook boundary, and LLM mock gate |
+| Day 1 | Done | `94f741e` added strict TS foundation, core types, shared utilities, safety, infrastructure, runtime config, and TS tests |
+| Day 2 | Done | `4353182` added TS domain modules, ToolRegistry, tool idempotency, and 9 Feishu tool definitions |
+| Day 3 | Next | Split orchestrator while keeping the current JS prototype runnable |
 
 ## Hermes Evidence Snapshot
 

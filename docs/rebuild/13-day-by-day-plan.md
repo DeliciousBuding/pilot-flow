@@ -3,6 +3,13 @@
 > 每天结束时：`npx tsc --noEmit` 通过 + 所有测试绿色 + git commit
 > 预计总工时：32-40 小时。Agent 编程可以提速，但 Feishu callback、安全边界和迁移验证不应压缩成口头完成。
 
+## Execution Status
+
+- [x] Day 0 complete: contract notes recorded in `CONTRACT_NOTES.md`.
+- [x] Day 1 complete: strict TypeScript foundation, shared utilities, safety, infrastructure, runtime config, and TS test bridge are implemented.
+- [x] Day 2 complete: domain modules, `ToolRegistry`, tool idempotency, and 9 Feishu tool definitions are implemented in commit `4353182`.
+- [ ] Day 3 next: split orchestrator modules while keeping the JS prototype runnable.
+
 ## Day 0：合同核验 + 迁移闸门（~2 小时）
 
 先锁住外部合同，再开始重写。产物写入 `docs/rebuild/CONTRACT_NOTES.md` 或对应实现注释。

@@ -217,7 +217,7 @@ classify_api_error(exception) → ClassifiedError:
 ## 关键技术细节
 
 ### Hermes 的 prompt 缓存策略
-Anthropic `system_and_3`：4 个 `cache_control: {type: "ephemeral"}` 断点（system prompt + 最近 3 条非 system 消息）。多轮对话输入 token 成本降 ~75%。
+Anthropic `system_and_3`：4 个 `cache_control: {type: "ephemeral"}` 断点（system prompt + 末尾 3 条非 system 消息）。多轮对话输入 token 成本降 ~75%。
 
 ### Hermes 的 Prompt 构建（7 层）
 1. Identity — SOUL.md 或 DEFAULT_IDENTITY
