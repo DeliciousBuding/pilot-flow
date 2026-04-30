@@ -152,6 +152,41 @@ test("runCallbackProof returns probe_failed when the probe card send fails", asy
   }
 });
 
+test("runCallbackProof does not send a probe card when the listener fails during startup", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "pilotflow-callback-proof-startup-failed-"));
+  const output = join(dir, "callback-proof.jsonl");
+  let sendCount = 0;
+
+  try {
+    const result = await runCallbackProof({
+      argv: [
+        "--output", output,
+        "--send-probe-card",
+        "--chat-id", "oc_probe",
+        "--probe-run-id", "callback-proof-startup-failed",
+      ],
+      env: {},
+      source: failingEventSource(),
+      runCommand: async () => {
+        sendCount += 1;
+        return okResult(["lark-cli"]);
+      },
+      now: () => "2026-05-01T00:00:00.000Z",
+    });
+
+    assert.equal(result.status, "subscribe_failed");
+    assert.equal(result.exitCode, 2);
+    assert.equal(result.probe.status, "not_sent");
+    assert.equal(sendCount, 0);
+
+    const log = await readFile(output, "utf8");
+    assert.match(log, /"type":"callback_proof.subscribe_failed"/u);
+    assert.doesNotMatch(log, /"type":"callback_proof.probe_card_sent"/u);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 test("runCallbackProof loads probe chat id from local env when cwd is provided", async () => {
   const dir = await mkdtemp(join(tmpdir(), "pilotflow-callback-proof-env-"));
   const output = join(dir, "callback-proof.jsonl");

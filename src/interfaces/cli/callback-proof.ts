@@ -10,6 +10,7 @@ import { parseArgs } from "../../shared/parse-args.js";
 import { buildToolIdempotencyKey } from "../../tools/idempotency.js";
 
 const DEFAULT_OUTPUT = "tmp/proof/callback-proof.jsonl";
+const LISTENER_STARTUP_GRACE_MS = 100;
 
 export interface CallbackProofOptions {
   readonly argv?: readonly string[];
@@ -84,6 +85,9 @@ export async function runCallbackProof(options: CallbackProofOptions = {}): Prom
     let nextEvent = nextWithTimeout(iterator, timeoutMs);
     if (parsed.flags["send-probe-card"] === true) {
       const probeRunId = stringFlag(parsed.flags["probe-run-id"]) ?? buildProbeRunId(now);
+      const startup = await observeListenerStartup(nextEvent, LISTENER_STARTUP_GRACE_MS);
+      if (startup.status === "rejected") throw startup.error;
+      if (startup.status === "settled") nextEvent = settledNext(startup.value);
       try {
         probe = await sendProbeCard({
           chatId: stringFlag(parsed.flags["chat-id"]) ?? env.PILOTFLOW_TEST_CHAT_ID,
@@ -308,6 +312,38 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
 interface PendingNext<T> {
   readonly promise: Promise<IteratorResult<T> | { readonly timeout: true }>;
   readonly cancel: () => void;
+}
+
+type StartupObservation<T> =
+  | { readonly status: "pending" }
+  | { readonly status: "settled"; readonly value: IteratorResult<T> | { readonly timeout: true } }
+  | { readonly status: "rejected"; readonly error: unknown };
+
+async function observeListenerStartup<T>(
+  pending: PendingNext<T>,
+  graceMs: number,
+): Promise<StartupObservation<T>> {
+  let timer: NodeJS.Timeout | undefined;
+  try {
+    return await Promise.race([
+      pending.promise.then<StartupObservation<T>, StartupObservation<T>>(
+        (value) => ({ status: "settled", value }),
+        (error: unknown) => ({ status: "rejected", error }),
+      ),
+      new Promise<StartupObservation<T>>((resolve) => {
+        timer = setTimeout(() => resolve({ status: "pending" }), graceMs);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+function settledNext<T>(value: IteratorResult<T> | { readonly timeout: true }): PendingNext<T> {
+  return {
+    promise: Promise.resolve(value),
+    cancel: () => {},
+  };
 }
 
 function nextWithTimeout<T>(

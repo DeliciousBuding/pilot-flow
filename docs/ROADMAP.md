@@ -79,6 +79,7 @@ Exit condition: a confirmed local command can create real Feishu artifacts and p
 - [x] Add structured live-check next actions for IM event blockers.
 - [x] Add structured callback-proof next actions for timeout and subscription failure cases.
 - [x] Start callback-proof listener before sending the probe card, and classify probe send failures separately.
+- [x] Fail callback-proof before sending a probe card when event subscription fails during startup.
 - [ ] Verify a real Feishu card button click reaches the listener and triggers the orchestrator; the 2026-05-01 probe card send succeeded, but no callback arrived within 30 seconds.
 - [ ] Verify `im.message.receive_v1` delivery; the structured mention probe now sends, but no IM event arrived within 60 seconds.
 - [ ] Capture a polished 6 to 8 minute happy-path walkthrough.
