@@ -81,21 +81,15 @@ flowchart LR
 ```mermaid
 flowchart LR
     subgraph Input
-        direction TB
         IM["Group Chat"]
     end
 
     subgraph PilotFlow
-        direction TB
-        Planner["Planner"]
-        Confirm["Confirmation"]
-        Router["Tool Router"]
-        Summary["Delivery Summary"]
-        Planner --> Confirm --> Router --> Summary
+        Planner["Planner"] --> Confirm["Confirmation"]
+        Confirm --> Router["Tool Router"]
     end
 
     subgraph Feishu Artifacts
-        direction TB
         Doc["Docs"]
         Base["Base"]
         Task["Tasks"]
@@ -109,7 +103,7 @@ flowchart LR
     Router --> Task
     Router --> Card
     Router --> Entry
-    Doc --> Summary
+    Doc --> Summary["Delivery Summary"]
     Base --> Summary
     Task --> Summary
     Summary --> IM

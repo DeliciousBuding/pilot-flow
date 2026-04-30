@@ -87,21 +87,15 @@ flowchart LR
 ```mermaid
 flowchart LR
     subgraph 输入
-        direction TB
         IM["群聊"]
     end
 
     subgraph PilotFlow
-        direction TB
-        Planner["规划器"]
-        Confirm["确认机制"]
-        Router["工具路由器"]
-        Summary["交付总结"]
-        Planner --> Confirm --> Router --> Summary
+        Planner["规划器"] --> Confirm["确认机制"]
+        Confirm --> Router["工具路由器"]
     end
 
     subgraph 飞书产物
-        direction TB
         Doc["文档"]
         Base["多维表格"]
         Task["任务"]
@@ -115,7 +109,7 @@ flowchart LR
     Router --> Task
     Router --> Card
     Router --> Entry
-    Doc --> Summary
+    Doc --> Summary["交付总结"]
     Base --> Summary
     Task --> Summary
     Summary --> IM
