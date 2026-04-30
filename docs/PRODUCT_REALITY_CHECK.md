@@ -20,6 +20,7 @@ It is not complete because the current product is still mostly operator-driven. 
 | Feishu API proof | Real but partial | IM, Card send, Doc, Base, Task, pinned entry, risk card, and final summary have been validated through live paths. |
 | End-user flow | Prototype | A local operator command can run the loop; a normal user cannot yet just talk to a production bot and rely on it. |
 | `pilot:run` TS path | Dry-run ready, live pending | Good product facade and safer defaults exist; real live validation is the next gate. |
+| `pilot:gateway` TS path | Local bridge implemented | It can consume message/card events and resume stored confirmation runs locally, but real tenant validation is still pending. |
 | Card callback | Not complete | Payload, parser, listener, and trigger bridge exist; real `card.action.trigger` delivery is still unproven. |
 | Group announcement | Fallback only | Native announcement was attempted, but the current group returns a docx announcement API block; pinned entry is the reliable route. |
 | LLM planning | Scaffolding | OpenAI-compatible client and Agent loop exist, but real planning success is not a product claim yet. |

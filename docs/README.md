@@ -51,6 +51,7 @@ Generated review reports are created under ignored `tmp/` and are not tracked as
 | Run grouped tests | `npm test` |
 | Run TypeScript tests only | `npm run test:ts` |
 | Check local environment | `npm run pilot:doctor` |
+| Run the TS Feishu event bridge | `npm run pilot:gateway -- --dry-run --max-events 1` |
 | Run the product project loop | `npm run pilot:run -- --dry-run` |
 | Render a run trace | `npm run pilot:recorder -- --input <run.jsonl> --output <html>` |
 | Rebuild review materials | `npm run pilot:package` |

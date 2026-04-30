@@ -36,6 +36,7 @@ lark-cli auth status --verify
 | Run one focused test | `npm run test:one -- <alias>` |
 | Check local environment | `npm run pilot:doctor` |
 | Run product project loop | `npm run pilot:run -- --dry-run` |
+| Run TS Feishu event gateway | `npm run pilot:gateway -- --dry-run --max-events 1` |
 | Run legacy manual demo loop | `npm run pilot:demo` |
 | Run TS gateway/Agent smoke path | `npm run pilot:agent-smoke` |
 | Run TS project-init bridge | `npm run pilot:project-init-ts` |
@@ -128,6 +129,22 @@ npm run pilot:agent-smoke -- --input "@PilotFlow 建立答辩项目空间"
 npm run pilot:agent-smoke -- --json
 ```
 
+## TypeScript Event Gateway
+
+The TypeScript gateway can subscribe to `im.message.receive_v1` and `card.action.trigger`, apply mention filtering, open a waiting-confirmation project-init run from a Feishu mention, persist the pending run locally, and resume it after an approved card callback. This is a local event bridge, not yet a fully validated tenant bot loop.
+
+```bash
+npm run pilot:gateway -- --dry-run --max-events 1
+npm run pilot:gateway -- --live --chat-id <chat> --base-token <base> --base-table-id <table>
+```
+
+Current boundary:
+
+- In `dry-run`, a mention can complete the deterministic project-init loop and write a JSONL trace.
+- In `live`, the first mention should create the waiting-confirmation run and optional execution-plan card, then store the pending run under `tmp/state/pending-gateway-runs.json`.
+- An approved `card.action.trigger` can resume the stored run through the same TS orchestrator path.
+- Real tenant validation is still required before this path replaces the older JS live proof.
+
 ## TypeScript Project Init Bridge
 
 The TypeScript project-init bridge runs the deterministic project planner through the split TS orchestrator, `ToolRegistry`, Feishu tool definitions, duplicate guard, and JSONL recorder. It is the migration path toward the future TS runtime, but `pilot:demo` remains the stable live demo path until TS live validation is complete.
@@ -165,6 +182,9 @@ Live mode is guarded: without `--confirm "确认执行"` it waits before tool ca
 | `PILOTFLOW_TASK_ASSIGNEE_OPEN_ID` | optional default assignee `open_id` for the first created Task |
 | `PILOTFLOW_LISTENER_MAX_EVENTS` | max event count for `pilot:listen:cards` |
 | `PILOTFLOW_LISTENER_TIMEOUT` | listener timeout such as `30s` or `2m` |
+| `PILOTFLOW_BOT_OPEN_ID` | optional bot `open_id` for TS mention filtering |
+| `PILOTFLOW_BOT_USER_ID` | optional bot `user_id` for TS mention filtering |
+| `PILOTFLOW_BOT_NAME` | optional bot display name for TS mention filtering |
 | `PILOTFLOW_LLM_BASE_URL` | optional OpenAI-compatible base URL for the TS Agent loop |
 | `PILOTFLOW_LLM_API_KEY` | local-only LLM API key; never commit |
 | `PILOTFLOW_LLM_MODEL` | model name for the TS Agent loop |

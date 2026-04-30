@@ -24,7 +24,7 @@ flowchart LR
 | Area | Status | Boundary |
 | --- | --- | --- |
 | Manual project launch loop | Useful prototype | The older JS path has real Feishu proof; it is not a production bot. |
-| Feishu-native surfaces | Partially live validated | IM, Cards, Doc, Base, Task, pinned entry, risk card, and summary are real; announcement and callback are not complete. |
+| Feishu-native surfaces | Partially live validated | IM, Cards, Doc, Base, Task, pinned entry, risk card, and summary are real; TS mention gateway exists locally, but announcement and callback are not complete. |
 | Human confirmation | Stable fallback | Text confirmation works; real card button confirmation remains pending. |
 | Traceability | Implemented | JSONL run log, Flight Recorder, and review packs make runs inspectable. |
 | Review packaging | Implemented but auxiliary | Useful for competition evidence; it must not become the product center. |
@@ -67,6 +67,7 @@ Exit condition: a confirmed local command can create real Feishu artifacts and p
 - [x] Optional Contacts lookup for owner labels.
 - [x] Bounded card listener and callback-trigger bridge.
 - [x] Native group announcement attempt with pinned-entry fallback.
+- [x] Local TS IM mention gateway bridge with pending-run continuation for approved card callbacks.
 - [ ] Verify a real Feishu card button click reaches the listener and triggers the orchestrator.
 - [ ] Capture a polished 6 to 8 minute happy-path walkthrough.
 - [ ] Capture a focused failure-path walkthrough or screenshot set.
@@ -138,7 +139,7 @@ Exit condition: PilotFlow feels useful beyond the first project-launch flow whil
 1. Configure real live targets, then validate `npm run pilot:run -- --live --confirm "确认执行"` against the activity tenant.
 2. Compare the `pilot:run` live artifacts with the older JS live proof; do not remove the JS path until parity is proven.
 3. Verify Open Platform card callback delivery with a real `card.action.trigger` event, or document the exact platform/config blocker with screenshots and logs.
-4. Convert the Feishu gateway from local smoke into an allowlisted IM mention trigger after callback proof is understood.
+4. Validate the new `pilot:gateway` path against the real tenant, then convert it into an allowlisted IM mention trigger after callback proof is understood.
 5. Promote Retrospective Eval cases into snapshot-backed fixtures from real successful and degraded runs.
 6. Capture happy-path and failure-path media outside Git, then rerun `pilot:status` until the package is no longer `needs_regeneration`.
 7. Only after the main Feishu loop is stable, design the first artifact approval card for worker previews.

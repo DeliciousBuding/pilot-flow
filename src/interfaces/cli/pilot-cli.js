@@ -24,6 +24,10 @@ const COMMANDS = {
     description: "Check local PilotFlow runtime requirements without printing secrets.",
     steps: [{ script: "pilot:doctor:run", args: [] }]
   },
+  gateway: {
+    description: "Run the TypeScript Feishu IM and card gateway bridge.",
+    steps: [{ script: "pilot:gateway", args: [] }]
+  },
   run: {
     description: "Run the product-grade TypeScript PilotFlow project flow.",
     steps: [{ script: "pilot:run", args: [] }]
@@ -107,6 +111,7 @@ function renderHelp() {
     "  npm run pilot:demo -- --send-plan-card --no-auto-confirm",
     "  npm run pilot:recorder -- --input tmp/runs/latest-manual-run.jsonl --output tmp/flight-recorder/latest.html",
     "  npm run pilot:doctor",
+    "  npm run pilot:gateway -- --dry-run --max-events 1",
     "  npm run pilot:run -- --dry-run --input \"目标: 建立答辩项目空间\"",
     "  npm run pilot:agent-smoke -- --input \"@PilotFlow 建立答辩项目空间\"",
     "  npm run pilot:project-init-ts -- --dry-run --send-entry-message",

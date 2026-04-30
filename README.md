@@ -208,7 +208,7 @@ Detailed plan: [docs/AGENT_EVOLUTION.md](docs/AGENT_EVOLUTION.md).
 
 | Surface | Product role | Current maturity |
 | --- | --- | --- |
-| IM | Main collaboration entry and summary channel | Live send validated; automatic group trigger pending |
+| IM | Main collaboration entry and summary channel | Live send validated; TS mention gateway bridge exists locally, real allowlisted trigger pending |
 | Cards | Execution plan, confirmation, risk decision | Live send validated; real button callback pending |
 | Docs | Project brief and delivery documents | Live creation validated |
 | Base | Tasks, detected risks, artifacts, confirmations | Live Project State write validated |
@@ -227,6 +227,7 @@ PilotFlow is currently a **strong engineering prototype**, not a finished produc
 | Activity tenant, `lark-cli`, and core Feishu API proof | Live validated | Real IM/Card/Doc/Base/Task paths have been exercised. |
 | JS project-launch live path | Live validated prototype | It can create visible Feishu artifacts and a run trace from a confirmed local command. |
 | TypeScript `pilot:run` path | Dry-run ready, live pending | Product facade exists; real live parity is the next hard gate. |
+| TypeScript `pilot:gateway` path | Local bridge implemented | It can consume Feishu message/card events, persist waiting confirmations, and resume approved runs locally; real tenant validation is still pending. |
 | Execution plan card and risk card | Live send validated | Button payloads exist, but real callback execution is not proven. |
 | Card callback listener bridge | Local/prototype | Parser, listener, and trigger bridge are tested; no real callback event has reached the listener yet. |
 | Pinned project entry | Live validated | This is the reliable project entrance in the current prototype. |
@@ -301,6 +302,7 @@ For local development and reviewer reproduction:
 npm run pilot:check
 npm test
 npm run pilot:run -- --dry-run
+npm run pilot:gateway -- --dry-run --max-events 1
 npm run pilot:agent-smoke
 npm run pilot:project-init-ts
 npm run pilot:run -- --dry-run --input "目标: 建立答辩项目空间 成员: 产品, 技术 交付物: Brief, Task 截止时间: 2026-05-03"
@@ -312,7 +314,7 @@ npm run pilot:status
 npm run pilot:audit
 ```
 
-`pilot:run` is the preferred product-facing local entry. It uses the TypeScript project-init path, forces dry-run unless live mode is explicit, enables the execution-plan card, project entry message, pinned entry, and risk card by default for dry-run or confirmed live runs, and writes to `tmp/runs/latest-manual-run.jsonl` or `tmp/runs/latest-live-run.jsonl` unless an output path is supplied. Live Feishu execution is still behind explicit confirmation. Operational setup lives in [docs/OPERATOR_RUNBOOK.md](docs/OPERATOR_RUNBOOK.md); contributor workflow lives in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md). Generated review packs, including the Run Retrospective Pack and Retrospective Eval report, are auxiliary material and are kept out of the product runtime surface.
+`pilot:run` is the preferred product-facing local entry for direct project-init runs. `pilot:gateway` is the new TS event bridge for `im.message.receive_v1` and `card.action.trigger`: it can open a waiting confirmation run from a mention, persist the pending run locally, and resume it after an approved card callback. Both paths still need real tenant validation before they can replace the older JS live proof. Operational setup lives in [docs/OPERATOR_RUNBOOK.md](docs/OPERATOR_RUNBOOK.md); contributor workflow lives in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md). Generated review packs, including the Run Retrospective Pack and Retrospective Eval report, are auxiliary material and are kept out of the product runtime surface.
 
 ## 🛡️ Trust Model
 

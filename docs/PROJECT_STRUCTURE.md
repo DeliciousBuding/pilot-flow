@@ -27,6 +27,7 @@ Use the small `pilot:*` facade for normal operation:
 ```bash
 npm run pilot:check
 npm run pilot:doctor
+npm run pilot:gateway -- --dry-run --max-events 1
 npm run pilot:run -- --dry-run
 npm run pilot:recorder -- --input tmp/runs/latest-manual-run.jsonl --output tmp/flight-recorder/latest.html
 npm run pilot:package
@@ -61,4 +62,4 @@ PilotFlow can run a real Feishu project-launch loop through a manual trigger and
 
 The Hermes-style TypeScript kernel rebuild has completed Day 0 through Day 7: strict TS foundation, domain modules, ToolRegistry, tool idempotency, 9 Feishu tool definitions, split TS orchestrator layer, minimal LLM client, Agent loop, session manager, Feishu gateway boundary, `pilot:agent-smoke` dry-run CLI bridge, `pilot:project-init-ts` live-guarded project-init bridge, `pilot:run` product facade, Retrospective Eval, and preview-only Review Worker contract are in place. The old JS runtime is still intentionally retained until the TS path passes the same real live and dry-run checks.
 
-PilotFlow is not yet a fully unattended long-running Feishu bot. Card callback listener wiring and gateway parsing exist locally, but real `card.action.trigger` delivery still needs Open Platform callback configuration verification. Public webhook transport remains a tested contract helper rather than the default product path. The stable fallback is text confirmation.
+PilotFlow is not yet a fully unattended long-running Feishu bot. The TS gateway now has a human-runnable `pilot:gateway` bridge for message/card events plus a local pending-run store, but real allowlisted IM triggering and real `card.action.trigger` delivery still need tenant validation. Public webhook transport remains a tested contract helper rather than the default product path. The stable fallback is text confirmation.
