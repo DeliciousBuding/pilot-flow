@@ -48,7 +48,7 @@ flowchart TB
 | Card Event Listener | Streams Feishu card callbacks and triggers approved runs | code-level listener and callback-trigger bridge implemented; live listener connected but callback delivery still pending |
 | LLM Client | Calls OpenAI-compatible chat completions with tool schemas | minimal TS client implemented with mock-fetch tests; real online success is not a rebuild gate |
 | Agent Loop | Runs while-next LLM -> tool calls -> registry -> tool output | TS loop implemented behind ToolRegistry and confirmation gate; deterministic orchestrator remains default path |
-| Feishu Gateway | Normalizes Feishu IM/card events before Agent/session routing | lark-cli NDJSON parser, mention gate, dedupe, per-chat queue, message/card handlers, and webhook contract helpers implemented |
+| Feishu Gateway | Normalizes Feishu IM/card events before Agent/session routing | lark-cli NDJSON parser, mention gate, dedupe, per-chat queue, message/card handlers, webhook contract helpers, and dry-run CLI smoke bridge implemented |
 
 ## Run State
 
@@ -86,7 +86,7 @@ Artifact normalization currently supports Feishu Doc, Base record batch writes, 
 
 The TypeScript rebuild path now has `src/tools/registry.ts`, `src/tools/idempotency.ts`, self-registering Feishu tool definitions under `src/tools/feishu/*.ts`, a split `src/orchestrator/` layer, `src/llm/`, `src/agent/`, and `src/gateway/feishu/`. The TS orchestrator owns validation fallback, confirmation gating, batch preflight, deterministic tool sequencing, optional fallback handling, callback parsing, Project State row building, assignee/contact resolution, and an atomic duplicate guard with TTL cleanup. The Agent loop uses the same ToolRegistry schema/execute surface, so LLM-driven tool calls cannot bypass registry preflight or confirmation enforcement. The existing JS runtime remains the live product path until the TS gateway and CLI entrypoints are wired.
 
-The Feishu gateway follows the Hermes pattern in a reduced form: default event input is `lark-cli event +subscribe` NDJSON, not a public webhook. The gateway can parse message and card events, apply DM/@mention filtering, dedupe event IDs, and serialize work per chat. The webhook helper only implements signature and verification-token contract tests; real encrypted webhook payloads, public callback delivery, and synchronous card mutation are deferred until platform fixtures are verified.
+The Feishu gateway follows the Hermes pattern in a reduced form: default event input is `lark-cli event +subscribe` NDJSON, not a public webhook. The gateway can parse message and card events, apply DM/@mention filtering, dedupe event IDs, and serialize work per chat. `pilot:agent-smoke` exercises this path locally with a mock LLM and dry-run Feishu tools. The webhook helper only implements signature and verification-token contract tests; real encrypted webhook payloads, public callback delivery, and synchronous card mutation are deferred until platform fixtures are verified.
 
 Plan validation runs immediately after planner output and before confirmation, preflight, duplicate-run guard, or any Feishu tool call. If required project-init fields fail validation, PilotFlow records `plan.validation_failed`, returns `needs_clarification`, and uses a safe fallback plan instead of creating Doc/Base/Task/IM artifacts.
 

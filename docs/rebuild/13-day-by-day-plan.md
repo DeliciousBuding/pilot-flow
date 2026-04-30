@@ -10,7 +10,8 @@
 - [x] Day 2 complete: domain modules, `ToolRegistry`, tool idempotency, and 9 Feishu tool definitions are implemented in commit `4353182`.
 - [x] Day 3 complete: `src/orchestrator/` split is implemented with confirmation gate, deterministic sequence, duplicate guard, card/message/state helpers, callback bridge, and tests while keeping the JS prototype runnable.
 - [x] Day 4 complete: Feishu gateway boundary, OpenAI-compatible LLM client, retry/error classifier, Agent loop, and session manager are implemented without deleting the JS public CLI path.
-- [ ] Day 5 next: CLI migration bridge, public command hardening, and a dry-run Feishu gateway smoke path.
+- [x] Day 5 complete: CLI migration bridge, public command hardening, and a dry-run Feishu gateway smoke path are implemented without replacing the JS live path.
+- [ ] Day 6 next: live-guarded TS project-init bridge and old-runtime removal decision.
 
 ## Day 0：合同核验 + 迁移闸门（~2 小时）
 
@@ -334,3 +335,10 @@ npm run pilot:demo          # dry-run demo
 ```
 
 **Day 5 完成标志**：全量编译通过，所有测试绿色，旧文件清理完毕。
+
+当前 Day 5 采用更保守的产品化迁移口径：不在 TS live path 完整验证前删除旧 JS runtime。已完成：
+
+- `src/interfaces/cli/agent-smoke.ts`：TS gateway/Agent dry-run smoke CLI。
+- `npm run pilot:agent-smoke`：可直接运行 mock Feishu event -> mention gate -> session -> Agent loop -> ToolRegistry -> dry-run Feishu tools。
+- `tests/interfaces/agent-smoke.test.ts`：覆盖默认输入、显式 lark-cli NDJSON event line 和未 @bot 的群消息过滤。
+- README、Operator Runbook、Architecture、Project Structure、Roadmap 和 rebuild docs 已同步新命令和 Day 5 状态。

@@ -35,6 +35,7 @@ lark-cli auth status --verify
 | Run one focused test | `npm run test:one -- <alias>` |
 | Check local environment | `npm run pilot:doctor` |
 | Run manual dry-run demo | `npm run pilot:demo` |
+| Run TS gateway/Agent smoke path | `npm run pilot:agent-smoke` |
 | Render Flight Recorder | `npm run pilot:recorder -- --input <run.jsonl> --output <html>` |
 | Rebuild review package | `npm run pilot:package` |
 | Rebuild delivery status | `npm run pilot:status` |
@@ -109,6 +110,16 @@ Show all runtime options:
 npm run pilot:demo -- --help
 ```
 
+## TypeScript Agent Smoke
+
+The TypeScript Agent kernel has a dry-run smoke command. It parses a Feishu-style NDJSON message event, applies mention filtering, creates a session, runs the Agent loop with a mock LLM, and executes Feishu tools through `ToolRegistry` in dry-run mode. It does not call a real model and does not write to Feishu.
+
+```bash
+npm run pilot:agent-smoke
+npm run pilot:agent-smoke -- --input "@PilotFlow 建立答辩项目空间"
+npm run pilot:agent-smoke -- --json
+```
+
 ## Runtime Variables
 
 | Variable | Meaning |
@@ -173,7 +184,7 @@ Generated reports and run logs stay under ignored `tmp/`.
 
 ## TypeScript Kernel Rebuild Status
 
-The TypeScript rebuild is active but not yet the live CLI path. Day 0 through Day 4 are complete: strict TS foundation, domain modules, ToolRegistry, tool idempotency, 9 Feishu tool definitions, split TS orchestrator, OpenAI-compatible LLM client, retry/error classifier, Agent loop, session manager, and Feishu gateway boundary are implemented and covered by TS tests. Operators should still use the `pilot:*` commands above for live and dry-run demos until the TS CLI bridge passes the same checks.
+The TypeScript rebuild is active but not yet the live CLI path. Day 0 through Day 5 are complete: strict TS foundation, domain modules, ToolRegistry, tool idempotency, 9 Feishu tool definitions, split TS orchestrator, OpenAI-compatible LLM client, retry/error classifier, Agent loop, session manager, Feishu gateway boundary, and a dry-run CLI smoke bridge are implemented and covered by TS tests. Operators should still use the JS-backed `pilot:demo` command for live Feishu demos until the TS live path passes the same checks.
 
 ## Known Platform Edges
 
