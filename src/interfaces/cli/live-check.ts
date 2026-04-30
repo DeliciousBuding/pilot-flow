@@ -41,6 +41,7 @@ export async function buildLiveCheckReport(options: LiveCheckOptions = {}): Prom
   const checks: LiveCheckItem[] = [];
   checks.push(await commandCheck("lark-cli", "lark-cli version", ["--version"], command, { timeoutMs: 10_000 }));
   checks.push(await commandCheck("lark-cli", "lark auth", ["auth", "status", "--verify"], command, commandOptions));
+  checks.push(await eventScopeCheck("im:message.p2p_msg:readonly", command, commandOptions));
 
   if (targets.chatId) {
     checks.push(await commandCheck("lark-cli", "chat readable", ["api", "GET", `/open-apis/im/v1/chats/${targets.chatId}`, "--as", "bot"], command, commandOptions));
@@ -146,6 +147,19 @@ async function commandCheck(
     return { name, status: "pass", detail: "ok" };
   } catch (error) {
     return { name, status: "fail", detail: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+async function eventScopeCheck(scope: string, command: CommandRunner, options: RunOptions): Promise<LiveCheckItem> {
+  try {
+    await command("lark-cli", ["auth", "check", "--scope", scope], options);
+    return { name: "IM event receive scope", status: "pass", detail: `${scope} granted` };
+  } catch (error) {
+    return {
+      name: "IM event receive scope",
+      status: "warn",
+      detail: `missing ${scope}; im.message.receive_v1 may not be delivered until the app scope and user authorization are updated`,
+    };
   }
 }
 
