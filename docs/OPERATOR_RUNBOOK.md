@@ -65,7 +65,7 @@ npm run pilot:doctor
 npm run pilot:doctor -- --verify-auth
 ```
 
-Use `pilot:live-check` before a real write run. It performs read-only checks for `lark-cli`, profile auth, IM event receive scope, event subscribe dry-run, chat visibility, Base table visibility, and bot mention identity. It ignores `PILOTFLOW_LLM_*` because this command only validates Feishu live targets.
+Use `pilot:live-check` before a real write run. It performs read-only checks for `lark-cli`, profile auth, IM event receive scope, event subscribe dry-run, event bus status, chat visibility, Base table visibility, and bot mention identity. It ignores `PILOTFLOW_LLM_*` because this command only validates Feishu live targets.
 When run from the repository root, `pilot:live-check` loads local `.env` values for target IDs but redacts them from the report.
 
 ```bash
@@ -306,7 +306,7 @@ Run the update from the workspace root because `--content @PERSONAL_PROGRESS.md`
 | Card sends but button does not trigger | Regenerate Callback Verification Pack and inspect Open Platform callback configuration |
 | Gateway live probe appears stuck | Re-run with `--timeout 60s --json`; `timeout` means no event arrived, while `subscribe_failed` points to subscription, permission, or profile setup |
 | Gateway probe fails before sending | Set `PILOTFLOW_BOT_USER_ID` or pass `--bot-user-id`; the default probe needs a structured bot mention |
-| Gateway probe message sends but no event arrives | Check `pilot:live-check` for missing `im:message.p2p_msg:readonly`, then inspect Open Platform event subscription, bot availability, app publication state, long-connection mode, and whether another subscriber is consuming events |
+| Gateway probe message sends but no event arrives | Check `pilot:live-check` for missing `im:message.p2p_msg:readonly` or a running event bus, then inspect Open Platform event subscription, bot availability, app publication state, and long-connection mode |
 | Callback proof returns `subscribe_failed` | Inspect the sanitized stderr in `tmp/proof/callback-proof.jsonl`, then check event subscription permissions and profile auth |
 | Announcement update fails | Keep pinned entry fallback; do not claim native announcement success for this group |
 | Contact lookup cannot assign owner | Use explicit `PILOTFLOW_OWNER_OPEN_ID_MAP_JSON` or keep text owner fallback |

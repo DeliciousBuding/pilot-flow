@@ -28,6 +28,7 @@ test("buildLiveCheckReport checks live targets with redacted details", async () 
   assert.equal(report.summary.failed, 0);
   assert.equal(checkStatus(report.checks, "IM event receive scope"), "pass");
   assert.equal(checkStatus(report.checks, "IM event subscribe dry-run"), "pass");
+  assert.equal(checkStatus(report.checks, "event bus status"), "pass");
   assert.equal(checkStatus(report.checks, "chat readable"), "pass");
   assert.equal(checkStatus(report.checks, "base table readable"), "pass");
   assert.equal(checkStatus(report.checks, "bot mention identity"), "warn");
@@ -60,7 +61,7 @@ test("buildLiveCheckReport reports missing env without live API calls", async ()
   assert.equal(checkStatus(report.checks, "chat readable"), "warn");
   assert.equal(checkStatus(report.checks, "base table readable"), "warn");
   assert.equal(checkStatus(report.checks, "bot mention identity"), "warn");
-  assert.equal(commandCount, 4);
+  assert.equal(commandCount, 5);
 });
 
 test("buildLiveCheckReport warns when the IM event receive scope is missing", async () => {
@@ -93,6 +94,22 @@ test("buildLiveCheckReport fails when the IM event subscribe command cannot be c
   const subscribeCheck = report.checks.find((item) => item.name === "IM event subscribe dry-run");
   assert.equal(subscribeCheck?.status, "fail");
   assert.match(subscribeCheck?.detail ?? "", /subscribe dry-run failed/u);
+});
+
+test("buildLiveCheckReport warns when the event bus is already running", async () => {
+  const report = await buildLiveCheckReport({
+    env: {},
+    runCommand: async (bin: string, args: readonly string[]) => {
+      if (args.join(" ") === "event status") {
+        return okResult([bin, ...args], "Bus: running");
+      }
+      return okResult([bin, ...args]);
+    },
+  });
+
+  const busCheck = report.checks.find((item) => item.name === "event bus status");
+  assert.equal(busCheck?.status, "warn");
+  assert.match(busCheck?.detail ?? "", /avoid multiple event subscribers/u);
 });
 
 test("buildLiveCheckReport ignores partial LLM env because it only checks Feishu live targets", async () => {
@@ -147,12 +164,12 @@ test("buildLiveCheckReport reports configured bot mention identity without print
   assert.doesNotMatch(rendered, /u_secret_bot_123456/u);
 });
 
-function okResult(command: readonly string[]): CommandResult {
+function okResult(command: readonly string[], stdout = "{}"): CommandResult {
   return {
     ok: true,
     exitCode: 0,
     exit_code: 0,
-    stdout: "{}",
+    stdout,
     stderr: "",
     command,
     json: {},

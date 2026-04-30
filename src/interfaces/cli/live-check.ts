@@ -43,6 +43,7 @@ export async function buildLiveCheckReport(options: LiveCheckOptions = {}): Prom
   checks.push(await commandCheck("lark-cli", "lark auth", ["auth", "status", "--verify"], command, commandOptions));
   checks.push(await eventScopeCheck("im:message.p2p_msg:readonly", command, commandOptions));
   checks.push(await eventSubscribeDryRunCheck("im.message.receive_v1", command, commandOptions));
+  checks.push(await eventBusStatusCheck(command, commandOptions));
 
   if (targets.chatId) {
     checks.push(await commandCheck("lark-cli", "chat readable", ["api", "GET", `/open-apis/im/v1/chats/${targets.chatId}`, "--as", "bot"], command, commandOptions));
@@ -175,6 +176,28 @@ async function eventSubscribeDryRunCheck(eventType: string, command: CommandRunn
       detail: error instanceof Error ? error.message : String(error),
     };
   }
+}
+
+async function eventBusStatusCheck(command: CommandRunner, options: RunOptions): Promise<LiveCheckItem> {
+  try {
+    const result = await command("lark-cli", ["event", "status"], options);
+    const detail = summarizeEventBusStatus(result.stdout);
+    return { name: "event bus status", status: detail.startsWith("running;") ? "warn" : "pass", detail };
+  } catch (error) {
+    return {
+      name: "event bus status",
+      status: "warn",
+      detail: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+function summarizeEventBusStatus(stdout = ""): string {
+  const text = stdout.trim();
+  if (!text) return "event bus status unavailable";
+  if (/not running/i.test(text)) return "not running";
+  if (/\brunning\b/i.test(text)) return "running; avoid multiple event subscribers unless intentionally using --force";
+  return text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean).slice(0, 2).join(" ");
 }
 
 function redactReport(report: LiveCheckReport): LiveCheckReport {
