@@ -2,7 +2,7 @@ import { pathToFileURL } from "node:url";
 import { JsonlRecorder } from "../../infrastructure/jsonl-recorder.js";
 import { handleCardEvent } from "../../gateway/feishu/card-handler.js";
 import { EventDedupe } from "../../gateway/feishu/dedupe.js";
-import { LarkCliEventSource } from "../../gateway/feishu/lark-cli-source.js";
+import { LarkCliEventSource, LarkCliSubscribeError } from "../../gateway/feishu/lark-cli-source.js";
 import type { EventSource, FeishuGatewayEvent } from "../../gateway/feishu/event-source.js";
 import { runCommand, type CommandResult } from "../../infrastructure/command-runner.js";
 import { loadCliEnv } from "../../config/local-env.js";
@@ -27,12 +27,17 @@ export interface CallbackProofProbeResult {
 }
 
 export interface CallbackProofResult {
-  readonly status: "observed" | "timeout_no_callback";
+  readonly status: "observed" | "timeout_no_callback" | "subscribe_failed";
   readonly observedCallbacks: number;
   readonly ignoredEvents: number;
   readonly unsupportedEvents: number;
   readonly output: string;
   readonly probe: CallbackProofProbeResult;
+  readonly failure?: {
+    readonly message: string;
+    readonly exitCode?: number | null;
+    readonly stderr?: string;
+  };
   readonly exitCode: number;
 }
 
@@ -62,6 +67,7 @@ export async function runCallbackProof(options: CallbackProofOptions = {}): Prom
   let unsupportedEvents = 0;
   let seenEvents = 0;
   let timedOut = false;
+  let failure: CallbackProofResult["failure"] | undefined;
 
   await recorder.record({ type: "callback_proof.started", runId: "callback-proof", output, strict, includeRaw, timestamp: now() });
   const probe = parsed.flags["send-probe-card"] === true
@@ -116,12 +122,23 @@ export async function runCallbackProof(options: CallbackProofOptions = {}): Prom
       }
       if (maxEvents > 0 && seenEvents >= maxEvents) break;
     }
+  } catch (error) {
+    const currentFailure = subscribeFailure(error);
+    failure = currentFailure;
+    await recorder.record({
+      type: "callback_proof.subscribe_failed",
+      runId: "callback-proof",
+      message: currentFailure.message,
+      exitCode: currentFailure.exitCode,
+      stderr: currentFailure.stderr,
+      timestamp: now(),
+    });
   } finally {
     await source.close();
     await recorder.close();
   }
 
-  const status = observedCallbacks > 0 ? "observed" : "timeout_no_callback";
+  const status = failure ? "subscribe_failed" : observedCallbacks > 0 ? "observed" : "timeout_no_callback";
   if (timedOut || status === "timeout_no_callback") {
     await recorder.record({ type: "callback_proof.timeout_no_callback", runId: "callback-proof", observedCallbacks, ignoredEvents, unsupportedEvents, timestamp: now() });
   }
@@ -133,7 +150,8 @@ export async function runCallbackProof(options: CallbackProofOptions = {}): Prom
     unsupportedEvents,
     output,
     probe,
-    exitCode: status === "timeout_no_callback" && strict ? 1 : 0,
+    failure,
+    exitCode: status === "subscribe_failed" ? 2 : status === "timeout_no_callback" && strict ? 1 : 0,
   };
 }
 
@@ -212,6 +230,7 @@ export function renderCallbackProof(result: CallbackProofResult): string {
     `probe_status: ${result.probe.status}`,
     result.probe.runId ? `probe_run_id: ${result.probe.runId}` : undefined,
     result.probe.messageId ? `probe_message_id: ${result.probe.messageId}` : undefined,
+    result.failure ? `failure: ${result.failure.message}` : undefined,
     `output: ${result.output}`,
   ].filter((line): line is string => typeof line === "string").join("\n");
 }
@@ -278,6 +297,19 @@ function extractMessageId(result: CommandResult): string | undefined {
     getString(result.json ?? {}, ["data", "message_id"]) ||
     getString(result.json ?? {}, ["message_id"]) ||
     undefined;
+}
+
+function subscribeFailure(error: unknown): NonNullable<CallbackProofResult["failure"]> {
+  if (error instanceof LarkCliSubscribeError) {
+    return {
+      message: error.message,
+      exitCode: error.details.exitCode,
+      stderr: error.details.stderr,
+    };
+  }
+  return {
+    message: error instanceof Error ? error.message : String(error),
+  };
 }
 
 function buildProbeRunId(now: () => string): string {

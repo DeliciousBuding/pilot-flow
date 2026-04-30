@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { runCallbackProof, renderCallbackProof } from "../../src/interfaces/cli/callback-proof.js";
 import type { FeishuGatewayEvent } from "../../src/gateway/feishu/event-source.js";
+import { LarkCliSubscribeError } from "../../src/gateway/feishu/lark-cli-source.js";
 import type { CommandResult } from "../../src/infrastructure/command-runner.js";
 
 test("runCallbackProof records observed card callbacks without raw payloads by default", async () => {
@@ -124,6 +125,30 @@ test("runCallbackProof loads probe chat id from local env when cwd is provided",
   }
 });
 
+test("runCallbackProof returns structured subscribe failures", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "pilotflow-callback-proof-failure-"));
+  const output = join(dir, "callback-proof.jsonl");
+
+  try {
+    const result = await runCallbackProof({
+      argv: ["--output", output],
+      source: failingEventSource(),
+      now: () => "2026-05-01T00:00:00.000Z",
+    });
+
+    assert.equal(result.status, "subscribe_failed");
+    assert.equal(result.exitCode, 2);
+    assert.equal(result.failure?.exitCode, 2);
+    assert.match(renderCallbackProof(result), /failure: lark-cli event subscription failed/u);
+
+    const log = await readFile(output, "utf8");
+    assert.match(log, /"type":"callback_proof.subscribe_failed"/u);
+    assert.doesNotMatch(log, /secret-token/u);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 function cardEvent(id: string, runId: string): FeishuGatewayEvent {
   return {
     kind: "card",
@@ -163,5 +188,18 @@ function okResult(command: readonly string[]): CommandResult {
     stderr: "",
     command,
     json: { data: { message: { message_id: "om_probe" } } },
+  };
+}
+
+function failingEventSource() {
+  return {
+    async *events(): AsyncIterable<FeishuGatewayEvent> {
+      throw new LarkCliSubscribeError("lark-cli event subscription failed: token=[REDACTED]", {
+        command: ["lark-cli", "event", "+subscribe"],
+        exitCode: 2,
+        stderr: "token=[REDACTED]",
+      });
+    },
+    async close() {},
   };
 }

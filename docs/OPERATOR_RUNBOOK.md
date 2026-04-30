@@ -172,6 +172,8 @@ npm run pilot:callback-proof -- --timeout 60s --strict
 
 `--send-probe-card` sends a small Feishu interactive card to `--chat-id` or `PILOTFLOW_TEST_CHAT_ID` before listening. Click its `确认执行` button from Feishu to test whether Open Platform delivers `card.action.trigger` back to the local listener. Use `--dry-run` with `--send-probe-card` to inspect the card-send command without writing to Feishu. `--strict` exits non-zero when no callback arrives. Raw payload capture is off by default; `--include-raw` is allowed only for ignored `tmp/` outputs.
 
+If `lark-cli event +subscribe` exits before any event arrives, the command now returns `subscribe_failed` and records sanitized stderr in the proof JSONL. Treat that as a subscription, permission, or Open Platform configuration issue. Treat `timeout_no_callback` as a different case: the listener stayed up, but no button event arrived during the window.
+
 ## TypeScript Project Init Bridge
 
 The TypeScript project-init bridge runs the deterministic project planner through the split TS orchestrator, `ToolRegistry`, Feishu tool definitions, duplicate guard, and JSONL recorder. The preferred product command is `pilot:run`, which wraps this bridge with the normal product surfaces. The older JS path remains available until repeated TS live parity and callback-driven continuation are proven.
@@ -297,6 +299,7 @@ Run the update from the workspace root because `--content @PERSONAL_PROGRESS.md`
 | Live mode stops before side effects | Confirm `PILOTFLOW_TEST_CHAT_ID`, `PILOTFLOW_BASE_TOKEN`, and `PILOTFLOW_BASE_TABLE_ID` |
 | Duplicate live run blocked | Use a new `PILOTFLOW_DEDUPE_KEY` or intentionally pass `--allow-duplicate-run` |
 | Card sends but button does not trigger | Regenerate Callback Verification Pack and inspect Open Platform callback configuration |
+| Callback proof returns `subscribe_failed` | Inspect the sanitized stderr in `tmp/proof/callback-proof.jsonl`, then check event subscription permissions and profile auth |
 | Announcement update fails | Keep pinned entry fallback; do not claim native announcement success for this group |
 | Contact lookup cannot assign owner | Use explicit `PILOTFLOW_OWNER_OPEN_ID_MAP_JSON` or keep text owner fallback |
 | Generated report mentions removed commands | Search for outdated command aliases or old review-pack paths, then update source generators |

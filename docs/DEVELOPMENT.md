@@ -114,6 +114,7 @@ Implemented runtime capabilities:
 - multiline-safe text IM sending through JSON `--content` instead of raw argv text
 - per-run reset of default JSONL output files so `latest-live-run.jsonl` and `latest-manual-run.jsonl` represent one current run
 - callback proof probe cards in `pilot:callback-proof -- --send-probe-card`, so callback validation can create its own clickable Feishu test card before listening
+- structured `lark-cli event +subscribe` failures with sanitized stderr, so callback and gateway debugging can distinguish subscription failure from a quiet timeout
 - retrospective eval runner in `src/review-packs/retrospective-eval.js`
 - preview-only Review Worker contract in `src/agent/review-worker.ts`
 
