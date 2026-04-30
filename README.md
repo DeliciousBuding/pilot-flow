@@ -85,31 +85,36 @@ flowchart LR
 ## 架构设计
 
 ```mermaid
-flowchart TB
-    subgraph "飞书原生界面"
+flowchart LR
+    subgraph 输入
         IM["群聊"]
-        Card["互动卡片"]
+    end
+
+    subgraph PilotFlow
+        Planner["规划器"] --> Confirm["确认机制"]
+        Confirm --> Router["工具路由器"]
+    end
+
+    subgraph 飞书产物
         Doc["文档"]
         Base["多维表格"]
         Task["任务"]
-    end
-
-    subgraph "PilotFlow 核心"
-        Planner["Agent 规划器"]
-        Confirm["人工确认机制"]
-        Router["飞书工具路由器"]
-        Recorder["Flight Recorder"]
+        Card["卡片"]
+        Entry["固定入口"]
     end
 
     IM --> Planner
-    Planner --> Confirm
-    Confirm --> Router
     Router --> Doc
     Router --> Base
     Router --> Task
     Router --> Card
-    Router --> IM
-    Router --> Recorder
+    Router --> Entry
+    Doc --> Summary["交付总结"]
+    Base --> Summary
+    Task --> Summary
+    Card --> Summary
+    Entry --> Summary
+    Summary --> IM
 ```
 
 详细架构：[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。

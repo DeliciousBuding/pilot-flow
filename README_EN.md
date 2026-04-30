@@ -79,31 +79,36 @@ flowchart LR
 ## Architecture
 
 ```mermaid
-flowchart TB
-    subgraph "Feishu Native Surfaces"
+flowchart LR
+    subgraph Input
         IM["Group Chat"]
-        Card["Cards"]
+    end
+
+    subgraph PilotFlow
+        Planner["Planner"] --> Confirm["Confirmation"]
+        Confirm --> Router["Tool Router"]
+    end
+
+    subgraph Feishu Artifacts
         Doc["Docs"]
         Base["Base"]
         Task["Tasks"]
-    end
-
-    subgraph "PilotFlow Core"
-        Planner["Agent Planner"]
-        Confirm["Confirmation Gate"]
-        Router["Feishu Tool Router"]
-        Recorder["Flight Recorder"]
+        Card["Cards"]
+        Entry["Pinned Entry"]
     end
 
     IM --> Planner
-    Planner --> Confirm
-    Confirm --> Router
     Router --> Doc
     Router --> Base
     Router --> Task
     Router --> Card
-    Router --> IM
-    Router --> Recorder
+    Router --> Entry
+    Doc --> Summary["Delivery Summary"]
+    Base --> Summary
+    Task --> Summary
+    Card --> Summary
+    Entry --> Summary
+    Summary --> IM
 ```
 
 Detailed architecture: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
