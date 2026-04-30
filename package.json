@@ -13,11 +13,15 @@
     "pilot:package": "node src/interfaces/cli/pilot-cli.js package",
     "pilot:audit": "node src/interfaces/cli/pilot-cli.js audit",
     "pilot:doctor": "node src/interfaces/cli/pilot-cli.js doctor",
-    "check": "node scripts/check-js.js",
-    "test": "node scripts/run-tests.js",
+    "check": "node scripts/check-js.js && tsc --noEmit",
+    "test": "npm run test:legacy && npm run test:ts",
+    "test:legacy": "node scripts/run-tests.js",
+    "test:ts": "tsc && node scripts/run-ts-tests.js",
     "test:core": "node scripts/run-tests.js core",
     "test:interfaces": "node scripts/run-tests.js interfaces",
     "test:review": "node scripts/run-tests.js review",
+    "ts:check": "tsc --noEmit",
+    "ts:build": "tsc",
     "pilot:demo:run": "node src/interfaces/cli/manual-trigger.js",
     "pilot:listen:cards": "node src/interfaces/cli/card-listener.js",
     "pilot:recorder:render": "node src/interfaces/cli/flight-recorder-view.js",
@@ -38,5 +42,9 @@
   },
   "engines": {
     "node": ">=20"
+  },
+  "devDependencies": {
+    "@types/node": "^25.6.0",
+    "typescript": "^6.0.3"
   }
 }
