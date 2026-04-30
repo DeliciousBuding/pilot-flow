@@ -23,6 +23,7 @@ This directory contains the public documentation set for PilotFlow.
 | `PROJECT_STRUCTURE.md` | Runtime layers, command surface, and placement rules | Files move or command boundaries change |
 | `OPERATOR_RUNBOOK.md` | Local operation, live run, evidence regeneration, troubleshooting | Commands, profiles, run targets, or fallback behavior change |
 | `DEVELOPMENT.md` | Contributor workflow, module boundaries, validation matrix | Code ownership, validation policy, or Git workflow changes |
+| `PRODUCTIZATION_REFACTOR_PLAN.md` | Cleanup and productization refactor plan | Repo structure, docs surface, or cleanup priorities change |
 | `VISUAL_DESIGN.md` | Feishu-native UX and visual rules | Cards, cockpit, or demo surfaces change |
 | `ROADMAP.md` | Immediate and long-term plan | Any phase completes or priorities shift |
 | `DOCUMENTATION_PLAN.md` | Documentation governance | README/docs conventions change |
