@@ -19,7 +19,7 @@ The areas still in progress include: the automatic IM-to-agent loop, real card b
 | End-user flow | Operator-driven prototype | A local operator command can run the loop; normal user flow through a production bot is in progress. |
 | `pilot:run` TS path | Single live run validated | Product facade and safer defaults exist; 2026-05-01 live run created Doc/Base/Task/cards/pinned entry/summary/trace. Repeated parity and callback checks are still needed. |
 | `pilot:gateway` TS path | Local bridge implemented | It can consume message/card events and resume stored confirmation runs locally through card callbacks or a same-chat `确认执行`, but real tenant validation is still pending. |
-| Card callback | Not complete | Payload, parser, listener, and trigger bridge exist; real `card.action.trigger` delivery is still unproven. |
+| Card callback | Not complete | Payload, parser, listener, trigger bridge, and self-sent probe card exist; real `card.action.trigger` delivery is still unproven. |
 | Group announcement | Fallback only | Native announcement was attempted, but the current group returns a docx announcement API block; pinned entry is the reliable route. |
 | LLM planning | Scaffolding | OpenAI-compatible client and Agent loop exist, but real planning success is not a product claim yet. |
 | Hermes learning | Partially adopted | Tool registry, session queue, gateway, retry/error classification, hermetic tests, and traces are adopted; full self-evolving multi-agent operation is not. |
@@ -66,7 +66,7 @@ PilotFlow should learn Hermes as runtime discipline, not as an excuse to add unc
 The next real product work should stay inside Feishu:
 
 1. Repeat `pilot:run -- --live --confirm "确认执行"` against real activity tenant targets and compare artifacts with older JS proof before deleting the legacy path.
-2. Make real card button callback delivery work or document the exact Open Platform blocker with proof.
+2. Make real card button callback delivery work with the callback proof probe card, or document the exact Open Platform blocker with proof.
 3. Turn the current local trigger into an allowlisted Feishu IM mention trigger.
 4. Persist project state and memory in Feishu-native surfaces first: Base, Doc, Task, pinned entry, cards.
 5. Add worker preview and approval cards only after the main Feishu loop is stable.

@@ -166,10 +166,11 @@ Use `pilot:callback-proof` after changing Open Platform callback settings or bef
 
 ```bash
 npm run pilot:callback-proof -- --timeout 60s
+npm run pilot:callback-proof -- --send-probe-card --timeout 60s
 npm run pilot:callback-proof -- --timeout 60s --strict
 ```
 
-`--strict` exits non-zero when no callback arrives. Raw payload capture is off by default; `--include-raw` is allowed only for ignored `tmp/` outputs.
+`--send-probe-card` sends a small Feishu interactive card to `--chat-id` or `PILOTFLOW_TEST_CHAT_ID` before listening. Click its `确认执行` button from Feishu to test whether Open Platform delivers `card.action.trigger` back to the local listener. Use `--dry-run` with `--send-probe-card` to inspect the card-send command without writing to Feishu. `--strict` exits non-zero when no callback arrives. Raw payload capture is off by default; `--include-raw` is allowed only for ignored `tmp/` outputs.
 
 ## TypeScript Project Init Bridge
 

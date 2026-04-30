@@ -113,6 +113,7 @@ Implemented runtime capabilities:
 - repo-relative ignored temp body files under `tmp/tool-bodies/` for `lark-cli docs +create --content @file`
 - multiline-safe text IM sending through JSON `--content` instead of raw argv text
 - per-run reset of default JSONL output files so `latest-live-run.jsonl` and `latest-manual-run.jsonl` represent one current run
+- callback proof probe cards in `pilot:callback-proof -- --send-probe-card`, so callback validation can create its own clickable Feishu test card before listening
 - retrospective eval runner in `src/review-packs/retrospective-eval.js`
 - preview-only Review Worker contract in `src/agent/review-worker.ts`
 
@@ -151,7 +152,7 @@ Known product boundary:
 | TypeScript domain or tools | `npm run ts:check`, `npm run test:ts`, `npm test` |
 | CLI/environment surface | `npm run test:one -- doctor`, `npm run test:interfaces`, `npm run pilot:doctor` |
 | Live target validation | `npm run test:ts`, `npm run pilot:live-check -- --json` |
-| Card callback proof | `npm run test:ts`, `npm run pilot:callback-proof -- --timeout 60s` |
+| Card callback proof | `npm run test:ts`, `npm run pilot:callback-proof -- --send-probe-card --dry-run --timeout 1s` |
 | Product run facade | `npm run test:ts`, `npm run pilot:run -- --dry-run --input "<intent>"` |
 | Planner logic | `npm run pilot:check`, `npm run test:one -- plan`, `npm run pilot:demo` |
 | Orchestrator logic | `npm run pilot:check`, `npm run test:one -- orchestrator`, `npm run pilot:demo` |
