@@ -117,7 +117,7 @@ Known product boundary:
 
 ## Development Workflow
 
-1. Read `D:\Code\LarkProject\AGENTS.md` and `D:\Code\LarkProject\PERSONAL_PROGRESS.md`.
+1. Read the workspace configuration and progress documents.
 2. Check repository state:
 
    ```powershell
@@ -192,5 +192,5 @@ If push fails, record the error and keep the local commit.
 
 - Do not commit `.env`, local secrets, tokens, App Secrets, screenshots with tokens, or copied auth responses.
 - Do not write secrets into `docs/`.
-- Store local-only secrets under `C:\Users\Ding\.config\local-secrets` if needed.
+- Store local-only secrets outside the repository in a secure local directory.
 - If a secret has appeared in chat or logs, rotate it before production or public demos.

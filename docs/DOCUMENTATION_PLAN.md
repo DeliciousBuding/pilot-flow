@@ -86,13 +86,7 @@ Proposed / Accepted / Replaced
 
 ## API Validation Records
 
-The detailed API validation logs currently live outside the repo under:
-
-```text
-D:\Code\LarkProject\docs\research\4.28
-```
-
-Only distilled, non-secret, durable conclusions should be copied into this public repository.
+The detailed API validation logs live outside the repo. Only distilled, non-secret, durable conclusions should be copied into this public repository.
 
 ## Public vs Local Docs
 

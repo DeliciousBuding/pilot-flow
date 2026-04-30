@@ -14,10 +14,10 @@ Use the activity tenant test environment.
 
 | Resource | Current target |
 | --- | --- |
-| Feishu group | `PilotFlow API Test 2026-04-28` |
+| Feishu group | *(configured locally in `.env`)* |
 | Activity profile | `pilotflow-contest` |
-| Project State Base | `GM08bZjW2aRdWQsZOFLcIClrnac` |
-| Project State table | `tbl6VvarB47BSudw` |
+| Project State Base | *(configured locally in `.env`)* |
+| Project State table | *(configured locally in `.env`)* |
 
 Before a live recording or live presentation:
 
@@ -85,7 +85,7 @@ Use this to explain why the product is safer than a black-box chat assistant.
 Briefly show the two current platform edges:
 
 - Card callback listener connects, but real `card.action.trigger` has not yet arrived in the validation window.
-- Native group announcement update returned `232097 Unable to operate docx type chat announcement` in the current test group.
+- Native group announcement is not available for the current test group due to a platform API limitation.
 
 Product framing:
 

@@ -11,7 +11,7 @@ For product scope, read [`PRODUCT_SPEC.md`](PRODUCT_SPEC.md). For module boundar
 | Node.js | `>=20` |
 | Feishu CLI | global `lark-cli >=1.0.23` |
 | Demo profile | `pilotflow-contest` |
-| Progress sync profile | `cli_a935d47f8138dcd2` |
+| Progress sync profile | *(configured locally)* |
 
 Check the local toolchain:
 
@@ -253,16 +253,16 @@ Stable fallback paths:
 
 ## Progress Document Sync
 
-The local progress file is `D:\Code\LarkProject\PERSONAL_PROGRESS.md`.
+The local progress file is `PERSONAL_PROGRESS.md` in the workspace root.
 
 Always fetch before overwriting the Feishu document:
 
 ```powershell
-lark-cli docs +fetch --api-version v2 --profile cli_a935d47f8138dcd2 --doc "<progress-doc>" --as user --format json --doc-format markdown --scope outline --max-depth 2
-lark-cli docs +update --api-version v2 --profile cli_a935d47f8138dcd2 --doc "<progress-doc>" --as user --command overwrite --doc-format markdown --content "@PERSONAL_PROGRESS.md"
+lark-cli docs +fetch --api-version v2 --profile <progress-profile> --doc "<progress-doc>" --as user --format json --doc-format markdown --scope outline --max-depth 2
+lark-cli docs +update --api-version v2 --profile <progress-profile> --doc "<progress-doc>" --as user --command overwrite --doc-format markdown --content "@PERSONAL_PROGRESS.md"
 ```
 
-Run the update from `D:\Code\LarkProject` because `--content @PERSONAL_PROGRESS.md` is relative to the current directory.
+Run the update from the workspace root because `--content @PERSONAL_PROGRESS.md` is relative to the current directory.
 
 ## Troubleshooting
 
@@ -283,4 +283,4 @@ Before sharing docs, screenshots, recordings, or generated reports:
 npm run pilot:audit
 ```
 
-Also search local source and docs for known secret patterns when credentials have been handled during the session. Secrets belong outside the repository, preferably under `C:\Users\Ding\.config\local-secrets`.
+Also search local source and docs for known secret patterns when credentials have been handled during the session. Secrets belong outside the repository in a secure local directory.

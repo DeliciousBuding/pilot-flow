@@ -22,3 +22,6 @@ output/
 Thumbs.db
 .idea/
 .vscode/
+
+# Internal rebuild docs (not for public repo)
+docs/rebuild/

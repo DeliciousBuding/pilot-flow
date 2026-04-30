@@ -2,165 +2,129 @@
 
 # ✈️ PilotFlow
 
-**飞书项目协作的 AI 运行层**<br/>
-**An AI operating layer for Feishu project work**
+**飞书项目协作的 AI 运行层**
 
-从群聊讨论开始，把目标、负责人、风险和材料推进成确认过的计划、可执行任务、可追踪状态和交付总结。<br/>
-Start from group-chat discussion and turn intent into confirmed plans, executable tasks, traceable state, and delivery summaries.
+从群聊讨论开始，把目标、负责人、风险和材料推进成确认过的计划、可执行任务、可追踪状态和交付总结。
 
-[![Status](https://img.shields.io/badge/status-strong%20prototype-orange)](#-mvp-progress)
-[![Feishu](https://img.shields.io/badge/Feishu-native-00A4FF)](#-feishu-native-surfaces)
-[![Agent](https://img.shields.io/badge/Agent-as%20Pilot-6f42c1)](#-product-experience)
+[English Version](README_EN.md)
+
+[![Feishu](https://img.shields.io/badge/飞书-原生-00A4FF)](#-飞书原生能力)
+[![Agent](https://img.shields.io/badge/Agent-主驾驶-6f42c1)](#-产品体验)
 [![Node](https://img.shields.io/badge/node-%3E%3D20-339933)](docs/OPERATOR_RUNBOOK.md)
-[![lark-cli](https://img.shields.io/badge/lark--cli-1.0.23-blue)](docs/OPERATOR_RUNBOOK.md)
 [![GitHub stars](https://img.shields.io/github/stars/DeliciousBuding/pilot-flow?style=social)](https://github.com/DeliciousBuding/pilot-flow/stargazers)
 [![GitHub last commit](https://img.shields.io/github/last-commit/DeliciousBuding/pilot-flow)](https://github.com/DeliciousBuding/pilot-flow/commits/main)
 
-[Product Spec](docs/PRODUCT_SPEC.md) · [Reality Check](docs/PRODUCT_REALITY_CHECK.md) · [Architecture](docs/ARCHITECTURE.md) · [Agent Evolution](docs/AGENT_EVOLUTION.md) · [Operator Runbook](docs/OPERATOR_RUNBOOK.md) · [Roadmap](docs/ROADMAP.md) · [Docs](docs/README.md)
-
-| Stage | Primary surface | Current focus |
-| --- | --- | --- |
-| Strong engineering prototype | Feishu IM + Cards + Doc + Base + Task | TS live proof, real callback delivery, capture materials |
+[产品规格](docs/PRODUCT_SPEC.md) · [架构设计](docs/ARCHITECTURE.md) · [路线图](docs/ROADMAP.md) · [操作手册](docs/OPERATOR_RUNBOOK.md) · [文档索引](docs/README.md)
 
 </div>
 
 ---
 
-## 📖 Table of Contents
+> **截图占位**：飞书群聊中 PilotFlow 发送执行计划卡片的效果截图。
 
-- [📌 中文](#-中文)
-- [🌍 English](#-english)
-- [🎯 Why PilotFlow](#-why-pilotflow)
-- [👥 Who It Is For](#-who-it-is-for)
-- [🧭 Product Experience](#-product-experience)
-- [🛫 Operating Model](#-operating-model)
-- [🔁 Product Loop](#-product-loop)
-- [🧠 Architecture](#-architecture)
-- [🧱 Product-Grade Foundations](#-product-grade-foundations)
-- [🧬 Agent Evolution](#-agent-evolution)
-- [🧩 Feishu-Native Surfaces](#-feishu-native-surfaces)
-- [🧪 MVP Progress](#-mvp-progress)
-- [🧾 Reality Check](#-reality-check)
-- [🗺️ Roadmap Snapshot](#-roadmap-snapshot)
-- [📚 Documentation](#-documentation)
-- [⚡ Prototype Demo](#-prototype-demo)
-- [🛡️ Trust Model](#-trust-model)
-- [🔐 Safety Principles](#-safety-principles)
-- [📈 Star History](#-star-history)
-- [🤝 Contributing](#-contributing)
-- [🙏 Acknowledgments](#-acknowledgments)
+---
 
-## 📌 中文
+## 一句话介绍
 
-PilotFlow 不是普通聊天机器人，不是文档生成器，也不是只面向程序员的代码 Agent。它的产品定位是一个面向飞书协作场景的 **AI 项目运行官**：
+**PilotFlow 是飞书群里的 AI 项目运行官——像一个项目经理一样，在飞书群里推动团队从讨论走向交付。**
 
-> **像一个项目经理一样，在飞书群里推动团队从讨论走向交付。**
+在真实协作里，项目的关键信息经常散落在群聊中：目标、负责人、截止时间、风险、材料、确认意见、临时承诺。PilotFlow 让 AI Agent 成为主驾驶，负责理解讨论、生成项目执行计划、请求人类确认、调用飞书原生工具，并把结果沉淀到文档、多维表格、任务、群入口消息和总结消息中。
 
-在真实协作里，项目的关键信息经常散落在群聊中：目标、负责人、截止时间、风险、材料、确认意见、临时承诺。PilotFlow 让 AI Agent 成为主驾驶，负责理解讨论、生成项目执行计划、请求人类确认、调用飞书原生工具，并把结果沉淀到 Doc、Base、Task、群入口消息和总结消息中。
+真正的产品体验发生在团队已经工作的地方：**飞书 IM、卡片、文档、多维表格和任务系统**。
 
-GUI 或 Chat Tab 不是主流程，它只是仪表盘和辅助操作台。真正的产品体验应该发生在团队已经工作的地方：**飞书 IM、卡片、文档、多维表格和任务系统**。
+> **Agent 主驾驶，GUI 做仪表盘，人类始终掌舵。**
 
-## 🌍 English
+## 为什么需要 PilotFlow
 
-PilotFlow is a Feishu-native AI operating layer for project work. It lives inside the collaboration flow, understands project intent, proposes an execution plan, asks for human confirmation, executes through Feishu tools, records every step, and sends a delivery summary back to the team.
-
-The product principle is simple:
-
-> **Agent as Pilot. GUI as cockpit. Humans stay in control.**
-
-PilotFlow is designed for practical team operations first: fewer lost decisions, fewer forgotten tasks, clearer project state, and a traceable AI workflow that fits Feishu instead of replacing it.
-
-## 🎯 Why PilotFlow
-
-| Team pain | PilotFlow response | Feishu-native output |
+| 团队痛点 | PilotFlow 响应 | 飞书原生输出 |
 | --- | --- | --- |
-| Discussion is scattered across group messages | Extract goals, members, deadlines, deliverables, and risks | Project execution plan |
-| Verbal agreement is hard to track | Ask for explicit confirmation before side effects | Card or text confirmation |
-| Tasks and risks disappear in chat history | Write structured project state | Base records and Tasks |
-| Project entry points are hard to find | Publish a stable project entry | Pinned entry message or group announcement |
-| AI actions are hard to trust | Record plans, tool calls, artifacts, fallbacks, and errors | Flight Recorder |
+| 讨论散落在群消息中 | 提取目标、成员、截止时间、交付物和风险 | 项目执行计划 |
+| 口头约定难以追踪 | 副作用发生前请求显式确认 | 卡片或文本确认 |
+| 任务和风险消失在聊天记录中 | 写入结构化项目状态 | 多维表格记录和飞书任务 |
+| 项目入口难以找到 | 发布稳定的项目入口 | 群内固定入口消息 |
+| AI 操作难以信任 | 记录计划、工具调用、产物、降级和异常 | 运行过程追溯 |
 
-## 👥 Who It Is For
+## 目标用户
 
-| Team type | Typical job | Why PilotFlow fits |
+| 团队类型 | 典型场景 | 为什么适合 PilotFlow |
 | --- | --- | --- |
-| Student competition teams | Turn brainstorming into a deliverable plan | Lightweight enough for fast project cycles, traceable enough for review |
-| Product and operations groups | Convert group decisions into documents, tasks, and status | Works inside Feishu where decisions already happen |
-| Hackathon or prototype teams | Keep scope, owners, risks, and demo assets aligned | Gives one visible project spine without a heavy PM tool |
-| AI-native teams | Let agents perform real collaboration work with guardrails | Confirmation, idempotency, and run traces keep automation explainable |
+| 学生团队 | 把头脑风暴变成可交付计划 | 轻量、可追溯，适合快速项目周期 |
+| 产品与运营团队 | 把群聊决策转化为文档、任务和状态 | 在决策发生的飞书环境中直接工作 |
+| 黑客松或原型团队 | 对齐范围、负责人、风险和演示素材 | 一个可见的项目主线，无需重型项目管理工具 |
+| AI 原生团队 | 让 Agent 在护栏内执行真实协作 | 确认机制和运行记录让自动化可解释 |
 
-PilotFlow is not limited to campus projects. The current prototype uses a competition scenario because it is concrete and easy to evaluate, but the product model is a general Feishu-native project operations assistant.
-
-## 🧭 Product Experience
+## 产品体验
 
 ```mermaid
 journey
-    title PilotFlow project launch journey
-    section Discuss
-      Team discusses a new project in Feishu group: 3: Team
-      PilotFlow extracts goal, owners, deliverables, deadline, risks: 5: PilotFlow
-    section Confirm
-      PilotFlow posts a project execution plan: 5: PilotFlow
-      Human owner confirms or edits the plan: 4: Owner
-    section Execute
-      PilotFlow creates project brief: 5: PilotFlow
-      PilotFlow writes task and risk state: 5: PilotFlow
-      PilotFlow sends final summary back to group: 5: PilotFlow
-    section Trace
-      Team opens Doc, Base, Task, and Flight Recorder: 4: Team
+    title PilotFlow 项目启动旅程
+    section 讨论
+      团队在飞书群中讨论新项目: 3: 团队
+      PilotFlow 提取目标、负责人、交付物、截止时间、风险: 5: PilotFlow
+    section 确认
+      PilotFlow 发送项目执行计划: 5: PilotFlow
+      负责人确认或编辑计划: 4: 负责人
+    section 执行
+      PilotFlow 创建项目文档: 5: PilotFlow
+      PilotFlow 写入任务和风险状态: 5: PilotFlow
+      PilotFlow 发送交付总结到群: 5: PilotFlow
+    section 追溯
+      团队打开文档、多维表格、任务和运行记录: 4: 团队
 ```
 
-## 🛫 Operating Model
+## 运行模型
 
-PilotFlow turns a vague group discussion into a managed project run:
-
-| Step | Product behavior | Control point |
+| 步骤 | 产品行为 | 控制点 |
 | --- | --- | --- |
-| Observe | Read the incoming project intent and extract goal, members, deliverables, deadline, and risks | No write side effects |
-| Plan | Generate a structured project execution plan | Schema validation before execution |
-| Confirm | Ask a human to approve, edit, restrict to doc-only, or cancel | Confirmation gate |
-| Execute | Create Feishu-native artifacts through a tool router | Preflight checks and duplicate-run guard |
-| Record | Capture every step, tool call, artifact, fallback, and error | JSONL run log and Flight Recorder |
-| Report | Send the final summary back to the group | Artifact-aware summary |
+| 观察 | 读取项目意图，提取目标、成员、交付物、截止时间和风险 | 无写入副作用 |
+| 计划 | 生成结构化项目执行计划 | 执行前 Schema 校验 |
+| 确认 | 请求人工批准、编辑、限制为仅文档或取消 | 人工确认机制 |
+| 执行 | 通过工具路由器创建飞书原生产物 | 预检和重复运行保护 |
+| 记录 | 记录每一步、工具调用、产物、降级和异常 | JSONL 运行日志和运行过程追溯 |
+| 汇报 | 向群内发送最终总结 | 产物感知的总结消息 |
 
-## 🔁 Product Loop
+## 产品闭环
 
 ```mermaid
 flowchart LR
-    A["Feishu group chat<br/>text or voice intent"] --> B["Agent Planner<br/>project execution plan"]
-    B --> C["Confirmation Gate<br/>human approval"]
-    C --> D["Feishu Tool Router"]
-    D --> E["Doc<br/>project brief"]
-    D --> F["Base / Task<br/>state and actions"]
-    D --> G["IM / Card<br/>updates and decisions"]
-    D --> H["Pinned Entry / Group Announcement<br/>project entry"]
-    E --> I["Delivery Summary"]
+    A["飞书群聊<br/>文本或语音意图"] --> B["Agent 规划器<br/>项目执行计划"]
+    B --> C["人工确认机制"]
+    C --> D["飞书工具路由器"]
+    D --> E["文档<br/>项目 Brief"]
+    D --> F["多维表格 / 任务<br/>状态和行动项"]
+    D --> G["消息 / 卡片<br/>更新和决策"]
+    D --> H["固定入口<br/>项目导航"]
+    E --> I["交付总结"]
     F --> I
     G --> I
     H --> I
-    I --> J["Flight Recorder<br/>trace and replay"]
+    I --> J["运行过程追溯"]
 ```
 
-## 🧠 Architecture
+> **截图占位**：产品运行后生成的飞书文档、多维表格状态和任务截图。
+
+---
+
+## 架构设计
 
 ```mermaid
 flowchart TB
-    subgraph "Feishu Native Surfaces"
-        IM["IM / Group Chat"]
-        Card["Message Cards"]
-        Doc["Docs"]
-        Base["Base"]
-        Task["Tasks"]
-        Ann["Pinned Entry / Announcement"]
+    subgraph "飞书原生界面"
+        IM["群聊 / 消息"]
+        Card["互动卡片"]
+        Doc["文档"]
+        Base["多维表格"]
+        Task["任务"]
+        Ann["固定入口"]
     end
 
-    subgraph "PilotFlow Core"
-        Trigger["Trigger"]
-        Planner["Agent Planner"]
-        Confirm["Confirmation Gate"]
-        Orchestrator["Run Orchestrator"]
-        Router["Feishu Tool Router"]
-        Recorder["Flight Recorder"]
+    subgraph "PilotFlow 核心"
+        Trigger["触发器"]
+        Planner["Agent 规划器"]
+        Confirm["人工确认机制"]
+        Orchestrator["运行编排器"]
+        Router["飞书工具路由器"]
+        Recorder["运行过程追溯"]
     end
 
     IM --> Trigger
@@ -177,186 +141,117 @@ flowchart TB
     Router --> IM
 ```
 
-Detailed architecture: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+详细架构：[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。
 
-## 🧱 Product-Grade Foundations
+## 飞书原生能力
 
-PilotFlow is packaged around product-grade foundations rather than a one-off script:
+PilotFlow 使用真实飞书能力，不使用模拟数据：
 
-| Foundation | Current implementation |
+| 飞书界面 | 产品角色 |
 | --- | --- |
-| Native surface strategy | IM, Cards, Docs, Base, Task, pinned entry, and optional announcement path |
-| Human control | Text confirmation fallback and card action protocol before side effects |
-| Run safety | Live preflight, duplicate-run guard, short idempotency keys, unsafe-plan fallback |
-| Traceability | JSONL run log, artifact normalizer, generated review packs, local Flight Recorder |
-| Failure handling | Tool failures are recorded; announcement and callback edges have explicit fallback stories |
-| Packaging | Product README, product spec, architecture, operator runbook, development guide, demo kit |
+| 群聊消息 | 项目发起和交付总结回传通道 |
+| 互动卡片 | 执行计划展示、确认交互和风险裁决 |
+| 飞书文档 | 自动生成项目 Brief 和交付文档 |
+| 多维表格 | 结构化项目状态：负责人、截止时间、风险等级、状态、链接 |
+| 飞书任务 | 行动项，支持负责人分配 |
+| 固定入口消息 | 群内稳定的项目导航入口 |
 
-## 🧬 Agent Evolution
+> **截图占位**：飞书互动卡片确认截图和运行过程追溯 HTML 视图截图。
 
-PilotFlow has adopted selected Hermes-style runtime patterns: Agent loop, ToolRegistry, Feishu gateway, session queues, error classification, retry, hermetic tests, and trace-first operation. This is not a claim that PilotFlow is already a mature autonomous agent platform. The next product layer is controlled self-evolution:
+## 路线图
 
-```text
-Run trace -> Evaluation -> Improvement proposal -> Human approval -> Updated workflow/template/test
-```
-
-Multi-agent work is planned as a manager-worker model, not uncontrolled parallel autonomy. The Pilot remains accountable; workers produce preview artifacts for documents, tables, research, scripts, or review, and Feishu writes still go through confirmation.
-
-Detailed plan: [docs/AGENT_EVOLUTION.md](docs/AGENT_EVOLUTION.md).
-
-## 🧩 Feishu-Native Surfaces
-
-| Surface | Product role | Current maturity |
+| 阶段 | 目标 | 状态 |
 | --- | --- | --- |
-| IM | Main collaboration entry and summary channel | Live send validated; TS mention gateway bridge exists locally, real allowlisted trigger pending |
-| Cards | Execution plan, confirmation, risk decision | Live send validated; real button callback pending |
-| Docs | Project brief and delivery documents | Live creation validated |
-| Base | Tasks, detected risks, artifacts, confirmations | Live Project State write validated |
-| Task | Concrete owner/deadline action items | Live creation validated; assignee mapping remains guarded |
-| Pinned Entry / Announcement | Stable project entrance | Pinned entry validated; native announcement falls back on current docx API block |
-| Event subscription | Card callback listener first, `@PilotFlow` automatic trigger later | Local listener bridge ready; platform callback proof pending |
-| Chat Tab / H5 | Lightweight cockpit and flight recorder | Static recorder prototype |
-| Whiteboard / Calendar / Slides | Demo enhancement surfaces | Later |
+| Phase 0 | CLI、飞书 API 验证、本地骨架 | 已完成 |
+| Phase 1 | 真实飞书闭环：文档、多维表格、任务、消息、运行日志 | 已完成 |
+| Phase 2 | 计划卡、风险卡、入口消息、负责人映射、重复运行保护 | 已完成 |
+| Phase 3 | 演示加固、录屏、提交材料 | 进行中 |
+| Phase 4 | 移动端确认、项目记忆、Worker 预览 | 计划中 |
+| Phase 5 | 事件订阅、多项目空间、自我进化闭环 | 计划中 |
 
-## 🧪 MVP Progress
+完整路线图：[docs/ROADMAP.md](docs/ROADMAP.md)。
 
-PilotFlow is currently a **strong engineering prototype**. The first deliverable is a reliable Feishu-native project launch loop, not a separate project-management SaaS and not an unattended production bot.
+## 文档
 
-| Capability | Maturity | Boundary |
-| --- | --- | --- |
-| Activity tenant, `lark-cli`, and core Feishu API proof | Live validated | Real IM/Card/Doc/Base/Task paths have been exercised. |
-| JS project-launch live path | Live validated prototype | It can create visible Feishu artifacts and a run trace from a confirmed local command. |
-| TypeScript `pilot:run` path | Dry-run ready, live pending | Product facade exists; real live parity is the next hard gate. |
-| TypeScript `pilot:gateway` path | Local bridge implemented | It can consume Feishu message/card events, persist waiting confirmations, and resume approved runs locally through card callbacks or the text command `确认执行`; real tenant validation is still pending. |
-| Execution plan card and risk card | Live send validated | Button payloads exist, but real callback execution is not proven. |
-| Card callback listener bridge | Local/prototype | Parser, listener, and trigger bridge are tested; no real callback event has reached the listener yet. |
-| Pinned project entry | Live validated | This is the reliable project entrance in the current prototype. |
-| Group announcement | Attempted fallback | Current test group returns a docx announcement API block, so do not claim native announcement success. |
-| Base/Task state | Live validated prototype | Owner mapping and Contacts lookup are guarded; text fallback remains important. |
-| Flight Recorder and review packs | Implemented support tooling | Useful for trust and evaluation, but not the product itself. |
-| LLM Agent loop | Scaffolding with tests | Real product planning through a model is not a current claim. |
-| Hermes-style self-evolution | Review loop only | Retrospective/eval/worker preview can propose improvements; no hidden self-modification. |
-| Multi-worker orchestration | Contract seed | First Review Worker is preview-only; broader workers and approval cards are future work. |
-
-Full hard-status page: [docs/PRODUCT_REALITY_CHECK.md](docs/PRODUCT_REALITY_CHECK.md).
-
-## 🧾 Reality Check
-
-PilotFlow is built around a real Feishu-native product spine: plan, confirmation, Feishu artifacts, project state, risk surface, summary, and trace. Key areas still in progress include automatic group-bot flow, real card callback delivery, and TypeScript live path validation alongside the existing JS live proof.
-
-The next milestone is live proof of `pilot:run`, callback delivery proof, and a cleaner Feishu IM trigger path.
-
-## 🗺️ Roadmap Snapshot
-
-```mermaid
-gantt
-    title PilotFlow MVP Roadmap
-    dateFormat  YYYY-MM-DD
-    section Foundation
-    CLI update and API validation        :done,    a1, 2026-04-28, 1d
-    Runnable prototype skeleton          :done,    a2, 2026-04-28, 1d
-    section Real Loop
-    Live Feishu tool mode                :done,    b1, 2026-04-28, 1d
-    Confirmation fallback                :done,    b2, 2026-04-28, 1d
-    Base and Task project state          :done,    b3, 2026-04-28, 1d
-    Contact owner lookup                 :done,    b4, 2026-04-28, 1d
-    Artifact-aware summary               :done,    b5, 2026-04-28, 1d
-    section Agent Kernel
-    TypeScript gateway and Agent loop    :done,    k1, 2026-04-30, 1d
-    CLI dry-run smoke bridge             :done,    k2, 2026-04-30, 1d
-    TS project-init guarded bridge        :done,    k3, 2026-04-30, 1d
-    Product run facade and eval loop      :done,    k4, 2026-04-30, 1d
-    section Demo
-    Risk detection and decision card     :done,    c1, 2026-04-28, 1d
-    Card callback action protocol        :done,    c2, 2026-04-28, 1d
-    Flight Recorder cockpit              :         c3, 2026-05-03, 3d
-    Demo hardening and recording         :         c4, 2026-05-06, 2d
-```
-
-Full roadmap: [docs/ROADMAP.md](docs/ROADMAP.md).
-
-## 📚 Documentation
-
-| Document | Purpose |
+| 文档 | 说明 |
 | --- | --- |
-| [Docs Index](docs/README.md) | Complete documentation map |
-| [Project Brief](docs/PROJECT_BRIEF.md) | Product and competition brief |
-| [Product Spec](docs/PRODUCT_SPEC.md) | User promise, feature tiers, non-goals |
-| [Architecture](docs/ARCHITECTURE.md) | Components, state model, tool routing |
-| [Agent Evolution](docs/AGENT_EVOLUTION.md) | Hermes-inspired self-evolution, memory, evaluation, and worker orchestration |
-| [Project Structure](docs/PROJECT_STRUCTURE.md) | Runtime layers, command surface, and placement rules |
-| [Operator Runbook](docs/OPERATOR_RUNBOOK.md) | Local operation, live run, evidence regeneration, troubleshooting |
-| [Development Guide](docs/DEVELOPMENT.md) | Contributor workflow, module boundaries, validation matrix |
-| [Visual Design](docs/VISUAL_DESIGN.md) | Feishu-native cards, cockpit, UX rules |
-| [Roadmap](docs/ROADMAP.md) | Long-term plan and immediate next actions |
-| [Demo Kit](docs/demo/README.md) | Demo playbook, capture guide, fallback notes, and review-pack workflow |
-| [Demo Capture Guide](docs/demo/CAPTURE_GUIDE.md) | Recording and screenshot checklist |
-| [Failure Paths](docs/demo/FAILURE_PATHS.md) | Fallback behavior, known platform limits, Q&A boundaries, and no-network explanation |
-| [Documentation Plan](docs/DOCUMENTATION_PLAN.md) | Documentation governance |
+| [文档索引](docs/README.md) | 完整文档地图 |
+| [项目简报](docs/PROJECT_BRIEF.md) | 产品与赛事简报 |
+| [产品规格](docs/PRODUCT_SPEC.md) | 用户承诺、功能分级、非目标 |
+| [架构设计](docs/ARCHITECTURE.md) | 组件、状态模型、工具路由 |
+| [Agent 进化](docs/AGENT_EVOLUTION.md) | 自我进化、记忆、评估与 Worker 编排 |
+| [项目结构](docs/PROJECT_STRUCTURE.md) | 运行层、命令入口、目录边界 |
+| [操作手册](docs/OPERATOR_RUNBOOK.md) | 本地操作、live run、证据生成 |
+| [开发指南](docs/DEVELOPMENT.md) | 贡献流程、模块边界 |
+| [视觉设计](docs/VISUAL_DESIGN.md) | 飞书原生卡片、驾驶舱、UX 规则 |
+| [路线图](docs/ROADMAP.md) | 长期规划和近期行动 |
+| [演示材料](docs/demo/README.md) | 演示脚本、录屏指南、失败路径 |
+| [真实状态](docs/PRODUCT_REALITY_CHECK.md) | 能力评估与声明边界 |
 
-## ⚡ Prototype Demo
-
-For local development and reviewer reproduction:
+## 快速开始
 
 ```bash
+# 安装依赖并验证环境
+npm install
 npm run pilot:check
+
+# 运行产品闭环（dry-run）
+npm run pilot:run -- --dry-run
+
+# 自定义输入运行
+npm run pilot:run -- --dry-run --input "目标: 建立答辩项目空间 成员: 产品, 技术 交付物: Brief, Task 截止时间: 2026-05-03"
+```
+
+<details>
+<summary>完整命令参考</summary>
+
+```bash
+# 环境验证
+npm run pilot:check
+npm run pilot:doctor
 npm test
+
+# 产品闭环
 npm run pilot:run -- --dry-run
 npm run pilot:gateway -- --dry-run --max-events 1
 npm run pilot:agent-smoke
-npm run pilot:project-init-ts
-npm run pilot:run -- --dry-run --input "目标: 建立答辩项目空间 成员: 产品, 技术 交付物: Brief, Task 截止时间: 2026-05-03"
-npm run pilot:project-init-ts -- --dry-run --send-entry-message --send-risk-card
+
+# 演示与证据
 npm run pilot:recorder -- --input tmp/runs/latest-manual-run.jsonl --output tmp/flight-recorder/latest.html
-npm run review:retrospective-eval
 npm run pilot:package
 npm run pilot:status
 npm run pilot:audit
 ```
 
-`pilot:run` is the preferred product-facing local entry for direct project-init runs. `pilot:gateway` is the new TS event bridge for `im.message.receive_v1` and `card.action.trigger`: it can open a waiting confirmation run from a mention, persist the pending run locally, and resume it through either an approved card callback or a plain-text `确认执行` in the same chat. Both paths still need real tenant validation before they can replace the older JS live proof. Operational setup lives in [docs/OPERATOR_RUNBOOK.md](docs/OPERATOR_RUNBOOK.md); contributor workflow lives in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md). Generated review packs, including the Run Retrospective Pack and Retrospective Eval report, are auxiliary material and are kept out of the product runtime surface.
+操作手册：[docs/OPERATOR_RUNBOOK.md](docs/OPERATOR_RUNBOOK.md)。开发指南：[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)。
 
-## 🛡️ Trust Model
+</details>
 
-| Question | PilotFlow answer |
-| --- | --- |
-| Can the agent write to Feishu without approval? | No. The live write path requires explicit confirmation. |
-| Can a failed tool call look successful? | It should not. Tool errors are recorded and surfaced as run events and fallback artifacts. |
-| Can the same demo accidentally create duplicate artifacts? | Live runs are guarded by a duplicate-run key unless the operator explicitly bypasses it. |
-| Can reviewers inspect what happened? | Yes. Run logs, generated review packs, Flight Recorder, retrospective reports, and final summaries expose the execution path. |
-| Can worker agents publish on their own? | No. The first Review Worker returns preview artifacts and proposed Feishu writes only; publishing remains confirmation-gated. |
-| Is the current version production-ready? | Not yet. It is a strong engineering prototype with known pending work around TS live parity, real card callback delivery, automatic IM trigger, and manual capture evidence. |
+## 安全原则
 
-## 🔐 Safety Principles
+- 发布项目产物前必须经过人工确认。
+- 工具失败会被记录和展示，Agent 不会假装失败的写入成功了。
+- 每条写入路径都设计了幂等或重复检测机制。
+- 密钥不允许出现在仓库、公开文档、截图或聊天记录中。
 
-- Human confirmation is required before publishing project artifacts.
-- Tool failures must be recorded and surfaced.
-- The Agent must not pretend a failed Feishu write succeeded.
-- Every write path should be designed for idempotency or duplicate detection.
-- Live project-init runs are guarded against accidental duplicate Feishu writes unless explicitly bypassed.
-- Secrets never belong in the repository, public docs, screenshots, or chat logs.
-- Official Feishu reference caches stay outside this repo.
-
-## 📈 Star History
+## Star History
 
 [![Star History Chart](https://api.star-history.com/svg?repos=DeliciousBuding/pilot-flow&type=Date)](https://star-history.com/#DeliciousBuding/pilot-flow&Date)
 
-## 🤝 Contributing
+## 参与贡献
 
-PilotFlow is moving quickly toward a competition MVP. Changes should keep the main loop stable:
+变更应保持主循环稳定：
 
 ```text
-Group chat -> Execution plan -> Confirmation -> Feishu tools -> State -> Risk decision -> Delivery summary
+群聊 -> 执行计划 -> 确认 -> 飞书工具 -> 状态 -> 风险裁决 -> 交付总结
 ```
 
-Before opening a change:
+1. 运行相关验证。
+2. 更新受影响的文档。
+3. 不要将本地密钥提交到仓库。
 
-1. Run the relevant validation.
-2. Update the affected docs.
-3. Keep official reference caches and local secrets out of the repo.
+## 致谢
 
-## 🙏 Acknowledgments
-
-- Feishu / Lark Open Platform and `lark-cli`.
-- Feishu AI Campus Challenge materials and challenge brief.
-- Agent engineering tools that influenced the worker-artifact roadmap.
+- 飞书 / Lark 开放平台和 `lark-cli`。
+- 飞书 AI 校园挑战赛赛事材料和赛题说明。
+- 影响了 Worker 产物路线的 Agent 工程工具。

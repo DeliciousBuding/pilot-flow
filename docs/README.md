@@ -30,7 +30,6 @@ If product status is unclear, read `PRODUCT_REALITY_CHECK.md` first. It is the a
 | `ROADMAP.md` | Forward-looking plan and unchecked work | Any phase completes or priorities shift |
 | `AGENT_EVOLUTION.md` | Hermes-inspired self-evolution and worker orchestration plan | Agent runtime, memory, eval, worker, or self-improvement direction changes |
 | `DOCUMENTATION_PLAN.md` | Documentation governance | README/docs conventions change |
-| `rebuild/README.md` | Hermes-style TypeScript Agent kernel rebuild plan and execution status | Runtime kernel, tool registry, gateway, or Agent loop changes |
 
 ## Demo Kit
 
