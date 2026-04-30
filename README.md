@@ -11,8 +11,8 @@
 [![Feishu](https://img.shields.io/badge/飞书-原生-00A4FF)](#-飞书原生能力)
 [![Agent](https://img.shields.io/badge/Agent-主驾驶-6f42c1)](#-产品体验)
 [![Node](https://img.shields.io/badge/node-%3E%3D20-339933)](docs/OPERATOR_RUNBOOK.md)
-[![GitHub stars](https://img.shields.io/github/stars/DeliciousBuding/pilot-flow?style=social)](https://github.com/DeliciousBuding/pilot-flow/stargazers)
-[![GitHub last commit](https://img.shields.io/github/last-commit/DeliciousBuding/pilot-flow)](https://github.com/DeliciousBuding/pilot-flow/commits/main)
+[![GitHub stars](https://img.shields.io/github/stars/DeliciousBuding/PilotFlow?style=social)](https://github.com/DeliciousBuding/PilotFlow/stargazers)
+[![GitHub last commit](https://img.shields.io/github/last-commit/DeliciousBuding/PilotFlow)](https://github.com/DeliciousBuding/PilotFlow/commits/main)
 
 [产品规格](docs/PRODUCT_SPEC.md) · [架构设计](docs/ARCHITECTURE.md) · [路线图](docs/ROADMAP.md) · [操作手册](docs/OPERATOR_RUNBOOK.md) · [文档索引](docs/README.md)
 
@@ -210,7 +210,7 @@ npm run pilot:audit
 
 ## Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=DeliciousBuding/pilot-flow&type=Date)](https://star-history.com/#DeliciousBuding/pilot-flow&Date)
+[![Star History Chart](https://api.star-history.com/svg?repos=DeliciousBuding/PilotFlow&type=Date)](https://star-history.com/#DeliciousBuding/PilotFlow&Date)
 
 ## 参与贡献
 

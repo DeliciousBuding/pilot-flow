@@ -11,8 +11,8 @@ Start from group-chat discussion and turn intent into confirmed plans, executabl
 [![Feishu](https://img.shields.io/badge/Feishu-native-00A4FF)](#-feishu-native-capabilities)
 [![Agent](https://img.shields.io/badge/Agent-as%20Pilot-6f42c1)](#-product-experience)
 [![Node](https://img.shields.io/badge/node-%3E%3D20-339933)](docs/OPERATOR_RUNBOOK.md)
-[![GitHub stars](https://img.shields.io/github/stars/DeliciousBuding/pilot-flow?style=social)](https://github.com/DeliciousBuding/pilot-flow/stargazers)
-[![GitHub last commit](https://img.shields.io/github/last-commit/DeliciousBuding/pilot-flow)](https://github.com/DeliciousBuding/pilot-flow/commits/main)
+[![GitHub stars](https://img.shields.io/github/stars/DeliciousBuding/PilotFlow?style=social)](https://github.com/DeliciousBuding/PilotFlow/stargazers)
+[![GitHub last commit](https://img.shields.io/github/last-commit/DeliciousBuding/PilotFlow)](https://github.com/DeliciousBuding/PilotFlow/commits/main)
 
 [Product Spec](docs/PRODUCT_SPEC.md) · [Architecture](docs/ARCHITECTURE.md) · [Roadmap](docs/ROADMAP.md) · [Operator Runbook](docs/OPERATOR_RUNBOOK.md) · [Docs](docs/README.md)
 
@@ -202,7 +202,7 @@ Operational setup: [docs/OPERATOR_RUNBOOK.md](docs/OPERATOR_RUNBOOK.md). Contrib
 
 ## Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=DeliciousBuding/pilot-flow&type=Date)](https://star-history.com/#DeliciousBuding/pilot-flow&Date)
+[![Star History Chart](https://api.star-history.com/svg?repos=DeliciousBuding/PilotFlow&type=Date)](https://star-history.com/#DeliciousBuding/PilotFlow&Date)
 
 ## Contributing
 
