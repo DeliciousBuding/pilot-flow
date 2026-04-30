@@ -91,6 +91,87 @@ test("runAgentGateway stores waiting live runs and resumes them from card callba
   }
 });
 
+test("runAgentGateway resumes pending live runs from plain text confirmation in the same chat", async () => {
+  const dir = join(process.cwd(), "tmp", "tests", `pilotflow-agent-gateway-live-${Date.now()}-c`);
+  await mkdir(dir, { recursive: true });
+  const storePath = join(dir, "pending.json");
+
+  try {
+    const firstRecorder = new MemoryRecorder();
+    const firstRegistry = createGatewayRegistry();
+    const first = await runAgentGateway({
+      argv: [
+        "--live",
+        "--pending-store", storePath,
+        "--chat-id", "oc_live",
+        "--base-token", "base_live",
+        "--base-table-id", "tbl_live",
+        "--storage-path", join(dir, "guard-live-1"),
+        "--send-plan-card",
+      ],
+      source: eventSource([messageEvent("@PilotFlow 建一个项目", "om_live_2", "oc_live")]),
+      registry: firstRegistry,
+      recorder: firstRecorder,
+    });
+
+    assert.equal(first.processedMessages, 1);
+    assert.equal(first.pendingRuns, 1);
+
+    const secondRecorder = new MemoryRecorder();
+    const secondRegistry = createGatewayRegistry();
+    const second = await runAgentGateway({
+      argv: [
+        "--live",
+        "--pending-store", storePath,
+        "--chat-id", "oc_live",
+        "--base-token", "base_live",
+        "--base-table-id", "tbl_live",
+        "--storage-path", join(dir, "guard-live-2"),
+      ],
+      source: eventSource([plainMessageEvent("确认执行", "om_live_3", "oc_live")]),
+      registry: secondRegistry,
+      recorder: secondRecorder,
+    });
+
+    assert.equal(second.processedMessages, 1);
+    assert.equal(second.pendingRuns, 0);
+    assert.equal(secondRecorder.ofType("run.completed").length, 1);
+    assert.equal(secondRecorder.ofType("gateway.text_continuation_completed").length, 1);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("runAgentGateway ignores confirmation text without a pending run", async () => {
+  const dir = join(process.cwd(), "tmp", "tests", `pilotflow-agent-gateway-live-${Date.now()}-d`);
+  await mkdir(dir, { recursive: true });
+
+  try {
+    const recorder = new MemoryRecorder();
+    const registry = createGatewayRegistry();
+    const result = await runAgentGateway({
+      argv: [
+        "--live",
+        "--pending-store", join(dir, "pending.json"),
+        "--chat-id", "oc_live",
+        "--base-token", "base_live",
+        "--base-table-id", "tbl_live",
+        "--storage-path", join(dir, "guard-live"),
+      ],
+      source: eventSource([plainMessageEvent("确认执行", "om_live_4", "oc_live")]),
+      registry,
+      recorder,
+    });
+
+    assert.equal(result.processedMessages, 0);
+    assert.equal(result.ignoredEvents, 1);
+    assert.equal(recorder.ofType("run.completed").length, 0);
+    assert.equal(recorder.ofType("gateway.text_confirmation_missing_pending_run").length, 1);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 function createGatewayRegistry(): ToolRegistry {
   const registry = new ToolRegistry();
   for (const name of ["doc.create", "base.write", "task.create", "card.send", "entry.send", "entry.pin", "im.send"]) {
@@ -143,6 +224,19 @@ function messageEvent(text: string, id: string, chatId: string): FeishuGatewayEv
     chatType: "group",
     text,
     mentions: [{ id: { open_id: "ou_pilotflow_bot" } }],
+    senderOpenId: "ou_user",
+    raw: {},
+  };
+}
+
+function plainMessageEvent(text: string, id: string, chatId: string): FeishuGatewayEvent {
+  return {
+    kind: "message",
+    id,
+    chatId,
+    chatType: "group",
+    text,
+    mentions: [],
     senderOpenId: "ou_user",
     raw: {},
   };

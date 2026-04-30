@@ -67,7 +67,7 @@ Exit condition: a confirmed local command can create real Feishu artifacts and p
 - [x] Optional Contacts lookup for owner labels.
 - [x] Bounded card listener and callback-trigger bridge.
 - [x] Native group announcement attempt with pinned-entry fallback.
-- [x] Local TS IM mention gateway bridge with pending-run continuation for approved card callbacks.
+- [x] Local TS IM mention gateway bridge with pending-run continuation for approved card callbacks and same-chat text confirmation.
 - [ ] Verify a real Feishu card button click reaches the listener and triggers the orchestrator.
 - [ ] Capture a polished 6 to 8 minute happy-path walkthrough.
 - [ ] Capture a focused failure-path walkthrough or screenshot set.

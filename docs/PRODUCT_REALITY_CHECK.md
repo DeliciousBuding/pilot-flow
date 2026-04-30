@@ -1,16 +1,14 @@
 # Product Reality Check
 
-Last updated: 2026-04-30
+Last updated: 2026-05-01
 
-This document is the hard boundary for PilotFlow product claims. It exists to stop the project from drifting into a polished-looking but unclear prototype. If another document sounds more optimistic than this page, this page wins and the other document should be corrected.
+This document provides an honest, boundary-setting assessment of PilotFlow's current capabilities. It serves as the single source of truth for product maturity claims. If another document sounds more optimistic than this page, this page wins and the other document should be corrected.
 
 ## Plain Answer
 
-PilotFlow is useful, but it is not a high-completion product yet.
+PilotFlow already proves a real Feishu-native project-launch loop: a confirmed run can create project documents, write structured state, create tasks, send cards/messages, pin an entry message, and record a replayable trace. That is a meaningful product spine.
 
-It is useful because it already proves a real Feishu-native project-launch loop: a confirmed run can create project documents, write structured state, create tasks, send cards/messages, pin an entry message, and record a replayable trace. That is a meaningful product spine.
-
-It is not complete because the current product is still mostly operator-driven. The automatic IM-to-agent loop, real card button callback delivery, repeated team usage, persistent memory, worker approval cards, and deployment story are not done. The TypeScript runtime is architecturally healthier than the original JS prototype, but its `pilot:run` live path still needs the same real Feishu validation as the earlier JS path before the old path can be retired.
+The areas still in progress include: the automatic IM-to-agent loop, real card button callback delivery, repeated team usage, persistent memory, worker approval cards, and deployment. The TypeScript runtime is architecturally healthier than the original JS prototype, but its `pilot:run` live path still needs the same real Feishu validation as the earlier JS path before the old path can be retired.
 
 ## Current Maturity
 
@@ -18,9 +16,9 @@ It is not complete because the current product is still mostly operator-driven. 
 | --- | --- | --- |
 | Product direction | Solid | "AI project operations officer inside Feishu" is clearer than "generic agent" or "coding assistant". |
 | Feishu API proof | Real but partial | IM, Card send, Doc, Base, Task, pinned entry, risk card, and final summary have been validated through live paths. |
-| End-user flow | Prototype | A local operator command can run the loop; a normal user cannot yet just talk to a production bot and rely on it. |
+| End-user flow | Operator-driven prototype | A local operator command can run the loop; normal user flow through a production bot is in progress. |
 | `pilot:run` TS path | Dry-run ready, live pending | Good product facade and safer defaults exist; real live validation is the next gate. |
-| `pilot:gateway` TS path | Local bridge implemented | It can consume message/card events and resume stored confirmation runs locally, but real tenant validation is still pending. |
+| `pilot:gateway` TS path | Local bridge implemented | It can consume message/card events and resume stored confirmation runs locally through card callbacks or a same-chat `确认执行`, but real tenant validation is still pending. |
 | Card callback | Not complete | Payload, parser, listener, and trigger bridge exist; real `card.action.trigger` delivery is still unproven. |
 | Group announcement | Fallback only | Native announcement was attempted, but the current group returns a docx announcement API block; pinned entry is the reliable route. |
 | LLM planning | Scaffolding | OpenAI-compatible client and Agent loop exist, but real planning success is not a product claim yet. |
@@ -34,6 +32,7 @@ It is not complete because the current product is still mostly operator-driven. 
 - `npm run pilot:check`, `npm test`, `npm run pilot:audit`, and `npm run pilot:doctor` give useful local quality gates.
 - `npm run pilot:run -- --dry-run` gives a product-facing dry-run of the TypeScript project-init path.
 - The older JS live path has validated Feishu Doc, Base, Task, IM, cards, pinned entry, risk card, and JSONL trace behavior.
+- The TS gateway can now keep a waiting-confirmation run in local state and resume it from the same chat with plain-text `确认执行` even before real card callback delivery is proven.
 - `Flight Recorder` and generated review packs make runs inspectable instead of opaque.
 - The repo structure is cleaner than the earlier sprint state: product CLI, review packs, runtime, gateway, tools, and docs are separated.
 
@@ -82,6 +81,4 @@ The next real product work should stay inside Feishu:
 
 ## Current Verdict
 
-PilotFlow is not a throwaway script and not useless. It has a real product spine and meaningful Feishu proof.
-
-But the completion level is closer to a strong engineering prototype than a finished product. The correct next move is not to add more pack generators or broad agent ideas. The next move is to prove the TypeScript product path live, close the Feishu callback gap, and turn Hermes-style architecture into fewer, stricter runtime paths.
+PilotFlow has a real product spine and meaningful Feishu proof. The completion level is that of a strong engineering prototype with a clear path forward. The highest-priority next steps are proving the TypeScript product path live, closing the Feishu callback gap, and turning Hermes-style architecture into fewer, stricter runtime paths — not adding more pack generators or broad agent ideas.

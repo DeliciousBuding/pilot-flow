@@ -4,6 +4,7 @@ import type { RunOptions } from "../../orchestrator/orchestrator.js";
 
 export interface PendingRunRecord {
   readonly runId: string;
+  readonly chatId?: string;
   readonly inputText: string;
   readonly options: PendingRunOptions;
   readonly createdAt: string;
@@ -51,6 +52,15 @@ export class PendingRunStore {
   async get(runId: string): Promise<PendingRunRecord | null> {
     const state = await this.readState();
     return state.runs.find((item) => item.runId === runId) ?? null;
+  }
+
+  async findLatestByChatId(chatId: string): Promise<PendingRunRecord | null> {
+    const state = await this.readState();
+    const matches = state.runs.filter((item) => item.chatId === chatId);
+    if (matches.length === 0) return null;
+    return matches
+      .slice()
+      .sort((left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt))[0] ?? null;
   }
 
   async take(runId: string): Promise<PendingRunRecord | null> {
@@ -122,6 +132,7 @@ function isPendingRunRecord(value: unknown): value is PendingRunRecord {
   return typeof record.runId === "string" &&
     typeof record.inputText === "string" &&
     typeof record.createdAt === "string" &&
+    (record.chatId === undefined || typeof record.chatId === "string") &&
     record.options !== null &&
     typeof record.options === "object" &&
     !Array.isArray(record.options);

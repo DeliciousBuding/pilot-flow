@@ -8,6 +8,7 @@ import type { EventSource } from "../../gateway/feishu/event-source.js";
 import { handleCardEvent } from "../../gateway/feishu/card-handler.js";
 import { LarkCliEventSource } from "../../gateway/feishu/lark-cli-source.js";
 import { handleMessageEvent } from "../../gateway/feishu/message-handler.js";
+import { stripSelfMention } from "../../gateway/feishu/mention-gate.js";
 import { PendingRunStore, toPendingRunOptions, type PendingRunRecord, type PendingRunOptions } from "../../gateway/feishu/pending-run-store.js";
 import { createProjectInitPlannerProvider } from "../../domain/plan.js";
 import { loadRuntimeConfig } from "../../config/runtime-config.js";
@@ -123,6 +124,19 @@ export async function runAgentGateway(options: AgentGatewayOptions = {}): Promis
       } as never);
 
       if (event.kind === "message") {
+        const resumed = await resumePendingRunFromTextConfirmation(event, {
+          bot,
+          dedupe,
+          queue,
+          recorder,
+          store,
+          run: async (pending) => orchestrator.run(pending.inputText, buildApprovedRunOptions(pending.options)),
+        });
+        if (resumed.status === "processed") {
+          processedMessages += 1;
+        } else if (resumed.status === "ignored_confirmation") {
+          ignoredEvents += 1;
+        } else {
         const result = await handleMessageEvent(event, {
           bot,
           sessions,
@@ -133,6 +147,7 @@ export async function runAgentGateway(options: AgentGatewayOptions = {}): Promis
             if (runResult.status === "waiting_confirmation" && runResult.plan) {
               await store.save({
                 runId: runResult.runId,
+                chatId: event.chatId,
                 inputText: text,
                 options: toPendingRunOptions(buildContinuationOptions(parsed.flags, text)),
                 createdAt: new Date().toISOString(),
@@ -143,6 +158,7 @@ export async function runAgentGateway(options: AgentGatewayOptions = {}): Promis
         });
         if (result.status === "processed") processedMessages += 1;
         else ignoredEvents += 1;
+        }
       } else if (event.kind === "card") {
         const continuation = await handleCardEvent(event, {
           dedupe,
@@ -189,6 +205,56 @@ export async function runAgentGateway(options: AgentGatewayOptions = {}): Promis
     pendingRuns: await store.count(),
     output: options.recorder ? undefined : output,
   };
+}
+
+interface TextConfirmationConfig {
+  readonly bot: BotIdentity;
+  readonly dedupe: EventDedupe;
+  readonly queue: ChatQueue;
+  readonly recorder: Recorder;
+  readonly store: PendingRunStore;
+  readonly run: (pending: PendingRunRecord) => Promise<RunResult>;
+}
+
+type TextConfirmationResult =
+  | { readonly status: "processed" }
+  | { readonly status: "ignored_confirmation"; readonly reason: string }
+  | { readonly status: "not_confirmation" };
+
+async function resumePendingRunFromTextConfirmation(
+  event: FeishuMessageEvent,
+  config: TextConfirmationConfig,
+): Promise<TextConfirmationResult> {
+  const text = stripSelfMention(event.text, config.bot.name);
+  if (!isAcceptedConfirmationText(text)) return { status: "not_confirmation" };
+  if (config.dedupe.seen(event.id)) return { status: "ignored_confirmation", reason: "duplicate_event" };
+
+  return config.queue.enqueue(event.chatId, async () => {
+    const pending = await config.store.findLatestByChatId(event.chatId);
+    if (!pending) {
+      await config.recorder.record({
+        type: "gateway.text_confirmation_missing_pending_run",
+        runId: "pending-run-missing",
+        chatId: event.chatId,
+        gateway_event_id: event.id,
+        confirmation_text: text,
+      });
+      return { status: "ignored_confirmation", reason: "missing_pending_run" } as const;
+    }
+
+    const result = await config.run(pending);
+    await config.store.delete(pending.runId);
+    await config.recorder.record({
+      type: "gateway.text_continuation_completed",
+      runId: result.runId,
+      originalRunId: pending.runId,
+      continuedRunId: result.runId,
+      chatId: event.chatId,
+      confirmation_text: text,
+      status: result.status,
+    });
+    return { status: "processed" } as const;
+  });
 }
 
 export function renderAgentGateway(result: AgentGatewayResult): string {

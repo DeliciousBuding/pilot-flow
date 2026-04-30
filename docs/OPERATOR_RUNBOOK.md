@@ -131,7 +131,7 @@ npm run pilot:agent-smoke -- --json
 
 ## TypeScript Event Gateway
 
-The TypeScript gateway can subscribe to `im.message.receive_v1` and `card.action.trigger`, apply mention filtering, open a waiting-confirmation project-init run from a Feishu mention, persist the pending run locally, and resume it after an approved card callback. This is a local event bridge, not yet a fully validated tenant bot loop.
+The TypeScript gateway can subscribe to `im.message.receive_v1` and `card.action.trigger`, apply mention filtering, open a waiting-confirmation project-init run from a Feishu mention, persist the pending run locally, and resume it after either an approved card callback or a same-chat text reply `确认执行`. This is a local event bridge, not yet a fully validated tenant bot loop.
 
 ```bash
 npm run pilot:gateway -- --dry-run --max-events 1
@@ -143,6 +143,7 @@ Current boundary:
 - In `dry-run`, a mention can complete the deterministic project-init loop and write a JSONL trace.
 - In `live`, the first mention should create the waiting-confirmation run and optional execution-plan card, then store the pending run under `tmp/state/pending-gateway-runs.json`.
 - An approved `card.action.trigger` can resume the stored run through the same TS orchestrator path.
+- A plain-text `确认执行` sent later in the same chat can also resume the latest pending run for that chat.
 - Real tenant validation is still required before this path replaces the older JS live proof.
 
 ## TypeScript Project Init Bridge

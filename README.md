@@ -8,7 +8,7 @@
 从群聊讨论开始，把目标、负责人、风险和材料推进成确认过的计划、可执行任务、可追踪状态和交付总结。<br/>
 Start from group-chat discussion and turn intent into confirmed plans, executable tasks, traceable state, and delivery summaries.
 
-[![Status](https://img.shields.io/badge/status-MVP%20prototype-orange)](#-mvp-progress)
+[![Status](https://img.shields.io/badge/status-strong%20prototype-orange)](#-mvp-progress)
 [![Feishu](https://img.shields.io/badge/Feishu-native-00A4FF)](#-feishu-native-surfaces)
 [![Agent](https://img.shields.io/badge/Agent-as%20Pilot-6f42c1)](#-product-experience)
 [![Node](https://img.shields.io/badge/node-%3E%3D20-339933)](docs/OPERATOR_RUNBOOK.md)
@@ -20,7 +20,7 @@ Start from group-chat discussion and turn intent into confirmed plans, executabl
 
 | Stage | Primary surface | Current focus |
 | --- | --- | --- |
-| Strong prototype | Feishu IM + Cards + Doc + Base + Task | TS live proof, real callback delivery, capture materials |
+| Strong engineering prototype | Feishu IM + Cards + Doc + Base + Task | TS live proof, real callback delivery, capture materials |
 
 </div>
 
@@ -181,7 +181,7 @@ Detailed architecture: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## 🧱 Product-Grade Foundations
 
-PilotFlow is still an MVP prototype, but it is packaged around product-grade foundations rather than a one-off script:
+PilotFlow is packaged around product-grade foundations rather than a one-off script:
 
 | Foundation | Current implementation |
 | --- | --- |
@@ -220,14 +220,14 @@ Detailed plan: [docs/AGENT_EVOLUTION.md](docs/AGENT_EVOLUTION.md).
 
 ## 🧪 MVP Progress
 
-PilotFlow is currently a **strong engineering prototype**, not a finished product. The first deliverable is a reliable Feishu-native project launch loop, not a separate project-management SaaS and not an unattended production bot.
+PilotFlow is currently a **strong engineering prototype**. The first deliverable is a reliable Feishu-native project launch loop, not a separate project-management SaaS and not an unattended production bot.
 
 | Capability | Maturity | Boundary |
 | --- | --- | --- |
 | Activity tenant, `lark-cli`, and core Feishu API proof | Live validated | Real IM/Card/Doc/Base/Task paths have been exercised. |
 | JS project-launch live path | Live validated prototype | It can create visible Feishu artifacts and a run trace from a confirmed local command. |
 | TypeScript `pilot:run` path | Dry-run ready, live pending | Product facade exists; real live parity is the next hard gate. |
-| TypeScript `pilot:gateway` path | Local bridge implemented | It can consume Feishu message/card events, persist waiting confirmations, and resume approved runs locally; real tenant validation is still pending. |
+| TypeScript `pilot:gateway` path | Local bridge implemented | It can consume Feishu message/card events, persist waiting confirmations, and resume approved runs locally through card callbacks or the text command `确认执行`; real tenant validation is still pending. |
 | Execution plan card and risk card | Live send validated | Button payloads exist, but real callback execution is not proven. |
 | Card callback listener bridge | Local/prototype | Parser, listener, and trigger bridge are tested; no real callback event has reached the listener yet. |
 | Pinned project entry | Live validated | This is the reliable project entrance in the current prototype. |
@@ -242,9 +242,9 @@ Full hard-status page: [docs/PRODUCT_REALITY_CHECK.md](docs/PRODUCT_REALITY_CHEC
 
 ## 🧾 Reality Check
 
-PilotFlow is useful because it has a real Feishu-native product spine: plan, confirmation, Feishu artifacts, project state, risk surface, summary, and trace. It is not complete because normal users still cannot rely on a fully automatic group bot, real card callback delivery is pending, and the TypeScript product path still needs live validation before it replaces the older JS live path.
+PilotFlow is built around a real Feishu-native product spine: plan, confirmation, Feishu artifacts, project state, risk surface, summary, and trace. Key areas still in progress include automatic group-bot flow, real card callback delivery, and TypeScript live path validation alongside the existing JS live proof.
 
-The next milestone is therefore not another documentation pack. It is live proof of `pilot:run`, callback delivery proof, and a cleaner Feishu IM trigger path.
+The next milestone is live proof of `pilot:run`, callback delivery proof, and a cleaner Feishu IM trigger path.
 
 ## 🗺️ Roadmap Snapshot
 
@@ -314,7 +314,7 @@ npm run pilot:status
 npm run pilot:audit
 ```
 
-`pilot:run` is the preferred product-facing local entry for direct project-init runs. `pilot:gateway` is the new TS event bridge for `im.message.receive_v1` and `card.action.trigger`: it can open a waiting confirmation run from a mention, persist the pending run locally, and resume it after an approved card callback. Both paths still need real tenant validation before they can replace the older JS live proof. Operational setup lives in [docs/OPERATOR_RUNBOOK.md](docs/OPERATOR_RUNBOOK.md); contributor workflow lives in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md). Generated review packs, including the Run Retrospective Pack and Retrospective Eval report, are auxiliary material and are kept out of the product runtime surface.
+`pilot:run` is the preferred product-facing local entry for direct project-init runs. `pilot:gateway` is the new TS event bridge for `im.message.receive_v1` and `card.action.trigger`: it can open a waiting confirmation run from a mention, persist the pending run locally, and resume it through either an approved card callback or a plain-text `确认执行` in the same chat. Both paths still need real tenant validation before they can replace the older JS live proof. Operational setup lives in [docs/OPERATOR_RUNBOOK.md](docs/OPERATOR_RUNBOOK.md); contributor workflow lives in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md). Generated review packs, including the Run Retrospective Pack and Retrospective Eval report, are auxiliary material and are kept out of the product runtime surface.
 
 ## 🛡️ Trust Model
 
@@ -325,7 +325,7 @@ npm run pilot:audit
 | Can the same demo accidentally create duplicate artifacts? | Live runs are guarded by a duplicate-run key unless the operator explicitly bypasses it. |
 | Can reviewers inspect what happened? | Yes. Run logs, generated review packs, Flight Recorder, retrospective reports, and final summaries expose the execution path. |
 | Can worker agents publish on their own? | No. The first Review Worker returns preview artifacts and proposed Feishu writes only; publishing remains confirmation-gated. |
-| Is the current prototype production-ready? | No. It is a strong engineering prototype with known pending work around TS live parity, real card callback delivery, automatic IM trigger, and manual capture evidence. |
+| Is the current version production-ready? | Not yet. It is a strong engineering prototype with known pending work around TS live parity, real card callback delivery, automatic IM trigger, and manual capture evidence. |
 
 ## 🔐 Safety Principles
 

@@ -42,3 +42,40 @@ test("PendingRunStore saves, takes, and prunes expired runs", async () => {
     await rm(dir, { recursive: true, force: true });
   }
 });
+
+test("PendingRunStore finds the latest run by chat id", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "pilotflow-pending-store-chat-"));
+  const store = new PendingRunStore({
+    storagePath: join(dir, "pending.json"),
+  });
+
+  try {
+    await store.save({
+      runId: "run-1",
+      chatId: "oc_1",
+      inputText: "first",
+      options: { sendEntryMessage: true },
+      createdAt: "2026-05-01T10:00:00.000Z",
+    });
+    await store.save({
+      runId: "run-2",
+      chatId: "oc_1",
+      inputText: "second",
+      options: { sendRiskCard: true },
+      createdAt: "2026-05-01T10:01:00.000Z",
+    });
+    await store.save({
+      runId: "run-3",
+      chatId: "oc_2",
+      inputText: "third",
+      options: {},
+      createdAt: "2026-05-01T10:02:00.000Z",
+    });
+
+    assert.equal((await store.findLatestByChatId("oc_1"))?.runId, "run-2");
+    assert.equal((await store.findLatestByChatId("oc_2"))?.runId, "run-3");
+    assert.equal(await store.findLatestByChatId("oc_missing"), null);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
