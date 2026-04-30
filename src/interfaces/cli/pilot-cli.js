@@ -24,6 +24,10 @@ const COMMANDS = {
     description: "Check local PilotFlow runtime requirements without printing secrets.",
     steps: [{ script: "pilot:doctor:run", args: [] }]
   },
+  "agent-smoke": {
+    description: "Run the TypeScript gateway and Agent dry-run smoke path.",
+    steps: [{ script: "pilot:agent-smoke", args: [] }]
+  },
   status: {
     description: "Regenerate the delivery index status page.",
     steps: [
@@ -85,6 +89,7 @@ function renderHelp() {
     "  npm run pilot:demo -- --send-plan-card --no-auto-confirm",
     "  npm run pilot:recorder -- --input tmp/runs/latest-manual-run.jsonl --output tmp/flight-recorder/latest.html",
     "  npm run pilot:doctor",
+    "  npm run pilot:agent-smoke -- --input \"@PilotFlow 建立答辩项目空间\"",
     "  npm run pilot:status",
     "  npm run pilot:package",
     "  npm run pilot:audit"

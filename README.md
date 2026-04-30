@@ -12,7 +12,7 @@ Start from group-chat discussion and turn intent into confirmed plans, executabl
 [![Feishu](https://img.shields.io/badge/Feishu-native-00A4FF)](#-feishu-native-surfaces)
 [![Agent](https://img.shields.io/badge/Agent-as%20Pilot-6f42c1)](#-product-experience)
 [![Node](https://img.shields.io/badge/node-%3E%3D20-339933)](docs/OPERATOR_RUNBOOK.md)
-[![lark-cli](https://img.shields.io/badge/lark--cli-1.0.21-blue)](docs/OPERATOR_RUNBOOK.md)
+[![lark-cli](https://img.shields.io/badge/lark--cli-1.0.23-blue)](docs/OPERATOR_RUNBOOK.md)
 [![GitHub stars](https://img.shields.io/github/stars/DeliciousBuding/pilot-flow?style=social)](https://github.com/DeliciousBuding/pilot-flow/stargazers)
 [![GitHub last commit](https://img.shields.io/github/last-commit/DeliciousBuding/pilot-flow)](https://github.com/DeliciousBuding/pilot-flow/commits/main)
 
@@ -235,6 +235,7 @@ PilotFlow is currently in **MVP prototype** stage. The first deliverable is a re
 | Card callback listener bridge | ✅ local tests passed |
 | Live card callback confirmation | 🟡 listener connected, no real callback event received yet |
 | Group announcement project entry | ✅ attempted; current group returns docx announcement API block and falls back to pinned entry |
+| TypeScript Agent kernel | ✅ Day 5 dry-run smoke path |
 
 ## 🗺️ Roadmap Snapshot
 
@@ -251,6 +252,9 @@ gantt
     Base and Task project state          :done,    b3, 2026-04-28, 1d
     Contact owner lookup                 :done,    b4, 2026-04-28, 1d
     Artifact-aware summary               :done,    b5, 2026-04-28, 1d
+    section Agent Kernel
+    TypeScript gateway and Agent loop    :done,    k1, 2026-04-30, 1d
+    CLI dry-run smoke bridge             :done,    k2, 2026-04-30, 1d
     section Demo
     Risk detection and decision card     :done,    c1, 2026-04-28, 1d
     Card callback action protocol        :done,    c2, 2026-04-28, 1d
@@ -286,6 +290,7 @@ For local development and reviewer reproduction:
 npm run pilot:check
 npm test
 npm run pilot:demo
+npm run pilot:agent-smoke
 npm run pilot:demo -- --send-plan-card --no-auto-confirm
 npm run pilot:demo -- --pin-entry-message --send-risk-card
 npm run pilot:recorder -- --input tmp/runs/latest-manual-run.jsonl --output tmp/flight-recorder/latest.html
