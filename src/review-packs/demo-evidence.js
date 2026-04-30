@@ -57,7 +57,7 @@ export function buildDemoEvidenceModel(events, { inputPath = "" } = {}) {
     fallbacks,
     failedOptionalArtifacts,
     evidenceChecklist: [
-      evidenceItem("Plan generated", Boolean(recorder.plan), "PilotFlow produced a structured project flight plan."),
+      evidenceItem("Plan generated", Boolean(recorder.plan), "PilotFlow produced a structured project execution plan."),
       evidenceItem("Doc created", artifactTypes.has("doc"), "A Feishu Doc artifact is present."),
       evidenceItem("Base state written", artifactTypes.has("base_record"), "Project state rows were written or planned."),
       evidenceItem("Task created", artifactTypes.has("task"), "A Feishu Task artifact is present."),

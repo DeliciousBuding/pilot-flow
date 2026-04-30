@@ -6,17 +6,17 @@ assert.deepEqual(
     event: {
       action: {
         value: {
-          pilotflow_card: "flight_plan",
+          pilotflow_card: "execution_plan",
           pilotflow_run_id: "run-1",
-          pilotflow_action: "confirm_takeoff"
+          pilotflow_action: "confirm_execute"
         }
       }
     }
   }),
   {
-    pilotflow_card: "flight_plan",
+    pilotflow_card: "execution_plan",
     pilotflow_run_id: "run-1",
-    pilotflow_action: "confirm_takeoff"
+    pilotflow_action: "confirm_execute"
   }
 );
 
@@ -28,25 +28,39 @@ assert.deepEqual(
       },
       action: {
         value: {
-          pilotflow_card: "flight_plan",
+          pilotflow_card: "execution_plan",
           pilotflow_run_id: "run-1",
-          pilotflow_action: "confirm_takeoff"
+          pilotflow_action: "confirm_execute"
         }
       }
     }
   }),
   {
     ok: true,
-    card: "flight_plan",
-    action: "confirm_takeoff",
+    card: "execution_plan",
+    action: "confirm_execute",
     run_id: "run-1",
     user_id: "ou_user",
     decision: {
       status: "approved",
       next: "run_full_project_init",
-      message: "Flight plan confirmed. Continue with Doc, Base, Task, risk, entry, and summary steps."
+      message: "Plan confirmed. Continue with Doc, Base, Task, risk, entry, and summary steps."
     }
   }
+);
+
+assert.equal(
+  handleCardCallback({
+    event: {
+      action: {
+        value: {
+          pilotflow_card: "execution_plan",
+          pilotflow_action: "confirm_takeoff"
+        }
+      }
+    }
+  }).decision.next,
+  "run_full_project_init"
 );
 
 assert.equal(
@@ -58,6 +72,20 @@ assert.equal(
     }
   }).decision.next,
   "run_doc_only"
+);
+
+assert.equal(
+  handleCardCallback({
+    event: {
+      action: {
+        value: {
+          pilotflow_card: "flight_plan",
+          pilotflow_action: "confirm_execute"
+        }
+      }
+    }
+  }).decision.next,
+  "run_full_project_init"
 );
 
 assert.equal(
@@ -88,7 +116,7 @@ assert.equal(
     event: {
       action: {
         value: {
-          pilotflow_card: "flight_plan",
+          pilotflow_card: "execution_plan",
           pilotflow_action: "unknown"
         }
       }

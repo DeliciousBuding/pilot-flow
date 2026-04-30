@@ -1,9 +1,12 @@
 import type { ProjectInitPlan } from "../types/plan.js";
+import { PRIMARY_CONFIRMATION_TEXT } from "./confirmation-text.js";
 
-export function buildFlightPlanCard({ runId, plan, confirmationText = "确认起飞" }: { readonly runId: string; readonly plan: ProjectInitPlan; readonly confirmationText?: string }): Record<string, unknown> {
+const EXECUTION_PLAN_CARD_TYPE = "execution_plan";
+
+export function buildFlightPlanCard({ runId, plan, confirmationText = PRIMARY_CONFIRMATION_TEXT }: { readonly runId: string; readonly plan: ProjectInitPlan; readonly confirmationText?: string }): Record<string, unknown> {
   return {
     config: { wide_screen_mode: true },
-    header: { template: "blue", title: { tag: "plain_text", content: "PilotFlow 项目飞行计划" } },
+    header: { template: "blue", title: { tag: "plain_text", content: "PilotFlow 项目执行计划" } },
     elements: [
       markdownBlock(`**目标**\n${plan.goal}`),
       markdownBlock(`**Run ID**\n${runId}`),
@@ -16,13 +19,13 @@ export function buildFlightPlanCard({ runId, plan, confirmationText = "确认起
       {
         tag: "action",
         actions: [
-          button("确认起飞", "confirm_takeoff", "primary", runId),
+          button("确认执行", "confirm_execute", "primary", runId),
           button("编辑计划", "edit_plan", "default", runId),
           button("仅生成文档", "doc_only", "default", runId),
           button("取消", "cancel", "danger", runId),
         ],
       },
-      { tag: "note", elements: [{ tag: "plain_text", content: `按钮回调接入前，也可以回复“${confirmationText}”继续。` }] },
+      { tag: "note", elements: [{ tag: "plain_text", content: `按钮回调接入前，也可以回复“${confirmationText}”继续执行。` }] },
     ],
   };
 }
@@ -32,7 +35,7 @@ function markdownBlock(content: string): Record<string, unknown> {
 }
 
 function button(text: string, action: string, type: string, runId: string): Record<string, unknown> {
-  return { tag: "button", text: { tag: "plain_text", content: text }, type, value: { pilotflow_card: "flight_plan", pilotflow_run_id: runId, pilotflow_action: action } };
+  return { tag: "button", text: { tag: "plain_text", content: text }, type, value: { pilotflow_card: EXECUTION_PLAN_CARD_TYPE, pilotflow_run_id: runId, pilotflow_action: action } };
 }
 
 function formatList(items: readonly string[], fallback: string): string {

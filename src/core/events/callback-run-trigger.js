@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import { JsonlRecorder } from "../recorder/jsonl-recorder.js";
 import { RunOrchestrator } from "../orchestrator/run-orchestrator.js";
+import { PRIMARY_CONFIRMATION_TEXT } from "../orchestrator/confirmation-text.js";
 
 export async function triggerRunFromCallback(callback, {
   inputPath,
@@ -60,7 +61,7 @@ export async function triggerRunFromCallback(callback, {
 
     const result = await orchestrator.startProjectInit(inputText, {
       autoConfirm: true,
-      confirmationText: "确认起飞 (card callback)",
+      confirmationText: `${PRIMARY_CONFIRMATION_TEXT} (card callback)`,
       sendEntryMessage: true,
       pinEntryMessage: true,
       updateAnnouncement: true,

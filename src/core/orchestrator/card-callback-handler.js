@@ -1,10 +1,22 @@
-const FLIGHT_PLAN_ACTIONS = new Map([
+const EXECUTION_PLAN_CARD_TYPE = "execution_plan";
+const LEGACY_EXECUTION_PLAN_CARD_TYPES = ["flight_plan"];
+const EXECUTION_PLAN_CARD_TYPES = new Set([EXECUTION_PLAN_CARD_TYPE, ...LEGACY_EXECUTION_PLAN_CARD_TYPES]);
+
+const EXECUTION_PLAN_ACTIONS = new Map([
+  [
+    "confirm_execute",
+    {
+      status: "approved",
+      next: "run_full_project_init",
+      message: "Plan confirmed. Continue with Doc, Base, Task, risk, entry, and summary steps."
+    }
+  ],
   [
     "confirm_takeoff",
     {
       status: "approved",
       next: "run_full_project_init",
-      message: "Flight plan confirmed. Continue with Doc, Base, Task, risk, entry, and summary steps."
+      message: "Plan confirmed. Continue with Doc, Base, Task, risk, entry, and summary steps."
     }
   ],
   [
@@ -12,7 +24,7 @@ const FLIGHT_PLAN_ACTIONS = new Map([
     {
       status: "needs_edit",
       next: "request_plan_edit",
-      message: "Requester wants to edit the flight plan before Feishu writes."
+      message: "Requester wants to edit the execution plan before Feishu writes."
     }
   ],
   [
@@ -20,7 +32,7 @@ const FLIGHT_PLAN_ACTIONS = new Map([
     {
       status: "approved_doc_only",
       next: "run_doc_only",
-      message: "Flight plan confirmed for document-only execution."
+      message: "Execution plan confirmed for document-only execution."
     }
   ],
   [
@@ -28,7 +40,7 @@ const FLIGHT_PLAN_ACTIONS = new Map([
     {
       status: "cancelled",
       next: "stop_run",
-      message: "Flight plan was cancelled before Feishu project artifacts were written."
+      message: "Execution plan was cancelled before Feishu project artifacts were written."
     }
   ]
 ]);
@@ -114,13 +126,13 @@ export function extractActionValue(payload = {}) {
 }
 
 function decisionFor(card, action) {
-  if (card === "flight_plan") return FLIGHT_PLAN_ACTIONS.get(action);
+  if (EXECUTION_PLAN_CARD_TYPES.has(card)) return EXECUTION_PLAN_ACTIONS.get(action);
   if (card === "risk_decision") return RISK_ACTIONS.get(action);
   return undefined;
 }
 
 function inferCardFromAction(action) {
-  if (FLIGHT_PLAN_ACTIONS.has(action)) return "flight_plan";
+  if (EXECUTION_PLAN_ACTIONS.has(action)) return EXECUTION_PLAN_CARD_TYPE;
   if (RISK_ACTIONS.has(action)) return "risk_decision";
   return "";
 }

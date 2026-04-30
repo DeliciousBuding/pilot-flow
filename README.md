@@ -54,13 +54,13 @@ PilotFlow 不是普通聊天机器人，不是文档生成器，也不是只面�
 
 > **像一个项目经理一样，在飞书群里推动团队从讨论走向交付。**
 
-在真实协作里，项目的关键信息经常散落在群聊中：目标、负责人、截止时间、风险、材料、确认意见、临时承诺。PilotFlow 让 AI Agent 成为主驾驶，负责理解讨论、生成项目飞行计划、请求人类确认、调用飞书原生工具，并把结果沉淀到 Doc、Base、Task、群入口消息和总结消息中。
+在真实协作里，项目的关键信息经常散落在群聊中：目标、负责人、截止时间、风险、材料、确认意见、临时承诺。PilotFlow 让 AI Agent 成为主驾驶，负责理解讨论、生成项目执行计划、请求人类确认、调用飞书原生工具，并把结果沉淀到 Doc、Base、Task、群入口消息和总结消息中。
 
 GUI 或 Chat Tab 不是主流程，它只是仪表盘和辅助操作台。真正的产品体验应该发生在团队已经工作的地方：**飞书 IM、卡片、文档、多维表格和任务系统**。
 
 ## 🌍 English
 
-PilotFlow is a Feishu-native AI operating layer for project work. It lives inside the collaboration flow, understands project intent, proposes a flight plan, asks for human confirmation, executes through Feishu tools, records every step, and sends a delivery summary back to the team.
+PilotFlow is a Feishu-native AI operating layer for project work. It lives inside the collaboration flow, understands project intent, proposes an execution plan, asks for human confirmation, executes through Feishu tools, records every step, and sends a delivery summary back to the team.
 
 The product principle is simple:
 
@@ -72,7 +72,7 @@ PilotFlow is designed for practical team operations first: fewer lost decisions,
 
 | Team pain | PilotFlow response | Feishu-native output |
 | --- | --- | --- |
-| Discussion is scattered across group messages | Extract goals, members, deadlines, deliverables, and risks | Project flight plan |
+| Discussion is scattered across group messages | Extract goals, members, deadlines, deliverables, and risks | Project execution plan |
 | Verbal agreement is hard to track | Ask for explicit confirmation before side effects | Card or text confirmation |
 | Tasks and risks disappear in chat history | Write structured project state | Base records and Tasks |
 | Project entry points are hard to find | Publish a stable project entry | Pinned entry message or group announcement |
@@ -98,7 +98,7 @@ journey
       Team discusses a new project in Feishu group: 3: Team
       PilotFlow extracts goal, owners, deliverables, deadline, risks: 5: PilotFlow
     section Confirm
-      PilotFlow posts a project flight plan: 5: PilotFlow
+      PilotFlow posts a project execution plan: 5: PilotFlow
       Human owner confirms or edits the plan: 4: Owner
     section Execute
       PilotFlow creates project brief: 5: PilotFlow
@@ -115,7 +115,7 @@ PilotFlow turns a vague group discussion into a managed project run:
 | Step | Product behavior | Control point |
 | --- | --- | --- |
 | Observe | Read the incoming project intent and extract goal, members, deliverables, deadline, and risks | No write side effects |
-| Plan | Generate a structured project flight plan | Schema validation before execution |
+| Plan | Generate a structured project execution plan | Schema validation before execution |
 | Confirm | Ask a human to approve, edit, restrict to doc-only, or cancel | Confirmation gate |
 | Execute | Create Feishu-native artifacts through a tool router | Preflight checks and duplicate-run guard |
 | Record | Capture every step, tool call, artifact, fallback, and error | JSONL run log and Flight Recorder |
@@ -125,7 +125,7 @@ PilotFlow turns a vague group discussion into a managed project run:
 
 ```mermaid
 flowchart LR
-    A["Feishu group chat<br/>text or voice intent"] --> B["Agent Planner<br/>project flight plan"]
+    A["Feishu group chat<br/>text or voice intent"] --> B["Agent Planner<br/>project execution plan"]
     B --> C["Confirmation Gate<br/>human approval"]
     C --> D["Feishu Tool Router"]
     D --> E["Doc<br/>project brief"]
@@ -195,7 +195,7 @@ PilotFlow is still an MVP prototype, but it is packaged around product-grade fou
 | Surface | Product role | MVP status |
 | --- | --- | --- |
 | IM | Main collaboration entry and summary channel | ✅ validated |
-| Cards | Flight plan, confirmation, risk decision | ✅ live send fixed, flight plan + risk decision prototypes, callback action protocol, bounded listener bridge |
+| Cards | Execution plan, confirmation, risk decision | ✅ live send fixed, execution plan + risk decision prototypes, callback action protocol, bounded listener bridge |
 | Docs | Project brief and delivery documents | ✅ creation validated |
 | Base | Tasks, detected risks, artifacts, confirmations | ✅ live rich Project State table validated |
 | Task | Concrete owner/deadline action items | ✅ creation validated, optional open_id/contact assignee mapping |
@@ -223,7 +223,7 @@ PilotFlow is currently in **MVP prototype** stage. The first deliverable is a re
 | Contact lookup for Task owner | ✅ read-path validated, optional prototype |
 | Local Flight Recorder | ✅ prototype |
 | Real one-command Feishu run | ✅ validated |
-| Project flight plan card | ✅ live send validated |
+| Project execution plan card | ✅ live send validated |
 | Card button action protocol | ✅ local handler prototype |
 | Project entry message fallback | ✅ prototype |
 | Pinned project entry message | ✅ live validated |
@@ -332,7 +332,7 @@ The current local demo reads a project-init fixture, writes a traceable run log,
 PilotFlow is moving quickly toward a competition MVP. Changes should keep the main loop stable:
 
 ```text
-Group chat -> Flight plan -> Confirmation -> Feishu tools -> State -> Risk decision -> Delivery summary
+Group chat -> Execution plan -> Confirmation -> Feishu tools -> State -> Risk decision -> Delivery summary
 ```
 
 Before opening a change:

@@ -87,7 +87,7 @@ Implemented runtime capabilities:
 - plan schema validation fallback before confirmation or tool calls
 - live-capable `doc.create`, `base.write`, `task.create`, and `im.send`
 - short Feishu write idempotency keys
-- text confirmation fallback with `确认起飞`
+- text confirmation fallback with `确认执行`
 - live preflight for Base and chat targets
 - Feishu artifact normalization for Doc, Base, Task, cards, pinned messages, announcements, IM, and local run logs
 - duplicate live-run guard with explicit bypass
@@ -141,7 +141,7 @@ Known product boundary:
 | Card callback protocol | `npm run test:one -- callback`, inspect `pilotflow_action` values |
 | Card listener bridge | `npm run test:one -- listener`, `npm run test:one -- trigger`, `npm run pilot:listen -- --dry-run --max-events 1 --timeout 30s` |
 | Artifact normalization | `npm run test:one -- artifacts`, `npm run pilot:demo`, inspect final artifacts |
-| Flight plan card | `npm run test:one -- card`, `npm run pilot:demo -- --send-plan-card --no-auto-confirm` |
+| Execution plan card | `npm run test:one -- card`, `npm run pilot:demo -- --send-plan-card --no-auto-confirm` |
 | Duplicate-run guard | `npm run test:one -- guard`, inspect guard events in JSONL |
 | Entry or announcement fallback | `npm run test:one -- entry`, `npm run test:one -- summary`, run the matching dry-run flag |
 | Flight Recorder view | `npm run test:one -- flight`, render a local HTML file |

@@ -3,7 +3,7 @@ import { buildFlightPlanCard } from "./flight-plan-card.js";
 
 const card = buildFlightPlanCard({
   runId: "run-test",
-  confirmationText: "确认起飞",
+  confirmationText: "确认执行",
   plan: {
     goal: "Launch PilotFlow MVP",
     members: ["Product Owner", "Agent Engineer"],
@@ -13,7 +13,7 @@ const card = buildFlightPlanCard({
   }
 });
 
-assert.equal(card.header.title.content, "PilotFlow 项目飞行计划");
+assert.equal(card.header.title.content, "PilotFlow 项目执行计划");
 assert.equal(card.header.template, "blue");
 assert.equal(card.config.wide_screen_mode, true);
 
@@ -23,11 +23,11 @@ assert.match(content, /Product Owner/);
 assert.match(content, /Project brief/);
 assert.match(content, /2026-05-02/);
 assert.match(content, /card callback delay/);
-assert.match(content, /确认起飞/);
-assert.match(content, /confirm_takeoff/);
+assert.match(content, /确认执行/);
+assert.match(content, /confirm_execute/);
 assert.match(content, /edit_plan/);
 assert.match(content, /doc_only/);
 assert.match(content, /cancel/);
-assert.match(content, /flight_plan/);
+assert.match(content, /execution_plan/);
 
-console.log("flight plan card tests passed");
+console.log("execution plan card tests passed");

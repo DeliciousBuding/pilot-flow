@@ -47,12 +47,12 @@ Explain that the current prototype uses a manual trigger fixture, while the inte
 Run or reference the live command used for the latest validated path:
 
 ```bash
-npm run pilot:demo -- --live --confirm "确认起飞" --send-plan-card --send-risk-card --pin-entry-message --update-announcement
+npm run pilot:demo -- --live --confirm "确认执行" --send-plan-card --send-risk-card --pin-entry-message --update-announcement
 ```
 
 Expected product result:
 
-- A project flight plan card is sent.
+- A project execution plan card is sent.
 - Human confirmation is required before visible side effects.
 - PilotFlow creates or updates the project artifacts.
 
@@ -62,7 +62,7 @@ Move through the real outputs in this order:
 
 | Step | What to show | What to say |
 | --- | --- | --- |
-| Flight plan card | Group message card | PilotFlow summarizes the intent before acting |
+| Execution plan card | Group message card | PilotFlow summarizes the intent before acting |
 | Feishu Doc | Generated project brief | The project now has a stable narrative artifact |
 | Base rows | Project State table | Tasks, risks, artifacts, owners, deadlines, and source run are structured |
 | Task | Feishu Task | At least one action item can become a native task |

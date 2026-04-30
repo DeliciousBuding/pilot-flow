@@ -27,7 +27,7 @@ flowchart LR
 
 ## Card Design
 
-Project flight plan card:
+Project execution plan card:
 
 | Region | Content |
 | --- | --- |

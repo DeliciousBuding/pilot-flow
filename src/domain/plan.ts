@@ -83,8 +83,8 @@ export function createProjectInitPlan(inputText: string): ProjectInitPlan {
     steps: defaultSteps(),
     confirmations: [
       {
-        id: "confirm-takeoff",
-        prompt: "Confirm the flight plan before PilotFlow writes project artifacts.",
+        id: "confirm-execute",
+        prompt: "Confirm the execution plan before PilotFlow writes project artifacts.",
         status: "pending",
         required_for: [
           "step-doc",
@@ -187,8 +187,8 @@ export function buildFallbackPlan(errors: readonly (PlanValidationIssue | string
 
 function defaultSteps(): readonly PlanStep[] {
   return [
-    { id: "step-plan", title: "Generate project flight plan", status: "pending" },
-    { id: "step-confirm", title: "Post flight plan card and request human confirmation", status: "pending", tool: "card.send" },
+    { id: "step-plan", title: "Generate project execution plan", status: "pending" },
+    { id: "step-confirm", title: "Post execution plan card and request human confirmation", status: "pending", tool: "card.send" },
     { id: "step-doc", title: "Create project brief document", status: "pending", tool: "doc.create" },
     { id: "step-state", title: "Write tasks and risks to project state", status: "pending", tool: "base.write" },
     { id: "step-task", title: "Create first task with owner/deadline fallback context", status: "pending", tool: "task.create" },

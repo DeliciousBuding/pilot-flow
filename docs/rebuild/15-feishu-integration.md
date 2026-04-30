@@ -261,7 +261,7 @@ function handleGenericCard(action: CardAction): void {
 }
 ```
 
-**PilotFlow 当前的卡片回调**：只处理审批按钮（确认起飞/取消），且平台配置未验证。重建时应拆成两个等级：
+**PilotFlow 当前的卡片回调**：只处理审批按钮（确认执行/取消），且平台配置未验证。重建时应拆成两个等级：
 
 1. 近期实现：`card.action.trigger` event ack + 幂等记录 + 异步更新卡片/发送后续消息。
 2. 后续增强：如果官方回调路径支持同步 card mutation，再返回更新卡片显示处理中状态。

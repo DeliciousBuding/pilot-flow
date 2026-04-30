@@ -7,7 +7,7 @@ This folder is the compact public demo kit for PilotFlow. It keeps only the huma
 Show that PilotFlow can work inside a real Feishu group as an AI project operations officer:
 
 ```text
-Group intent -> Flight plan -> Human confirmation -> Doc/Base/Task/Card/Entry -> Summary -> Trace
+Group intent -> Execution plan -> Human confirmation -> Doc/Base/Task/Card/Entry -> Summary -> Trace
 ```
 
 The demo should make three things obvious:
@@ -53,7 +53,7 @@ Individual review-pack commands are documented in [`../OPERATOR_RUNBOOK.md`](../
 | Area | Status |
 | --- | --- |
 | Live one-command Feishu run | Validated |
-| Project flight-plan card send | Validated |
+| Project execution-plan card send | Validated |
 | Risk decision card live send | Validated |
 | Rich Base state rows | Validated |
 | Project entry pinned in group | Validated |

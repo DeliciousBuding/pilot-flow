@@ -9,7 +9,7 @@ test("handleCardEvent dedupes card callbacks and returns PilotFlow decisions", a
   const event = {
     kind: "card" as const,
     id: "evt-1",
-    raw: { event: { action: { value: { pilotflow_card: "flight_plan", pilotflow_action: "confirm_takeoff", pilotflow_run_id: "run-1" } }, operator: { open_id: "ou_user" } } },
+    raw: { event: { action: { value: { pilotflow_card: "execution_plan", pilotflow_action: "confirm_execute", pilotflow_run_id: "run-1" } }, operator: { open_id: "ou_user" } } },
   };
 
   const first = await handleCardEvent(event, { dedupe });
@@ -24,7 +24,7 @@ test("handleCardEvent dedupes card callbacks and returns PilotFlow decisions", a
 test("handleCardEvent dedupes repeated business actions across different event ids", async () => {
   const dedupe = new EventDedupe({ ttlMs: 1000, maxEntries: 10 }, () => 1_000);
   let actions = 0;
-  const raw = { event: { action: { value: { pilotflow_card: "flight_plan", pilotflow_action: "confirm_takeoff", pilotflow_run_id: "run-1" } }, context: { open_chat_id: "oc_1" } } };
+  const raw = { event: { action: { value: { pilotflow_card: "execution_plan", pilotflow_action: "confirm_execute", pilotflow_run_id: "run-1" } }, context: { open_chat_id: "oc_1" } } };
 
   const first = await handleCardEvent({ kind: "card", id: "evt-1", raw }, { dedupe, queue: new ChatQueue(), onAction: async () => { actions++; } });
   const second = await handleCardEvent({ kind: "card", id: "evt-2", raw }, { dedupe, queue: new ChatQueue(), onAction: async () => { actions++; } });

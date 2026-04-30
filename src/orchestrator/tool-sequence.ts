@@ -10,6 +10,7 @@ import type { ToolContext } from "../types/tool.js";
 import type { ToolRegistry } from "../tools/registry.js";
 import { buildEntryAnnouncementHtml, buildEntryMessageText } from "./entry-message.js";
 import { buildFlightPlanCard } from "./flight-plan-card.js";
+import { PRIMARY_CONFIRMATION_TEXT } from "./confirmation-text.js";
 import { PROJECT_STATE_FIELDS, buildProjectStateRows, firstTaskSummary, normalizeDueDate } from "./project-state.js";
 import { buildSummaryText } from "./summary-builder.js";
 import type { TaskAssignee } from "./assignee-resolver.js";
@@ -106,7 +107,7 @@ export function buildPlanCardStep(): SequenceStep {
   return {
     id: "step-confirm",
     tool: "card.send",
-    input: ({ runId, plan }) => ({ title: "PilotFlow 项目飞行计划", card: buildFlightPlanCard({ runId, plan, confirmationText: "确认起飞" }) }),
+    input: ({ runId, plan }) => ({ title: "PilotFlow 项目执行计划", card: buildFlightPlanCard({ runId, plan, confirmationText: PRIMARY_CONFIRMATION_TEXT }) }),
   };
 }
 

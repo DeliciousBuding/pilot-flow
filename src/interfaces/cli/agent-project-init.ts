@@ -11,6 +11,7 @@ import { ToolRegistry } from "../../tools/registry.js";
 import { loadRuntimeConfig } from "../../config/runtime-config.js";
 import type { Artifact } from "../../types/artifact.js";
 import type { RuntimeConfig } from "../../types/config.js";
+import { isAcceptedConfirmationText } from "../../orchestrator/confirmation-text.js";
 
 const DEFAULT_INPUT = [
   "目标: 为校园 AI 产品答辩建立项目空间",
@@ -148,7 +149,7 @@ function autoConfirm(flags: Record<string, string | boolean>, runtime: RuntimeCo
   if (flags["no-auto-confirm"] === true) return false;
   if (flags["auto-confirm"] === true) return true;
   if (runtime.mode !== "live") return true;
-  return Boolean(stringFlag(flags.confirm));
+  return isAcceptedConfirmationText(stringFlag(flags.confirm) ?? "");
 }
 
 function ownerMap(value: unknown): Record<string, string> | undefined {

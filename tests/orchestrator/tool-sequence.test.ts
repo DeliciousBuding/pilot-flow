@@ -121,7 +121,7 @@ function samplePlan(): ProjectInitPlan {
     deadline: "2026-05-01",
     missing_info: [],
     steps: [],
-    confirmations: [{ id: "confirm-takeoff", prompt: "Confirm", status: "pending", required_for: [] }],
+    confirmations: [{ id: "confirm-execute", prompt: "Confirm", status: "pending", required_for: [] }],
     risks: [],
   };
 }

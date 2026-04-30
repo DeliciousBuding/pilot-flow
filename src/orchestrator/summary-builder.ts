@@ -2,7 +2,7 @@ import type { Artifact } from "../types/artifact.js";
 import type { ProjectInitPlan } from "../types/plan.js";
 
 export function buildSummaryText({ runId, plan, artifacts = [] }: { readonly runId: string; readonly plan: ProjectInitPlan; readonly artifacts?: readonly Artifact[] }): string {
-  const lines = ["PilotFlow 已完成项目起飞。", "", `Run ID: ${runId}`, `目标: ${plan.goal}`, "", "已生成产物:"];
+  const lines = ["PilotFlow 已完成项目推进。", "", `Run ID: ${runId}`, `目标: ${plan.goal}`, "", "已生成产物:"];
   const doc = firstArtifact(artifacts, "doc");
   if (doc) lines.push(`- Doc: ${formatArtifactTarget(doc)}`);
   const baseRecords = artifacts.filter((artifact) => artifact.type === "base_record");

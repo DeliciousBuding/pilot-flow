@@ -26,7 +26,7 @@ test("parseLarkCliEventLine normalizes message and card events", () => {
 
   const card = parseLarkCliEventLine(JSON.stringify({
     header: { event_id: "evt-2", event_type: "card.action.trigger" },
-    event: { action: { value: { pilotflow_card: "flight_plan", pilotflow_action: "confirm_takeoff", pilotflow_run_id: "run-1" } }, operator: { open_id: "ou_user" } },
+    event: { action: { value: { pilotflow_card: "execution_plan", pilotflow_action: "confirm_execute", pilotflow_run_id: "run-1" } }, operator: { open_id: "ou_user" } },
   }));
   assert.equal(card?.kind, "card");
   assert.equal(card?.id, "evt-2");

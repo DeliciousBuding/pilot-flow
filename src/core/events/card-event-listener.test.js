@@ -35,8 +35,8 @@ await test("handleLine parses valid card.action.trigger with approved action", a
     event: {
       action: {
         value: {
-          pilotflow_card: "flight_plan",
-          pilotflow_action: "confirm_takeoff",
+          pilotflow_card: "execution_plan",
+          pilotflow_action: "confirm_execute",
           pilotflow_run_id: "run-abc-123"
         }
       },
@@ -51,11 +51,11 @@ await test("handleLine parses valid card.action.trigger with approved action", a
 
   assert.equal(callbacks.length, 1);
   assert.equal(callbacks[0].ok, true);
-  assert.equal(callbacks[0].card, "flight_plan");
-  assert.equal(callbacks[0].action, "confirm_takeoff");
+  assert.equal(callbacks[0].card, "execution_plan");
+  assert.equal(callbacks[0].action, "confirm_execute");
   assert.equal(callbacks[0].decision.status, "approved");
   assert.equal(triggers.length, 1);
-  assert.equal(triggers[0].action, "confirm_takeoff");
+  assert.equal(triggers[0].action, "confirm_execute");
 });
 
 await test("handleLine does not trigger on non-approved action", () => {
@@ -72,7 +72,7 @@ await test("handleLine does not trigger on non-approved action", () => {
     event: {
       action: {
         value: {
-          pilotflow_card: "flight_plan",
+          pilotflow_card: "execution_plan",
           pilotflow_action: "cancel"
         }
       }
@@ -105,8 +105,8 @@ await test("handleLine reports async trigger failures", async () => {
       event: {
         action: {
           value: {
-            pilotflow_card: "flight_plan",
-            pilotflow_action: "confirm_takeoff"
+            pilotflow_card: "execution_plan",
+            pilotflow_action: "confirm_execute"
           }
         }
       }
@@ -161,8 +161,8 @@ await test("handleLine does not trigger when stopped", () => {
     event: {
       action: {
         value: {
-          pilotflow_card: "flight_plan",
-          pilotflow_action: "confirm_takeoff"
+          pilotflow_card: "execution_plan",
+          pilotflow_action: "confirm_execute"
         }
       }
     }
@@ -213,7 +213,7 @@ await test("handleLine stops after maxEvents", () => {
       event: {
         action: {
           value: {
-            pilotflow_card: "flight_plan",
+            pilotflow_card: "execution_plan",
             pilotflow_action: "cancel"
           }
         }

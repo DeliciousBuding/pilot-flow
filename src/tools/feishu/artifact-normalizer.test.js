@@ -117,7 +117,7 @@ assert.deepEqual(
 assert.deepEqual(
   normalizeFeishuArtifacts(
     "card.send",
-    { title: "PilotFlow 项目飞行计划", card: { header: { title: { content: "Ignored fallback" } } } },
+    { title: "PilotFlow 项目执行计划", card: { header: { title: { content: "Ignored fallback" } } } },
     { dry_run: true },
     { runId }
   ),
@@ -125,7 +125,7 @@ assert.deepEqual(
     {
       id: "artifact-run-test-card",
       type: "card",
-      title: "PilotFlow 项目飞行计划",
+      title: "PilotFlow 项目执行计划",
       status: "planned"
     }
   ]

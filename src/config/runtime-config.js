@@ -1,7 +1,6 @@
 import { resolve } from "node:path";
 import { DEFAULT_DUPLICATE_GUARD_PATH } from "../core/orchestrator/duplicate-run-guard.js";
-
-const CONFIRMATION_PHRASE = "确认起飞";
+import { confirmationTextHint, isAcceptedConfirmationText, PRIMARY_CONFIRMATION_TEXT } from "../core/orchestrator/confirmation-text.js";
 
 export function loadRuntimeConfig(argv = process.argv.slice(2), env = process.env) {
   const args = parseArgs(argv);
@@ -49,9 +48,9 @@ export function loadRuntimeConfig(argv = process.argv.slice(2), env = process.en
       filePath: resolve(stringValue(args["duplicate-guard-path"]) || env.PILOTFLOW_DUPLICATE_GUARD_PATH || DEFAULT_DUPLICATE_GUARD_PATH)
     },
     confirmation: {
-      expectedText: CONFIRMATION_PHRASE,
+      expectedText: PRIMARY_CONFIRMATION_TEXT,
       text: confirmationText,
-      autoConfirm: dryRun ? args["no-auto-confirm"] !== true : confirmationText === CONFIRMATION_PHRASE
+      autoConfirm: dryRun ? args["no-auto-confirm"] !== true : isAcceptedConfirmationText(confirmationText)
     },
     feishu: {
       chatId: stringValue(args["chat-id"]) || env.PILOTFLOW_TEST_CHAT_ID,
@@ -109,12 +108,12 @@ function stringValue(value) {
 function buildUsage() {
   return `Usage:
   npm run pilot:demo
-  npm run pilot:demo -- --live --confirm "确认起飞"
+  npm run pilot:demo -- --live --confirm "${PRIMARY_CONFIRMATION_TEXT}"
 
 Options:
   --dry-run                 Build lark-cli commands without writing to Feishu.
   --live                    Execute lark-cli commands against Feishu.
-  --send-plan-card          Send or dry-run the project flight plan card before confirmation.
+  --send-plan-card          Send or dry-run the project execution plan card before confirmation.
   --send-entry-message      Send or dry-run a project entry message after Doc/Base/Task artifacts are created.
   --pin-entry-message       Send the project entry message and pin it in the target chat.
   --update-announcement     Try to upgrade the project entry into the group announcement; falls back to pinned entry on API failure.
@@ -126,7 +125,7 @@ Options:
   --allow-duplicate-run     Bypass duplicate-run protection for intentional repeated live writes.
   --disable-duplicate-guard Disable live duplicate-run protection.
   --duplicate-guard-path <path>  Local duplicate-run guard file. Defaults to ${DEFAULT_DUPLICATE_GUARD_PATH}.
-  --confirm <text>          Live writes require the exact phrase: ${CONFIRMATION_PHRASE}
+  --confirm <text>          Live writes require: ${confirmationTextHint()}
   --profile <name>          lark-cli profile. Defaults to pilotflow-contest.
   --chat-id <oc_xxx>        Target Feishu group chat for final summary.
   --base-token <token>      Target Base token for state records.

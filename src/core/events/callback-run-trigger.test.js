@@ -13,8 +13,8 @@ class MemoryRecorder {
 
 const approvedCallback = {
   ok: true,
-  card: "flight_plan",
-  action: "confirm_takeoff",
+  card: "execution_plan",
+  action: "confirm_execute",
   run_id: "run-original",
   user_id: "ou_user",
   decision: {

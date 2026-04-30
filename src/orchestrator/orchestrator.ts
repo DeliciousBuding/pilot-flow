@@ -12,6 +12,7 @@ import { type ConfirmationGate } from "./confirmation-gate.js";
 import { buildProjectInitDedupeKey, duplicateGuardSummary, DuplicateGuard } from "./duplicate-guard.js";
 import { resolveContactAssignee } from "./contact-resolver.js";
 import { buildPlanCardStep, buildToolSequence, executeToolSequence, preflightToolSequence, type RunSequenceOptions } from "./tool-sequence.js";
+import { PRIMARY_CONFIRMATION_TEXT } from "./confirmation-text.js";
 
 export interface OrchestratorConfig {
   readonly planner: PlannerProvider;
@@ -112,7 +113,7 @@ export class Orchestrator {
       await this.record({ type: "confirmation.requested", event: "confirmation.requested", runId, run_id: runId, confirmation: plan.confirmations[0] });
       const confirmation = await this.config.confirmationGate.request(plan, risks, { autoConfirm: options.autoConfirm ?? this.config.runtime.autoConfirm, confirmationText: options.confirmationText, mode });
       if (!confirmation.approved) {
-        await this.record({ type: "run.waiting_confirmation", event: "run.waiting_confirmation", runId, run_id: runId, expected_confirmation_text: "确认起飞", received_confirmation_text: options.confirmationText || null });
+        await this.record({ type: "run.waiting_confirmation", event: "run.waiting_confirmation", runId, run_id: runId, expected_confirmation_text: PRIMARY_CONFIRMATION_TEXT, received_confirmation_text: options.confirmationText || null });
         return { runId, status: "waiting_confirmation", plan, risks, riskDecision, risk_decision: riskDecision, artifacts, duplicateGuard: guardState, duplicate_guard: guardState };
       }
       await this.record({ type: "confirmation.approved", event: "confirmation.approved", runId, run_id: runId, confirmation: { ...plan.confirmations[0], status: "approved", confirmation_text: confirmation.confirmationText } });

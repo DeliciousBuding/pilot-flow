@@ -1,6 +1,6 @@
 export function buildDeliverySummaryText({ runId, plan, artifacts = [] }) {
   const lines = [
-    "PilotFlow 已完成项目起飞。",
+    "PilotFlow 已完成项目推进。",
     "",
     `Run ID: ${runId}`,
     `目标: ${plan.goal}`,

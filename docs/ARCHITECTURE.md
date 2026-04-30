@@ -35,7 +35,7 @@ flowchart TB
 | --- | --- | --- |
 | Trigger | Starts a run from manual input now, IM event later | manual trigger implemented; TS Feishu gateway boundary added |
 | Planner | Converts input into project plan JSON | deterministic prototype planner implemented behind JS and TS provider boundaries |
-| Confirmation Gate | Stops side effects until human approval | flight plan card, dry-run auto-confirm, live text fallback, callback action protocol, and bounded callback listener implemented |
+| Confirmation Gate | Stops side effects until human approval | execution plan card, dry-run auto-confirm, live text fallback, callback action protocol, and bounded callback listener implemented |
 | Duplicate Run Guard | Blocks accidental repeated live runs for the same project target | local guard file implemented under `tmp/run-guard/` |
 | Orchestrator | Owns run lifecycle and tool sequence | Doc/Base/Task/risk/entry/announcement/pin/IM sequence implemented with artifact-aware messages and state rows |
 | Domain Layer | Owns deterministic planning, validation fallback, risk logic, card data, and product text rendering | TS domain modules added in `src/domain/`; old JS prototype remains until the TS path is fully wired |
@@ -75,7 +75,7 @@ The current schemas live in `src/schemas`. The current planner is deterministic 
 | Schema | Meaning |
 | --- | --- |
 | `Run` | One execution of a PilotFlow workflow |
-| `Plan` | Agent-generated project flight plan |
+| `Plan` | Agent-generated project execution plan |
 | `Step` | Unit of planned work |
 | `ToolCall` | One call to a Feishu or local tool |
 | `Confirmation` | Human approval gate |
@@ -94,7 +94,7 @@ The risk detector runs immediately after the plan is generated. It preserves pla
 
 Task assignee resolution runs before `task.create`. Planner member labels remain human-readable, while `PILOTFLOW_OWNER_OPEN_ID_MAP_JSON` can map those labels to Feishu `open_id` values. If no explicit map matches and `PILOTFLOW_AUTO_LOOKUP_OWNER_CONTACT` is enabled, PilotFlow performs a read-only `contact +search-user` lookup and assigns the first task only when the result is exact or unambiguous. If lookup is blocked or ambiguous, PilotFlow keeps the text owner fallback in the task description and run trace. The priority order is explicit owner map, optional contact lookup, optional default assignee, then text fallback.
 
-The project flight plan card is generated before side effects and can be sent with `--send-plan-card`. Its buttons carry a stable `pilotflow_card`, `pilotflow_run_id`, and `pilotflow_action` value for confirm, edit, doc-only, and cancel decisions. The risk decision card is generated after Doc/Base/Task writes and can be sent with `--send-risk-card`; its buttons use the same callback value convention for owner, deadline, accept, and defer decisions. `card-callback-handler.js` parses Feishu-style callback payloads, while `card-event-listener.js` wraps `lark-cli event +subscribe` and `callback-run-trigger.js` can start the orchestrator from an approved flight-plan callback. This is code-level wiring; a live listener attempt connected to Feishu but received no callback event, so Open Platform card callback configuration is the remaining validation.
+The project execution plan card is generated before side effects and can be sent with `--send-plan-card`. Its buttons carry a stable `pilotflow_card`, `pilotflow_run_id`, and `pilotflow_action` value for confirm, edit, doc-only, and cancel decisions. The risk decision card is generated after Doc/Base/Task writes and can be sent with `--send-risk-card`; its buttons use the same callback value convention for owner, deadline, accept, and defer decisions. `card-callback-handler.js` parses Feishu-style callback payloads, while `card-event-listener.js` wraps `lark-cli event +subscribe` and `callback-run-trigger.js` can start the orchestrator from an approved execution-plan callback. This is code-level wiring; a live listener attempt connected to Feishu but received no callback event, so Open Platform card callback configuration is the remaining validation.
 
 The project entry message is generated after Doc, Base, and Task calls complete and can be sent with `--send-entry-message` as the current fallback for a stable group entrance. `--pin-entry-message` sends that entry message and then calls `im.pins.create` to pin it in the target chat. `--update-announcement` attempts the native group announcement API as bot identity; the current test group returns `232097 Unable to operate docx type chat announcement`, so PilotFlow records a failed announcement artifact and continues with the pinned entry fallback. The final IM summary is generated afterward, so the group message can include the created Doc URL, Base record IDs, Task URL, project entry state, announcement fallback state, run ID, and next-step prompt.
 
@@ -167,7 +167,7 @@ PILOTFLOW_TASKLIST_ID=<tasklist_guid_or_url>
 PILOTFLOW_OWNER_OPEN_ID_MAP_JSON={"Product Owner":"ou_xxx"}
 PILOTFLOW_AUTO_LOOKUP_OWNER_CONTACT=true|false
 PILOTFLOW_TASK_ASSIGNEE_OPEN_ID=<optional_default_open_id>
-PILOTFLOW_CONFIRMATION_TEXT=确认起飞
+PILOTFLOW_CONFIRMATION_TEXT=确认执行
 PILOTFLOW_LISTENER_MAX_EVENTS=<optional_max_events>
 PILOTFLOW_LISTENER_TIMEOUT=<optional_timeout_like_30s>
 PILOTFLOW_LLM_BASE_URL=<openai_compatible_base_url>
@@ -178,7 +178,7 @@ PILOTFLOW_LLM_MAX_TOKENS=4096
 PILOTFLOW_LLM_TEMPERATURE=0.1
 ```
 
-Live mode requires the confirmation text `确认起飞`. It also preflights required Base and chat targets before the first Feishu write so a missing target does not create a partial Doc-only run.
+Live mode requires the primary confirmation text `确认执行`; the previous wording remains accepted as a compatibility alias only. It also preflights required Base and chat targets before the first Feishu write so a missing target does not create a partial Doc-only run.
 
 ## Reliability Rules
 

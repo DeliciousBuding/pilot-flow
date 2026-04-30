@@ -45,7 +45,7 @@ const text = buildDeliverySummaryText({
   ]
 });
 
-assert.match(text, /PilotFlow 已完成项目起飞/);
+assert.match(text, /PilotFlow 已完成项目推进/);
 assert.match(text, /Run ID: run-test/);
 assert.match(text, /目标: Launch PilotFlow MVP/);
 assert.match(text, /Doc: PilotFlow Project Brief - https:\/\/example\.feishu\.cn\/docx\/doc_123/);

@@ -23,7 +23,7 @@ try {
               {
                 tag: "action",
                 actions: [
-                  button("confirm_takeoff"),
+                  button("confirm_execute"),
                   button("edit_plan"),
                   button("doc_only"),
                   button("cancel")
@@ -104,7 +104,7 @@ function button(action) {
   return {
     tag: "button",
     value: {
-      pilotflow_card: "flight_plan",
+      pilotflow_card: "execution_plan",
       pilotflow_run_id: "run_demo",
       pilotflow_action: action
     }

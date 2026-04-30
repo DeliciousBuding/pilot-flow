@@ -350,7 +350,7 @@ npm run pilot:demo          # dry-run demo
 Day 6 不删除旧 JS live path，而是新增一个可独立验证的 TS project-init bridge：
 
 - `src/interfaces/cli/agent-project-init.ts`：`DeterministicPlanner -> Orchestrator -> ToolRegistry -> Feishu tools -> JsonlRecorder`。
-- `npm run pilot:project-init-ts` / `node src/interfaces/cli/pilot-cli.js project-init-ts`：默认 dry-run；live 必须显式 `--live --confirm "确认起飞"`。
+- `npm run pilot:project-init-ts` / `node src/interfaces/cli/pilot-cli.js project-init-ts`：默认 dry-run；live 必须显式 `--live --confirm "确认执行"`。
 - live confirmed runs 复用 TS orchestrator 的 plan validation、batch preflight、confirmation gate、duplicate guard、optional fallback 和 artifact reporting。
 - `agent-smoke` 保持 hermetic mock LLM + dry-run gateway/session/Agent smoke，不扩展成 live。
 - 旧 JS `pilot:demo` 继续作为稳定 live demo path，直到 TS bridge 通过真实飞书 live run、card callback 平台验证和提交材料复核后再讨论删除。

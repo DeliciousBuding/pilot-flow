@@ -114,7 +114,7 @@ function buildRequiredCaptures() {
       surface: "Feishu group",
       purpose: "Show PilotFlow starts and finishes in the group where the team works.",
       anchor: "Final summary message and pinned entry",
-      action: "Open the test group, show the flight plan card, risk card, pinned entry, and final summary."
+      action: "Open the test group, show the execution plan card, risk card, pinned entry, and final summary."
     },
     {
       title: "Generated project brief",

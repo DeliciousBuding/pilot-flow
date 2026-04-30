@@ -18,7 +18,7 @@ Generated files stay under ignored `tmp/`. Raw videos and screenshots should als
 
 | Capture | Surface | Purpose |
 | --- | --- | --- |
-| Happy-path walkthrough | Feishu group | Show flight-plan card, risk card, pinned entry, and final summary in the main collaboration space |
+| Happy-path walkthrough | Feishu group | Show execution-plan card, risk card, pinned entry, and final summary in the main collaboration space |
 | Generated project brief | Feishu Doc | Show the project narrative artifact |
 | Structured project state | Feishu Base | Show owner, due date, risk level, source run, source message, and URL fields |
 | Native task artifact | Feishu Task | Show at least one action item became a Feishu-native task |

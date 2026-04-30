@@ -6,7 +6,7 @@ PilotFlow should not hide platform limits or tool failures. A core product promi
 
 | Situation | Current behavior | Demo explanation |
 | --- | --- | --- |
-| Card callback event does not arrive | Use text confirmation `确认起飞` | Confirmation is still explicit; card callback remains a platform configuration item |
+| Card callback event does not arrive | Use text confirmation `确认执行` | Confirmation is still explicit; card callback remains a platform configuration item |
 | Group announcement API is blocked | Record failed announcement artifact and use pinned entry message | The project still has a stable Feishu-native group entry |
 | Base/table config is missing | Stop before visible side effects | Prevents half-created project artifacts |
 | Plan schema is invalid | Return `needs_clarification` before confirmation and tools | PilotFlow does not act on unsafe or incomplete plans |
@@ -21,7 +21,7 @@ PilotFlow should not hide platform limits or tool failures. A core product promi
 
 Implemented:
 
-- Flight-plan card action values.
+- Execution-plan card action values.
 - Risk-decision card action values.
 - Local callback parser and handler.
 - Bounded event listener.

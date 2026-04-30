@@ -60,7 +60,7 @@ test("runAgentProjectInit live mode preflights all targets before confirmed writ
     const output = join(dir, "preflight.jsonl");
     await assert.rejects(
       () => runAgentProjectInit({
-        argv: ["--live", "--confirm", "确认起飞", "--input", "launch", "--output", output],
+        argv: ["--live", "--confirm", "确认执行", "--input", "launch", "--output", output],
         env: { PILOTFLOW_FEISHU_MODE: "live" },
       }),
       /Missing required Feishu targets before side effects/u,

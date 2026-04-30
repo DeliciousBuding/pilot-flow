@@ -95,7 +95,7 @@ function renderHelp() {
     "  npm run pilot:doctor",
     "  npm run pilot:agent-smoke -- --input \"@PilotFlow 建立答辩项目空间\"",
     "  npm run pilot:project-init-ts -- --dry-run --send-entry-message",
-    "  npm run pilot:project-init-ts -- --live --confirm \"确认起飞\" --send-entry-message",
+    "  npm run pilot:project-init-ts -- --live --confirm \"确认执行\" --send-entry-message",
     "  npm run pilot:status",
     "  npm run pilot:package",
     "  npm run pilot:audit"

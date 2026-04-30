@@ -2,7 +2,8 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
-const EXPECTED_ACTIONS = ["confirm_takeoff", "edit_plan", "doc_only", "cancel"];
+const CONFIRM_ACTIONS = ["confirm_execute", "confirm_takeoff"];
+const EXPECTED_ACTIONS = ["edit_plan", "doc_only", "cancel"];
 
 if (isMainModule()) {
   const config = parseArgs(process.argv.slice(2));
@@ -52,7 +53,7 @@ export async function buildCallbackVerificationPack({
     output: resolve(output),
     status,
     sources: [
-      sourceEvidence("Flight-plan card send run log", cardRunLog, cardEvents.length > 0),
+      sourceEvidence("Execution-plan card send run log", cardRunLog, cardEvents.length > 0),
       sourceEvidence("Bounded card listener log", listenerLog, listenerEvents.length > 0),
       sourceEvidence("Permission Appendix Pack", permissionPack, Boolean(permissionText))
     ],
@@ -81,7 +82,7 @@ export function renderCallbackVerificationMarkdown(pack) {
     "",
     "| Signal | Status | Notes |",
     "| --- | --- | --- |",
-    `| Flight-plan card sent | ${pack.card.ready ? "ready" : "missing"} | ${escapeCell(pack.card.summary)} |`,
+    `| Execution-plan card sent | ${pack.card.ready ? "ready" : "missing"} | ${escapeCell(pack.card.summary)} |`,
     `| Button action values | ${pack.card.actionsReady ? "ready" : "missing"} | ${escapeCell(pack.card.actionSummary)} |`,
     `| Listener connection | ${pack.listener.status} | ${escapeCell(pack.listener.summary)} |`,
     `| Permission appendix | ${pack.permissions.status} | ${escapeCell(pack.permissions.summary)} |`,
@@ -110,7 +111,10 @@ function inspectCardRun(events) {
   const artifact = events.find((event) => event.event === "artifact.created" && event.artifact?.type === "card");
   const card = toolCall?.input?.card || {};
   const actions = extractButtonActions(card);
-  const missingActions = EXPECTED_ACTIONS.filter((action) => !actions.includes(action));
+  const missingActions = [
+    ...(CONFIRM_ACTIONS.some((action) => actions.includes(action)) ? [] : ["confirm_execute"]),
+    ...EXPECTED_ACTIONS.filter((action) => !actions.includes(action)),
+  ];
   const messageId = artifact?.artifact?.external_id || success?.output?.json?.data?.message_id || "";
   const ready = Boolean(toolCall && success && messageId);
 
@@ -198,7 +202,7 @@ function deriveStatus({ card, listener, permissions }) {
 
 function buildChecklist({ card, listener, permissions }) {
   return [
-    { done: card.ready, text: "Flight-plan card was sent successfully to the test group." },
+    { done: card.ready, text: "Execution-plan card was sent successfully to the test group." },
     { done: card.actionsReady, text: "Card buttons contain `pilotflow_card`, `pilotflow_run_id`, and all expected `pilotflow_action` values." },
     { done: permissions.status === "event_dry_run_ready", text: "Bot event-subscribe dry-run accepts `card.action.trigger`." },
     { done: listener.status === "connected_no_callback" || listener.status === "callback_received", text: "Bounded listener connected during a controlled validation window." },
@@ -217,7 +221,7 @@ function buildNextActions({ listener, status }) {
   const actions = [
     "Open Feishu Open Platform event/callback settings and capture the `card.action.trigger` configuration state.",
     "Confirm the app bot is installed in the target group and the sent card belongs to the same app profile.",
-    "Run `npm run pilot:listen -- --max-events 1 --timeout 2m` immediately before clicking the flight-plan card button.",
+    "Run `npm run pilot:listen -- --max-events 1 --timeout 2m` immediately before clicking the execution-plan card button.",
     "After clicking the button, regenerate this pack with the new listener log.",
     "Keep text confirmation as fallback in the live demo until this pack reports `callback_verified`."
   ];
@@ -284,7 +288,7 @@ function buildUsage() {
   npm run review:callback-verification -- --output tmp/demo-callback/CALLBACK_VERIFICATION.md
 
 Options:
-  --card-run-log <path>      Flight-plan card send JSONL log.
+  --card-run-log <path>      Execution-plan card send JSONL log.
   --listener-log <path>      Bounded card listener JSONL log.
   --permission-pack <path>   Permission Appendix Pack markdown path.
   --output <path>            Callback verification markdown output path.

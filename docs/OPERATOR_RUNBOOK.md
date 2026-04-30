@@ -89,14 +89,14 @@ type, title, owner, due_date, status, risk_level, source_run, source_message, ur
 Live writes require explicit confirmation:
 
 ```bash
-npm run pilot:demo -- --live --confirm "确认起飞"
+npm run pilot:demo -- --live --confirm "确认执行"
 ```
 
 Useful live flags:
 
 | Flag | Purpose |
 | --- | --- |
-| `--send-plan-card` | Send the project flight-plan card before confirmation |
+| `--send-plan-card` | Send the project execution-plan card before confirmation |
 | `--send-entry-message` | Send a stable project entry after artifacts are created |
 | `--pin-entry-message` | Pin the project entry message in the group |
 | `--update-announcement` | Try native group announcement update and fall back to pinned entry on failure |
@@ -128,10 +128,10 @@ The TypeScript project-init bridge runs the deterministic project planner throug
 ```bash
 npm run pilot:project-init-ts
 npm run pilot:project-init-ts -- --dry-run --send-entry-message --send-risk-card
-npm run pilot:project-init-ts -- --live --confirm "确认起飞" --send-entry-message --send-risk-card
+npm run pilot:project-init-ts -- --live --confirm "确认执行" --send-entry-message --send-risk-card
 ```
 
-Live mode is guarded: without `--confirm "确认起飞"` it waits before tool calls; with confirmation but missing live targets it fails preflight before Feishu writes.
+Live mode is guarded: without `--confirm "确认执行"` it waits before tool calls; with confirmation but missing live targets it fails preflight before Feishu writes.
 
 ## Runtime Variables
 
@@ -143,8 +143,8 @@ Live mode is guarded: without `--confirm "确认起飞"` it waits before tool ca
 | `PILOTFLOW_BASE_TOKEN` | Base token for state rows |
 | `PILOTFLOW_BASE_TABLE_ID` | Base table ID or name |
 | `PILOTFLOW_TASKLIST_ID` | optional tasklist GUID or AppLink |
-| `PILOTFLOW_CONFIRMATION_TEXT` | must equal `确认起飞` for live writes |
-| `PILOTFLOW_SEND_PLAN_CARD` | `true` or `1` to send the flight-plan card |
+| `PILOTFLOW_CONFIRMATION_TEXT` | primary live confirmation text is `确认执行`; the previous phrase is accepted only for compatibility |
+| `PILOTFLOW_SEND_PLAN_CARD` | `true` or `1` to send the execution-plan card |
 | `PILOTFLOW_SEND_ENTRY_MESSAGE` | `true` or `1` to send a project entry message |
 | `PILOTFLOW_PIN_ENTRY_MESSAGE` | `true` or `1` to pin the project entry |
 | `PILOTFLOW_UPDATE_ANNOUNCEMENT` | `true` or `1` to try announcement update |
@@ -209,7 +209,7 @@ The TypeScript rebuild is active but not yet the default live CLI path. Day 0 th
 
 Stable fallback paths:
 
-- text confirmation with `确认起飞`
+- text confirmation with `确认执行`
 - pinned project entry message
 - generated Flight Recorder and review packs
 

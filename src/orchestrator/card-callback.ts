@@ -1,10 +1,16 @@
 import type { RunOptions, RunResult } from "./orchestrator.js";
+import { PRIMARY_CONFIRMATION_TEXT } from "./confirmation-text.js";
 
-const FLIGHT_PLAN_ACTIONS = new Map([
-  ["confirm_takeoff", { status: "approved", next: "run_full_project_init", message: "Flight plan confirmed. Continue with Doc, Base, Task, risk, entry, and summary steps." }],
-  ["edit_plan", { status: "needs_edit", next: "request_plan_edit", message: "Requester wants to edit the flight plan before Feishu writes." }],
-  ["doc_only", { status: "approved_doc_only", next: "run_doc_only", message: "Flight plan confirmed for document-only execution." }],
-  ["cancel", { status: "cancelled", next: "stop_run", message: "Flight plan was cancelled before Feishu project artifacts were written." }],
+const EXECUTION_PLAN_CARD_TYPE = "execution_plan";
+const LEGACY_EXECUTION_PLAN_CARD_TYPES = ["flight_plan"] as const;
+const EXECUTION_PLAN_CARD_TYPES = new Set<string>([EXECUTION_PLAN_CARD_TYPE, ...LEGACY_EXECUTION_PLAN_CARD_TYPES]);
+
+const EXECUTION_PLAN_ACTIONS = new Map([
+  ["confirm_execute", { status: "approved", next: "run_full_project_init", message: "Plan confirmed. Continue with Doc, Base, Task, risk, entry, and summary steps." }],
+  ["confirm_takeoff", { status: "approved", next: "run_full_project_init", message: "Plan confirmed. Continue with Doc, Base, Task, risk, entry, and summary steps." }],
+  ["edit_plan", { status: "needs_edit", next: "request_plan_edit", message: "Requester wants to edit the execution plan before Feishu writes." }],
+  ["doc_only", { status: "approved_doc_only", next: "run_doc_only", message: "Execution plan confirmed for document-only execution." }],
+  ["cancel", { status: "cancelled", next: "stop_run", message: "Execution plan was cancelled before Feishu project artifacts were written." }],
 ]);
 
 const RISK_ACTIONS = new Map([
@@ -50,11 +56,11 @@ export async function handleCardCallback(
   const action = isExtractedAction(actionOrPayload) ? actionOrPayload : extractCardAction(actionOrPayload ?? {});
   if (!action) return rejected("", "", "", "", "unsupported_action");
   if (!orchestrator) return { ok: true, card: action.card, action: action.action, run_id: action.runId, user_id: action.userId, decision: action.decision };
-  if (action.card === "flight_plan" && action.action === "confirm_takeoff") {
+  if (EXECUTION_PLAN_CARD_TYPES.has(action.card) && action.decision.next === "run_full_project_init") {
     return orchestrator.run(options.inputText ?? "", {
       ...options.runOptions,
       autoConfirm: true,
-      confirmationText: "确认起飞",
+      confirmationText: PRIMARY_CONFIRMATION_TEXT,
     });
   }
   return { ok: true, card: action.card, action: action.action, run_id: action.runId, user_id: action.userId, decision: action.decision };
@@ -75,11 +81,11 @@ export function extractCardActionValue(payload: Record<string, unknown> = {}): R
 }
 
 function decisionFor(card: string, action: string): CardActionDecision | undefined {
-  return card === "flight_plan" ? FLIGHT_PLAN_ACTIONS.get(action) : card === "risk_decision" ? RISK_ACTIONS.get(action) : undefined;
+  return EXECUTION_PLAN_CARD_TYPES.has(card) ? EXECUTION_PLAN_ACTIONS.get(action) : card === "risk_decision" ? RISK_ACTIONS.get(action) : undefined;
 }
 
 function inferCardFromAction(action: string): string {
-  if (FLIGHT_PLAN_ACTIONS.has(action)) return "flight_plan";
+  if (EXECUTION_PLAN_ACTIONS.has(action)) return EXECUTION_PLAN_CARD_TYPE;
   if (RISK_ACTIONS.has(action)) return "risk_decision";
   return "";
 }

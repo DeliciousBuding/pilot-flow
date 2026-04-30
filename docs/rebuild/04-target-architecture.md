@@ -76,7 +76,7 @@ pilot-flow/
 │   │   ├── tool-sequence.ts            ← 确定性工具序列定义
 │   │   ├── duplicate-guard.ts          ← 去重守卫（修复竞态 + 崩溃 TTL）
 │   │   ├── entry-message.ts            ← 入口消息构建
-│   │   ├── flight-plan-card.ts         ← 飞行计划卡片模板
+│   │   ├── flight-plan-card.ts         ← 执行计划卡片模板
 │   │   ├── risk-decision-card.ts       ← 风险决策卡片模板
 │   │   ├── summary-builder.ts          ← 交付摘要构建
 │   │   ├── project-state.ts            ← 项目状态行构建

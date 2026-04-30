@@ -1,4 +1,7 @@
-const DEFAULT_CONFIRMATION_TEXT = "确认起飞";
+import { PRIMARY_CONFIRMATION_TEXT } from "./confirmation-text.js";
+
+const DEFAULT_CONFIRMATION_TEXT = PRIMARY_CONFIRMATION_TEXT;
+const EXECUTION_PLAN_CARD_TYPE = "execution_plan";
 
 export function buildFlightPlanCard({ runId, plan, confirmationText = DEFAULT_CONFIRMATION_TEXT }) {
   return {
@@ -9,7 +12,7 @@ export function buildFlightPlanCard({ runId, plan, confirmationText = DEFAULT_CO
       template: "blue",
       title: {
         tag: "plain_text",
-        content: "PilotFlow 项目飞行计划"
+        content: "PilotFlow 项目执行计划"
       }
     },
     elements: [
@@ -24,7 +27,7 @@ export function buildFlightPlanCard({ runId, plan, confirmationText = DEFAULT_CO
       {
         tag: "action",
         actions: [
-          actionButton("确认起飞", "confirm_takeoff", "primary", runId),
+          actionButton("确认执行", "confirm_execute", "primary", runId),
           actionButton("编辑计划", "edit_plan", "default", runId),
           actionButton("仅生成文档", "doc_only", "default", runId),
           actionButton("取消", "cancel", "danger", runId)
@@ -35,7 +38,7 @@ export function buildFlightPlanCard({ runId, plan, confirmationText = DEFAULT_CO
         elements: [
           {
             tag: "plain_text",
-            content: `按钮回调接入前，也可以回复“${confirmationText}”继续。`
+            content: `按钮回调接入前，也可以回复“${confirmationText}”继续执行。`
           }
         ]
       }
@@ -66,7 +69,7 @@ function actionButton(text, action, type, runId) {
     },
     type,
     value: {
-      pilotflow_card: "flight_plan",
+      pilotflow_card: EXECUTION_PLAN_CARD_TYPE,
       pilotflow_run_id: runId,
       pilotflow_action: action
     }

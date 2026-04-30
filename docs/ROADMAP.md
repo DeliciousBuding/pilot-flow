@@ -10,7 +10,7 @@ Core loop:
 
 ```mermaid
 flowchart LR
-    A["Feishu group intent"] --> B["Project flight plan"]
+    A["Feishu group intent"] --> B["Project execution plan"]
     B --> C["Human confirmation"]
     C --> D["Feishu tool execution"]
     D --> E["Project state"]
@@ -56,7 +56,7 @@ Exit condition: a confirmed local command can create real Feishu artifacts and p
 
 ## Phase 2: Feishu-Native MVP
 
-- [x] Flight-plan card with action protocol.
+- [x] Execution-plan card with action protocol.
 - [x] Risk detection and risk-decision card.
 - [x] Project entry message and pinned-entry fallback.
 - [x] Base owner/deadline/risk/source/url state fields.

@@ -49,7 +49,7 @@ describe("Orchestrator", () => {
 
       const completed = await harness.orchestrator.run("launch", {
         autoConfirm: true,
-        confirmationText: "确认起飞",
+        confirmationText: "确认执行",
         dedupeKey: "project_init:card-then-run",
       });
       assert.equal(completed.status, "completed");
@@ -62,7 +62,7 @@ describe("Orchestrator", () => {
     const harness = await createHarness({ mode: "live", targets: { chatId: "chat" } });
     try {
       await assert.rejects(
-        () => harness.orchestrator.run("launch", { autoConfirm: true, confirmationText: "确认起飞" }),
+        () => harness.orchestrator.run("launch", { autoConfirm: true, confirmationText: "确认执行" }),
         /Missing required Feishu targets before side effects/u,
       );
       assert.equal(harness.called.length, 0);
@@ -77,7 +77,7 @@ describe("Orchestrator", () => {
     try {
       const result = await harness.orchestrator.run("launch", {
         autoConfirm: true,
-        confirmationText: "确认起飞",
+        confirmationText: "确认执行",
         sendEntryMessage: true,
         sendRiskCard: true,
       });
@@ -97,7 +97,7 @@ describe("Orchestrator", () => {
     try {
       await harness.orchestrator.run("launch", {
         autoConfirm: true,
-        confirmationText: "确认起飞",
+        confirmationText: "确认执行",
         sourceMessage: "source-message-1",
       });
 
@@ -110,10 +110,10 @@ describe("Orchestrator", () => {
   it("starts duplicate guard before Feishu writes and blocks the second confirmed live run", async () => {
     const harness = await createHarness({ mode: "live" });
     try {
-      await harness.orchestrator.run("launch", { autoConfirm: true, confirmationText: "确认起飞", dedupeKey: "project_init:fixed" });
+      await harness.orchestrator.run("launch", { autoConfirm: true, confirmationText: "确认执行", dedupeKey: "project_init:fixed" });
 
       await assert.rejects(
-        () => harness.orchestrator.run("launch", { autoConfirm: true, confirmationText: "确认起飞", dedupeKey: "project_init:fixed" }),
+        () => harness.orchestrator.run("launch", { autoConfirm: true, confirmationText: "确认执行", dedupeKey: "project_init:fixed" }),
         /Duplicate live run blocked/u,
       );
       assert.equal(harness.called.filter((name) => name === "doc.create").length, 1);
@@ -194,7 +194,7 @@ function samplePlan(): ProjectInitPlan {
     deadline: "2026-05-01",
     missing_info: [],
     steps: [],
-    confirmations: [{ id: "confirm-takeoff", prompt: "Confirm", status: "pending", required_for: [] }],
+    confirmations: [{ id: "confirm-execute", prompt: "Confirm", status: "pending", required_for: [] }],
     risks: [],
   };
 }

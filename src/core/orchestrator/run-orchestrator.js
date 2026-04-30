@@ -13,6 +13,7 @@ import { resolveContactSearchAssignee } from "./contact-owner-resolver.js";
 import { buildRiskDecisionCard } from "./risk-decision-card.js";
 import { detectProjectRisks, summarizeRiskDecision } from "./risk-detector.js";
 import { applyDefaultTaskAssignee, resolveTaskAssignee } from "./task-assignee-resolver.js";
+import { PRIMARY_CONFIRMATION_TEXT } from "./confirmation-text.js";
 import {
   buildProjectStateRows,
   firstTaskSummary,
@@ -125,8 +126,8 @@ export class RunOrchestrator {
       try {
         artifacts.push(
           ...(await this.toolSteps.callTool(runId, 0, "step-confirm", "card.send", {
-            title: "PilotFlow 项目飞行计划",
-            card: buildFlightPlanCard({ runId, plan, confirmationText: "确认起飞" })
+            title: "PilotFlow 项目执行计划",
+            card: buildFlightPlanCard({ runId, plan, confirmationText: PRIMARY_CONFIRMATION_TEXT })
           }))
         );
       } catch (error) {
@@ -144,7 +145,7 @@ export class RunOrchestrator {
       await this.recorder.record({
         run_id: runId,
         event: "run.waiting_confirmation",
-        expected_confirmation_text: "确认起飞",
+        expected_confirmation_text: PRIMARY_CONFIRMATION_TEXT,
         received_confirmation_text: confirmationText || null
       });
       return { runId, status: "waiting_confirmation", plan, risks, risk_decision: riskDecision, artifacts, duplicate_guard: guardState };

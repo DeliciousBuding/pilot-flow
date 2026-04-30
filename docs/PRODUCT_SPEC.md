@@ -55,7 +55,7 @@ PilotFlow should be described by its maturity level, not as a finished enterpris
 | Surface | User-facing role | Current boundary |
 | --- | --- | --- |
 | Feishu IM | Main entry point and final summary channel | validated through manual/live runs; automatic group trigger is later |
-| Message Cards | Flight plan confirmation and risk decisions | live send and local action protocol ready; real callback delivery pending |
+| Message Cards | Execution plan confirmation and risk decisions | live send and local action protocol ready; real callback delivery pending |
 | Feishu Docs | Project brief and delivery document | live creation validated |
 | Feishu Base | Project state, risk rows, artifacts, source links | live rich table validated |
 | Feishu Task | Concrete first action item with optional assignee mapping | live creation validated; owner lookup remains guarded |
@@ -85,7 +85,7 @@ Deadline: 2026-05-03.
 
 Expected flow:
 
-1. PilotFlow proposes a project flight plan.
+1. PilotFlow proposes a project execution plan.
 2. User confirms the plan.
 3. PilotFlow creates a Feishu Doc.
 4. PilotFlow writes task/risk state to Base or Task.
@@ -100,7 +100,7 @@ Expected flow:
 | Manual trigger | Start from local command | implemented |
 | Project plan JSON | Extract goal, members, deliverables, deadline, risks | implemented for fixture |
 | Plan validation fallback | Stop unsafe runs when planner output is malformed | prototype implemented |
-| Flight plan card | Show plan before write side effects | live send validated with confirm/edit/doc-only/cancel actions |
+| Execution plan card | Show plan before write side effects | live send validated with confirm/edit/doc-only/cancel actions |
 | Confirmation gate | Require approval before writes | dry-run auto-confirm, live text fallback implemented |
 | Card callback readiness | Parse card action callbacks into PilotFlow decisions and trigger approved runs | local handler, bounded listener, and trigger bridge implemented; live listener connected but callback delivery pending |
 | Doc creation | Create project brief | live validated with returned Doc URL |

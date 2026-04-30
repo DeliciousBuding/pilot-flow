@@ -1,5 +1,6 @@
 import type { ProjectInitPlan } from "../types/plan.js";
 import type { DetectedRisk } from "../domain/risk.js";
+import { isAcceptedConfirmationText } from "./confirmation-text.js";
 
 export interface ConfirmationOptions {
   readonly autoConfirm?: boolean;
@@ -22,7 +23,7 @@ export class TextConfirmationGate implements ConfirmationGate {
   async request(_plan: ProjectInitPlan, _risks: readonly DetectedRisk[], options: ConfirmationOptions): Promise<ConfirmationDecision> {
     if (options.autoConfirm === false) return { approved: false, status: "waiting_confirmation", reason: "auto_confirm_disabled" };
     if (options.mode !== "live") return { approved: true, status: "approved", confirmationText: options.confirmationText || "auto-confirmed dry-run" };
-    if (options.confirmationText?.trim() === "确认起飞") return { approved: true, status: "approved", confirmationText: options.confirmationText };
+    if (isAcceptedConfirmationText(options.confirmationText ?? "")) return { approved: true, status: "approved", confirmationText: options.confirmationText };
     return { approved: false, status: "waiting_confirmation", reason: "missing_live_confirmation_text", confirmationText: options.confirmationText };
   }
 }

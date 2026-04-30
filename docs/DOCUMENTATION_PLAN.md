@@ -15,7 +15,7 @@ PilotFlow documentation should evolve with the product. The README is the front 
 | `docs/VISUAL_DESIGN.md` | UX and visual standards | card, cockpit, demo UI changes |
 | `docs/ROADMAP.md` | Long-term plan | completed phases or priority shifts |
 | `docs/adr/` | Architecture decisions | irreversible or debated decisions |
-| `docs/api-validation/` | Feishu capability tests | new API flight tests |
+| `docs/api-validation/` | Feishu capability tests | new API validation tests |
 | `docs/demo/` | Demo scripts and Q&A | demo flow changes |
 
 ## Documentation Quality Bar

@@ -272,8 +272,8 @@ function validPlan(overrides = {}) {
     ],
     confirmations: [
       {
-        id: "confirm-takeoff",
-        prompt: "Confirm the flight plan before PilotFlow writes project artifacts.",
+        id: "confirm-execute",
+        prompt: "Confirm the execution plan before PilotFlow writes project artifacts.",
         status: "pending",
         required_for: ["step-doc", "step-state"]
       }

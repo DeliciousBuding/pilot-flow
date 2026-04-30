@@ -71,7 +71,7 @@ const DEFAULT_INPUTS = [
 
 const CORE_CAPABILITIES = [
   ["IM entry", "Validated", "Group summary and project entry are sent back to Feishu IM."],
-  ["Cards", "Validated with boundary", "Flight plan and risk cards send successfully; callback delivery still needs platform configuration proof."],
+  ["Cards", "Validated with boundary", "Execution plan and risk cards send successfully; callback delivery still needs platform configuration proof."],
   ["Doc", "Validated", "Project brief creation is covered by the live run evidence."],
   ["Base", "Validated", "Rich Project State rows include owner, due date, risk, source, and URL fields."],
   ["Task", "Validated", "Task creation works, with optional owner open_id mapping and Contacts lookup."],
