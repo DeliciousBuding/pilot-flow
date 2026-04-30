@@ -2,7 +2,9 @@ import { randomUUID } from "node:crypto";
 import { createProjectInitPlan } from "../planner/project-init-planner.js";
 import { buildPlanValidationFallbackPlan, validateProjectInitPlan } from "../planner/plan-validator.js";
 import { FeishuToolExecutor } from "../../tools/feishu/feishu-tool-executor.js";
-import { normalizeFeishuArtifacts } from "../../tools/feishu/artifact-normalizer.js";
+import { ToolStepRunner } from "../../runtime/tool-step-runner.js";
+import { buildBriefMarkdown } from "../../domain/project-brief.js";
+import { buildTaskDescription } from "../../domain/task-description.js";
 import { buildDeliverySummaryText } from "./summary-builder.js";
 import { buildFlightPlanCard } from "./flight-plan-card.js";
 import { buildProjectAnnouncementHtml, buildProjectEntryMessageText } from "./entry-message-builder.js";
@@ -27,6 +29,7 @@ export class RunOrchestrator {
     this.profile = profile;
     this.feishuTargets = feishuTargets;
     this.tools = new FeishuToolExecutor({ dryRun, profile, targets: feishuTargets });
+    this.toolSteps = new ToolStepRunner({ recorder, tools: this.tools });
     this.duplicateGuard = new DuplicateRunGuard(duplicateGuard);
     this.planner = planner;
   }
@@ -121,7 +124,7 @@ export class RunOrchestrator {
     if (sendPlanCard) {
       try {
         artifacts.push(
-          ...(await this.callTool(runId, 0, "step-confirm", "card.send", {
+          ...(await this.toolSteps.callTool(runId, 0, "step-confirm", "card.send", {
             title: "PilotFlow 项目飞行计划",
             card: buildFlightPlanCard({ runId, plan, confirmationText: "确认起飞" })
           }))
@@ -158,14 +161,14 @@ export class RunOrchestrator {
 
     try {
       artifacts.push(
-        ...(await this.callTool(runId, 1, "step-doc", "doc.create", {
+        ...(await this.toolSteps.callTool(runId, 1, "step-doc", "doc.create", {
           title: "PilotFlow Project Brief",
           markdown: buildBriefMarkdown(plan)
         }))
       );
 
       artifacts.push(
-        ...(await this.callTool(runId, 2, "step-state", "base.write", {
+        ...(await this.toolSteps.callTool(runId, 2, "step-state", "base.write", {
           body: {
             fields: PROJECT_STATE_FIELDS,
             rows: buildProjectStateRows(plan, { runId, artifacts, risks })
@@ -185,7 +188,7 @@ export class RunOrchestrator {
       }
 
       artifacts.push(
-        ...(await this.callTool(runId, sequence, "step-task", "task.create", {
+        ...(await this.toolSteps.callTool(runId, sequence, "step-task", "task.create", {
           summary: firstTaskSummary(plan),
           description: buildTaskDescription({ runId, plan, taskAssignee }),
           due: normalizeDueDate(plan.deadline),
@@ -198,13 +201,13 @@ export class RunOrchestrator {
 
       if (sendRiskCard) {
         artifacts.push(
-          ...(await this.callTool(runId, sequence, "step-risk", "card.send", {
+          ...(await this.toolSteps.callTool(runId, sequence, "step-risk", "card.send", {
             title: "PilotFlow 风险裁决卡",
             card: buildRiskDecisionCard({ runId, plan, risks, summary: riskDecision })
           }))
         );
       } else {
-        await this.skipStep(runId, "step-risk", "risk decision card disabled");
+        await this.toolSteps.skipStep(runId, "step-risk", "risk decision card disabled");
       }
       sequence += 1;
 
@@ -212,27 +215,27 @@ export class RunOrchestrator {
       let entryMessageArtifact;
       if (shouldSendEntryMessage) {
         const entryMessageText = buildProjectEntryMessageText({ runId, plan, artifacts });
-        const entryArtifacts = await this.callTool(runId, sequence, "step-entry", "entry.send", {
+        const entryArtifacts = await this.toolSteps.callTool(runId, sequence, "step-entry", "entry.send", {
           text: entryMessageText
         });
         artifacts.push(...entryArtifacts);
         entryMessageArtifact = entryArtifacts.find((artifact) => artifact.type === "entry_message");
       } else {
-        await this.skipStep(runId, "step-entry", "entry message disabled");
+        await this.toolSteps.skipStep(runId, "step-entry", "entry message disabled");
       }
       sequence += 1;
 
       if (updateAnnouncement) {
         const announcementHtml = buildProjectAnnouncementHtml({ runId, plan, artifacts });
         artifacts.push(
-          ...(await this.callOptionalTool(runId, sequence, "step-announcement", "announcement.update", {
+          ...(await this.toolSteps.callOptionalTool(runId, sequence, "step-announcement", "announcement.update", {
             title: "PilotFlow group announcement",
             html: announcementHtml,
             revision: "0"
           }))
         );
       } else {
-        await this.skipStep(runId, "step-announcement", "announcement update disabled");
+        await this.toolSteps.skipStep(runId, "step-announcement", "announcement update disabled");
       }
       sequence += 1;
 
@@ -240,22 +243,22 @@ export class RunOrchestrator {
         const messageId = entryMessageArtifact?.external_id || (entryMessageArtifact?.status === "planned" ? entryMessageArtifact.id : "");
         if (messageId) {
           artifacts.push(
-            ...(await this.callTool(runId, sequence, "step-pin", "entry.pin", {
+            ...(await this.toolSteps.callTool(runId, sequence, "step-pin", "entry.pin", {
               title: "Pinned PilotFlow project entry",
               messageId
             }))
           );
         } else {
-          await this.skipStep(runId, "step-pin", "entry message id unavailable");
+          await this.toolSteps.skipStep(runId, "step-pin", "entry message id unavailable");
         }
       } else {
-        await this.skipStep(runId, "step-pin", "entry pin disabled");
+        await this.toolSteps.skipStep(runId, "step-pin", "entry pin disabled");
       }
       sequence += 1;
 
       const summaryText = buildDeliverySummaryText({ runId, plan, artifacts });
       artifacts.push(
-        ...(await this.callTool(runId, sequence, "step-summary", "im.send", {
+        ...(await this.toolSteps.callTool(runId, sequence, "step-summary", "im.send", {
           text: summaryText
         }))
       );
@@ -282,68 +285,6 @@ export class RunOrchestrator {
     await this.recorder.record({ run_id: runId, event: "run.completed" });
 
     return { runId, status: "completed", plan, risks, risk_decision: riskDecision, artifacts, duplicate_guard: guardState };
-  }
-
-  async callOptionalTool(runId, sequence, stepId, tool, input) {
-    try {
-      return await this.callTool(runId, sequence, stepId, tool, input);
-    } catch (error) {
-      const failedArtifact = {
-        id: `artifact-${runId}-${tool.replaceAll(".", "-")}`,
-        type: tool === "announcement.update" ? "announcement" : "message",
-        title: input.title || tool,
-        status: "failed",
-        error: error.message
-      };
-      await this.recorder.record({
-        run_id: runId,
-        event: "artifact.failed",
-        tool_call_id: `tool-${sequence}`,
-        artifact: failedArtifact
-      });
-      await this.recorder.record({
-        run_id: runId,
-        event: "optional_tool.fallback",
-        tool,
-        fallback: "continue_with_existing_project_entry_path",
-        error: { message: error.message }
-      });
-      return [failedArtifact];
-    }
-  }
-
-  async callTool(runId, sequence, stepId, tool, input) {
-    const toolCallId = `tool-${sequence}`;
-    await this.recorder.record({ run_id: runId, event: "step.status_changed", step_id: stepId, status: "running" });
-    await this.recorder.record({ run_id: runId, event: "tool.called", tool_call_id: toolCallId, tool, input });
-    try {
-      const output = await this.tools.execute(tool, input, { runId, sequence });
-      await this.recorder.record({ run_id: runId, event: "tool.succeeded", tool_call_id: toolCallId, tool, output });
-      const artifacts = normalizeFeishuArtifacts(tool, input, output, { runId, sequence });
-      for (const artifact of artifacts) {
-        await this.recorder.record({
-          run_id: runId,
-          event: artifact.status === "planned" ? "artifact.planned" : "artifact.created",
-          tool_call_id: toolCallId,
-          artifact
-        });
-      }
-      await this.recorder.record({ run_id: runId, event: "step.status_changed", step_id: stepId, status: "succeeded" });
-      return artifacts;
-    } catch (error) {
-      await this.recorder.record({
-        run_id: runId,
-        event: "tool.failed",
-        tool_call_id: toolCallId,
-        tool,
-        error: {
-          message: error.message,
-          result: error.result
-        }
-      });
-      await this.recorder.record({ run_id: runId, event: "step.status_changed", step_id: stepId, status: "failed" });
-      throw error;
-    }
   }
 
   async lookupOwnerContact(runId, sequence, taskAssignee) {
@@ -397,10 +338,6 @@ export class RunOrchestrator {
         }
       };
     }
-  }
-
-  async skipStep(runId, stepId, reason) {
-    await this.recorder.record({ run_id: runId, event: "step.status_changed", step_id: stepId, status: "skipped", reason });
   }
 
   async startDuplicateGuard(runId, key, plan, enabledForRun) {
@@ -459,46 +396,4 @@ function plannedToolsForRun({ autoConfirm, sendPlanCard, sendEntryMessage, pinEn
 
 function shouldGuardRun({ autoConfirm, sendPlanCard }) {
   return autoConfirm || sendPlanCard;
-}
-
-function buildBriefMarkdown(plan) {
-  return `# PilotFlow Project Brief
-
-## Goal
-
-${plan.goal}
-
-## Members
-
-${plan.members.map((member) => `- ${member}`).join("\n") || "- TBD"}
-
-## Deliverables
-
-${plan.deliverables.map((item) => `- ${item}`).join("\n") || "- TBD"}
-
-## Deadline
-
-${plan.deadline}
-
-## Risks
-
-${plan.risks.map((risk) => `- ${risk.title}`).join("\n") || "- No explicit risks"}
-`;
-}
-
-function buildTaskDescription({ runId, plan, taskAssignee }) {
-  const lines = [
-    `Created by PilotFlow run ${runId}.`,
-    "",
-    `Goal: ${plan.goal}`,
-    `Fallback owner: ${taskAssignee.owner}`
-  ];
-
-  if (taskAssignee.assignee) {
-    lines.push(`Feishu assignee: ${taskAssignee.assignee} (${taskAssignee.source})`);
-  } else {
-    lines.push(`Feishu assignee: ${taskAssignee.source}; using text owner fallback.`);
-  }
-
-  return lines.join("\n");
 }

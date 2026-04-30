@@ -4,6 +4,9 @@ import { relative } from "node:path";
 const TEST_GROUPS = {
   core: [
     "src/config/runtime-config.test.js",
+    "src/domain/project-brief.test.js",
+    "src/domain/task-description.test.js",
+    "src/runtime/tool-step-runner.test.js",
     "src/core/planner/plan-validator.test.js",
     "src/core/orchestrator/run-orchestrator.test.js",
     "src/core/orchestrator/card-callback-handler.test.js",
@@ -21,19 +24,19 @@ const TEST_GROUPS = {
     "src/tools/feishu/artifact-normalizer.test.js",
     "src/tools/feishu/feishu-tool-executor.test.js"
   ],
-  demo: ["src/demo/flight-recorder-view.test.js"],
-  packs: [
-    "src/demo/packs/demo-evidence.test.js",
-    "src/demo/packs/demo-eval.test.js",
-    "src/demo/packs/demo-capture-pack.test.js",
-    "src/demo/packs/demo-failure-pack.test.js",
-    "src/demo/packs/demo-readiness-pack.test.js",
-    "src/demo/packs/demo-permission-pack.test.js",
-    "src/demo/packs/demo-callback-verification-pack.test.js",
-    "src/demo/packs/demo-judge-pack.test.js",
-    "src/demo/packs/demo-submission-pack.test.js",
-    "src/demo/packs/demo-delivery-index-pack.test.js",
-    "src/demo/packs/demo-safety-audit-pack.test.js"
+  interfaces: ["src/interfaces/cli/flight-recorder-view.test.js", "src/interfaces/cli/doctor.test.js"],
+  review: [
+    "src/review-packs/demo-evidence.test.js",
+    "src/review-packs/demo-eval.test.js",
+    "src/review-packs/demo-capture-pack.test.js",
+    "src/review-packs/demo-failure-pack.test.js",
+    "src/review-packs/demo-readiness-pack.test.js",
+    "src/review-packs/demo-permission-pack.test.js",
+    "src/review-packs/demo-callback-verification-pack.test.js",
+    "src/review-packs/demo-judge-pack.test.js",
+    "src/review-packs/demo-submission-pack.test.js",
+    "src/review-packs/demo-delivery-index-pack.test.js",
+    "src/review-packs/demo-safety-audit-pack.test.js"
   ]
 };
 
@@ -46,24 +49,28 @@ const TEST_ALIASES = {
   card: "src/core/orchestrator/flight-plan-card.test.js",
   guard: "src/core/orchestrator/duplicate-run-guard.test.js",
   entry: "src/core/orchestrator/entry-message-builder.test.js",
-  flight: "src/demo/flight-recorder-view.test.js",
-  evidence: "src/demo/packs/demo-evidence.test.js",
-  eval: "src/demo/packs/demo-eval.test.js",
-  capture: "src/demo/packs/demo-capture-pack.test.js",
-  failure: "src/demo/packs/demo-failure-pack.test.js",
-  readiness: "src/demo/packs/demo-readiness-pack.test.js",
-  permissions: "src/demo/packs/demo-permission-pack.test.js",
-  judge: "src/demo/packs/demo-judge-pack.test.js",
-  "callback-pack": "src/demo/packs/demo-callback-verification-pack.test.js",
-  submission: "src/demo/packs/demo-submission-pack.test.js",
-  "delivery-index": "src/demo/packs/demo-delivery-index-pack.test.js",
-  "safety-audit": "src/demo/packs/demo-safety-audit-pack.test.js",
+  flight: "src/interfaces/cli/flight-recorder-view.test.js",
+  doctor: "src/interfaces/cli/doctor.test.js",
+  evidence: "src/review-packs/demo-evidence.test.js",
+  eval: "src/review-packs/demo-eval.test.js",
+  capture: "src/review-packs/demo-capture-pack.test.js",
+  failure: "src/review-packs/demo-failure-pack.test.js",
+  readiness: "src/review-packs/demo-readiness-pack.test.js",
+  permissions: "src/review-packs/demo-permission-pack.test.js",
+  judge: "src/review-packs/demo-judge-pack.test.js",
+  "callback-pack": "src/review-packs/demo-callback-verification-pack.test.js",
+  submission: "src/review-packs/demo-submission-pack.test.js",
+  "delivery-index": "src/review-packs/demo-delivery-index-pack.test.js",
+  "safety-audit": "src/review-packs/demo-safety-audit-pack.test.js",
   risk: ["src/core/orchestrator/risk-detector.test.js", "src/core/orchestrator/risk-decision-card.test.js"],
   state: "src/core/orchestrator/project-state-builder.test.js",
   summary: "src/core/orchestrator/summary-builder.test.js",
   contact: "src/core/orchestrator/contact-owner-resolver.test.js",
   assignee: "src/core/orchestrator/task-assignee-resolver.test.js",
   config: "src/config/runtime-config.test.js",
+  brief: "src/domain/project-brief.test.js",
+  tasktext: "src/domain/task-description.test.js",
+  "tool-steps": "src/runtime/tool-step-runner.test.js",
   listener: "src/core/events/card-event-listener.test.js",
   trigger: "src/core/events/callback-run-trigger.test.js"
 };
@@ -138,7 +145,8 @@ function renderHelp() {
     "Examples:",
     "  npm test",
     "  npm run test:core",
-    "  npm run test:packs",
+    "  npm run test:interfaces",
+    "  npm run test:review",
     "  npm run test:one -- plan",
     "  npm run test:one -- risk"
   ].join("\n");

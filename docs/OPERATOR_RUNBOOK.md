@@ -30,8 +30,9 @@ lark-cli auth status --verify
 | Syntax check every JS file | `npm run pilot:check` |
 | Run all grouped tests | `npm test` |
 | Run core tests | `npm run test:core` |
-| Run evidence-pack tests | `npm run test:packs` |
+| Run evidence-pack tests | `npm run test:review` |
 | Run one focused test | `npm run test:one -- <alias>` |
+| Check local environment | `npm run pilot:doctor` |
 | Run manual dry-run demo | `npm run pilot:demo` |
 | Render Flight Recorder | `npm run pilot:recorder -- --input <run.jsonl> --output <html>` |
 | Rebuild review package | `npm run pilot:package` |
@@ -43,7 +44,15 @@ Focused test aliases are maintained in [`scripts/run-tests.js`](../scripts/run-t
 ```bash
 npm run test:one -- plan
 npm run test:one -- risk
+npm run test:one -- doctor
 npm run test:one -- submission
+```
+
+`pilot:doctor` checks Node.js, `lark-cli`, `.env` Git ignore status, and required environment variable names. It reports missing names only; it does not print secret values. Add `-- --verify-auth` only when you want a sanitized profile token-status check:
+
+```bash
+npm run pilot:doctor
+npm run pilot:doctor -- --verify-auth
 ```
 
 ## Dry-Run Operation
@@ -63,7 +72,7 @@ Expected result:
 Preview Feishu target setup:
 
 ```bash
-npm run setup:feishu -- --dry-run
+npm run pilot:setup -- --dry-run
 ```
 
 The current `Project State` table template is:
@@ -77,7 +86,7 @@ type, title, owner, due_date, status, risk_level, source_run, source_message, ur
 Live writes require explicit confirmation:
 
 ```bash
-npm run demo:manual -- --live --confirm "确认起飞"
+npm run pilot:demo -- --live --confirm "确认起飞"
 ```
 
 Useful live flags:
@@ -96,7 +105,7 @@ Useful live flags:
 Show all runtime options:
 
 ```bash
-npm run demo:manual -- --help
+npm run pilot:demo -- --help
 ```
 
 ## Runtime Variables
@@ -122,7 +131,7 @@ npm run demo:manual -- --help
 | `PILOTFLOW_OWNER_OPEN_ID_MAP_JSON` | JSON object mapping owner labels to Feishu `open_id` |
 | `PILOTFLOW_AUTO_LOOKUP_OWNER_CONTACT` | `true` or `1` to search Feishu Contacts |
 | `PILOTFLOW_TASK_ASSIGNEE_OPEN_ID` | optional default assignee `open_id` for the first created Task |
-| `PILOTFLOW_LISTENER_MAX_EVENTS` | max event count for `listen:cards` |
+| `PILOTFLOW_LISTENER_MAX_EVENTS` | max event count for `pilot:listen:cards` |
 | `PILOTFLOW_LISTENER_TIMEOUT` | listener timeout such as `30s` or `2m` |
 
 Do not commit `.env`; it is intentionally ignored.
@@ -140,17 +149,17 @@ npm run pilot:audit
 Individual pack commands remain available for targeted regeneration:
 
 ```bash
-npm run demo:evidence -- --input tmp/runs/latest-manual-run.jsonl --output tmp/demo-evidence/DEMO_EVIDENCE.md
-npm run demo:eval -- --output tmp/demo-eval/DEMO_EVAL.md
-npm run demo:capture -- --output tmp/demo-capture/CAPTURE_PACK.md
-npm run demo:failure -- --output tmp/demo-failure/FAILURE_DEMO.md
-npm run demo:readiness -- --output tmp/demo-readiness/DEMO_READINESS.md
-npm run demo:permissions -- --collect-version --collect-auth --collect-event-dry-run --output tmp/demo-permissions/PERMISSION_APPENDIX.md
-npm run demo:callback-verification -- --output tmp/demo-callback/CALLBACK_VERIFICATION.md
-npm run demo:judge -- --output tmp/demo-judge/JUDGE_REVIEW.md
-npm run demo:submission -- --output tmp/demo-submission/SUBMISSION_PACK.md
-npm run demo:delivery-index -- --output tmp/demo-delivery/DELIVERY_INDEX.md
-npm run demo:safety-audit -- --output tmp/demo-safety/SAFETY_AUDIT.md
+npm run review:evidence -- --input tmp/runs/latest-manual-run.jsonl --output tmp/demo-evidence/DEMO_EVIDENCE.md
+npm run review:eval -- --output tmp/demo-eval/DEMO_EVAL.md
+npm run review:capture -- --output tmp/demo-capture/CAPTURE_PACK.md
+npm run review:failure -- --output tmp/demo-failure/FAILURE_DEMO.md
+npm run review:readiness -- --output tmp/demo-readiness/DEMO_READINESS.md
+npm run review:permissions -- --collect-version --collect-auth --collect-event-dry-run --output tmp/demo-permissions/PERMISSION_APPENDIX.md
+npm run review:callback-verification -- --output tmp/demo-callback/CALLBACK_VERIFICATION.md
+npm run review:judge -- --output tmp/demo-judge/JUDGE_REVIEW.md
+npm run review:submission -- --output tmp/demo-submission/SUBMISSION_PACK.md
+npm run review:delivery-index -- --output tmp/demo-delivery/DELIVERY_INDEX.md
+npm run review:safety-audit -- --output tmp/demo-safety/SAFETY_AUDIT.md
 ```
 
 Generated reports and run logs stay under ignored `tmp/`.
@@ -159,15 +168,15 @@ Generated reports and run logs stay under ignored `tmp/`.
 
 | Edge | Current behavior |
 | --- | --- |
-| Card callback delivery | Code-level listener and trigger bridge exist; the 2026-04-29 live listener attempt connected but did not receive a real `card.action.trigger` event |
+| Card callback delivery | Code-level listener and trigger bridge exist; a live listener attempt connected but did not receive a real `card.action.trigger` event |
 | Group announcement | Native announcement update was attempted; the current test group returns `232097 Unable to operate docx type chat announcement` |
-| Manual media | Submission/readiness packs separate machine evidence from videos, screenshots, and callback configuration proof |
+| Manual media | Submission/readiness review separate machine evidence from videos, screenshots, and callback configuration proof |
 
 Stable fallback paths:
 
 - text confirmation with `确认起飞`
 - pinned project entry message
-- generated Flight Recorder and evidence packs
+- generated Flight Recorder and review packs
 
 ## Progress Document Sync
 
@@ -191,7 +200,7 @@ Run the update from `D:\Code\LarkProject` because `--content @PERSONAL_PROGRESS.
 | Card sends but button does not trigger | Regenerate Callback Verification Pack and inspect Open Platform callback configuration |
 | Announcement update fails | Keep pinned entry fallback; do not claim native announcement success for this group |
 | Contact lookup cannot assign owner | Use explicit `PILOTFLOW_OWNER_OPEN_ID_MAP_JSON` or keep text owner fallback |
-| Generated report mentions old commands | Search for the legacy check command, legacy focused-test aliases, or old flat demo-pack paths, then update source generators |
+| Generated report mentions removed commands | Search for outdated command aliases or old review-pack paths, then update source generators |
 
 ## Safety Checks
 

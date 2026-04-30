@@ -1,6 +1,29 @@
 const DEFAULT_DEADLINE = "TBD";
+const DETERMINISTIC_PROVIDER = "deterministic-prototype";
+
+export class DeterministicProjectInitPlanner {
+  constructor({ provider = DETERMINISTIC_PROVIDER } = {}) {
+    this.provider = provider;
+  }
+
+  plan(inputText) {
+    return buildDeterministicProjectInitPlan(inputText);
+  }
+}
+
+export function createProjectInitPlannerProvider({ type = DETERMINISTIC_PROVIDER } = {}) {
+  if (type !== DETERMINISTIC_PROVIDER && type !== "deterministic") {
+    throw new Error(`Unsupported project-init planner provider: ${type}`);
+  }
+
+  return new DeterministicProjectInitPlanner({ provider: type });
+}
 
 export function createProjectInitPlan(inputText) {
+  return buildDeterministicProjectInitPlan(inputText);
+}
+
+function buildDeterministicProjectInitPlan(inputText) {
   const fields = parseDemoInput(inputText);
   const goal = fields.goal || inputText.split(/\r?\n/).find(Boolean) || "Launch a project from group discussion";
   const members = splitList(fields.members);

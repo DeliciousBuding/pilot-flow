@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { createProjectInitPlan } from "./project-init-planner.js";
+import { createProjectInitPlan, createProjectInitPlannerProvider, DeterministicProjectInitPlanner } from "./project-init-planner.js";
 import { buildPlanValidationFallbackPlan, validateProjectInitPlan } from "./plan-validator.js";
 
 const validPlan = createProjectInitPlan(`Goal: Ship MVP
@@ -9,6 +9,11 @@ Deadline: 2026-05-02
 Risks: callback delay`);
 
 assert.equal(validateProjectInitPlan(validPlan).ok, true);
+
+const plannerProvider = createProjectInitPlannerProvider();
+assert.equal(plannerProvider instanceof DeterministicProjectInitPlanner, true);
+assert.equal(validateProjectInitPlan(plannerProvider.plan("Goal: Ship MVP")).ok, true);
+assert.throws(() => createProjectInitPlannerProvider({ type: "llm" }), /Unsupported project-init planner provider/);
 
 const invalidPlan = {
   intent: "project_init",

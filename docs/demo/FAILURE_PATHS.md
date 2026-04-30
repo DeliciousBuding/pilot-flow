@@ -1,6 +1,6 @@
 # Failure Paths And Fallbacks
 
-PilotFlow should not hide platform limits or tool failures. A core product promise is that every important action is either completed, stopped before side effects, or recorded with a fallback.
+PilotFlow should not hide platform limits or tool failures. A core product promise is that every important action is completed, stopped before side effects, or recorded with a fallback.
 
 ## Fallback Map
 
@@ -13,7 +13,7 @@ PilotFlow should not hide platform limits or tool failures. A core product promi
 | Duplicate live run is detected | Block unless explicitly bypassed | Prevents repeated Docs, Tasks, and group messages during demos |
 | Owner cannot map to `open_id` | Keep text owner fallback in Base and Task description | The project remains usable while native assignment improves |
 | Contacts lookup is blocked or ambiguous | Record lookup outcome and keep fallback owner | Permissions or ambiguity do not break the main flow |
-| Live network is unavailable | Use the latest generated evidence pack and Flight Recorder | The demo can still show the completed run, artifacts, and fallback trace |
+| Live network is unavailable | Use generated review packs and Flight Recorder | The demo can still show completed artifacts and fallback trace from a real run |
 
 ## Known Current Platform Edges
 
@@ -21,8 +21,8 @@ PilotFlow should not hide platform limits or tool failures. A core product promi
 
 Implemented:
 
-- Flight plan card action values.
-- Risk decision card action values.
+- Flight-plan card action values.
+- Risk-decision card action values.
 - Local callback parser and handler.
 - Bounded event listener.
 - Callback-trigger bridge.
@@ -30,11 +30,11 @@ Implemented:
 Observed live behavior:
 
 - Listener connected to Feishu successfully.
-- No `card.action.trigger` event was received in the validation window.
+- No real `card.action.trigger` event has been captured yet.
 
 Current demo stance:
 
-- Do not claim the real button callback is validated.
+- Do not claim end-to-end card callback delivery is validated.
 - Show the card and explain text confirmation as the stable fallback.
 - Treat callback delivery as an Open Platform configuration verification item.
 
@@ -57,45 +57,39 @@ Current demo stance:
 - The stable product entry is pinned message.
 - The announcement path is a documented upgrade path, not the primary demo dependency.
 
-## Evidence To Keep
+## Failure-Path Evidence
 
-For each important demo run, keep local evidence under ignored `tmp/`:
+The generated failure-path and evaluation reports should cover:
 
-```bash
-npm run pilot:recorder -- --input tmp/runs/<run>.jsonl --output tmp/flight-recorder/<run>.html
-npm run demo:evidence -- --input tmp/runs/<run>.jsonl --output tmp/demo-evidence/<run>.md
-```
+| Scenario | Evidence to show |
+| --- | --- |
+| Callback event did not arrive | Listener evidence and callback-verification status |
+| Announcement API blocked | Announcement error and pinned-entry continuation |
+| Invalid planner schema | Clarification result before confirmation or Feishu writes |
+| Duplicate live run blocked | Duplicate-run guard result |
+| Missing owner or vague deadline | Risk detection and risk-decision card explanation |
 
-Recommended evidence items:
+Regenerate local evidence through the operator runbook commands, then use the generated report as an appendix during Q&A.
 
-- Run ID.
-- Feishu Doc URL.
-- Base record IDs.
-- Task URL.
-- Risk card message ID.
-- Pinned entry message ID.
-- Final summary message ID.
-- Announcement failure artifact, if present.
-- Tool-call list and terminal status.
-
-## No-Network Fallback
-
-If the live Feishu environment is unavailable during a presentation, use the latest generated evidence package:
-
-- Open the recorded Feishu screenshots or existing Feishu artifacts if they are already cached in the desktop app.
-- Open `tmp/flight-recorder/<run>.html` to show the full run trace.
-- Open `tmp/demo-evidence/<run>.md` to show the evidence checklist, artifact IDs, tool calls, and fallback notes.
-- Explain that PilotFlow's demo does not depend on a hidden mock path: the evidence pack is generated from the JSONL log of a real live run.
-
-## How To Explain Failure Paths
+## Reviewer Q&A Language
 
 Use product language:
 
-> PilotFlow treats tool failures as part of the project state. It records the error, chooses a safe fallback when possible, and tells the team what happened.
+> PilotFlow treats tool failures as part of the project state. It records the condition, chooses a safe fallback when possible, and tells the team what happened.
 
 Avoid claiming:
 
-- "Everything is fully automated."
-- "All Feishu APIs are already production-ready."
-- "Card buttons are validated end to end."
-- "Group announcement works in all groups."
+- Everything is fully automated.
+- All Feishu APIs are already production-ready.
+- Card buttons are validated end to end.
+- Group announcement works in all groups.
+- Multi-agent worker automation is part of the current main loop.
+
+## No-Network Fallback
+
+If the live Feishu environment is unavailable during a presentation:
+
+- Open scrubbed recordings or screenshots if they are already prepared.
+- Open the Flight Recorder HTML to show the full run trace.
+- Open generated review packs to show artifact IDs, tool calls, status, and fallback notes.
+- Explain that these materials are generated from JSONL logs of real runs, not from a hidden mock path.

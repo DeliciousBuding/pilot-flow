@@ -46,7 +46,7 @@ export async function triggerRunFromCallback(callback, {
   });
 
   try {
-    const inputText = await readFile(inputPath || "src/demo/fixtures/demo_input_project_init.txt", "utf8");
+    const inputText = await readFile(inputPath || "src/interfaces/cli/fixtures/demo_input_project_init.txt", "utf8");
     const runRecorder = new JsonlRecorder(runLogPath);
 
     const orchestrator = new RunOrchestrator({

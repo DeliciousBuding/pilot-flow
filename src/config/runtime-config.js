@@ -18,7 +18,7 @@ export function loadRuntimeConfig(argv = process.argv.slice(2), env = process.en
     mode,
     dryRun,
     profile: stringValue(args.profile) || env.PILOTFLOW_LARK_PROFILE || "pilotflow-contest",
-    inputPath: resolve(stringValue(args.input) || "src/demo/fixtures/demo_input_project_init.txt"),
+    inputPath: resolve(stringValue(args.input) || "src/interfaces/cli/fixtures/demo_input_project_init.txt"),
     outputPath: resolve(stringValue(args.output) || "tmp/runs/latest-manual-run.jsonl"),
     planCard: {
       send: booleanValue(args["send-plan-card"]) || booleanEnv(env.PILOTFLOW_SEND_PLAN_CARD)
@@ -108,8 +108,8 @@ function stringValue(value) {
 
 function buildUsage() {
   return `Usage:
-  npm run demo:manual
-  npm run demo:manual -- --live --confirm "确认起飞"
+  npm run pilot:demo
+  npm run pilot:demo -- --live --confirm "确认起飞"
 
 Options:
   --dry-run                 Build lark-cli commands without writing to Feishu.

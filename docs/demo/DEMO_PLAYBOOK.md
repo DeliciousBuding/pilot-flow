@@ -47,7 +47,7 @@ Explain that the current prototype uses a manual trigger fixture, while the inte
 Run or reference the live command used for the latest validated path:
 
 ```bash
-npm run demo:manual -- --live --confirm "确认起飞" --send-plan-card --send-risk-card --pin-entry-message --update-announcement
+npm run pilot:demo -- --live --confirm "确认起飞" --send-plan-card --send-risk-card --pin-entry-message --update-announcement
 ```
 
 Expected product result:

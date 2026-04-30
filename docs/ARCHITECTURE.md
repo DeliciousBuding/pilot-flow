@@ -34,10 +34,12 @@ flowchart TB
 | Component | Responsibility | Current status |
 | --- | --- | --- |
 | Trigger | Starts a run from manual input now, IM event later | manual trigger implemented |
-| Planner | Converts input into project plan JSON | fixed demo planner implemented |
+| Planner | Converts input into project plan JSON | deterministic prototype planner implemented behind a provider boundary |
 | Confirmation Gate | Stops side effects until human approval | flight plan card, dry-run auto-confirm, live text fallback, callback action protocol, and bounded callback listener implemented |
 | Duplicate Run Guard | Blocks accidental repeated live runs for the same project target | local guard file implemented under `tmp/run-guard/` |
 | Orchestrator | Owns run lifecycle and tool sequence | Doc/Base/Task/risk/entry/announcement/pin/IM sequence implemented with artifact-aware messages and state rows |
+| Domain Renderers | Render project brief and task descriptions | pure helpers split into `src/domain/` |
+| Tool Step Runner | Records tool calls, artifacts, skipped steps, and optional fallbacks | shared runtime helper split into `src/runtime/` |
 | Feishu Tool Executor | Converts tool calls into `lark-cli` commands | dry-run and live-capable command runner implemented with short Feishu-safe idempotency keys |
 | Flight Recorder | Records events, tool calls, artifacts, failures | JSONL with step status and artifact events implemented |
 | Risk Engine | Enriches planner risks and creates a decision summary | initial detector and risk decision card implemented |
@@ -64,7 +66,7 @@ stateDiagram-v2
 
 ## Data Model
 
-The current schemas live in `src/schemas`.
+The current schemas live in `src/schemas`. The current planner is deterministic prototype logic, exposed through `DeterministicProjectInitPlanner`; an LLM planner can be added later behind the same provider boundary without changing the confirmation and tool execution contract.
 
 | Schema | Meaning |
 | --- | --- |
@@ -84,7 +86,7 @@ The risk detector runs immediately after the plan is generated. It preserves pla
 
 Task assignee resolution runs before `task.create`. Planner member labels remain human-readable, while `PILOTFLOW_OWNER_OPEN_ID_MAP_JSON` can map those labels to Feishu `open_id` values. If no explicit map matches and `PILOTFLOW_AUTO_LOOKUP_OWNER_CONTACT` is enabled, PilotFlow performs a read-only `contact +search-user` lookup and assigns the first task only when the result is exact or unambiguous. If lookup is blocked or ambiguous, PilotFlow keeps the text owner fallback in the task description and run trace. The priority order is explicit owner map, optional contact lookup, optional default assignee, then text fallback.
 
-The project flight plan card is generated before side effects and can be sent with `--send-plan-card`. Its buttons carry a stable `pilotflow_card`, `pilotflow_run_id`, and `pilotflow_action` value for confirm, edit, doc-only, and cancel decisions. The risk decision card is generated after Doc/Base/Task writes and can be sent with `--send-risk-card`; its buttons use the same callback value convention for owner, deadline, accept, and defer decisions. `card-callback-handler.js` parses Feishu-style callback payloads, while `card-event-listener.js` wraps `lark-cli event +subscribe` and `callback-run-trigger.js` can start the orchestrator from an approved flight-plan callback. This is code-level wiring; the 2026-04-29 live listener attempt connected to Feishu but received no callback event, so Open Platform card callback configuration is the remaining validation.
+The project flight plan card is generated before side effects and can be sent with `--send-plan-card`. Its buttons carry a stable `pilotflow_card`, `pilotflow_run_id`, and `pilotflow_action` value for confirm, edit, doc-only, and cancel decisions. The risk decision card is generated after Doc/Base/Task writes and can be sent with `--send-risk-card`; its buttons use the same callback value convention for owner, deadline, accept, and defer decisions. `card-callback-handler.js` parses Feishu-style callback payloads, while `card-event-listener.js` wraps `lark-cli event +subscribe` and `callback-run-trigger.js` can start the orchestrator from an approved flight-plan callback. This is code-level wiring; a live listener attempt connected to Feishu but received no callback event, so Open Platform card callback configuration is the remaining validation.
 
 The project entry message is generated after Doc, Base, and Task calls complete and can be sent with `--send-entry-message` as the current fallback for a stable group entrance. `--pin-entry-message` sends that entry message and then calls `im.pins.create` to pin it in the target chat. `--update-announcement` attempts the native group announcement API as bot identity; the current test group returns `232097 Unable to operate docx type chat announcement`, so PilotFlow records a failed announcement artifact and continues with the pinned entry fallback. The final IM summary is generated afterward, so the group message can include the created Doc URL, Base record IDs, Task URL, project entry state, announcement fallback state, run ID, and next-step prompt.
 
@@ -92,7 +94,7 @@ The duplicate-run guard runs after live target preflight and before Feishu side 
 
 ## Project State Rows
 
-The current Base state template is shared by `setup:feishu` and the orchestrator:
+The current Base state template is shared by `pilot:setup` and the orchestrator:
 
 | Field | Purpose |
 | --- | --- |

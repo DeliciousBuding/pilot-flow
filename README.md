@@ -186,7 +186,7 @@ PilotFlow is still an MVP prototype, but it is packaged around product-grade fou
 | Native surface strategy | IM, Cards, Docs, Base, Task, pinned entry, and optional announcement path |
 | Human control | Text confirmation fallback and card action protocol before side effects |
 | Run safety | Live preflight, duplicate-run guard, short idempotency keys, unsafe-plan fallback |
-| Traceability | JSONL run log, artifact normalizer, generated evidence packs, local Flight Recorder |
+| Traceability | JSONL run log, artifact normalizer, generated review packs, local Flight Recorder |
 | Failure handling | Tool failures are recorded; announcement and callback edges have explicit fallback stories |
 | Packaging | Product README, product spec, architecture, operator runbook, development guide, demo kit |
 
@@ -273,17 +273,9 @@ Full roadmap: [docs/ROADMAP.md](docs/ROADMAP.md).
 | [Development Guide](docs/DEVELOPMENT.md) | Contributor workflow, module boundaries, validation matrix |
 | [Visual Design](docs/VISUAL_DESIGN.md) | Feishu-native cards, cockpit, UX rules |
 | [Roadmap](docs/ROADMAP.md) | Long-term plan and immediate next actions |
-| [Demo Kit](docs/demo/README.md) | Demo playbook, Q&A, fallback notes, evidence workflow |
-| [Demo Evaluation](docs/demo/EVALUATION.md) | Runnable demo-risk cases and generated-report workflow |
+| [Demo Kit](docs/demo/README.md) | Demo playbook, capture guide, fallback notes, and review-pack workflow |
 | [Demo Capture Guide](docs/demo/CAPTURE_GUIDE.md) | Recording and screenshot checklist |
-| [Failure-Path Demo](docs/demo/FAILURE_DEMO.md) | Reviewer-facing failure-path appendix |
-| [Demo Readiness](docs/demo/READINESS.md) | Pre-recording evidence and manual-capture gate |
-| [Permission Appendix](docs/demo/PERMISSIONS.md) | Sanitized permission and callback configuration appendix |
-| [Callback Verification](docs/demo/CALLBACK_VERIFICATION.md) | Callback readiness report for card payloads, listener, and real event delivery |
-| [Judge Review Pack](docs/demo/JUDGE_REVIEW.md) | Reviewer entry pack for product story, evidence, boundaries, and reproduction |
-| [Demo Submission Pack](docs/demo/SUBMISSION.md) | Final local gate for machine evidence and manual capture status |
-| [Demo Delivery Index](docs/demo/DELIVERY_INDEX.md) | Local review-packaging index for docs, generated evidence, trace artifacts, and manual capture state |
-| [Demo Safety Audit](docs/demo/SAFETY_AUDIT.md) | Pattern-based safety gate for public docs, generated review packs, and trace material |
+| [Failure Paths](docs/demo/FAILURE_PATHS.md) | Fallback behavior, known platform limits, Q&A boundaries, and no-network explanation |
 | [Documentation Plan](docs/DOCUMENTATION_PLAN.md) | Documentation governance |
 
 ## ⚡ Prototype Demo
@@ -302,7 +294,7 @@ npm run pilot:status
 npm run pilot:audit
 ```
 
-The current local demo reads a project-init fixture, writes a traceable run log, and returns planned artifacts. Live Feishu execution is available behind an explicit confirmation gate. Operational setup lives in [docs/OPERATOR_RUNBOOK.md](docs/OPERATOR_RUNBOOK.md); contributor workflow lives in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
+The current local demo reads a project-init fixture, writes a traceable run log, and returns planned artifacts. Live Feishu execution is available behind an explicit confirmation gate. Operational setup lives in [docs/OPERATOR_RUNBOOK.md](docs/OPERATOR_RUNBOOK.md); contributor workflow lives in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md). Generated review packs are auxiliary material and are kept out of the product runtime surface.
 
 ## 🛡️ Trust Model
 
@@ -311,7 +303,7 @@ The current local demo reads a project-init fixture, writes a traceable run log,
 | Can the agent write to Feishu without approval? | No. The live write path requires explicit confirmation. |
 | Can a failed tool call look successful? | It should not. Tool errors are recorded and surfaced as run events and fallback artifacts. |
 | Can the same demo accidentally create duplicate artifacts? | Live runs are guarded by a duplicate-run key unless the operator explicitly bypasses it. |
-| Can reviewers inspect what happened? | Yes. Run logs, generated packs, Flight Recorder, and final summaries expose the execution path. |
+| Can reviewers inspect what happened? | Yes. Run logs, generated review packs, Flight Recorder, and final summaries expose the execution path. |
 | Is the current prototype production-ready? | No. It is a validated MVP prototype with known pending work around real card callback delivery and manual capture evidence. |
 
 ## 🔐 Safety Principles

@@ -37,7 +37,7 @@ The product is mature in its workflow design even while the implementation remai
 | Planning | Project-init flight plan with risks and deliverables | General-purpose enterprise planning suite |
 | Execution | Doc, Base, Task, IM, cards, pinned entry, announcement fallback | Heavy standalone project-management dashboard |
 | Control | Confirmation gate, preflight checks, duplicate-run guard | Silent bulk writes without human approval |
-| Evidence | JSONL run log, Flight Recorder, demo evidence packs | Production observability platform |
+| Evidence | JSONL run log, Flight Recorder, generated review packs | Production observability platform |
 
 ## Design Principles
 

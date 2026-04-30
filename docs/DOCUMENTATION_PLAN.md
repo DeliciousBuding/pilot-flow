@@ -106,7 +106,7 @@ Public repo docs may include:
 Local workspace docs may include:
 
 - official Feishu reference caches
-- competition material packs
+- competition material review
 - raw API validation logs with resource IDs
 - private progress notes
 
