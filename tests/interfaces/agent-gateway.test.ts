@@ -324,6 +324,8 @@ test("runAgentGateway refuses live IM probes when receive scope is missing", asy
 
     assert.equal(result.probe.status, "failed");
     assert.match(result.probe.error ?? "", /im:message\.p2p_msg:readonly/u);
+    assert.equal(result.nextActions.some((item) => /im:message\.p2p_msg:readonly/u.test(item.action)), true);
+    assert.equal(result.nextActions.some((item) => /auth login/u.test(item.action)), true);
     assert.equal(calls.length, 1);
     assert.equal(calls[0]?.join(" "), "lark-cli auth check --scope im:message.p2p_msg:readonly");
     assert.equal(recorder.ofType("gateway.probe_message_failed").length, 1);
@@ -360,6 +362,7 @@ test("runAgentGateway fails the default IM probe when bot user id is missing", a
 
     assert.equal(result.probe.status, "failed");
     assert.match(result.probe.error ?? "", /PILOTFLOW_BOT_USER_ID/u);
+    assert.equal(result.nextActions.some((item) => /PILOTFLOW_BOT_USER_ID/u.test(item.action)), true);
     assert.equal(calls.length, 0);
     assert.equal(recorder.ofType("gateway.probe_message_failed").length, 1);
   } finally {
@@ -392,6 +395,7 @@ test("runAgentGateway surfaces subscribe failures without leaking stderr secrets
     assert.equal(result.failure?.exitCode, 2);
     assert.match(result.failure?.message ?? "", /event subscription failed/u);
     assert.doesNotMatch(result.failure?.message ?? "", /secret-token/u);
+    assert.equal(result.nextActions.some((item) => /event \+subscribe/u.test(item.action)), true);
     assert.equal(recorder.ofType("gateway.subscribe_failed").length, 1);
   } finally {
     await rm(dir, { recursive: true, force: true });

@@ -79,6 +79,7 @@ Exit condition: a confirmed local command can create real Feishu artifacts and p
 - [x] Add a live-check event bus status check to catch competing local subscribers.
 - [x] Refuse live gateway IM probes before sending when `im:message.p2p_msg:readonly` is missing.
 - [x] Add structured live-check next actions for IM event blockers.
+- [x] Add structured gateway next actions for probe and subscription blockers.
 - [x] Add structured callback-proof next actions for timeout and subscription failure cases.
 - [x] Start callback-proof listener before sending the probe card, and classify probe send failures separately.
 - [x] Fail callback-proof before sending a probe card when event subscription fails during startup.

@@ -163,6 +163,7 @@ Current boundary:
 - `--send-probe-message` starts the listener first, then sends a one-line IM smoke request to the test chat. The default probe requires `PILOTFLOW_BOT_USER_ID` or `--bot-user-id` so the message contains a structured bot mention. Use `--probe-text` only when sending a custom probe intentionally.
 - In live mode, `--send-probe-message` first checks `im:message.p2p_msg:readonly`. If the scope is missing, it fails before sending the probe message.
 - Subscription failures return `status: subscribe_failed` and write sanitized stderr to the gateway JSONL log.
+- Gateway JSON output includes `nextActions` for missing IM scope, missing bot mention identity, missing probe chat, subscription failure, and probe timeout cases.
 - Real tenant validation is still required before this path replaces the older JS live proof.
 
 ## Callback Proof

@@ -50,6 +50,11 @@ export interface AgentGatewayProbeResult {
   readonly warning?: string;
 }
 
+export interface AgentGatewayAction {
+  readonly reason: string;
+  readonly action: string;
+}
+
 export interface AgentGatewayResult {
   readonly status: "completed" | "timeout" | "subscribe_failed";
   readonly processedMessages: number;
@@ -64,6 +69,7 @@ export interface AgentGatewayResult {
     readonly exitCode?: number | null;
     readonly stderr?: string;
   };
+  readonly nextActions: readonly AgentGatewayAction[];
 }
 
 export async function runAgentGateway(options: AgentGatewayOptions = {}): Promise<AgentGatewayResult> {
@@ -246,8 +252,9 @@ export async function runAgentGateway(options: AgentGatewayOptions = {}): Promis
     await source.close();
   }
 
-  return {
-    status: failure ? "subscribe_failed" : counters.timedOut ? "timeout" : "completed",
+  const status: AgentGatewayResult["status"] = failure ? "subscribe_failed" : counters.timedOut ? "timeout" : "completed";
+  const result: AgentGatewayResult = {
+    status,
     processedMessages: counters.processedMessages,
     processedCards: counters.processedCards,
     ignoredEvents: counters.ignoredEvents,
@@ -256,7 +263,9 @@ export async function runAgentGateway(options: AgentGatewayOptions = {}): Promis
     output: options.recorder ? undefined : output,
     probe,
     failure,
+    nextActions: [],
   };
+  return { ...result, nextActions: buildNextActions(result, runtime.profile) };
 }
 
 interface GatewayCounters {
@@ -447,6 +456,7 @@ export function renderAgentGateway(result: AgentGatewayResult): string {
     result.probe.messageId ? `probe_message_id: ${result.probe.messageId}` : undefined,
     result.probe.error ? `probe_error: ${result.probe.error}` : undefined,
     result.failure ? `failure: ${result.failure.message}` : undefined,
+    ...renderNextActions(result.nextActions),
     result.output ? `output: ${result.output}` : undefined,
   ].filter((line): line is string => typeof line === "string").join("\n");
 }
@@ -638,6 +648,88 @@ function subscribeFailure(error: unknown): NonNullable<AgentGatewayResult["failu
   return {
     message: error instanceof Error ? error.message : String(error),
   };
+}
+
+function buildNextActions(result: AgentGatewayResult, profile: string): readonly AgentGatewayAction[] {
+  if (result.status === "subscribe_failed") {
+    return [
+      {
+        reason: "The gateway event subscription did not stay up.",
+        action: "Run lark-cli event +subscribe --as bot --event-types im.message.receive_v1,card.action.trigger --dry-run, then fix the CLI profile, event permissions, or Open Platform subscription error shown in the gateway log.",
+      },
+    ];
+  }
+
+  if (result.probe.status === "failed") {
+    const error = result.probe.error ?? "";
+    if (/im:message\.p2p_msg:readonly/u.test(error)) {
+      return [
+        {
+          reason: "IM event delivery is blocked before the gateway can receive probe messages.",
+          action: `Enable im:message.p2p_msg:readonly in Feishu Open Platform, publish or make it effective, then run lark-cli auth login --profile ${profile} --scope "im:message.p2p_msg:readonly" and rerun pilot:live-check.`,
+        },
+      ];
+    }
+    if (/PILOTFLOW_BOT_USER_ID|bot-user-id/u.test(error)) {
+      return [
+        {
+          reason: "The default gateway probe needs a structured bot mention.",
+          action: "Set PILOTFLOW_BOT_USER_ID locally or pass --bot-user-id before running pilot:gateway -- --live --send-probe-message.",
+        },
+      ];
+    }
+    if (/probe-chat-id|chat-id|PILOTFLOW_TEST_CHAT_ID/u.test(error)) {
+      return [
+        {
+          reason: "The gateway probe has no target chat.",
+          action: "Set PILOTFLOW_TEST_CHAT_ID or pass --probe-chat-id before sending a gateway probe.",
+        },
+      ];
+    }
+    return [
+      {
+        reason: "The gateway probe message could not be sent.",
+        action: "Check the target chat id, profile, message permission, bot installation state, and lark-cli im +messages-send error before retrying.",
+      },
+    ];
+  }
+
+  if (result.status === "timeout" && result.probe.status === "sent") {
+    return [
+      {
+        reason: "A probe message was sent, but no im.message.receive_v1 event reached PilotFlow during the timeout window.",
+        action: "Inspect Open Platform event subscription, long-connection mode, bot availability in the chat, app publication state, and rerun pilot:live-check before retrying pilot:gateway.",
+      },
+    ];
+  }
+
+  if (result.status === "timeout" && result.probe.status === "dry_run") {
+    return [
+      {
+        reason: "The probe was dry-run, so no real Feishu event can arrive.",
+        action: "Rerun with --live after pilot:live-check passes when collecting real gateway evidence.",
+      },
+    ];
+  }
+
+  if (result.status === "timeout" && result.probe.status === "not_sent") {
+    return [
+      {
+        reason: "No probe message was sent, so timeout only proves that no existing gateway event arrived.",
+        action: "Rerun with --send-probe-message --timeout 60s --max-events 1 after pilot:live-check passes.",
+      },
+    ];
+  }
+
+  return [];
+}
+
+function renderNextActions(actions: readonly AgentGatewayAction[]): readonly string[] {
+  if (actions.length === 0) return [];
+  return [
+    "next_actions:",
+    ...actions.map((item, index) => `${index + 1}. ${item.action} (${item.reason})`),
+  ];
 }
 
 function buildMessageRunOptions(flags: Record<string, string | boolean>, mode: "dry-run" | "live", text: string): RunOptions {
