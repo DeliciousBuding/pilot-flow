@@ -32,6 +32,7 @@ npm test
 | Runtime helpers | `src/runtime/` | reusable execution primitives such as tool-step recording and optional fallback handling |
 | Tool registry | `src/tools/registry.ts`, `src/tools/idempotency.ts` | LLM-safe registry, confirmation enforcement, preflight, recorder redaction, idempotency |
 | Feishu integration | `src/tools/feishu/`, `src/adapters/lark-cli/` | JS live executor, TS Feishu tool definitions, artifact normalization, lark-cli wrapping |
+| Agent runtime | `src/agent/` | Agent loop, session state, and preview-only worker contracts |
 | Runtime config and schemas | `src/config/`, `src/schemas/` | environment parsing and structured plan schemas |
 | CLI interfaces | `src/interfaces/cli/` | direct runnable entry points and local doctor |
 | Review packs | `src/review-packs/` | generated review, readiness, submission, delivery, callback, permission, and safety reports |
@@ -52,9 +53,11 @@ Keep `package.json` readable. Long or repeatable automation belongs in `scripts/
 | `npm run test:core` | Run core/config/event/tool tests |
 | `npm run test:interfaces` | Run CLI interface tests |
 | `npm run test:review` | Run evidence-pack tests |
+| `npm run test:evals` | Run retrospective eval-pack tests |
 | `npm run test:one -- <alias>` | Run one focused test alias |
 | `npm run pilot:doctor` | Check local runtime requirements without printing secrets |
-| `npm run pilot:demo` | Run the manual dry-run demo |
+| `npm run pilot:run -- --dry-run` | Run the product-facing TS project loop with default Feishu-native surfaces |
+| `npm run pilot:demo` | Run the legacy manual dry-run demo |
 | `npm run pilot:package` | Regenerate the core machine-review package |
 | `npm run pilot:status` | Regenerate delivery status |
 | `npm run pilot:audit` | Run safety audit |
@@ -76,6 +79,7 @@ npm run test:one -- risk
 npm run test:one -- evidence
 npm run test:one -- submission
 npm run test:one -- retrospective
+npm run test:one -- retrospective-eval
 npm run test:one -- safety-audit
 ```
 
@@ -100,6 +104,9 @@ Implemented runtime capabilities:
 - TypeScript domain modules in `src/domain/` for deterministic planning, plan validation fallback, risk detection, risk card data, brief markdown, and task description
 - TypeScript `ToolRegistry` in `src/tools/registry.ts` with LLM-safe tool names, JSON-string argument parsing, live preflight, live confirmation enforcement, recorder redaction, and self-registering Feishu tools
 - tool-step recording and optional fallback in `src/runtime/tool-step-runner.js`
+- product-facing `pilot:run` facade in `src/interfaces/cli/pilot-run.ts`, which wraps the TS project-init path and enables plan card, entry message, pinned entry, and risk card by default
+- retrospective eval runner in `src/review-packs/retrospective-eval.js`
+- preview-only Review Worker contract in `src/agent/review-worker.ts`
 
 Known product boundary:
 
@@ -134,7 +141,8 @@ Known product boundary:
 | README/docs only | `git diff --check` |
 | Broad refactor | `npm run pilot:check`, `npm test`, `npm run pilot:status`, `npm run pilot:audit` |
 | TypeScript domain or tools | `npm run ts:check`, `npm run test:ts`, `npm test` |
-| CLI/environment surface | `npm run test:one -- doctor`, `npm run pilot:doctor` |
+| CLI/environment surface | `npm run test:one -- doctor`, `npm run test:interfaces`, `npm run pilot:doctor` |
+| Product run facade | `npm run test:ts`, `npm run pilot:run -- --dry-run --input "<intent>"` |
 | Planner logic | `npm run pilot:check`, `npm run test:one -- plan`, `npm run pilot:demo` |
 | Orchestrator logic | `npm run pilot:check`, `npm run test:one -- orchestrator`, `npm run pilot:demo` |
 | Domain renderer | `npm run test:one -- brief tasktext` |
@@ -157,6 +165,9 @@ Known product boundary:
 | Submission pack | `npm run test:one -- submission`, regenerate the pack |
 | Delivery index | `npm run test:one -- delivery-index`, `npm run pilot:status` |
 | Safety audit pack | `npm run test:one -- safety-audit`, `npm run pilot:audit` |
+| Retrospective eval runner | `npm run test:evals`, `npm run review:retrospective-eval` |
+| Command facade argument routing | `npm run test:interfaces`, `npm run pilot:package -- --input <run.jsonl>` |
+| Agent worker preview | `npm run test:ts`, inspect `src/agent/review-worker.ts` for preview-only writes |
 | Risk detection/card | `npm run test:one -- risk`, `npm run pilot:demo -- --send-risk-card` |
 | Task assignee mapping | `npm run test:one -- assignee`, `npm run test:one -- config` |
 | Contact owner lookup | `npm run test:one -- contact`, `npm run pilot:demo -- --auto-lookup-owner-contact` |

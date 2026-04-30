@@ -113,13 +113,44 @@ export function renderAgentProjectInit(result: AgentProjectInitResult): string {
 }
 
 async function main(argv = process.argv.slice(2)): Promise<void> {
-  const parsed = parseArgs(argv, { boolean: ["json"] });
+  const parsed = parseArgs(argv, { boolean: ["json", "help", "h"] });
+  if (parsed.flags.help === true || parsed.flags.h === true) {
+    console.log(buildAgentProjectInitUsage());
+    return;
+  }
+
   const result = await runAgentProjectInit({ argv });
   if (parsed.flags.json === true) {
     console.log(JSON.stringify(result, null, 2));
     return;
   }
   console.log(renderAgentProjectInit(result));
+}
+
+export function buildAgentProjectInitUsage(): string {
+  return `Usage:
+  npm run pilot:project-init-ts
+  npm run pilot:project-init-ts -- --dry-run --send-entry-message --send-risk-card
+  npm run pilot:project-init-ts -- --live --confirm "确认执行" --send-entry-message --send-risk-card
+
+Options:
+  --dry-run                         Run without Feishu writes.
+  --live                            Enable live Feishu mode.
+  --confirm <text>                  Required confirmation text for live side effects.
+  --input <text>                    Inline project intent.
+  --input-file <path>               Read project intent from a file.
+  --output <path>                   JSONL run log path.
+  --send-plan-card                  Send or dry-run an execution-plan card.
+  --send-entry-message              Send or dry-run the project entry message.
+  --pin-entry-message               Pin or dry-run the project entry message.
+  --update-announcement             Try native announcement update and fallback on failure.
+  --send-risk-card                  Send or dry-run a risk decision card.
+  --auto-lookup-owner-contact       Search Feishu Contacts for owner labels.
+  --owner-open-id-map-json <json>   Map owner labels to Feishu open_id values.
+  --allow-duplicate-run             Bypass duplicate-run protection intentionally.
+  --json                            Print JSON result.
+  --help                            Show this help.
+`;
 }
 
 async function resolveInput(flags: Record<string, string | boolean>): Promise<string> {

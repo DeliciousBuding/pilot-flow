@@ -24,7 +24,7 @@ const TEST_GROUPS = {
     "src/tools/feishu/artifact-normalizer.test.js",
     "src/tools/feishu/feishu-tool-executor.test.js"
   ],
-  interfaces: ["src/interfaces/cli/flight-recorder-view.test.js", "src/interfaces/cli/doctor.test.js"],
+  interfaces: ["src/interfaces/cli/flight-recorder-view.test.js", "src/interfaces/cli/doctor.test.js", "src/interfaces/cli/pilot-cli.test.js"],
   review: [
     "src/review-packs/demo-evidence.test.js",
     "src/review-packs/demo-eval.test.js",
@@ -38,7 +38,8 @@ const TEST_GROUPS = {
     "src/review-packs/demo-delivery-index-pack.test.js",
     "src/review-packs/demo-safety-audit-pack.test.js",
     "src/review-packs/run-retrospective-pack.test.js"
-  ]
+  ],
+  evals: ["src/review-packs/retrospective-eval.test.js"]
 };
 
 const TEST_ALIASES = {
@@ -51,6 +52,7 @@ const TEST_ALIASES = {
   guard: "src/core/orchestrator/duplicate-run-guard.test.js",
   entry: "src/core/orchestrator/entry-message-builder.test.js",
   flight: "src/interfaces/cli/flight-recorder-view.test.js",
+  "pilot-cli": "src/interfaces/cli/pilot-cli.test.js",
   doctor: "src/interfaces/cli/doctor.test.js",
   evidence: "src/review-packs/demo-evidence.test.js",
   eval: "src/review-packs/demo-eval.test.js",
@@ -64,6 +66,7 @@ const TEST_ALIASES = {
   "delivery-index": "src/review-packs/demo-delivery-index-pack.test.js",
   "safety-audit": "src/review-packs/demo-safety-audit-pack.test.js",
   retrospective: "src/review-packs/run-retrospective-pack.test.js",
+  "retrospective-eval": "src/review-packs/retrospective-eval.test.js",
   risk: ["src/core/orchestrator/risk-detector.test.js", "src/core/orchestrator/risk-decision-card.test.js"],
   state: "src/core/orchestrator/project-state-builder.test.js",
   summary: "src/core/orchestrator/summary-builder.test.js",

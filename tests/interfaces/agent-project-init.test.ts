@@ -3,7 +3,16 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import test from "node:test";
-import { renderAgentProjectInit, runAgentProjectInit } from "../../src/interfaces/cli/agent-project-init.js";
+import { buildAgentProjectInitUsage, renderAgentProjectInit, runAgentProjectInit } from "../../src/interfaces/cli/agent-project-init.js";
+
+test("buildAgentProjectInitUsage documents runtime options without running the flow", () => {
+  const usage = buildAgentProjectInitUsage();
+
+  assert.match(usage, /Usage:/u);
+  assert.match(usage, /--live/u);
+  assert.match(usage, /--confirm/u);
+  assert.match(usage, /--send-plan-card/u);
+});
 
 test("runAgentProjectInit completes the TS orchestrator dry-run bridge", async () => {
   const dir = await mkdtemp(join(tmpdir(), "pilotflow-agent-project-"));

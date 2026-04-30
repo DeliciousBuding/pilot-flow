@@ -60,6 +60,7 @@ flowchart LR
 | Workflow template | Docs/Base row or versioned JSON | Reuse successful project patterns |
 | Improvement proposal | Feishu Doc/Card and Git issue/PR later | Keep changes reviewable |
 | Run retrospective | `tmp/run-retrospective/RUN_RETROSPECTIVE.md` | Summarize run quality signals and candidate eval cases |
+| Retrospective eval | `tmp/retrospective-eval/RETROSPECTIVE_EVAL.md` | Check the current run against review cases before publishing claims |
 
 ### Guardrails
 
@@ -134,7 +135,8 @@ Workers do not own Feishu writes. They return preview artifacts and proposed act
 
 - [ ] Add a structured `run.review` event shape to Flight Recorder.
 - [x] Add a generated "Run Retrospective Pack" from JSONL logs.
-- [ ] Turn failure cases into stable eval fixtures.
+- [x] Add a first Retrospective Eval runner over optional fallback, missing owner, TBD deadline, planner validation fallback, and tool failure traces.
+- [ ] Promote failure cases into stable snapshot-backed eval fixtures.
 - [x] Add first quality signals: missing owner, missing due date, failed optional tool, and optional fallback used.
 - [ ] Extend quality signals for callback pending, duplicate blocked, and manual fallback used.
 
@@ -147,11 +149,13 @@ Workers do not own Feishu writes. They return preview artifacts and proposed act
 
 ### Stage C: Worker Preview
 
-- [ ] Implement a `WorkerRequest` / `WorkerResult` type contract.
-- [ ] Add a single Review Worker first because it is read-only and low risk.
+- [x] Implement a `WorkerRequest` / `WorkerResult` type contract.
+- [x] Add a single Review Worker first because it is read-only and low risk.
 - [ ] Add Doc Worker preview generation.
 - [ ] Add Base/Data Worker dry-run diff.
 - [ ] Add Script/Automation Worker behind local sandbox and explicit approval.
+
+Current implementation: `src/agent/review-worker.ts` accepts retrospective and eval inputs, returns a `worker_review` preview artifact, and emits proposed Feishu Doc content with `confirmed: false`. It does not call `lark-cli`, ToolRegistry, or any Feishu API directly.
 
 ### Stage D: Managed Orchestration
 

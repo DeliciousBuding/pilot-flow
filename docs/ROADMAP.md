@@ -29,8 +29,8 @@ flowchart LR
 | Traceability | Implemented | JSONL run log, Flight Recorder, and review-pack generators are available |
 | Review packaging | Implemented | Machine evidence can be regenerated locally; manual videos and screenshots remain outside Git |
 | Product cleanup | Implemented for JS prototype | Runtime entrypoints, review tooling, command facade, and public demo docs are separated |
-| TypeScript kernel rebuild | In progress | Day 0 through Day 6 complete; TS gateway, LLM client, Agent loop, dry-run smoke CLI, and live-guarded project-init bridge are in place while JS CLI remains the stable live product path |
-| Hermes-style evolution | First review artifact implemented | Run Retrospective Pack turns traces into quality signals, improvement proposals, and eval seeds; memory, context compression, and worker orchestration remain behind human approval |
+| TypeScript kernel rebuild | In progress | Day 0 through Day 6 complete; TS gateway, LLM client, Agent loop, dry-run smoke CLI, live-guarded project-init bridge, and product-facing `pilot:run` facade are in place |
+| Hermes-style evolution | Review loop implemented | Run Retrospective Pack, Retrospective Eval, and preview-only Review Worker are in place; memory, context compression, and broader worker orchestration remain behind human approval |
 
 ## Phase 0: Foundation
 
@@ -95,6 +95,7 @@ Exit condition: product runtime, review packaging, and documentation are visibly
 - [x] Day 4: add Feishu gateway, session queue, Agent loop, and mock-tested LLM provider.
 - [x] Day 5: bridge TS gateway/agent into CLI dry-run smoke paths and keep live migration guarded.
 - [x] Day 6: bridge TS runtime into a live-guarded project-init path; old JS runtime removal remains gated by real live validation.
+- [x] Day 7: add `pilot:run` product facade, retrospective eval runner, and preview-only Review Worker contract.
 
 Exit condition: TypeScript path can run the same dry-run and live-guarded project launch loop as the current JS prototype, then pass real Feishu live validation before old runtime removal.
 
@@ -103,14 +104,16 @@ Exit condition: TypeScript path can run the same dry-run and live-guarded projec
 - [ ] Mobile-friendly confirmation once callback delivery is verified.
 - [ ] Desktop or Chat Tab cockpit for run status, artifacts, risks, and retry decisions.
 - [x] Run Retrospective Pack generated from Flight Recorder traces.
-- [ ] Convert failure paths into stable eval fixtures.
+- [x] Add initial Retrospective Eval runner for optional fallback, missing owner, TBD deadline, planner validation fallback, and tool failure trace.
+- [ ] Promote retrospective eval cases into a broader fixture suite with real run snapshots.
 - [ ] Add project memory schema for team preferences, recurring owners, project templates, and platform limits.
 - [ ] Add bounded context compression for old tool outputs and long group sessions.
 - [ ] Choose one additional Feishu-native surface:
   - Whiteboard for roadmap visualization.
   - Calendar for milestone scheduling.
+- [x] Add first preview-only Review Worker contract.
 - [ ] Worker artifact preview for document, table, script, or research outputs.
-- [ ] Human approval before publishing worker artifacts into Feishu.
+- [ ] Human approval cards before publishing worker artifacts into Feishu.
 
 Exit condition: PilotFlow feels useful beyond the first project-launch flow while keeping human control intact.
 
@@ -119,7 +122,8 @@ Exit condition: PilotFlow feels useful beyond the first project-launch flow whil
 - [ ] Event-driven group trigger with allowlisted groups.
 - [ ] Multi-project space management.
 - [ ] Persistent project memory.
-- [ ] Manager-worker orchestration with typed `WorkerRequest` and `WorkerResult` contracts.
+- [x] Typed `WorkerRequest` and `WorkerResult` contract for the first Review Worker.
+- [ ] Manager-worker orchestration across multiple worker types.
 - [ ] Feishu worker progress cards and artifact approval cards.
 - [ ] Self-evolution loop: trace -> evaluation -> improvement proposal -> approved workflow/template/test update.
 - [ ] Permission and audit model.
@@ -129,9 +133,10 @@ Exit condition: PilotFlow feels useful beyond the first project-launch flow whil
 
 ## Immediate Next Actions
 
-1. Validate `npm run pilot:project-init-ts` against a real Feishu live target after confirming Base/chat/task configuration.
-2. Keep the current JS prototype runnable until TS live-guarded flows pass the same dry-run, live, evidence, and callback checks.
-3. Convert Run Retrospective Pack output into stable evaluation fixtures for optional fallback, missing owner, and TBD deadline cases.
+1. Validate `npm run pilot:run -- --live --confirm "确认执行"` against a real Feishu target after confirming Base/chat/task configuration.
+2. Keep the current JS prototype runnable until `pilot:run` passes the same dry-run, live, evidence, and callback checks.
+3. Promote Retrospective Eval cases into snapshot-backed fixtures from real successful and degraded runs.
 4. Capture happy-path and failure-path media outside Git.
 5. Verify Open Platform card callback delivery or keep it explicitly marked as pending.
-6. Run `pilot:doctor`, `pilot:check`, tests, review package generation, status, and safety audit before any public handoff.
+6. Design the first artifact approval card for worker previews before adding Doc/Data/Script workers.
+7. Run `pilot:doctor`, `pilot:check`, tests, review package generation, status, and safety audit before any public handoff.

@@ -13,6 +13,7 @@
     "pilot:package": "node src/interfaces/cli/pilot-cli.js package",
     "pilot:audit": "node src/interfaces/cli/pilot-cli.js audit",
     "pilot:doctor": "node src/interfaces/cli/pilot-cli.js doctor",
+    "pilot:run": "tsc && node dist/src/interfaces/cli/pilot-run.js",
     "pilot:agent-smoke": "tsc && node dist/src/interfaces/cli/agent-smoke.js",
     "pilot:project-init-ts": "tsc && node dist/src/interfaces/cli/agent-project-init.js",
     "check": "node scripts/check-js.js && tsc --noEmit",
@@ -22,6 +23,7 @@
     "test:core": "node scripts/run-tests.js core",
     "test:interfaces": "node scripts/run-tests.js interfaces",
     "test:review": "node scripts/run-tests.js review",
+    "test:evals": "node scripts/run-tests.js evals",
     "ts:check": "tsc --noEmit",
     "ts:build": "tsc",
     "pilot:demo:run": "node src/interfaces/cli/manual-trigger.js",
@@ -41,6 +43,7 @@
     "review:delivery-index": "node src/review-packs/demo-delivery-index-pack.js",
     "review:safety-audit": "node src/review-packs/demo-safety-audit-pack.js",
     "review:retrospective": "node src/review-packs/run-retrospective-pack.js",
+    "review:retrospective-eval": "node src/review-packs/retrospective-eval.js",
     "test:one": "node scripts/run-tests.js"
   },
   "engines": {

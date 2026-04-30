@@ -32,9 +32,11 @@ lark-cli auth status --verify
 | Run TypeScript tests only | `npm run test:ts` |
 | Run core tests | `npm run test:core` |
 | Run evidence-pack tests | `npm run test:review` |
+| Run retrospective eval tests | `npm run test:evals` |
 | Run one focused test | `npm run test:one -- <alias>` |
 | Check local environment | `npm run pilot:doctor` |
-| Run manual dry-run demo | `npm run pilot:demo` |
+| Run product project loop | `npm run pilot:run -- --dry-run` |
+| Run legacy manual demo loop | `npm run pilot:demo` |
 | Run TS gateway/Agent smoke path | `npm run pilot:agent-smoke` |
 | Run TS project-init bridge | `npm run pilot:project-init-ts` |
 | Render Flight Recorder | `npm run pilot:recorder -- --input <run.jsonl> --output <html>` |
@@ -50,6 +52,7 @@ npm run test:one -- risk
 npm run test:one -- doctor
 npm run test:one -- submission
 npm run test:one -- retrospective
+npm run test:one -- retrospective-eval
 ```
 
 `pilot:doctor` checks Node.js, `lark-cli`, `.env` Git ignore status, and required environment variable names. It reports missing names only; it does not print secret values. Add `-- --verify-auth` only when you want a sanitized profile token-status check:
@@ -61,17 +64,20 @@ npm run pilot:doctor -- --verify-auth
 
 ## Dry-Run Operation
 
-Run the basic local demo:
+Run the product-facing local loop:
 
 ```bash
-npm run pilot:demo
+npm run pilot:run -- --dry-run
+npm run pilot:run -- --dry-run --input "目标: 建立答辩项目空间 成员: 产品, 技术 交付物: Brief, Task 截止时间: 2026-05-03"
 ```
 
 Expected result:
 
 - a `project_init` plan
 - status `completed`
-- JSONL run log under `tmp/runs/`
+- execution-plan card, project entry, pinned entry, and risk card enabled by default
+- JSONL run log at `tmp/runs/latest-manual-run.jsonl` unless `--output` is supplied
+- live mode is never inferred from the environment for this product entry; pass `--live` explicitly
 
 Preview Feishu target setup:
 
@@ -90,7 +96,7 @@ type, title, owner, due_date, status, risk_level, source_run, source_message, ur
 Live writes require explicit confirmation:
 
 ```bash
-npm run pilot:demo -- --live --confirm "确认执行"
+npm run pilot:run -- --live --confirm "确认执行"
 ```
 
 Useful live flags:
@@ -109,7 +115,7 @@ Useful live flags:
 Show all runtime options:
 
 ```bash
-npm run pilot:demo -- --help
+npm run pilot:project-init-ts -- --help
 ```
 
 ## TypeScript Agent Smoke
@@ -178,6 +184,12 @@ npm run pilot:status
 npm run pilot:audit
 ```
 
+To package a specific run log, pass a shared input. The facade forwards it to the retrospective and retrospective-eval steps:
+
+```bash
+npm run pilot:package -- --input tmp/runs/pilot-run-smoke.jsonl
+```
+
 Individual pack commands remain available for targeted regeneration:
 
 ```bash
@@ -191,17 +203,18 @@ npm run review:callback-verification -- --output tmp/demo-callback/CALLBACK_VERI
 npm run review:judge -- --output tmp/demo-judge/JUDGE_REVIEW.md
 npm run review:submission -- --output tmp/demo-submission/SUBMISSION_PACK.md
 npm run review:retrospective -- --output tmp/run-retrospective/RUN_RETROSPECTIVE.md
+npm run review:retrospective-eval -- --output tmp/retrospective-eval/RETROSPECTIVE_EVAL.md
 npm run review:delivery-index -- --output tmp/demo-delivery/DELIVERY_INDEX.md
 npm run review:safety-audit -- --output tmp/demo-safety/SAFETY_AUDIT.md
 ```
 
-The retrospective pack reads a JSONL run log and produces quality signals, improvement proposals, and evaluation seeds. By default it reads `tmp/runs/latest-live-run.jsonl` when present, otherwise `tmp/runs/latest-manual-run.jsonl`; pass `--input <run.jsonl>` when packaging a specific run. It is review-only: it does not change code, prompts, docs, or Feishu artifacts.
+The retrospective pack reads a JSONL run log and produces quality signals, improvement proposals, and evaluation seeds. The retrospective eval runner checks those signals against the current fallback and clarification cases. By default both read `tmp/runs/latest-live-run.jsonl` when present, otherwise `tmp/runs/latest-manual-run.jsonl`; pass `--input <run.jsonl>` when packaging a specific run. They are review-only: they do not change code, prompts, docs, or Feishu artifacts.
 
 Generated reports and run logs stay under ignored `tmp/`.
 
 ## TypeScript Kernel Rebuild Status
 
-The TypeScript rebuild is active but not yet the default live CLI path. Day 0 through Day 6 are complete: strict TS foundation, domain modules, ToolRegistry, tool idempotency, 9 Feishu tool definitions, split TS orchestrator, OpenAI-compatible LLM client, retry/error classifier, Agent loop, session manager, Feishu gateway boundary, dry-run CLI smoke bridge, and live-guarded project-init bridge are implemented and covered by TS tests. Operators should still use the JS-backed `pilot:demo` command for official live Feishu demos until the TS live path passes the same real target checks.
+The TypeScript rebuild is active. Day 0 through Day 7 are complete: strict TS foundation, domain modules, ToolRegistry, tool idempotency, 9 Feishu tool definitions, split TS orchestrator, OpenAI-compatible LLM client, retry/error classifier, Agent loop, session manager, Feishu gateway boundary, dry-run CLI smoke bridge, live-guarded project-init bridge, `pilot:run`, Retrospective Eval, and Review Worker preview contract are implemented and covered by tests. `pilot:run` is now the preferred product-facing dry-run entry over the TS path. For official live Feishu demos, keep the JS-backed `pilot:demo` available until `pilot:run` passes the same real target checks.
 
 ## Known Platform Edges
 

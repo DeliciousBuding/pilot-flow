@@ -48,13 +48,15 @@ Generated review reports are created under ignored `tmp/` and are not tracked as
 | Run grouped tests | `npm test` |
 | Run TypeScript tests only | `npm run test:ts` |
 | Check local environment | `npm run pilot:doctor` |
-| Run the manual product loop | `npm run pilot:demo` |
+| Run the product project loop | `npm run pilot:run -- --dry-run` |
 | Render a run trace | `npm run pilot:recorder -- --input <run.jsonl> --output <html>` |
 | Rebuild review materials | `npm run pilot:package` |
 | Check submission status | `npm run pilot:status` |
 | Scan before sharing | `npm run pilot:audit` |
 
-`pilot:package` includes the Run Retrospective Pack under ignored `tmp/run-retrospective/`, which turns a run log into quality signals, improvement proposals, and evaluation seeds for human review. The pack defaults to `tmp/runs/latest-live-run.jsonl` when present, otherwise `tmp/runs/latest-manual-run.jsonl`.
+`pilot:run` is the preferred product-facing local entry. It forces dry-run unless live mode is explicit, enables the execution-plan card, project entry message, pinned entry, and risk card by default for dry-run or confirmed live runs, and preserves the confirmation gate for live writes.
+
+`pilot:package` includes the Run Retrospective Pack under ignored `tmp/run-retrospective/` and the Retrospective Eval report under ignored `tmp/retrospective-eval/`. Together they turn a run log into quality signals, improvement proposals, eval seeds, and a small diagnostic report with passed, failed, and not-applicable cases for human review. They default to `tmp/runs/latest-live-run.jsonl` when present, otherwise `tmp/runs/latest-manual-run.jsonl`.
 
 ## Planned Folders
 

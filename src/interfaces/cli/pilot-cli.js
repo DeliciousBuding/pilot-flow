@@ -24,6 +24,10 @@ const COMMANDS = {
     description: "Check local PilotFlow runtime requirements without printing secrets.",
     steps: [{ script: "pilot:doctor:run", args: [] }]
   },
+  run: {
+    description: "Run the product-grade TypeScript PilotFlow project flow.",
+    steps: [{ script: "pilot:run", args: [] }]
+  },
   "agent-smoke": {
     description: "Run the TypeScript gateway and Agent dry-run smoke path.",
     steps: [{ script: "pilot:agent-smoke", args: [] }]
@@ -58,7 +62,13 @@ const COMMANDS = {
       },
       {
         script: "review:retrospective",
-        args: ["--", "--output", "tmp/run-retrospective/RUN_RETROSPECTIVE.md"]
+        args: ["--", "--output", "tmp/run-retrospective/RUN_RETROSPECTIVE.md"],
+        acceptsSharedInput: true
+      },
+      {
+        script: "review:retrospective-eval",
+        args: ["--", "--output", "tmp/retrospective-eval/RETROSPECTIVE_EVAL.md"],
+        acceptsSharedInput: true
       },
       {
         script: "review:delivery-index",
@@ -97,6 +107,7 @@ function renderHelp() {
     "  npm run pilot:demo -- --send-plan-card --no-auto-confirm",
     "  npm run pilot:recorder -- --input tmp/runs/latest-manual-run.jsonl --output tmp/flight-recorder/latest.html",
     "  npm run pilot:doctor",
+    "  npm run pilot:run -- --dry-run --input \"目标: 建立答辩项目空间\"",
     "  npm run pilot:agent-smoke -- --input \"@PilotFlow 建立答辩项目空间\"",
     "  npm run pilot:project-init-ts -- --dry-run --send-entry-message",
     "  npm run pilot:project-init-ts -- --live --confirm \"确认执行\" --send-entry-message",
@@ -141,6 +152,39 @@ function runNpmScript(script, args) {
   });
 }
 
+function buildStepArgs({ command, stepIndex, passthroughArgs = [] }) {
+  const step = command.steps[stepIndex];
+  if (!step) throw new Error(`Unknown step index: ${stepIndex}`);
+
+  if (command.steps.length === 1 && passthroughArgs.length > 0) {
+    return ["--", ...passthroughArgs];
+  }
+
+  const sharedInput = extractInputArgs(passthroughArgs);
+  if (step.acceptsSharedInput && sharedInput.length > 0) {
+    return [...step.args, ...sharedInput];
+  }
+
+  return step.args;
+}
+
+function extractInputArgs(args) {
+  const inputArgs = [];
+  for (let index = 0; index < args.length; index += 1) {
+    const item = args[index];
+    if (item === "--input") {
+      const value = args[index + 1];
+      if (value && !value.startsWith("--")) {
+        inputArgs.push(item, value);
+        index += 1;
+      }
+      continue;
+    }
+    if (item.startsWith("--input=")) inputArgs.push(item);
+  }
+  return inputArgs;
+}
+
 async function main(argv = process.argv.slice(2)) {
   const { commandName, passthroughArgs } = splitArgs(argv);
 
@@ -161,7 +205,7 @@ async function main(argv = process.argv.slice(2)) {
   console.log(`PilotFlow: ${command.description}`);
 
   for (const [index, step] of command.steps.entries()) {
-    const args = index === command.steps.length - 1 && passthroughArgs.length > 0 ? ["--", ...passthroughArgs] : step.args;
+    const args = buildStepArgs({ command, stepIndex: index, passthroughArgs });
     console.log(`\n> npm run ${step.script}${args.length > 0 ? ` ${args.join(" ")}` : ""}`);
     await runNpmScript(step.script, args);
   }
@@ -174,4 +218,4 @@ if (import.meta.url === pathToFileURL(process.argv[1]).href) {
   });
 }
 
-export { COMMANDS, main, renderHelp, splitArgs };
+export { COMMANDS, buildStepArgs, main, renderHelp, splitArgs };

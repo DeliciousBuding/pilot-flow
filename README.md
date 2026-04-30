@@ -248,7 +248,10 @@ PilotFlow is currently in **MVP prototype** stage. The first deliverable is a re
 | Card callback listener bridge | ✅ local tests passed |
 | Live card callback confirmation | 🟡 listener connected, no real callback event received yet |
 | Group announcement project entry | ✅ attempted; current group returns docx announcement API block and falls back to pinned entry |
-| TypeScript Agent kernel | ✅ Day 6 live-guarded project-init bridge |
+| TypeScript Agent kernel | ✅ Day 7 product run facade and review loop |
+| Product run entry | ✅ `pilot:run` wraps the TS project flow with Feishu-native product surfaces enabled |
+| Retrospective eval loop | ✅ review-only eval report generated from JSONL run retrospectives |
+| Review Worker preview | ✅ typed preview-only worker contract; no direct Feishu writes |
 
 ## 🗺️ Roadmap Snapshot
 
@@ -269,6 +272,7 @@ gantt
     TypeScript gateway and Agent loop    :done,    k1, 2026-04-30, 1d
     CLI dry-run smoke bridge             :done,    k2, 2026-04-30, 1d
     TS project-init guarded bridge        :done,    k3, 2026-04-30, 1d
+    Product run facade and eval loop      :done,    k4, 2026-04-30, 1d
     section Demo
     Risk detection and decision card     :done,    c1, 2026-04-28, 1d
     Card callback action protocol        :done,    c2, 2026-04-28, 1d
@@ -304,18 +308,19 @@ For local development and reviewer reproduction:
 ```bash
 npm run pilot:check
 npm test
-npm run pilot:demo
+npm run pilot:run -- --dry-run
 npm run pilot:agent-smoke
 npm run pilot:project-init-ts
-npm run pilot:demo -- --send-plan-card --no-auto-confirm
-npm run pilot:demo -- --pin-entry-message --send-risk-card
+npm run pilot:run -- --dry-run --input "目标: 建立答辩项目空间 成员: 产品, 技术 交付物: Brief, Task 截止时间: 2026-05-03"
+npm run pilot:project-init-ts -- --dry-run --send-entry-message --send-risk-card
 npm run pilot:recorder -- --input tmp/runs/latest-manual-run.jsonl --output tmp/flight-recorder/latest.html
+npm run review:retrospective-eval
 npm run pilot:package
 npm run pilot:status
 npm run pilot:audit
 ```
 
-The current local demo reads a project-init fixture, writes a traceable run log, and returns planned artifacts. Live Feishu execution is available behind an explicit confirmation gate. Operational setup lives in [docs/OPERATOR_RUNBOOK.md](docs/OPERATOR_RUNBOOK.md); contributor workflow lives in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md). Generated review packs, including the Run Retrospective Pack, are auxiliary material and are kept out of the product runtime surface.
+`pilot:run` is the preferred product-facing local entry. It uses the TypeScript project-init path, forces dry-run unless live mode is explicit, enables the execution-plan card, project entry message, pinned entry, and risk card by default for dry-run or confirmed live runs, and writes to `tmp/runs/latest-manual-run.jsonl` or `tmp/runs/latest-live-run.jsonl` unless an output path is supplied. Live Feishu execution is still behind explicit confirmation. Operational setup lives in [docs/OPERATOR_RUNBOOK.md](docs/OPERATOR_RUNBOOK.md); contributor workflow lives in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md). Generated review packs, including the Run Retrospective Pack and Retrospective Eval report, are auxiliary material and are kept out of the product runtime surface.
 
 ## 🛡️ Trust Model
 
@@ -325,6 +330,7 @@ The current local demo reads a project-init fixture, writes a traceable run log,
 | Can a failed tool call look successful? | It should not. Tool errors are recorded and surfaced as run events and fallback artifacts. |
 | Can the same demo accidentally create duplicate artifacts? | Live runs are guarded by a duplicate-run key unless the operator explicitly bypasses it. |
 | Can reviewers inspect what happened? | Yes. Run logs, generated review packs, Flight Recorder, retrospective reports, and final summaries expose the execution path. |
+| Can worker agents publish on their own? | No. The first Review Worker returns preview artifacts and proposed Feishu writes only; publishing remains confirmation-gated. |
 | Is the current prototype production-ready? | No. It is a validated MVP prototype with known pending work around real card callback delivery and manual capture evidence. |
 
 ## 🔐 Safety Principles
