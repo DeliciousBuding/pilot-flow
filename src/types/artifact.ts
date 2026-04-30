@@ -8,7 +8,8 @@ export type ArtifactType =
   | "entry_message"
   | "pinned_message"
   | "card"
-  | "announcement";
+  | "announcement"
+  | "run_log";
 
 export interface Artifact {
   readonly type: ArtifactType;

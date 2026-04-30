@@ -1,7 +1,7 @@
 # PilotFlow Hermes-Style Agent Kernel Rebuild
 
 > Created: 2026-04-30
-> Status: Day 0 through Day 2 implemented; Day 3 orchestrator rebuild is next
+> Status: Day 0 through Day 3 implemented; Day 4 gateway, LLM client, and agent loop are next
 > Intent: rebuild PilotFlow around an Agent kernel instead of continuing to pile features onto the current script-shaped prototype.
 
 This folder is the rebuild blueprint for turning PilotFlow into a Feishu-native Agent product kernel.
@@ -27,7 +27,7 @@ The decision is now intentionally stronger than the previous cleanup plan: Pilot
 | Day 0 | Done | `docs/rebuild/CONTRACT_NOTES.md` records lark-cli docs/event contracts, webhook boundary, and LLM mock gate |
 | Day 1 | Done | `94f741e` added strict TS foundation, core types, shared utilities, safety, infrastructure, runtime config, and TS tests |
 | Day 2 | Done | `4353182` added TS domain modules, ToolRegistry, tool idempotency, and 9 Feishu tool definitions |
-| Day 3 | Next | Split orchestrator while keeping the current JS prototype runnable |
+| Day 3 | Done | TS `src/orchestrator/` split added with confirmation gate, deterministic tool sequence, atomic duplicate guard, cards/messages/state/resolver helpers, callback bridge, and 59 TS tests while keeping the JS prototype runnable |
 
 ## Hermes Evidence Snapshot
 

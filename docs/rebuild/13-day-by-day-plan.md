@@ -8,7 +8,8 @@
 - [x] Day 0 complete: contract notes recorded in `CONTRACT_NOTES.md`.
 - [x] Day 1 complete: strict TypeScript foundation, shared utilities, safety, infrastructure, runtime config, and TS test bridge are implemented.
 - [x] Day 2 complete: domain modules, `ToolRegistry`, tool idempotency, and 9 Feishu tool definitions are implemented in commit `4353182`.
-- [ ] Day 3 next: split orchestrator modules while keeping the JS prototype runnable.
+- [x] Day 3 complete: `src/orchestrator/` split is implemented with confirmation gate, deterministic sequence, duplicate guard, card/message/state helpers, callback bridge, and tests while keeping the JS prototype runnable.
+- [ ] Day 4 next: Feishu gateway, LLM client, and Agent loop wiring without deleting the JS public CLI path.
 
 ## Day 0：合同核验 + 迁移闸门（~2 小时）
 

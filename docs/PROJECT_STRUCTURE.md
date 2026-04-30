@@ -57,6 +57,6 @@ Use `review:*` only when regenerating one specific review pack or debugging a pa
 
 PilotFlow can run a real Feishu project-launch loop through a manual trigger and confirmation gate. It can create or send Doc, Base rows, Task, cards, pinned entry, final summary, and trace output.
 
-The Hermes-style TypeScript kernel rebuild has completed Day 0 through Day 2: strict TS foundation, domain modules, ToolRegistry, tool idempotency, and 9 Feishu tool definitions are in place. The old JS runtime is still intentionally retained until the TS orchestrator and CLI path pass the same live and dry-run checks.
+The Hermes-style TypeScript kernel rebuild has completed Day 0 through Day 3: strict TS foundation, domain modules, ToolRegistry, tool idempotency, 9 Feishu tool definitions, and the split TS orchestrator layer are in place. The old JS runtime is still intentionally retained until the TS gateway and CLI path pass the same live and dry-run checks.
 
 PilotFlow is not yet a fully unattended long-running Feishu bot. Card callback listener wiring exists locally, but real `card.action.trigger` delivery still needs Open Platform callback configuration verification. The stable fallback is text confirmation.
