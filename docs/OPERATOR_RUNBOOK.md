@@ -274,7 +274,7 @@ The TypeScript rebuild is active. Day 0 through Day 7 are complete: strict TS fo
 | Edge | Current behavior |
 | --- | --- |
 | Card callback delivery | Code-level listener and trigger bridge exist; on 2026-05-01 a probe card was sent successfully, but the listener did not receive `card.action.trigger` within 30 seconds |
-| IM event delivery | Pending retest with a configured `PILOTFLOW_BOT_USER_ID`; the current default probe now fails closed instead of sending a plain text `@PilotFlow` |
+| IM event delivery | On 2026-05-01 a structured mention probe was sent after `PILOTFLOW_BOT_USER_ID` was configured, but no `im.message.receive_v1` reached the listener within 60 seconds |
 | Group announcement | Native announcement update was attempted; the current test group returns `232097 Unable to operate docx type chat announcement` |
 | Manual media | Submission/readiness review separate machine evidence from videos, screenshots, and callback configuration proof |
 
@@ -306,7 +306,7 @@ Run the update from the workspace root because `--content @PERSONAL_PROGRESS.md`
 | Card sends but button does not trigger | Regenerate Callback Verification Pack and inspect Open Platform callback configuration |
 | Gateway live probe appears stuck | Re-run with `--timeout 60s --json`; `timeout` means no event arrived, while `subscribe_failed` points to subscription, permission, or profile setup |
 | Gateway probe fails before sending | Set `PILOTFLOW_BOT_USER_ID` or pass `--bot-user-id`; the default probe needs a structured bot mention |
-| Gateway probe message sends but no event arrives | Check Open Platform event subscription for `im.message.receive_v1`, bot availability, app publication state, and long-connection/event settings |
+| Gateway probe message sends but no event arrives | Check Open Platform event subscription for `im.message.receive_v1`, bot availability, app publication state, long-connection mode, and whether another subscriber is consuming events |
 | Callback proof returns `subscribe_failed` | Inspect the sanitized stderr in `tmp/proof/callback-proof.jsonl`, then check event subscription permissions and profile auth |
 | Announcement update fails | Keep pinned entry fallback; do not claim native announcement success for this group |
 | Contact lookup cannot assign owner | Use explicit `PILOTFLOW_OWNER_OPEN_ID_MAP_JSON` or keep text owner fallback |
