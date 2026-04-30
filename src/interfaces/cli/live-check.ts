@@ -60,6 +60,14 @@ export async function buildLiveCheckReport(options: LiveCheckOptions = {}): Prom
     detail: targets.tasklistId ? `configured ${maskValue(targets.tasklistId)}` : "optional PILOTFLOW_TASKLIST_ID not set",
   });
 
+  checks.push({
+    name: "bot mention identity",
+    status: env.PILOTFLOW_BOT_USER_ID ? "pass" : "warn",
+    detail: env.PILOTFLOW_BOT_USER_ID
+      ? "PILOTFLOW_BOT_USER_ID is set for structured gateway probes"
+      : "missing PILOTFLOW_BOT_USER_ID; gateway IM probe will fail before sending unless --bot-user-id or --probe-text is passed",
+  });
+
   return {
     generatedAt: new Date().toISOString(),
     profile: runtime.profile,

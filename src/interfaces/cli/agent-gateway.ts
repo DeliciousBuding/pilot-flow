@@ -43,9 +43,11 @@ export interface AgentGatewayOptions {
 
 export interface AgentGatewayProbeResult {
   readonly status: "not_sent" | "sent" | "dry_run" | "failed";
+  readonly mentionMode?: "structured_mention" | "custom_text";
   readonly runId?: string;
   readonly messageId?: string;
   readonly error?: string;
+  readonly warning?: string;
 }
 
 export interface AgentGatewayResult {
@@ -147,15 +149,35 @@ export async function runAgentGateway(options: AgentGatewayOptions = {}): Promis
     const iterator = source.events()[Symbol.asyncIterator]();
     let nextEvent = nextWithTimeout(iterator, timeoutMs);
     if (parsed.flags["send-probe-message"] === true) {
+      const probeRunId = stringFlag(parsed.flags["probe-run-id"]) ?? buildProbeRunId(options.now);
+      const probeMessage = buildProbeMessage({
+        bot,
+        runId: probeRunId,
+        customText: stringFlag(parsed.flags["probe-text"]),
+      });
+      if (probeMessage.status === "failed") {
+        probe = {
+          status: "failed",
+          runId: probeRunId,
+          error: probeMessage.error,
+        };
+        await recorder.record({
+          type: "gateway.probe_message_failed",
+          runId: probeRunId,
+          error: probeMessage.error,
+        } as never);
+      } else {
       probe = await sendProbeMessage({
         chatId: stringFlag(parsed.flags["probe-chat-id"]) ?? runtime.feishuTargets.chatId,
         profile: runtime.profile,
         dryRun: runtime.mode === "dry-run",
-        text: stringFlag(parsed.flags["probe-text"]) ?? buildProbeMessageText(bot, stringFlag(parsed.flags["probe-run-id"])),
-        runId: stringFlag(parsed.flags["probe-run-id"]) ?? buildProbeRunId(options.now),
+          text: probeMessage.text,
+          mentionMode: probeMessage.mentionMode,
+          runId: probeRunId,
         command,
         recorder,
       });
+      }
     }
 
     while (true) {
@@ -340,6 +362,7 @@ export function renderAgentGateway(result: AgentGatewayResult): string {
     `unsupported_events: ${result.unsupportedEvents}`,
     `pending_runs: ${result.pendingRuns}`,
     `probe_status: ${result.probe.status}`,
+    result.probe.mentionMode ? `probe_mention_mode: ${result.probe.mentionMode}` : undefined,
     result.probe.runId ? `probe_run_id: ${result.probe.runId}` : undefined,
     result.probe.messageId ? `probe_message_id: ${result.probe.messageId}` : undefined,
     result.probe.error ? `probe_error: ${result.probe.error}` : undefined,
@@ -361,7 +384,7 @@ Options:
   --timeout <duration>              Stop after duration, for example 60s or 2m.
   --output <path>                   JSONL gateway run log path.
   --pending-store <path>            Local store for waiting confirmation runs.
-  --send-probe-message              Send a real IM probe message after the listener starts.
+  --send-probe-message              Send a real IM probe message after the listener starts; default text requires a real bot user_id.
   --probe-text <text>               Probe message body; defaults to a safe smoke request.
   --probe-run-id <id>               Stable id used in the probe message and idempotency key.
   --probe-chat-id <chat>            Probe chat; defaults to --chat-id or PILOTFLOW_TEST_CHAT_ID.
@@ -385,6 +408,7 @@ async function sendProbeMessage(options: {
   readonly profile?: string;
   readonly dryRun: boolean;
   readonly text: string;
+  readonly mentionMode: "structured_mention" | "custom_text";
   readonly runId: string;
   readonly command: typeof runCommand;
   readonly recorder: Recorder;
@@ -409,10 +433,12 @@ async function sendProbeMessage(options: {
       type: "gateway.probe_message_sent",
       runId: options.runId,
       dry_run: options.dryRun,
+      mention_mode: options.mentionMode,
       message_id: messageId,
     } as never);
     return {
       status: options.dryRun ? "dry_run" : "sent",
+      mentionMode: options.mentionMode,
       runId: options.runId,
       messageId,
     };
@@ -423,10 +449,26 @@ async function sendProbeMessage(options: {
   }
 }
 
-function buildProbeMessageText(bot: BotIdentity, runId?: string): string {
-  const currentRunId = runId ?? buildProbeRunId();
-  const mention = isPlaceholderBotUserId(bot.userId) ? `@${bot.name}` : `<at user_id="${bot.userId}">${bot.name}</at>`;
-  return `${mention} 目标: PilotFlow gateway IM probe ${currentRunId} 成员: 产品, 技术 交付物: 网关探针 截止时间: 2026-05-01 风险: 仅验证事件触发`;
+function buildProbeMessage(options: {
+  readonly bot: BotIdentity;
+  readonly runId: string;
+  readonly customText?: string;
+}): { readonly status: "ok"; readonly text: string; readonly mentionMode: "structured_mention" | "custom_text" } | { readonly status: "failed"; readonly error: string } {
+  if (options.customText) {
+    return { status: "ok", text: options.customText, mentionMode: "custom_text" };
+  }
+  if (isPlaceholderBotUserId(options.bot.userId)) {
+    return {
+      status: "failed",
+      error: "Default gateway probe requires --bot-user-id or PILOTFLOW_BOT_USER_ID so Feishu receives a structured bot mention; pass --probe-text to override.",
+    };
+  }
+  const mention = `<at user_id="${options.bot.userId}">${options.bot.name}</at>`;
+  return {
+    status: "ok",
+    text: `${mention} 目标: PilotFlow gateway IM probe ${options.runId} 成员: 产品, 技术 交付物: 网关探针 截止时间: 2026-05-01 风险: 仅验证事件触发`,
+    mentionMode: "structured_mention",
+  };
 }
 
 function buildProbeRunId(now?: () => number): string {

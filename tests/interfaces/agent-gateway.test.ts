@@ -243,6 +243,7 @@ test("runAgentGateway can send an IM probe message after starting the listener",
     });
 
     assert.equal(result.probe.status, "dry_run");
+    assert.equal(result.probe.mentionMode, "structured_mention");
     assert.equal(result.probe.messageId, "om_probe");
     assert.equal(calls.length, 1);
     assert.equal(calls[0]?.includes("--as"), true);
@@ -260,7 +261,7 @@ test("runAgentGateway loads probe chat id from local env when cwd is provided", 
   const calls: string[][] = [];
 
   try {
-    await writeFile(join(dir, ".env"), "PILOTFLOW_TEST_CHAT_ID=oc_from_env\nPILOTFLOW_LARK_PROFILE=pilotflow-test\n", "utf8");
+    await writeFile(join(dir, ".env"), "PILOTFLOW_TEST_CHAT_ID=oc_from_env\nPILOTFLOW_LARK_PROFILE=pilotflow-test\nPILOTFLOW_BOT_USER_ID=u_from_env\n", "utf8");
     const recorder = new MemoryRecorder();
     const registry = createGatewayRegistry();
     const result = await runAgentGateway({
@@ -282,8 +283,43 @@ test("runAgentGateway loads probe chat id from local env when cwd is provided", 
     });
 
     assert.equal(result.probe.status, "dry_run");
+    assert.equal(result.probe.mentionMode, "structured_mention");
     assert.equal(calls[0]?.includes("oc_from_env"), true);
     assert.equal(calls[0]?.includes("profile=pilotflow-test"), true);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("runAgentGateway fails the default IM probe when bot user id is missing", async () => {
+  const dir = join(process.cwd(), "tmp", "tests", `pilotflow-agent-gateway-missing-bot-${Date.now()}`);
+  await mkdir(dir, { recursive: true });
+  const calls: string[][] = [];
+
+  try {
+    const recorder = new MemoryRecorder();
+    const registry = createGatewayRegistry();
+    const result = await runAgentGateway({
+      argv: [
+        "--dry-run",
+        "--send-probe-message",
+        "--chat-id", "oc_probe",
+        "--pending-store", join(dir, "pending.json"),
+      ],
+      env: {},
+      source: eventSource([]),
+      registry,
+      recorder,
+      runCommand: async (bin, args) => {
+        calls.push([bin, ...args]);
+        return okResult([bin, ...args]);
+      },
+    });
+
+    assert.equal(result.probe.status, "failed");
+    assert.match(result.probe.error ?? "", /PILOTFLOW_BOT_USER_ID/u);
+    assert.equal(calls.length, 0);
+    assert.equal(recorder.ofType("gateway.probe_message_failed").length, 1);
   } finally {
     await rm(dir, { recursive: true, force: true });
   }

@@ -28,6 +28,7 @@ test("buildLiveCheckReport checks live targets with redacted details", async () 
   assert.equal(report.summary.failed, 0);
   assert.equal(checkStatus(report.checks, "chat readable"), "pass");
   assert.equal(checkStatus(report.checks, "base table readable"), "pass");
+  assert.equal(checkStatus(report.checks, "bot mention identity"), "warn");
 
   const rendered = renderLiveCheckReport(report);
   assert.match(rendered, /PilotFlow Live Check/u);
@@ -56,6 +57,7 @@ test("buildLiveCheckReport reports missing env without live API calls", async ()
   assert.equal(report.summary.warned > 0, true);
   assert.equal(checkStatus(report.checks, "chat readable"), "warn");
   assert.equal(checkStatus(report.checks, "base table readable"), "warn");
+  assert.equal(checkStatus(report.checks, "bot mention identity"), "warn");
   assert.equal(commandCount, 2);
 });
 
@@ -95,6 +97,20 @@ test("buildLiveCheckReport loads local .env targets", async () => {
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
+});
+
+test("buildLiveCheckReport reports configured bot mention identity without printing it", async () => {
+  const report = await buildLiveCheckReport({
+    env: {
+      PILOTFLOW_BOT_USER_ID: "u_secret_bot_123456",
+    },
+    runCommand: async (bin: string, args: readonly string[]) => okResult([bin, ...args]),
+  });
+
+  assert.equal(checkStatus(report.checks, "bot mention identity"), "pass");
+  const rendered = renderLiveCheckReport(report);
+  assert.match(rendered, /PILOTFLOW_BOT_USER_ID is set/u);
+  assert.doesNotMatch(rendered, /u_secret_bot_123456/u);
 });
 
 function okResult(command: readonly string[]): CommandResult {
