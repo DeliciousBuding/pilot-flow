@@ -4,6 +4,10 @@ const SENSITIVE_KEYS = new Set([
   "--user-id",
   "--content",
   "--text",
+  "--json",
+  "--data",
+  "--summary",
+  "--description",
   "--api-key",
   "--token",
   "--secret",
@@ -12,6 +16,10 @@ const SENSITIVE_KEYS = new Set([
 
 const SENSITIVE_BARE_KEYS = new Set([
   "content",
+  "markdown",
+  "json",
+  "data",
+  "summary",
   "text",
   "description",
   "baseToken",

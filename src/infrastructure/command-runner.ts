@@ -113,12 +113,20 @@ async function runProcess(
         new CommandFailedError(stderr.trim() || stdout.trim() || `Command exited with ${code}`, {
           command: options.command,
           exitCode: code,
-          stdout,
-          stderr,
+          stdout: redactProcessOutput(stdout),
+          stderr: redactProcessOutput(stderr),
         }),
       );
     });
   });
+}
+
+function redactProcessOutput(output: string): string {
+  return output
+    .slice(0, 2_000)
+    .replace(/Bearer\s+[A-Za-z0-9._~+/=-]+/g, "Bearer [REDACTED]")
+    .replace(/sk-[A-Za-z0-9_-]{8,}/g, "sk-[REDACTED]")
+    .replace(/(app_secret|client_secret|secret|token|api_key)["'=:\s]+[A-Za-z0-9._~+/=-]{8,}/gi, "$1=[REDACTED]");
 }
 
 export function parseJson(stdout: string): Record<string, unknown> | undefined {

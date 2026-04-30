@@ -6,13 +6,14 @@ export type RiskLevel = "low" | "medium" | "high" | "critical";
 
 export type RiskStatus = "open" | "mitigated" | "accepted" | "closed";
 
-export type ConfirmationStatus = "pending" | "approved" | "rejected" | "timeout";
+export type ConfirmationStatus = "pending" | "approved" | "rejected" | "expired";
 
 export interface PlanStep {
   readonly id: string;
   readonly title: string;
   readonly status: StepStatus;
   readonly tool?: string;
+  readonly depends_on?: readonly string[];
 }
 
 export interface PlanRisk {
@@ -22,6 +23,9 @@ export interface PlanRisk {
   readonly status: RiskStatus;
   readonly owner?: string;
   readonly recommendation?: string;
+  readonly source?: string;
+  readonly source_run?: string;
+  readonly decision_options?: readonly string[];
 }
 
 export interface PlanConfirmation {

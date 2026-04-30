@@ -5,6 +5,7 @@ export interface ToolContext {
   readonly runId: string;
   readonly sequence: number;
   readonly dryRun: boolean;
+  readonly confirmed?: boolean;
   readonly recorder: Recorder;
   readonly profile?: string;
   readonly targets?: Record<string, string | undefined>;
@@ -14,7 +15,7 @@ export interface ToolResult {
   readonly success: boolean;
   readonly artifact?: Artifact;
   readonly artifacts?: readonly Artifact[];
-  readonly output?: string;
+  readonly output?: unknown;
   readonly error?: string;
   readonly metadata?: Record<string, unknown>;
 }
