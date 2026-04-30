@@ -29,7 +29,7 @@ flowchart LR
 | Traceability | Implemented | JSONL run log, Flight Recorder, and review-pack generators are available |
 | Review packaging | Implemented | Machine evidence can be regenerated locally; manual videos and screenshots remain outside Git |
 | Product cleanup | Implemented for JS prototype | Runtime entrypoints, review tooling, command facade, and public demo docs are separated |
-| TypeScript kernel rebuild | In progress | Day 0 through Day 5 complete; TS gateway, LLM client, Agent loop, and dry-run smoke CLI are in place while JS CLI remains the live product path |
+| TypeScript kernel rebuild | In progress | Day 0 through Day 6 complete; TS gateway, LLM client, Agent loop, dry-run smoke CLI, and live-guarded project-init bridge are in place while JS CLI remains the stable live product path |
 
 ## Phase 0: Foundation
 
@@ -93,9 +93,9 @@ Exit condition: product runtime, review packaging, and documentation are visibly
 - [x] Day 3: split the orchestrator into confirmation gate, tool sequence, duplicate guard, cards, project state, entry, summary, and resolver modules.
 - [x] Day 4: add Feishu gateway, session queue, Agent loop, and mock-tested LLM provider.
 - [x] Day 5: bridge TS gateway/agent into CLI dry-run smoke paths and keep live migration guarded.
-- [ ] Day 6: bridge TS runtime into a live-guarded project-init path, then remove old JS runtime only after the TS path passes.
+- [x] Day 6: bridge TS runtime into a live-guarded project-init path; old JS runtime removal remains gated by real live validation.
 
-Exit condition: TypeScript path can run the same dry-run and live-guarded project launch loop as the current JS prototype.
+Exit condition: TypeScript path can run the same dry-run and live-guarded project launch loop as the current JS prototype, then pass real Feishu live validation before old runtime removal.
 
 ## Phase 4: Strong MVP Enhancements
 
@@ -121,8 +121,8 @@ Exit condition: PilotFlow feels useful beyond the first project-launch flow whil
 
 ## Immediate Next Actions
 
-1. Implement TypeScript rebuild Day 6: live-guarded TS project-init bridge with the same confirmation, preflight, duplicate guard, and artifact reporting semantics as the JS path.
-2. Keep the current JS prototype runnable until TS live-guarded flows pass the same checks.
+1. Validate `npm run pilot:project-init-ts` against a real Feishu live target after confirming Base/chat/task configuration.
+2. Keep the current JS prototype runnable until TS live-guarded flows pass the same dry-run, live, evidence, and callback checks.
 3. Capture happy-path and failure-path media outside Git.
 4. Verify Open Platform card callback delivery or keep it explicitly marked as pending.
 5. Run `pilot:doctor`, `pilot:check`, tests, review package generation, status, and safety audit before any public handoff.

@@ -36,6 +36,7 @@ lark-cli auth status --verify
 | Check local environment | `npm run pilot:doctor` |
 | Run manual dry-run demo | `npm run pilot:demo` |
 | Run TS gateway/Agent smoke path | `npm run pilot:agent-smoke` |
+| Run TS project-init bridge | `npm run pilot:project-init-ts` |
 | Render Flight Recorder | `npm run pilot:recorder -- --input <run.jsonl> --output <html>` |
 | Rebuild review package | `npm run pilot:package` |
 | Rebuild delivery status | `npm run pilot:status` |
@@ -120,6 +121,18 @@ npm run pilot:agent-smoke -- --input "@PilotFlow 建立答辩项目空间"
 npm run pilot:agent-smoke -- --json
 ```
 
+## TypeScript Project Init Bridge
+
+The TypeScript project-init bridge runs the deterministic project planner through the split TS orchestrator, `ToolRegistry`, Feishu tool definitions, duplicate guard, and JSONL recorder. It is the migration path toward the future TS runtime, but `pilot:demo` remains the stable live demo path until TS live validation is complete.
+
+```bash
+npm run pilot:project-init-ts
+npm run pilot:project-init-ts -- --dry-run --send-entry-message --send-risk-card
+npm run pilot:project-init-ts -- --live --confirm "确认起飞" --send-entry-message --send-risk-card
+```
+
+Live mode is guarded: without `--confirm "确认起飞"` it waits before tool calls; with confirmation but missing live targets it fails preflight before Feishu writes.
+
 ## Runtime Variables
 
 | Variable | Meaning |
@@ -184,7 +197,7 @@ Generated reports and run logs stay under ignored `tmp/`.
 
 ## TypeScript Kernel Rebuild Status
 
-The TypeScript rebuild is active but not yet the live CLI path. Day 0 through Day 5 are complete: strict TS foundation, domain modules, ToolRegistry, tool idempotency, 9 Feishu tool definitions, split TS orchestrator, OpenAI-compatible LLM client, retry/error classifier, Agent loop, session manager, Feishu gateway boundary, and a dry-run CLI smoke bridge are implemented and covered by TS tests. Operators should still use the JS-backed `pilot:demo` command for live Feishu demos until the TS live path passes the same checks.
+The TypeScript rebuild is active but not yet the default live CLI path. Day 0 through Day 6 are complete: strict TS foundation, domain modules, ToolRegistry, tool idempotency, 9 Feishu tool definitions, split TS orchestrator, OpenAI-compatible LLM client, retry/error classifier, Agent loop, session manager, Feishu gateway boundary, dry-run CLI smoke bridge, and live-guarded project-init bridge are implemented and covered by TS tests. Operators should still use the JS-backed `pilot:demo` command for official live Feishu demos until the TS live path passes the same real target checks.
 
 ## Known Platform Edges
 

@@ -235,7 +235,7 @@ PilotFlow is currently in **MVP prototype** stage. The first deliverable is a re
 | Card callback listener bridge | ✅ local tests passed |
 | Live card callback confirmation | 🟡 listener connected, no real callback event received yet |
 | Group announcement project entry | ✅ attempted; current group returns docx announcement API block and falls back to pinned entry |
-| TypeScript Agent kernel | ✅ Day 5 dry-run smoke path |
+| TypeScript Agent kernel | ✅ Day 6 live-guarded project-init bridge |
 
 ## 🗺️ Roadmap Snapshot
 
@@ -255,6 +255,7 @@ gantt
     section Agent Kernel
     TypeScript gateway and Agent loop    :done,    k1, 2026-04-30, 1d
     CLI dry-run smoke bridge             :done,    k2, 2026-04-30, 1d
+    TS project-init guarded bridge        :done,    k3, 2026-04-30, 1d
     section Demo
     Risk detection and decision card     :done,    c1, 2026-04-28, 1d
     Card callback action protocol        :done,    c2, 2026-04-28, 1d
@@ -291,6 +292,7 @@ npm run pilot:check
 npm test
 npm run pilot:demo
 npm run pilot:agent-smoke
+npm run pilot:project-init-ts
 npm run pilot:demo -- --send-plan-card --no-auto-confirm
 npm run pilot:demo -- --pin-entry-message --send-risk-card
 npm run pilot:recorder -- --input tmp/runs/latest-manual-run.jsonl --output tmp/flight-recorder/latest.html
