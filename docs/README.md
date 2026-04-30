@@ -12,12 +12,15 @@ This directory contains the public documentation set for PilotFlow. It should re
 | Designer or demo owner | `VISUAL_DESIGN.md` -> `demo/README.md` -> `demo/CAPTURE_GUIDE.md` |
 | Future agent session | workspace `AGENTS.md` -> `PERSONAL_PROGRESS.md` -> repo README -> this index |
 
+If product status is unclear, read `PRODUCT_REALITY_CHECK.md` first. It is the authority for what is actually usable, what is only validated by prototype paths, and what must not be claimed yet.
+
 ## Product And Engineering Docs
 
 | File | Purpose | Update when |
 | --- | --- | --- |
 | `PROJECT_BRIEF.md` | Short product narrative, competition brief, and MVP scope | Positioning or scope changes |
 | `PRODUCT_SPEC.md` | User promise, target users, maturity model, trust model, MVP boundary | Product decisions change |
+| `PRODUCT_REALITY_CHECK.md` | Hard maturity check: what works, what is pending, what not to claim | Any status, live proof, or product claim changes |
 | `ARCHITECTURE.md` | Core components, state, tool routing | Runtime or module design changes |
 | `PROJECT_STRUCTURE.md` | Runtime layers, command surface, and placement rules | Files move or command boundaries change |
 | `OPERATOR_RUNBOOK.md` | Local operation, live run, review-pack generation, troubleshooting | Commands, profiles, run targets, or fallback behavior change |

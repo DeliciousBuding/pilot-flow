@@ -45,8 +45,8 @@ PilotFlow should be described by its maturity level, not as a finished enterpris
 | Level | Meaning | Current state |
 | --- | --- | --- |
 | Concept | Product positioning and target workflow are defined | complete |
-| Validated prototype | Real Feishu APIs can create visible artifacts | current |
-| Demo-ready MVP | Main path is stable enough for evaluation with captured proof | in progress |
+| Validated prototype | Real Feishu APIs can create visible artifacts | current for the older JS live path |
+| Demo-ready MVP | Main path is stable enough for evaluation with captured proof | in progress; TS `pilot:run` live proof and capture evidence pending |
 | Team pilot | Real group trigger, callback confirmation, and repeated team use | planned |
 | Productized service | Deployment, tenancy, audit, permissions, and support model | later |
 
@@ -54,13 +54,15 @@ PilotFlow should be described by its maturity level, not as a finished enterpris
 
 | Surface | User-facing role | Current boundary |
 | --- | --- | --- |
-| Feishu IM | Main entry point and final summary channel | validated through manual/live runs; automatic group trigger is later |
+| Feishu IM | Main entry point and final summary channel | live send validated; automatic group trigger is not product-ready |
 | Message Cards | Execution plan confirmation and risk decisions | live send and local action protocol ready; real callback delivery pending |
 | Feishu Docs | Project brief and delivery document | live creation validated |
 | Feishu Base | Project state, risk rows, artifacts, source links | live rich table validated |
 | Feishu Task | Concrete first action item with optional assignee mapping | live creation validated; owner lookup remains guarded |
 | Pinned entry / announcement | Stable project entrance | pinned entry live validated; native announcement can fall back when API blocks docx announcements |
 | Flight Recorder | Trace viewer for explainability and review | static local prototype |
+
+See [`PRODUCT_REALITY_CHECK.md`](PRODUCT_REALITY_CHECK.md) for the current claim boundary.
 
 ## Trust Model
 

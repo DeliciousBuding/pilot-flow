@@ -1,6 +1,6 @@
 # Agent Evolution
 
-PilotFlow has already borrowed the first layer of Hermes-style engineering: typed runtime boundaries, a tool registry, Feishu gateway parsing, session queues, retry/error classification, hermetic tests, and run traces. The next layer is not "more agents everywhere"; it is a controlled evolution loop that lets PilotFlow learn from each project run and coordinate specialist workers when the work is too broad for one deterministic flow.
+PilotFlow has borrowed useful Hermes-style engineering patterns: typed runtime boundaries, a tool registry, Feishu gateway parsing, session queues, retry/error classification, hermetic tests, and run traces. This is not the same as being a mature Hermes-like autonomous system. The next layer must be a controlled evolution loop that lets PilotFlow learn from each project run and coordinate specialist workers only after the main Feishu loop is reliable.
 
 ## Product Stance
 
@@ -12,6 +12,8 @@ PilotFlow should feel like a Feishu-native project operations officer, not a gen
 | Is PilotFlow a multi-agent system? | Eventually, yes, but only behind a manager-worker boundary where the Pilot remains accountable. |
 | Does every workflow need an LLM? | No. Deterministic project-init remains a reliable path; LLM planning and workers are opt-in routes through the same tool registry. |
 | What makes it "evolve"? | Run traces, evaluations, failure records, and human feedback are converted into improvement proposals, test cases, prompt updates, and workflow templates. |
+
+Current boundary: Retrospective Pack, Retrospective Eval, and the preview-only Review Worker are the first pieces of this loop. They do not make PilotFlow self-modifying, autonomous, or production multi-agent. Those claims remain future work.
 
 ## Hermes Ideas We Have Actually Adopted
 
