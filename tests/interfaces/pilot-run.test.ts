@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import test from "node:test";
@@ -85,6 +85,24 @@ test("runPilotRun forces dry-run unless live mode is explicit", async () => {
     const result = await runPilotRun({
       argv: ["--input", "目标: 建立答辩项目空间", "--output", output],
       env: { PILOTFLOW_FEISHU_MODE: "live" },
+    });
+
+    assert.equal(result.mode, "dry-run");
+    assert.equal(result.status, "completed");
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("runPilotRun loads local .env without overriding explicit dry-run default", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "pilotflow-pilot-run-local-env-"));
+  try {
+    const output = join(dir, "run.jsonl");
+    await writeFile(join(dir, ".env"), "PILOTFLOW_FEISHU_MODE=live\nPILOTFLOW_LARK_PROFILE=from-file\n", "utf8");
+    const result = await runPilotRun({
+      argv: ["--input", "目标: 建立答辩项目空间", "--output", output],
+      env: {},
+      cwd: dir,
     });
 
     assert.equal(result.mode, "dry-run");

@@ -1,11 +1,13 @@
 import { pathToFileURL } from "node:url";
 import { runCommand, type CommandResult, type RunOptions } from "../../infrastructure/command-runner.js";
 import { loadRuntimeConfig } from "../../config/runtime-config.js";
+import { loadLocalEnv } from "../../config/local-env.js";
 import { parseArgs } from "../../shared/parse-args.js";
 
 export interface LiveCheckOptions {
   readonly argv?: readonly string[];
   readonly env?: NodeJS.ProcessEnv;
+  readonly cwd?: string;
   readonly runCommand?: CommandRunner;
 }
 
@@ -30,7 +32,7 @@ export interface LiveCheckReport {
 
 export async function buildLiveCheckReport(options: LiveCheckOptions = {}): Promise<LiveCheckReport> {
   const argv = options.argv ?? [];
-  const env = feishuOnlyEnv(options.env ?? process.env);
+  const env = feishuOnlyEnv(loadCommandEnv(options.env, options.cwd));
   const command = options.runCommand ?? runCommand;
   const runtime = loadRuntimeConfig(["--live", ...argv], env);
   const targets = runtime.feishuTargets;
@@ -38,7 +40,7 @@ export async function buildLiveCheckReport(options: LiveCheckOptions = {}): Prom
 
   const checks: LiveCheckItem[] = [];
   checks.push(await commandCheck("lark-cli", "lark-cli version", ["--version"], command, { timeoutMs: 10_000 }));
-  checks.push(await commandCheck("lark-cli", "lark auth", ["auth", "status", "--verify", "--format", "json"], command, commandOptions));
+  checks.push(await commandCheck("lark-cli", "lark auth", ["auth", "status", "--verify"], command, commandOptions));
 
   if (targets.chatId) {
     checks.push(await commandCheck("lark-cli", "chat readable", ["api", "GET", `/open-apis/im/v1/chats/${targets.chatId}`, "--as", "bot"], command, commandOptions));
@@ -47,7 +49,7 @@ export async function buildLiveCheckReport(options: LiveCheckOptions = {}): Prom
   }
 
   if (targets.baseToken && targets.baseTableId) {
-    checks.push(await commandCheck("lark-cli", "base table readable", ["api", "GET", `/open-apis/bitable/v1/apps/${targets.baseToken}/tables/${targets.baseTableId}`, "--as", "user"], command, commandOptions));
+    checks.push(await commandCheck("lark-cli", "base table readable", ["base", "+table-get", "--base-token", targets.baseToken, "--table-id", targets.baseTableId, "--as", "user"], command, commandOptions));
   } else {
     checks.push({ name: "base table readable", status: "warn", detail: "missing PILOTFLOW_BASE_TOKEN or PILOTFLOW_BASE_TABLE_ID" });
   }
@@ -76,6 +78,11 @@ function feishuOnlyEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
     if (key.startsWith("PILOTFLOW_LLM_")) delete next[key];
   }
   return next;
+}
+
+function loadCommandEnv(env: NodeJS.ProcessEnv | undefined, cwd: string | undefined): NodeJS.ProcessEnv {
+  if (cwd || env === undefined) return loadLocalEnv({ cwd, env: env ?? process.env });
+  return env;
 }
 
 export function renderLiveCheckReport(report: LiveCheckReport): string {

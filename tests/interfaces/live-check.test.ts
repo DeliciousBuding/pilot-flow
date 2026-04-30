@@ -1,12 +1,16 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 import { buildLiveCheckReport, renderLiveCheckReport } from "../../src/interfaces/cli/live-check.js";
 import type { CommandResult } from "../../src/infrastructure/command-runner.js";
 
 type TestCheck = { readonly name: string; readonly status: string };
 
 test("buildLiveCheckReport checks live targets with redacted details", async () => {
-  const calls: readonly string[][] = [];
+  const calls: string[][] = [];
+  const profiles: string[] = [];
   const report = await buildLiveCheckReport({
     argv: ["--profile", "pilotflow-contest"],
     env: {
@@ -15,7 +19,8 @@ test("buildLiveCheckReport checks live targets with redacted details", async () 
       PILOTFLOW_BASE_TABLE_ID: "tbl_secret_table_123456",
     },
     runCommand: async (bin: string, args: readonly string[], options: { readonly profile?: string }) => {
-      (calls as string[][]).push([bin, ...args, options.profile ?? ""]);
+      calls.push([bin, ...args]);
+      if (options.profile) profiles.push(options.profile);
       return okResult([bin, ...args]);
     },
   });
@@ -32,7 +37,9 @@ test("buildLiveCheckReport checks live targets with redacted details", async () 
   assert.doesNotMatch(rendered, /tbl_secret_table_123456/u);
   assert.doesNotMatch(rendered, /Bearer|sk-/iu);
   assert.equal(calls.some((call) => call.includes("/open-apis/im/v1/chats/oc_secret_chat_123456")), true);
-  assert.equal(calls.some((call) => call.includes("/open-apis/bitable/v1/apps/bascn_secret_base_123456/tables/tbl_secret_table_123456")), true);
+  assert.equal(calls.some((call) => call.join(" ") === "lark-cli base +table-get --base-token bascn_secret_base_123456 --table-id tbl_secret_table_123456 --as user"), true);
+  assert.equal(calls.some((call) => call.includes("--format")), false);
+  assert.equal(profiles.includes("pilotflow-contest"), true);
 });
 
 test("buildLiveCheckReport reports missing env without live API calls", async () => {
@@ -59,6 +66,35 @@ test("buildLiveCheckReport ignores partial LLM env because it only checks Feishu
   });
 
   assert.equal(report.summary.failed, 0);
+});
+
+test("buildLiveCheckReport loads local .env targets", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "pilotflow-live-check-env-"));
+  const calls: string[][] = [];
+  try {
+    await writeFile(join(dir, ".env"), [
+      "PILOTFLOW_TEST_CHAT_ID=oc_from_env_file",
+      "PILOTFLOW_BASE_TOKEN=bascn_from_env_file",
+      "PILOTFLOW_BASE_TABLE_ID=tbl_from_env_file",
+    ].join("\n"), "utf8");
+
+    const report = await buildLiveCheckReport({
+      cwd: dir,
+      env: {},
+      runCommand: async (bin: string, args: readonly string[]) => {
+        calls.push([bin, ...args]);
+        return okResult([bin, ...args]);
+      },
+    });
+
+    assert.equal(report.summary.failed, 0);
+    assert.equal(checkStatus(report.checks, "chat readable"), "pass");
+    assert.equal(checkStatus(report.checks, "base table readable"), "pass");
+    assert.equal(calls.some((call) => call.includes("/open-apis/im/v1/chats/oc_from_env_file")), true);
+    assert.equal(calls.some((call) => call.join(" ") === "lark-cli base +table-get --base-token bascn_from_env_file --table-id tbl_from_env_file --as user"), true);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
 });
 
 function okResult(command: readonly string[]): CommandResult {

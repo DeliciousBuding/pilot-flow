@@ -66,6 +66,7 @@ npm run pilot:doctor -- --verify-auth
 ```
 
 Use `pilot:live-check` before a real write run. It performs read-only checks for `lark-cli`, profile auth, chat visibility, and Base table visibility. It ignores `PILOTFLOW_LLM_*` because this command only validates Feishu live targets.
+When run from the repository root, `pilot:live-check` loads local `.env` values for target IDs but redacts them from the report.
 
 ```bash
 npm run pilot:live-check
@@ -87,7 +88,8 @@ Expected result:
 - status `completed`
 - execution-plan card, project entry, pinned entry, and risk card enabled by default
 - JSONL run log at `tmp/runs/latest-manual-run.jsonl` unless `--output` is supplied
-- live mode is never inferred from the environment for this product entry; pass `--live` explicitly
+- local `.env` is loaded for target/profile values
+- live mode is never inferred from `.env` for this product entry; pass `--live` explicitly
 
 Preview Feishu target setup:
 

@@ -107,6 +107,7 @@ Implemented runtime capabilities:
 - TypeScript `ToolRegistry` in `src/tools/registry.ts` with LLM-safe tool names, JSON-string argument parsing, live preflight, live confirmation enforcement, recorder redaction, and self-registering Feishu tools
 - tool-step recording and optional fallback in `src/runtime/tool-step-runner.js`
 - product-facing `pilot:run` facade in `src/interfaces/cli/pilot-run.ts`, which wraps the TS project-init path and enables plan card, entry message, pinned entry, and risk card by default
+- local `.env` loading for CLI entry points that need Feishu target/profile values, without overriding explicit env passed by tests or callers
 - retrospective eval runner in `src/review-packs/retrospective-eval.js`
 - preview-only Review Worker contract in `src/agent/review-worker.ts`
 

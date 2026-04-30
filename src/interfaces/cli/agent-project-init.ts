@@ -9,6 +9,7 @@ import { parseArgs } from "../../shared/parse-args.js";
 import { registerFeishuTools } from "../../tools/feishu/index.js";
 import { ToolRegistry } from "../../tools/registry.js";
 import { loadRuntimeConfig } from "../../config/runtime-config.js";
+import { loadLocalEnv } from "../../config/local-env.js";
 import type { Artifact } from "../../types/artifact.js";
 import type { RuntimeConfig } from "../../types/config.js";
 import { isAcceptedConfirmationText } from "../../orchestrator/confirmation-text.js";
@@ -24,6 +25,7 @@ const DEFAULT_INPUT = [
 export interface AgentProjectInitOptions {
   readonly argv?: readonly string[];
   readonly env?: NodeJS.ProcessEnv;
+  readonly cwd?: string;
 }
 
 export interface AgentProjectInitResult {
@@ -71,7 +73,7 @@ export async function runAgentProjectInit(options: AgentProjectInitOptions = {})
       "mode",
     ],
   });
-  const runtime = loadRuntimeConfig(argv, deterministicRuntimeEnv(options.env ?? process.env));
+  const runtime = loadRuntimeConfig(argv, deterministicRuntimeEnv(loadCommandEnv(options.env, options.cwd)));
   const input = await resolveInput(parsed.flags);
   const output = stringFlag(parsed.flags.output) ?? defaultOutputPath();
   const registry = new ToolRegistry();
@@ -207,6 +209,11 @@ function deterministicRuntimeEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
     if (key.startsWith("PILOTFLOW_LLM_")) delete next[key];
   }
   return next;
+}
+
+function loadCommandEnv(env: NodeJS.ProcessEnv | undefined, cwd: string | undefined): NodeJS.ProcessEnv {
+  if (cwd || env === undefined) return loadLocalEnv({ cwd, env: env ?? process.env });
+  return env;
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1]).href) {
