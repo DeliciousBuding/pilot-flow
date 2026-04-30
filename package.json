@@ -40,6 +40,7 @@
     "review:submission": "node src/review-packs/demo-submission-pack.js",
     "review:delivery-index": "node src/review-packs/demo-delivery-index-pack.js",
     "review:safety-audit": "node src/review-packs/demo-safety-audit-pack.js",
+    "review:retrospective": "node src/review-packs/run-retrospective-pack.js",
     "test:one": "node scripts/run-tests.js"
   },
   "engines": {

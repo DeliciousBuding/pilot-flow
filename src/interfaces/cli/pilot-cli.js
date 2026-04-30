@@ -57,6 +57,10 @@ const COMMANDS = {
         args: ["--", "--output", "tmp/demo-submission/SUBMISSION_PACK.md"]
       },
       {
+        script: "review:retrospective",
+        args: ["--", "--output", "tmp/run-retrospective/RUN_RETROSPECTIVE.md"]
+      },
+      {
         script: "review:delivery-index",
         args: ["--", "--output", "tmp/demo-delivery/DELIVERY_INDEX.md"]
       }

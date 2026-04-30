@@ -15,7 +15,7 @@ PilotFlow keeps product runtime, CLI interfaces, and generated review tooling in
 | Feishu gateway | `src/gateway/feishu/` | Feishu event normalization, mention filtering, event dedupe, per-chat queue, message/card handlers | tool implementation, planner policy, generated review reports |
 | Runtime config and schemas | `src/config/`, `src/schemas/` | environment parsing, runtime options, JSON schemas | Feishu side effects |
 | CLI interfaces | `src/interfaces/cli/` | manual trigger, listener wrapper, recorder view, setup, command facade, doctor | generated review pack logic |
-| Review packs | `src/review-packs/` | readiness, submission, delivery, callback, permission, safety, and other generated Markdown materials | core product flow |
+| Review packs | `src/review-packs/` | readiness, submission, delivery, callback, permission, safety, retrospective, and other generated Markdown materials | core product flow |
 | Dev automation | `scripts/` | repo checks and grouped local test runners | product runtime behavior |
 | Public docs | `docs/` | product, architecture, operator runbook, development, roadmap, demo guidance | private official document cache, raw secrets, raw logs |
 | Local generated output | `tmp/` | run logs, generated reports, recorder HTML, local capture manifests | committed source |

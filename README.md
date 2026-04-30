@@ -315,7 +315,7 @@ npm run pilot:status
 npm run pilot:audit
 ```
 
-The current local demo reads a project-init fixture, writes a traceable run log, and returns planned artifacts. Live Feishu execution is available behind an explicit confirmation gate. Operational setup lives in [docs/OPERATOR_RUNBOOK.md](docs/OPERATOR_RUNBOOK.md); contributor workflow lives in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md). Generated review packs are auxiliary material and are kept out of the product runtime surface.
+The current local demo reads a project-init fixture, writes a traceable run log, and returns planned artifacts. Live Feishu execution is available behind an explicit confirmation gate. Operational setup lives in [docs/OPERATOR_RUNBOOK.md](docs/OPERATOR_RUNBOOK.md); contributor workflow lives in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md). Generated review packs, including the Run Retrospective Pack, are auxiliary material and are kept out of the product runtime surface.
 
 ## 🛡️ Trust Model
 
@@ -324,7 +324,7 @@ The current local demo reads a project-init fixture, writes a traceable run log,
 | Can the agent write to Feishu without approval? | No. The live write path requires explicit confirmation. |
 | Can a failed tool call look successful? | It should not. Tool errors are recorded and surfaced as run events and fallback artifacts. |
 | Can the same demo accidentally create duplicate artifacts? | Live runs are guarded by a duplicate-run key unless the operator explicitly bypasses it. |
-| Can reviewers inspect what happened? | Yes. Run logs, generated review packs, Flight Recorder, and final summaries expose the execution path. |
+| Can reviewers inspect what happened? | Yes. Run logs, generated review packs, Flight Recorder, retrospective reports, and final summaries expose the execution path. |
 | Is the current prototype production-ready? | No. It is a validated MVP prototype with known pending work around real card callback delivery and manual capture evidence. |
 
 ## 🔐 Safety Principles

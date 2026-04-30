@@ -36,7 +36,8 @@ const TEST_GROUPS = {
     "src/review-packs/demo-judge-pack.test.js",
     "src/review-packs/demo-submission-pack.test.js",
     "src/review-packs/demo-delivery-index-pack.test.js",
-    "src/review-packs/demo-safety-audit-pack.test.js"
+    "src/review-packs/demo-safety-audit-pack.test.js",
+    "src/review-packs/run-retrospective-pack.test.js"
   ]
 };
 
@@ -62,6 +63,7 @@ const TEST_ALIASES = {
   submission: "src/review-packs/demo-submission-pack.test.js",
   "delivery-index": "src/review-packs/demo-delivery-index-pack.test.js",
   "safety-audit": "src/review-packs/demo-safety-audit-pack.test.js",
+  retrospective: "src/review-packs/run-retrospective-pack.test.js",
   risk: ["src/core/orchestrator/risk-detector.test.js", "src/core/orchestrator/risk-decision-card.test.js"],
   state: "src/core/orchestrator/project-state-builder.test.js",
   summary: "src/core/orchestrator/summary-builder.test.js",

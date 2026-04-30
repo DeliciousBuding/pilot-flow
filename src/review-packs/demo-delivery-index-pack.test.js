@@ -23,6 +23,7 @@ try {
     failure: await writeTemp("tmp/demo-failure/FAILURE_DEMO.md", "DUPLICATE_RUN_BLOCKED"),
     evidence: await writeTemp("tmp/demo-evidence/DEMO_EVIDENCE.md", "Evidence Checklist"),
     evaluation: await writeTemp("tmp/demo-eval/DEMO_EVAL.md", "232097"),
+    retrospective: await writeTemp("tmp/run-retrospective/RUN_RETROSPECTIVE.md", "PilotFlow Run Retrospective Pack"),
     flightRecorder: await writeTemp("tmp/flight-recorder/latest.html", "PilotFlow Flight Recorder"),
     runLog: await writeTemp("tmp/runs/latest.jsonl", "run.completed")
   };
@@ -44,6 +45,7 @@ try {
   assert.match(markdown, /PilotFlow Demo Delivery Index/);
   assert.match(markdown, /Recommended Opening Order/);
   assert.match(markdown, /Demo Submission Pack/);
+  assert.match(markdown, /Run Retrospective Pack/);
   assert.match(markdown, /ready_for_manual_capture/);
 
   const readySources = {

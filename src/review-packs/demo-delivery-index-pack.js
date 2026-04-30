@@ -140,6 +140,15 @@ const DEFAULT_SOURCES = [
     purpose: "Local risk and fallback evaluation cases."
   },
   {
+    key: "retrospective",
+    group: "machine_evidence",
+    label: "Run Retrospective Pack",
+    path: "tmp/run-retrospective/RUN_RETROSPECTIVE.md",
+    anchor: "PilotFlow Run Retrospective Pack",
+    required: true,
+    purpose: "Run-level quality signals, improvement proposals, and evaluation seeds."
+  },
+  {
     key: "flightRecorder",
     group: "machine_evidence",
     label: "Flight Recorder HTML",
@@ -168,6 +177,7 @@ const OPENING_ORDER = [
   "Permission Appendix Pack",
   "Callback Verification Pack",
   "Flight Recorder HTML",
+  "Run Retrospective Pack",
   "Failure-Path Demo Pack"
 ];
 
@@ -341,6 +351,7 @@ function buildRecommendedCommands() {
     "npm run review:readiness -- --output tmp/demo-readiness/DEMO_READINESS.md",
     "npm run review:judge -- --output tmp/demo-judge/JUDGE_REVIEW.md",
     "npm run review:submission -- --output tmp/demo-submission/SUBMISSION_PACK.md",
+    "npm run review:retrospective -- --output tmp/run-retrospective/RUN_RETROSPECTIVE.md",
     "npm run review:delivery-index -- --output tmp/demo-delivery/DELIVERY_INDEX.md"
   ];
 }
@@ -429,6 +440,7 @@ Options:
   --failure <path>            Failure-Path Demo Pack path.
   --evidence <path>           Demo Evidence Pack path.
   --evaluation <path>         Demo Evaluation Pack path.
+  --retrospective <path>      Run Retrospective Pack path.
   --flight-recorder <path>    Flight Recorder HTML path.
   --run-log <path>            Live JSONL run log path.
   --output <path>             Delivery index markdown output path.

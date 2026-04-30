@@ -24,6 +24,7 @@ PilotFlow should feel like a Feishu-native project operations officer, not a gen
 | Session manager | Bounded per-chat state with TTL and history cap | Implemented under `src/agent/session-manager.ts` |
 | Hermetic tests | Mock LLM, dry-run tools, deterministic event fixtures | Implemented in TS test suite |
 | Trace-first operation | JSONL run log, Flight Recorder, generated review packs | Implemented in JS/TS paths |
+| Retrospective pack | Turn a run trace into quality signals, improvement proposals, and eval seeds | Implemented in `src/review-packs/run-retrospective-pack.js` |
 
 ## Hermes Ideas To Adopt Next
 
@@ -58,6 +59,7 @@ flowchart LR
 | Project memory | Future Base table or local ignored store | Remember stable team preferences |
 | Workflow template | Docs/Base row or versioned JSON | Reuse successful project patterns |
 | Improvement proposal | Feishu Doc/Card and Git issue/PR later | Keep changes reviewable |
+| Run retrospective | `tmp/run-retrospective/RUN_RETROSPECTIVE.md` | Summarize run quality signals and candidate eval cases |
 
 ### Guardrails
 
@@ -131,9 +133,10 @@ Workers do not own Feishu writes. They return preview artifacts and proposed act
 ### Stage A: Evolution Records
 
 - [ ] Add a structured `run.review` event shape to Flight Recorder.
-- [ ] Add a generated "Run Retrospective Pack" from JSONL logs.
+- [x] Add a generated "Run Retrospective Pack" from JSONL logs.
 - [ ] Turn failure cases into stable eval fixtures.
-- [ ] Add quality signals: missing owner, missing due date, failed optional tool, callback pending, duplicate blocked, manual fallback used.
+- [x] Add first quality signals: missing owner, missing due date, failed optional tool, and optional fallback used.
+- [ ] Extend quality signals for callback pending, duplicate blocked, and manual fallback used.
 
 ### Stage B: Memory And Compression
 

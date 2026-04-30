@@ -54,6 +54,8 @@ Generated review reports are created under ignored `tmp/` and are not tracked as
 | Check submission status | `npm run pilot:status` |
 | Scan before sharing | `npm run pilot:audit` |
 
+`pilot:package` includes the Run Retrospective Pack under ignored `tmp/run-retrospective/`, which turns a run log into quality signals, improvement proposals, and evaluation seeds for human review. The pack defaults to `tmp/runs/latest-live-run.jsonl` when present, otherwise `tmp/runs/latest-manual-run.jsonl`.
+
 ## Planned Folders
 
 ```text

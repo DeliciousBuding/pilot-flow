@@ -30,7 +30,7 @@ flowchart LR
 | Review packaging | Implemented | Machine evidence can be regenerated locally; manual videos and screenshots remain outside Git |
 | Product cleanup | Implemented for JS prototype | Runtime entrypoints, review tooling, command facade, and public demo docs are separated |
 | TypeScript kernel rebuild | In progress | Day 0 through Day 6 complete; TS gateway, LLM client, Agent loop, dry-run smoke CLI, and live-guarded project-init bridge are in place while JS CLI remains the stable live product path |
-| Hermes-style evolution | Planned | Runtime primitives exist; self-evolution, memory, context compression, and worker orchestration are planned behind human approval |
+| Hermes-style evolution | First review artifact implemented | Run Retrospective Pack turns traces into quality signals, improvement proposals, and eval seeds; memory, context compression, and worker orchestration remain behind human approval |
 
 ## Phase 0: Foundation
 
@@ -102,7 +102,7 @@ Exit condition: TypeScript path can run the same dry-run and live-guarded projec
 
 - [ ] Mobile-friendly confirmation once callback delivery is verified.
 - [ ] Desktop or Chat Tab cockpit for run status, artifacts, risks, and retry decisions.
-- [ ] Run Retrospective Pack generated from Flight Recorder traces.
+- [x] Run Retrospective Pack generated from Flight Recorder traces.
 - [ ] Convert failure paths into stable eval fixtures.
 - [ ] Add project memory schema for team preferences, recurring owners, project templates, and platform limits.
 - [ ] Add bounded context compression for old tool outputs and long group sessions.
@@ -131,7 +131,7 @@ Exit condition: PilotFlow feels useful beyond the first project-launch flow whil
 
 1. Validate `npm run pilot:project-init-ts` against a real Feishu live target after confirming Base/chat/task configuration.
 2. Keep the current JS prototype runnable until TS live-guarded flows pass the same dry-run, live, evidence, and callback checks.
-3. Generate the first Run Retrospective Pack design from the existing JSONL traces.
+3. Convert Run Retrospective Pack output into stable evaluation fixtures for optional fallback, missing owner, and TBD deadline cases.
 4. Capture happy-path and failure-path media outside Git.
 5. Verify Open Platform card callback delivery or keep it explicitly marked as pending.
 6. Run `pilot:doctor`, `pilot:check`, tests, review package generation, status, and safety audit before any public handoff.

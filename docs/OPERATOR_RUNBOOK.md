@@ -49,6 +49,7 @@ npm run test:one -- plan
 npm run test:one -- risk
 npm run test:one -- doctor
 npm run test:one -- submission
+npm run test:one -- retrospective
 ```
 
 `pilot:doctor` checks Node.js, `lark-cli`, `.env` Git ignore status, and required environment variable names. It reports missing names only; it does not print secret values. Add `-- --verify-auth` only when you want a sanitized profile token-status check:
@@ -189,9 +190,12 @@ npm run review:permissions -- --collect-version --collect-auth --collect-event-d
 npm run review:callback-verification -- --output tmp/demo-callback/CALLBACK_VERIFICATION.md
 npm run review:judge -- --output tmp/demo-judge/JUDGE_REVIEW.md
 npm run review:submission -- --output tmp/demo-submission/SUBMISSION_PACK.md
+npm run review:retrospective -- --output tmp/run-retrospective/RUN_RETROSPECTIVE.md
 npm run review:delivery-index -- --output tmp/demo-delivery/DELIVERY_INDEX.md
 npm run review:safety-audit -- --output tmp/demo-safety/SAFETY_AUDIT.md
 ```
+
+The retrospective pack reads a JSONL run log and produces quality signals, improvement proposals, and evaluation seeds. By default it reads `tmp/runs/latest-live-run.jsonl` when present, otherwise `tmp/runs/latest-manual-run.jsonl`; pass `--input <run.jsonl>` when packaging a specific run. It is review-only: it does not change code, prompts, docs, or Feishu artifacts.
 
 Generated reports and run logs stay under ignored `tmp/`.
 
