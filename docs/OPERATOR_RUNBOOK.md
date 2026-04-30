@@ -175,9 +175,9 @@ npm run pilot:callback-proof -- --send-probe-card --timeout 60s
 npm run pilot:callback-proof -- --timeout 60s --strict
 ```
 
-`--send-probe-card` sends a small Feishu interactive card to `--chat-id` or `PILOTFLOW_TEST_CHAT_ID` before listening. Click its `确认执行` button from Feishu to test whether Open Platform delivers `card.action.trigger` back to the local listener. Use `--dry-run` with `--send-probe-card` to inspect the card-send command without writing to Feishu. `--strict` exits non-zero when no callback arrives. Raw payload capture is off by default; `--include-raw` is allowed only for ignored `tmp/` outputs.
+`--send-probe-card` starts the listener first, then sends a small Feishu interactive card to `--chat-id` or `PILOTFLOW_TEST_CHAT_ID`. Click its `确认执行` button from Feishu to test whether Open Platform delivers `card.action.trigger` back to the local listener. Use `--dry-run` with `--send-probe-card` to inspect the card-send command without writing to Feishu. `--strict` exits non-zero when no callback arrives. Raw payload capture is off by default; `--include-raw` is allowed only for ignored `tmp/` outputs.
 
-If `lark-cli event +subscribe` exits before any event arrives, the command now returns `subscribe_failed` and records sanitized stderr in the proof JSONL. Treat that as a subscription, permission, or Open Platform configuration issue. Treat `timeout_no_callback` as a different case: the listener stayed up, but no button event arrived during the window.
+If `lark-cli event +subscribe` exits before any event arrives, the command returns `subscribe_failed` and records sanitized stderr in the proof JSONL. If the probe card cannot be sent, it returns `probe_failed`. Treat `timeout_no_callback` as a different case: the listener stayed up, but no button event arrived during the window.
 
 ## TypeScript Project Init Bridge
 

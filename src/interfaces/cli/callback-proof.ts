@@ -21,9 +21,10 @@ export interface CallbackProofOptions {
 }
 
 export interface CallbackProofProbeResult {
-  readonly status: "not_sent" | "sent" | "dry_run";
+  readonly status: "not_sent" | "sent" | "dry_run" | "failed";
   readonly runId?: string;
   readonly messageId?: string;
+  readonly error?: string;
 }
 
 export interface CallbackProofAction {
@@ -32,7 +33,7 @@ export interface CallbackProofAction {
 }
 
 export interface CallbackProofResult {
-  readonly status: "observed" | "timeout_no_callback" | "subscribe_failed";
+  readonly status: "observed" | "timeout_no_callback" | "subscribe_failed" | "probe_failed";
   readonly observedCallbacks: number;
   readonly ignoredEvents: number;
   readonly unsupportedEvents: number;
@@ -74,59 +75,83 @@ export async function runCallbackProof(options: CallbackProofOptions = {}): Prom
   let seenEvents = 0;
   let timedOut = false;
   let failure: CallbackProofResult["failure"] | undefined;
+  let probe: CallbackProofProbeResult = { status: "not_sent" };
 
   await recorder.record({ type: "callback_proof.started", runId: "callback-proof", output, strict, includeRaw, timestamp: now() });
-  const probe = parsed.flags["send-probe-card"] === true
-    ? await sendProbeCard({
-      chatId: stringFlag(parsed.flags["chat-id"]) ?? env.PILOTFLOW_TEST_CHAT_ID,
-      profile,
-      dryRun: parsed.flags["dry-run"] === true,
-      title: stringFlag(parsed.flags["probe-title"]) ?? "PilotFlow callback proof",
-      runId: stringFlag(parsed.flags["probe-run-id"]) ?? buildProbeRunId(now),
-      command,
-      recorder,
-      timestamp: now,
-    })
-    : { status: "not_sent" } as const;
 
   try {
     const iterator = source.events()[Symbol.asyncIterator]();
-    while (true) {
-      const next = await nextWithTimeout(iterator, timeoutMs);
-      if (isTimeoutResult(next)) {
-        timedOut = true;
-        break;
-      }
-      if (next.done) break;
-      const event = next.value;
-      seenEvents += 1;
-      if (event.kind !== "card") {
-        unsupportedEvents += 1;
-        await recorder.record({ type: "callback_proof.unsupported_event", runId: "callback-proof", gatewayEventId: event.id, gatewayKind: event.kind, timestamp: now() });
-      } else {
-        const result = await handleCardEvent(event, {
-          dedupe,
-          onAction: async (action) => {
-            observedCallbacks += 1;
-            await recorder.record({
-              type: "callback_proof.callback_observed",
-              runId: action.runId || "unknown-run",
-              gatewayEventId: event.id,
-              card: action.card,
-              action: action.action,
-              operatorPresent: action.userId.length > 0,
-              chatContextPresent: hasChatContext(event.raw),
-              timestamp: now(),
-              raw: includeRaw ? event.raw : undefined,
-            });
-          },
+    let nextEvent = nextWithTimeout(iterator, timeoutMs);
+    if (parsed.flags["send-probe-card"] === true) {
+      const probeRunId = stringFlag(parsed.flags["probe-run-id"]) ?? buildProbeRunId(now);
+      try {
+        probe = await sendProbeCard({
+          chatId: stringFlag(parsed.flags["chat-id"]) ?? env.PILOTFLOW_TEST_CHAT_ID,
+          profile,
+          dryRun: parsed.flags["dry-run"] === true,
+          title: stringFlag(parsed.flags["probe-title"]) ?? "PilotFlow callback proof",
+          runId: probeRunId,
+          command,
+          recorder,
+          timestamp: now,
         });
-        if (result.status === "ignored") {
-          ignoredEvents += 1;
-          await recorder.record({ type: "callback_proof.callback_ignored", runId: "callback-proof", gatewayEventId: event.id, reason: result.reason, timestamp: now() });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        probe = { status: "failed", runId: probeRunId, error: message };
+        await recorder.record({
+          type: "callback_proof.probe_card_failed",
+          runId: probeRunId,
+          message,
+          timestamp: now(),
+        });
+      }
+    }
+
+    if (probe.status === "failed") {
+      nextEvent.cancel();
+      timedOut = false;
+    } else {
+      while (true) {
+        const next = await nextEvent.promise;
+        if (isTimeoutResult(next)) {
+          timedOut = true;
+          break;
+        }
+        if (next.done) break;
+        const event = next.value;
+        nextEvent = nextWithTimeout(iterator, timeoutMs);
+        seenEvents += 1;
+        if (event.kind !== "card") {
+          unsupportedEvents += 1;
+          await recorder.record({ type: "callback_proof.unsupported_event", runId: "callback-proof", gatewayEventId: event.id, gatewayKind: event.kind, timestamp: now() });
+        } else {
+          const result = await handleCardEvent(event, {
+            dedupe,
+            onAction: async (action) => {
+              observedCallbacks += 1;
+              await recorder.record({
+                type: "callback_proof.callback_observed",
+                runId: action.runId || "unknown-run",
+                gatewayEventId: event.id,
+                card: action.card,
+                action: action.action,
+                operatorPresent: action.userId.length > 0,
+                chatContextPresent: hasChatContext(event.raw),
+                timestamp: now(),
+                raw: includeRaw ? event.raw : undefined,
+              });
+            },
+          });
+          if (result.status === "ignored") {
+            ignoredEvents += 1;
+            await recorder.record({ type: "callback_proof.callback_ignored", runId: "callback-proof", gatewayEventId: event.id, reason: result.reason, timestamp: now() });
+          }
+        }
+        if (maxEvents > 0 && seenEvents >= maxEvents) {
+          nextEvent.cancel();
+          break;
         }
       }
-      if (maxEvents > 0 && seenEvents >= maxEvents) break;
     }
   } catch (error) {
     const currentFailure = subscribeFailure(error);
@@ -144,7 +169,7 @@ export async function runCallbackProof(options: CallbackProofOptions = {}): Prom
     await recorder.close();
   }
 
-  const status = failure ? "subscribe_failed" : observedCallbacks > 0 ? "observed" : "timeout_no_callback";
+  const status = failure ? "subscribe_failed" : probe.status === "failed" ? "probe_failed" : observedCallbacks > 0 ? "observed" : "timeout_no_callback";
   if (timedOut || status === "timeout_no_callback") {
     await recorder.record({ type: "callback_proof.timeout_no_callback", runId: "callback-proof", observedCallbacks, ignoredEvents, unsupportedEvents, timestamp: now() });
   }
@@ -159,7 +184,7 @@ export async function runCallbackProof(options: CallbackProofOptions = {}): Prom
     probe,
     nextActions,
     failure,
-    exitCode: status === "subscribe_failed" ? 2 : status === "timeout_no_callback" && strict ? 1 : 0,
+    exitCode: status === "subscribe_failed" || status === "probe_failed" ? 2 : status === "timeout_no_callback" && strict ? 1 : 0,
   };
 }
 
@@ -238,6 +263,7 @@ export function renderCallbackProof(result: CallbackProofResult): string {
     `probe_status: ${result.probe.status}`,
     result.probe.runId ? `probe_run_id: ${result.probe.runId}` : undefined,
     result.probe.messageId ? `probe_message_id: ${result.probe.messageId}` : undefined,
+    result.probe.error ? `probe_error: ${result.probe.error}` : undefined,
     result.failure ? `failure: ${result.failure.message}` : undefined,
     ...renderNextActions(result.nextActions),
     `output: ${result.output}`,
@@ -256,7 +282,7 @@ Options:
   --timeout <duration>  Stop after duration, for example 60s or 2m.
   --max-events <n>      Stop after n events.
   --output <path>       JSONL proof output path.
-  --send-probe-card     Send a callback probe card before listening.
+  --send-probe-card     Start listening, then send a callback probe card.
   --probe-title <text>  Probe card title.
   --probe-run-id <id>   Probe callback run id.
   --dry-run             Dry-run the probe card send command.
@@ -279,22 +305,41 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
   process.exitCode = result.exitCode;
 }
 
-async function nextWithTimeout<T>(
+interface PendingNext<T> {
+  readonly promise: Promise<IteratorResult<T> | { readonly timeout: true }>;
+  readonly cancel: () => void;
+}
+
+function nextWithTimeout<T>(
   iterator: AsyncIterator<T>,
   timeoutMs: number,
-): Promise<IteratorResult<T> | { readonly timeout: true }> {
-  if (timeoutMs <= 0) return iterator.next();
+): PendingNext<T> {
   let timer: NodeJS.Timeout | undefined;
-  try {
-    return await Promise.race([
-      iterator.next(),
-      new Promise<{ readonly timeout: true }>((resolve) => {
-        timer = setTimeout(() => resolve({ timeout: true }), timeoutMs);
-      }),
-    ]);
-  } finally {
-    if (timer) clearTimeout(timer);
-  }
+  let settled = false;
+  const promise = (async () => {
+    if (timeoutMs <= 0) return iterator.next();
+    try {
+      return await Promise.race([
+        iterator.next(),
+        new Promise<{ readonly timeout: true }>((resolve) => {
+          timer = setTimeout(() => resolve({ timeout: true }), timeoutMs);
+        }),
+      ]);
+    } finally {
+      settled = true;
+      if (timer) clearTimeout(timer);
+    }
+  })();
+
+  return {
+    promise,
+    cancel: () => {
+      if (!settled && timer) {
+        clearTimeout(timer);
+        timer = undefined;
+      }
+    },
+  };
 }
 
 function hasChatContext(raw: Record<string, unknown>): boolean {
@@ -333,6 +378,14 @@ function buildNextActions(input: {
       {
         reason: "The callback listener did not stay up.",
         action: "Run lark-cli event +subscribe --as bot --event-types card.action.trigger --dry-run, then fix the CLI profile, event permission, or Open Platform event subscription error shown in the proof log.",
+      },
+    ];
+  }
+  if (input.status === "probe_failed") {
+    return [
+      {
+        reason: "The probe card could not be sent to Feishu.",
+        action: "Check the target chat id, profile, message permission, bot installation state, and lark-cli im +messages-send error before retrying callback proof.",
       },
     ];
   }

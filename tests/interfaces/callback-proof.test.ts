@@ -59,10 +59,11 @@ test("runCallbackProof records timeout and fails only in strict mode", async () 
   }
 });
 
-test("runCallbackProof can send a callback probe card before listening", async () => {
+test("runCallbackProof starts listening before sending a callback probe card", async () => {
   const dir = await mkdtemp(join(tmpdir(), "pilotflow-callback-proof-probe-"));
   const output = join(dir, "callback-proof.jsonl");
   const calls: string[][] = [];
+  let listenerStarted = false;
 
   try {
     const result = await runCallbackProof({
@@ -75,8 +76,13 @@ test("runCallbackProof can send a callback probe card before listening", async (
         "--max-events", "0",
       ],
       env: {},
-      source: eventSource([]),
+      source: observableEventSource({
+        onNext: () => {
+          listenerStarted = true;
+        },
+      }),
       runCommand: async (bin, args, options = {}) => {
+        assert.equal(listenerStarted, true);
         calls.push([bin, ...args, `dryRun=${String(options.dryRun)}`]);
         return okResult([bin, ...args]);
       },
@@ -98,6 +104,49 @@ test("runCallbackProof can send a callback probe card before listening", async (
     const log = await readFile(output, "utf8");
     assert.match(log, /"type":"callback_proof.probe_card_sent"/u);
     assert.match(log, /"runId":"callback-proof-test"/u);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("runCallbackProof returns probe_failed when the probe card send fails", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "pilotflow-callback-proof-probe-failed-"));
+  const output = join(dir, "callback-proof.jsonl");
+  let closed = false;
+
+  try {
+    const result = await runCallbackProof({
+      argv: [
+        "--output", output,
+        "--send-probe-card",
+        "--chat-id", "oc_probe",
+        "--probe-run-id", "callback-proof-failed",
+        "--timeout", "1s",
+      ],
+      env: {},
+      source: observableEventSource({
+        onClose: () => {
+          closed = true;
+        },
+      }),
+      runCommand: async () => {
+        throw new Error("im +messages-send failed: permission denied");
+      },
+      now: () => "2026-05-01T00:00:00.000Z",
+    });
+
+    assert.equal(result.status, "probe_failed");
+    assert.equal(result.exitCode, 2);
+    assert.equal(result.probe.status, "failed");
+    assert.equal(result.probe.runId, "callback-proof-failed");
+    assert.match(result.probe.error ?? "", /permission denied/u);
+    assert.match(result.nextActions[0]?.action ?? "", /target chat id/u);
+    assert.match(renderCallbackProof(result), /probe_error: im \+messages-send failed/u);
+    assert.equal(closed, true);
+
+    const log = await readFile(output, "utf8");
+    assert.match(log, /"type":"callback_proof.probe_card_failed"/u);
+    assert.doesNotMatch(log, /"type":"callback_proof.timeout_no_callback"/u);
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
@@ -181,6 +230,29 @@ function eventSource(events: readonly FeishuGatewayEvent[]) {
       for (const event of events) yield event;
     },
     async close() {},
+  };
+}
+
+function observableEventSource(hooks: {
+  readonly onNext?: () => void;
+  readonly onClose?: () => void;
+} = {}) {
+  return {
+    events(): AsyncIterable<FeishuGatewayEvent> {
+      return {
+        [Symbol.asyncIterator]() {
+          return {
+            async next(): Promise<IteratorResult<FeishuGatewayEvent>> {
+              hooks.onNext?.();
+              return { done: true, value: undefined };
+            },
+          };
+        },
+      };
+    },
+    async close() {
+      hooks.onClose?.();
+    },
   };
 }
 
