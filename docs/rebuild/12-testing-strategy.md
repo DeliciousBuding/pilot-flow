@@ -132,6 +132,8 @@ const CREDENTIAL_PATTERNS = [
 const SAVED_ENV: Record<string, string | undefined> = {};
 
 export function hermeticSetup(): void {
+  for (const key of Object.keys(SAVED_ENV)) delete SAVED_ENV[key];
+
   for (const key of Object.keys(process.env)) {
     if (CREDENTIAL_PATTERNS.some((p) => p.test(key))) {
       SAVED_ENV[key] = process.env[key];
@@ -152,6 +154,7 @@ export function hermeticTeardown(): void {
       process.env[key] = value;
     }
   }
+  for (const key of Object.keys(SAVED_ENV)) delete SAVED_ENV[key];
 }
 ```
 

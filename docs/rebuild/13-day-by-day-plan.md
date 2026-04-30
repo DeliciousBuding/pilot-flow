@@ -1,7 +1,17 @@
 # 13 - Day-by-Day Execution Plan
 
 > 每天结束时：`npx tsc --noEmit` 通过 + 所有测试绿色 + git commit
-> 预计总工时：24-28 小时（Day 3 和 Day 4 各增加 2-3 小时缓冲）
+> 预计总工时：32-40 小时。Agent 编程可以提速，但 Feishu callback、安全边界和迁移验证不应压缩成口头完成。
+
+## Day 0：合同核验 + 迁移闸门（~2 小时）
+
+先锁住外部合同，再开始重写。产物写入 `docs/rebuild/CONTRACT_NOTES.md` 或对应实现注释。
+
+- `lark-cli docs +create --api-version v2 --help`：确认 `--content @file` / `--content -` / `--doc-format markdown`。
+- `lark-cli event +subscribe --help`：确认 WebSocket NDJSON 事件接收作为第一事件来源。
+- 飞书后台 callback 配置：确认 `card.action.trigger` 的实际投递形态、verification token、encrypt key、是否启用加密。
+- OpenAI-compatible provider：只用 mock fetch 验证工具调用格式；不要求真实模型在线成功作为重构闸门。
+- 迁移闸门：旧 JS prototype 在新 TS path 通过前保留，不删除可运行入口。
 
 ## Day 1：脚手架 + 类型 + 基础设施（~4 小时）
 
@@ -186,7 +196,7 @@ npm test
 npx tsc --noEmit
 npm test
 # 手动 dry-run 测试
-node dist/interfaces/cli/cli-trigger.js --input fixtures/sample-input.txt --dry-run
+node dist/src/interfaces/cli/cli-trigger.js --input fixtures/sample-input.txt --dry-run
 ```
 
 **Day 3 完成标志**：orchestrator 拆分完成，dry-run 测试通过。
@@ -211,7 +221,9 @@ node dist/interfaces/cli/cli-trigger.js --input fixtures/sample-input.txt --dry-
 ### 4.3 创建 src/gateway/feishu/（2 小时）
 
 按 [15-feishu-integration.md](15-feishu-integration.md) 创建：
-- `src/gateway/feishu/webhook-server.ts`
+- `src/gateway/feishu/event-source.ts`
+- `src/gateway/feishu/lark-cli-source.ts`
+- `src/gateway/feishu/webhook-server.ts`（optional transport，先写 contract/test stub）
 - `src/gateway/feishu/message-handler.ts`
 - `src/gateway/feishu/card-handler.ts`
 - `src/gateway/feishu/mention-gate.ts`
@@ -240,6 +252,7 @@ node dist/interfaces/cli/cli-trigger.js --input fixtures/sample-input.txt --dry-
 - `tests/agent/loop.test.ts`
 - `tests/gateway/feishu/mention-gate.test.ts`
 - `tests/gateway/feishu/dedupe.test.ts`
+- `tests/gateway/feishu/lark-cli-source.test.ts`
 - `tests/gateway/feishu/webhook-server.test.ts`
 
 ### 4.7 验证（15 分钟）
@@ -247,7 +260,7 @@ node dist/interfaces/cli/cli-trigger.js --input fixtures/sample-input.txt --dry-
 ```bash
 npx tsc --noEmit
 npm test
-node dist/interfaces/cli/pilot-cli.js doctor
+node dist/src/interfaces/cli/pilot-cli.js doctor
 ```
 
 **Day 4 完成标志**：CLI 入口可运行，OpenAI-compatible LLM client 有 mock fetch 测试，Agent loop 可完成至少一次 tool call round-trip，gateway 的 mention/dedupe/webhook verification 单测绿色。

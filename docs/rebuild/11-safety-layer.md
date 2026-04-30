@@ -54,9 +54,9 @@ const CHECKS: PreflightCheck[] = [
   {
     name: "tasklist-id",
     check: (c) => ({
-      ok: !!c.feishuTargets.tasklistId,
-      missing: c.feishuTargets.tasklistId ? [] : ["PILOTFLOW_TASKLIST_ID"],
-      warnings: [],
+      ok: true,
+      missing: [],
+      warnings: c.feishuTargets.tasklistId ? [] : ["PILOTFLOW_TASKLIST_ID not set; task.create will use the default Feishu task destination"],
     }),
   },
 ];
@@ -64,10 +64,8 @@ const CHECKS: PreflightCheck[] = [
 export function preflight(config: RuntimeConfig, toolName?: string): PreflightResult {
   if (config.mode === "dry-run") return { ok: true, missing: [], warnings: [] };
 
-  // task.create 额外需要 tasklistId
-  const checks = toolName === "task.create"
-    ? CHECKS
-    : CHECKS.filter((c) => c.name !== "tasklist-id");
+  // task.create 的 tasklistId 默认不阻断；仅作为 warning，除非调用方显式要求指定清单。
+  const checks = toolName === "task.create" ? CHECKS : CHECKS.filter((c) => c.name !== "tasklist-id");
 
   const allMissing: string[] = [];
   const allWarnings: string[] = [];
@@ -87,12 +85,12 @@ export function preflight(config: RuntimeConfig, toolName?: string): PreflightRe
 **来源**：hermes `file_safety.py` 模式。
 
 ```typescript
-import { resolve, normalize } from "node:path";
+import { resolve, normalize, relative, sep } from "node:path";
+import { realpathSync } from "node:fs";
 
 // 精确路径拒绝
 const DENIED_PATHS = new Set([
-  ".env", ".env.local", ".env.production",
-  ".netrc", ".npmrc",
+  ".env", ".env.local", ".env.production", ".netrc", ".npmrc",
   "/etc/sudoers",
 ]);
 
@@ -103,20 +101,32 @@ const DENIED_PREFIXES = [
   "/etc/", "/root/",
 ];
 
-export function isPathSafe(inputPath: string): boolean {
-  // 先 normalize + resolve 消除 .. 和 URL 编码绕过
-  const resolved = resolve(normalize(inputPath)).replace(/\\/g, "/").toLowerCase();
+export function isPathSafe(inputPath: string, safeRoot = process.cwd()): boolean {
+  // 先 normalize + resolve + realpath，消除 ..、symlink 和大小写绕过。
+  const resolvedRaw = resolve(normalize(inputPath));
+  const rootRaw = resolve(normalize(safeRoot));
+  const resolved = safeRealpath(resolvedRaw).replace(/\\/g, "/").toLowerCase();
+  const root = safeRealpath(rootRaw).replace(/\\/g, "/").toLowerCase();
 
   // 精确匹配
   const basename = resolved.split("/").pop() || "";
   if (DENIED_PATHS.has(basename)) return false;
 
-  // 前缀匹配（在 resolved 路径上检查）
+  // 必须留在明确 safe root 内，除非调用方显式提供另一个 safeRoot。
+  const rel = relative(root, resolved).replaceAll(sep, "/");
+  if (rel.startsWith("..") || rel === "..") return false;
+
+  // 锚定前缀匹配，避免 substring includes 误伤或漏判。
   for (const prefix of DENIED_PREFIXES) {
-    if (resolved.includes(prefix)) return false;
+    if (resolved.startsWith(prefix) || resolved.includes(`/${prefix}`)) return false;
   }
 
   return true;
+}
+
+function safeRealpath(path: string): string {
+  try { return realpathSync.native(path); }
+  catch { return path; }
 }
 
 export function assertPathSafe(path: string): void {

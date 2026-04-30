@@ -44,7 +44,12 @@ app.router.add_post("/webhook/event", handle_event)
 # 5. body size limit（1 MB）
 ```
 
-**PilotFlow 实现建议**：用 Node.js 内置 `http` 模块（零运行时依赖）。
+**PilotFlow 实现建议**：
+
+- 第一阶段默认使用 `lark-cli event +subscribe` 作为 WebSocket NDJSON event source，避免先引入公网 webhook、证书、内网穿透和平台回调配置不确定性。
+- `webhook-server.ts` 作为第二 transport 保留，但上线前必须核验官方签名算法、challenge 是否携带签名、verification token 位置、以及后台是否启用事件加密。
+- 第一版 webhook 明确要求飞书后台关闭事件加密；如果启用加密，必须先实现官方 decrypt 步骤，再读取 `type`、`challenge`、`token`、`header`、`event`。
+- Webhook mode fail-closed：`PILOTFLOW_VERIFICATION_TOKEN` 和 `PILOTFLOW_ENCRYPT_KEY` 必须在启动 preflight 中存在；只有显式 test fixture 可以绕过 token。
 
 ```typescript
 // src/gateway/feishu/webhook-server.ts
@@ -130,7 +135,7 @@ function json(res: ServerResponse, status: number, data: unknown): void {
 
 function verifyToken(body: Record<string, unknown>): boolean {
   const expected = process.env.PILOTFLOW_VERIFICATION_TOKEN;
-  if (!expected) return true;
+  if (!expected) throw new Error("PILOTFLOW_VERIFICATION_TOKEN is required for webhook mode");
   const token =
     typeof body.token === "string"
       ? body.token
@@ -165,7 +170,10 @@ const server = createServer(async (req, res) => {
 
   // 3. 事件路由
   const event = body.event;
-  switch (body.header?.event_type) {
+  const header = typeof body.header === "object" && body.header !== null
+    ? body.header as { event_type?: unknown }
+    : {};
+  switch (header.event_type) {
     case "im.message.receive_v1":
       await handleMessage(event);
       break;
@@ -195,13 +203,24 @@ interface BotIdentity {
   name: string;
 }
 
-function shouldAcceptMessage(message: any, bot: BotIdentity): boolean {
+interface FeishuMention {
+  readonly id?: { readonly open_id?: string; readonly user_id?: string };
+  readonly name?: string;
+  readonly key?: string;
+}
+
+interface FeishuInboundMessage {
+  readonly chat_type?: string;
+  readonly mentions?: readonly FeishuMention[];
+}
+
+function shouldAcceptMessage(message: FeishuInboundMessage, bot: BotIdentity): boolean {
   // DM 总是接受
   if (message.chat_type === "p2p") return true;
 
   // 群聊需要 @mention
   const mentions = message.mentions || [];
-  return mentions.some((m: any) =>
+  return mentions.some((m) =>
     m.id?.open_id === bot.openId ||
     m.id?.user_id === bot.userId ||
     m.name === bot.name ||
@@ -242,10 +261,11 @@ function handleGenericCard(action: CardAction): void {
 }
 ```
 
-**PilotFlow 当前的卡片回调**：只处理审批按钮（确认起飞/取消），且平台配置未验证。重建时应：
-1. 用 `card.action.trigger` 事件接收按钮点击
-2. 同步返回更新卡片（显示处理中状态）
-3. 异步执行工具序列
+**PilotFlow 当前的卡片回调**：只处理审批按钮（确认起飞/取消），且平台配置未验证。重建时应拆成两个等级：
+
+1. 近期实现：`card.action.trigger` event ack + 幂等记录 + 异步更新卡片/发送后续消息。
+2. 后续增强：如果官方回调路径支持同步 card mutation，再返回更新卡片显示处理中状态。
+3. 验收条件：callback token dedupe、replay/idempotency、per-chat queue、一次点击只触发一次工具序列。
 
 ### 4. 文本/媒体批处理
 
@@ -382,5 +402,5 @@ function isUserAllowed(userId: string): boolean {
 ### Wiki
 - `GET /open-apis/wiki/v2/spaces/get_node` — 反查 wiki token
 
-**PilotFlow 现有工具已覆盖的**：doc.create, base.write, task.create, im.send, card.send, announcement.update
+**PilotFlow 重构目标工具集合**：doc.create, base.write, task.create, im.send, entry.send, entry.pin, card.send, announcement.update, contact.search
 **PilotFlow 尚未使用的**：消息回复、消息编辑、表情管理、文档评论、文件上传/下载

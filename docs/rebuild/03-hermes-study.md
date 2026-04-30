@@ -113,14 +113,13 @@ classify_api_error(exception) → ClassifiedError:
 
 **402 真假区分**：检查 "try again"、"resets at" 等信号区分瞬时限流 vs 真实配额耗尽。
 
-### 工具注册表（`tools/registry.py`）
+### 工具注册表（`tools/registry.py` + 相关调用层）
 
-- **函数式自注册**：每个工具文件在模块导入时调用 `registry.register(name, schema, handler, check_fn, requires_env)`
-- **AST 扫描发现**：`discover_builtin_tools()` 用 AST 找 `tools/` 中含 `registry.register()` 的文件
-- **4 层插件**：bundled → user → project → pip
-- **MCP 集成**：连接外部 MCP server，工具注册到同一 registry
-- **Tool→LLM 翻译**：`get_tool_definitions()` 把 registry 转为 OpenAI function-calling 格式
-- **分发**：`handle_function_call()` 调用 registry.dispatch()，pre/post hooks
+- **函数式自注册**：每个工具文件在模块导入时调用 registry register。
+- **可用性检查**：registry 层提供工具存在性、schema 导出、dispatch 和错误路径。
+- **Tool→LLM 翻译**：registry 输出 provider 可接受的 function schema；PilotFlow 需要把内部 `doc.create` 映射为 LLM-safe `doc_create`。
+- **分发边界**：PilotFlow registry 只做注册、preflight、dispatch、recording；不要把插件发现、MCP 生命周期、pre/post hook 编排都塞进同一个文件。
+- **不直接移植的层**：Hermes 的插件发现、MCP 覆盖/注销、外部工具生命周期属于更大平台范围；可作为未来参考，不进入第一版 registry。
 
 ### 技能系统
 
@@ -211,7 +210,7 @@ classify_api_error(exception) → ClassifiedError:
 | Multi-platform gateway | 只有飞书 |
 | Skills marketplace | 3-5 个固定 skill |
 | Plugin 系统 | 工具集固定且小 |
-| Credential pool 轮转 | 一个 API key |
+| Credential pool 轮转 | 第一版 defer；先保留单 provider env，后续再做 key pool / model routing |
 | TUI / Ink | Feishu cards 是 UI |
 | Subagent 委托 | 增加并发复杂度 |
 

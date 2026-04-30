@@ -78,14 +78,17 @@ export function createLlmClient(options: LlmCallOptions): LlmClient {
         throw new LlmError(classified.reason, response.status, errorBody);
       }
 
-      const data = await response.json() as { choices: { message: LlmResponse; finish_reason: string }[] };
+      const data = await response.json() as {
+        choices: { message: LlmResponse; finish_reason: LlmResponse["finish_reason"] }[];
+        usage?: LlmResponse["usage"];
+      };
       const choice = data.choices[0];
 
       return {
         content: choice.message.content || "",
         tool_calls: choice.message.tool_calls,
-        usage: (data as any).usage,
-        finish_reason: choice.finish_reason as LlmResponse["finish_reason"],
+        usage: data.usage,
+        finish_reason: choice.finish_reason,
       };
     },
   };

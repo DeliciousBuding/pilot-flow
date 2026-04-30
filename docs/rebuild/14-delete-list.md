@@ -76,7 +76,7 @@ Do not delete `src/interfaces/` as a directory. The new product gateway lives in
 1. 先删测试文件（`.test.js`）— 不影响运行
 2. 再删 `src/core/` — 已被 `src/orchestrator/` + `src/domain/` 替代
 3. 再删 `src/runtime/` + `src/adapters/` — 已被 tools/registry + infrastructure 替代
-4. 再删 `src/tools/feishu/feishu-tool-executor.js` + `artifact-normalizer.js` — 已被 6 个独立文件替代
+4. 再删 `src/tools/feishu/feishu-tool-executor.js` + `artifact-normalizer.js` — 已被 9 个独立文件替代
 5. 新增 `src/gateway/feishu/` 并验证 IM/card/webhook 单测
 6. 再删 `src/interfaces/cli/` 中的旧 `.js` — 已被同目录 `.ts` 替代
 7. 最后删 `scripts/check-js.js`

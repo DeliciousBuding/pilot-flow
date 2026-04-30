@@ -23,8 +23,10 @@ Use the LLM to decide which registered tools to call and in what order for IM-dr
 import type { ToolRegistry } from "../tools/registry.js";
 import type { Recorder } from "../types/recorder.js";
 import type { SessionMessage, ToolCallMessage } from "../types/session.js";
+import type { ProjectInitPlan } from "../types/plan.js";
 import type { LlmClient } from "../llm/client.js";
 import type { ClassifiedError } from "../llm/error-classifier.js";
+import { generateRunId } from "../shared/id.js";
 
 export interface AgentLoopConfig {
   readonly llm: LlmClient;
@@ -58,6 +60,7 @@ export async function runAgentLoop(
   const toolSchemas = config.tools.getSchemas();
   let iterations = 0;
   let toolCallsMade = 0;
+  const runId = generateRunId("agent");
 
   while (iterations < maxIterations) {
     iterations++;
@@ -95,15 +98,13 @@ export async function runAgentLoop(
         });
         continue;
       }
-      // 确认门控：所有有 side-effect 的工具必须确认（fail-closed）
-      // 判定规则：有 requiresTargets 的工具 = side-effect 工具，必须确认
-      // 显式标记 safeWithoutConfirmation: true 的只读工具可跳过
+      // 确认门控：所有 side-effect 工具必须确认（fail-closed）
+      // 判定规则：ToolDefinition.confirmationRequired 是唯一权威。
       const toolDef = config.tools.get(call.function.name);
-      const needsConfirmation = toolDef && !toolDef.safeWithoutConfirmation &&
-        (toolDef.requiresTargets || toolDef.requiresLive);
+      const needsConfirmation = toolDef?.confirmationRequired === true;
       if (needsConfirmation) {
         const confirmed = await config.confirmationGate.request(
-          { goal: call.function.name, tool: call.function.name } as any,
+          buildToolConfirmationRequest(call.function.name, input),
           [],
           { autoConfirm: false },
         );
@@ -118,7 +119,7 @@ export async function runAgentLoop(
       }
 
       const ctx = {
-        runId: `agent-${Date.now()}`,
+        runId,
         sequence: toolCallsMade,
         dryRun: config.runtime.mode === "dry-run",
         recorder: config.recorder,
@@ -184,6 +185,20 @@ function safeParseJson(str: string): Record<string, unknown> | null {
   catch { return null; }
 }
 
+function buildToolConfirmationRequest(toolName: string, input: Record<string, unknown>): ProjectInitPlan {
+  return {
+    intent: "project_init",
+    goal: `Confirm ${toolName}`,
+    members: [],
+    deliverables: [`Execute ${toolName}`],
+    deadline: "",
+    missing_info: [],
+    steps: [{ id: `confirm-${toolName}`, title: `Execute ${toolName}`, status: "pending", tool: toolName }],
+    confirmations: [{ id: `confirm-${toolName}`, prompt: `Allow ${toolName}?`, status: "pending", required_for: [toolName] }],
+    risks: [],
+  };
+}
+
 /** 用户输入消毒 — 过滤已知注入模式 */
 function sanitizeUserInput(text: string): string {
   const patterns = [
@@ -236,6 +251,8 @@ async run(inputText: string, options: RunOptions): Promise<RunResult> {
       llm: this.config.llm,
       tools: this.config.tools,
       recorder: this.config.recorder,
+      runtime: this.config.runtime,
+      confirmationGate: this.config.confirmationGate,
     });
     return { status: "completed", artifacts: extractArtifacts(result.messages) };
   } else {

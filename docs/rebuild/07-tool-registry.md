@@ -7,7 +7,7 @@
 ## 设计目标
 
 1. **自注册** — 每个工具文件导入时自动注册到全局 registry
-2. **OpenAI 兼容** — 工具 schema 直接是 OpenAI function-calling 格式
+2. **OpenAI 兼容** — registry 输出 LLM-safe function-calling schema，同时保留内部点分命名
 3. **类型安全** — TypeScript 泛型约束 input/output
 4. **可测试** — handler 与 registry 解耦，可独立测试
 5. **preflight 检查** — 工具声明自己需要的 targets，registry 在执行前检查
@@ -19,7 +19,7 @@
 
 import type { ToolDefinition, ToolHandler, ToolSchema, ToolContext, ToolResult } from "../types/tool.js";
 import type { RecorderEvent } from "../types/recorder.js";
-import { PilotFlowError } from "../error-handling/errors.js";
+import { PilotFlowError } from "../shared/errors.js";
 
 export class ToolNotFoundError extends PilotFlowError {
   constructor(public readonly toolName: string) {
@@ -47,24 +47,28 @@ export class ToolAlreadyRegisteredError extends PilotFlowError {
 
 export class ToolRegistry {
   private tools = new Map<string, ToolDefinition>();
+  private llmNameToName = new Map<string, string>();
 
   /** 注册工具（模块导入时调用） */
   register(def: ToolDefinition): void {
     if (this.tools.has(def.name)) {
       throw new ToolAlreadyRegisteredError(def.name);
     }
+    const llmName = def.llmName ?? toLlmToolName(def.name);
     this.tools.set(def.name, def);
+    this.llmNameToName.set(llmName, def.name);
   }
 
   /** 执行工具 */
   async execute(name: string, input: Record<string, unknown>, ctx: ToolContext): Promise<ToolResult> {
-    const tool = this.tools.get(name);
-    if (!tool) throw new ToolNotFoundError(name);
+    const internalName = this.llmNameToName.get(name) ?? name;
+    const tool = this.tools.get(internalName);
+    if (!tool) throw new ToolNotFoundError(internalName);
 
     // preflight: 检查必需的 targets
     if (tool.requiresTargets && !ctx.dryRun) {
       const missing = tool.requiresTargets.filter((t) => !ctx.targets?.[t]);
-      if (missing.length > 0) throw new ToolPreflightError(name, missing);
+      if (missing.length > 0) throw new ToolPreflightError(internalName, missing);
     }
 
     // 记录 tool.called（脱敏输入，防止敏感内容泄露到 JSONL）
@@ -72,8 +76,8 @@ export class ToolRegistry {
       type: "tool.called",
       runId: ctx.runId,
       sequence: ctx.sequence,
-      tool: name,
-      input: redactToolInput(name, input),
+      tool: internalName,
+      input: redactToolInput(internalName, input),
     });
 
     try {
@@ -84,9 +88,9 @@ export class ToolRegistry {
         type: "tool.succeeded",
         runId: ctx.runId,
         sequence: ctx.sequence,
-        tool: name,
+        tool: internalName,
         output: typeof result.output === "string" ? result.output.slice(0, 500) : result.output,
-        artifact: result.artifact ? { type: result.artifact.type, external_id: result.artifact.external_id } : undefined,
+        artifacts: summarizeArtifacts(result),
       });
 
       return result;
@@ -96,7 +100,7 @@ export class ToolRegistry {
         type: "tool.failed",
         runId: ctx.runId,
         sequence: ctx.sequence,
-        tool: name,
+        tool: internalName,
         error: error instanceof Error ? error.message : String(error),
       });
 
@@ -111,17 +115,23 @@ export class ToolRegistry {
 
   /** 获取 OpenAI 格式的工具 schema 列表 */
   getSchemas(): readonly ToolSchema[] {
-    return this.getDefinitions().map((t) => t.schema);
+    return this.getDefinitions().map((t) => ({
+      ...t.schema,
+      function: {
+        ...t.schema.function,
+        name: t.llmName ?? toLlmToolName(t.name),
+      },
+    }));
   }
 
   /** 检查工具是否存在 */
   has(name: string): boolean {
-    return this.tools.has(name);
+    return this.tools.has(this.llmNameToName.get(name) ?? name);
   }
 
   /** 获取工具定义（只读） */
   get(name: string): ToolDefinition | undefined {
-    return this.tools.get(name);
+    return this.tools.get(this.llmNameToName.get(name) ?? name);
   }
 
   /** 获取已注册工具名称列表 */
@@ -132,6 +142,7 @@ export class ToolRegistry {
   /** 清空所有注册（测试用，防止跨测试污染） */
   reset(): void {
     this.tools.clear();
+    this.llmNameToName.clear();
   }
 }
 
@@ -152,6 +163,15 @@ function redactToolInput(toolName: string, input: Record<string, unknown>): Reco
   return redacted;
 }
 
+function toLlmToolName(name: string): string {
+  return name.replaceAll(".", "_");
+}
+
+function summarizeArtifacts(result: ToolResult): readonly Record<string, string | undefined>[] {
+  const artifacts = result.artifacts ?? (result.artifact ? [result.artifact] : []);
+  return artifacts.map((artifact) => ({ type: artifact.type, external_id: artifact.external_id }));
+}
+
 /** 全局单例 — 所有工具文件导入时使用 */
 export const registry = new ToolRegistry();
 ```
@@ -167,12 +187,14 @@ import type { ToolResult } from "../../types/tool.js";
 
 registry.register({
   name: "doc.create",
+  llmName: "doc_create",
   description: "Create a Feishu document from markdown content. Returns document ID and URL.",
+  confirmationRequired: true,
   requiresTargets: [],  // lark-cli 通过 profile 处理认证，不需要 Base token
   schema: {
     type: "function",
     function: {
-      name: "doc.create",
+      name: "doc_create",
       description: "Create a Feishu document from markdown content",
       parameters: {
         type: "object",
@@ -202,13 +224,14 @@ registry.register({
       };
     }
 
+    const contentFile = await writeIgnoredTempFile("doc-create", `# ${title}\n\n${markdown}`);
     const result = await runCommand("lark-cli", [
       "docs", "+create",
       "--api-version", "v2",
       "--profile", ctx.profile || "pilotflow-contest",
       "--as", "user",
       "--doc-format", "markdown",
-      "--content", `# ${title}\n\n${markdown}`,
+      "--content", `@${contentFile}`,
     ], { timeoutMs: 30000 });
 
     if (result.exitCode !== 0) {
@@ -238,13 +261,17 @@ registry.register({
 |--------|------|-------------|------|------|
 | `doc.create` | `tools/feishu/doc-create.ts` | — | 否 | 创建飞书文档（lark-cli profile 认证） |
 | `base.write` | `tools/feishu/base-write.ts` | `baseToken`, `baseTableId` | 否 | 写入 Base 表行 |
-| `task.create` | `tools/feishu/task-create.ts` | `tasklistId` | 否 | 创建飞书任务 |
+| `task.create` | `tools/feishu/task-create.ts` | `tasklistId` optional | 否 | 创建飞书任务；缺省时使用飞书默认任务目标 |
 | `im.send` | `tools/feishu/im-send.ts` | `chatId` | 否 | 发送 IM 消息 |
 | `entry.send` | `tools/feishu/entry-send.ts` | `chatId` | 否 | 发送项目入口消息（语义独立于 im.send，artifact 类型为 `entry_message`） |
 | `entry.pin` | `tools/feishu/entry-pin.ts` | `chatId` | 是 | 置顶消息（依赖 entry.send 返回的 message_id） |
 | `card.send` | `tools/feishu/card-send.ts` | `chatId` | 否 | 发送交互式卡片 |
 | `announcement.update` | `tools/feishu/announcement-update.ts` | `chatId` | 是 | 更新群公告（失败降级为 entry.pin） |
 | `contact.search` | `tools/feishu/contact-search.ts` | — | 是 | 搜索飞书联系人（用于任务分配解析） |
+
+Internal tool names use dot notation for readability and recorder grouping. LLM-facing names must use `llmName` with only letters, numbers, `_`, or `-` for provider compatibility. The registry maps `doc_create` back to `doc.create` before execution.
+
+`writeIgnoredTempFile()` represents a small infrastructure helper that writes sensitive/long command bodies into `tmp/` or the OS temp directory and returns a path safe for `--content @file`. Do not pass full document bodies through argv in live mode.
 
 ### 工具输出归一化
 

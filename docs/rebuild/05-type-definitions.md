@@ -146,6 +146,7 @@ export type RunStatus =
   | "pending"
   | "running"
   | "waiting_confirmation"
+  | "needs_clarification"
   | "completed"
   | "failed"
   | "cancelled"
@@ -171,6 +172,7 @@ export interface ToolContext {
 export interface ToolResult {
   readonly success: boolean;
   readonly artifact?: import("./artifact.js").Artifact;
+  readonly artifacts?: readonly import("./artifact.js").Artifact[];
   readonly output?: string;
   readonly error?: string;
   readonly metadata?: Record<string, unknown>;
@@ -184,12 +186,17 @@ export type ToolHandler = (
 
 /** 工具定义（注册到 registry 的完整描述） */
 export interface ToolDefinition {
+  /** Internal stable name used by orchestrator and recorder, e.g. "doc.create". */
   readonly name: string;
+  /** LLM-safe function name, e.g. "doc_create"; defaults to name with dots replaced by underscores. */
+  readonly llmName?: string;
   readonly description: string;
   readonly schema: ToolSchema;
   readonly handler: ToolHandler;
   readonly requiresLive?: boolean;
   readonly requiresTargets?: readonly string[];
+  /** true for every write or external side effect, even if no target token is required. */
+  readonly confirmationRequired: boolean;
   readonly optional?: boolean;
   readonly safeWithoutConfirmation?: boolean;  // true = 只读工具，无需确认门控
 }

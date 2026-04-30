@@ -13,6 +13,7 @@
 
 ```
 src/llm/error-classifier.ts    ← LLM API 错误分类（HTTP 状态码 + 消息模式）
+src/shared/errors.ts                  ← PilotFlowError + shared typed subclasses
 src/infrastructure/command-runner.ts  ← lark-cli 进程错误（exit code + stderr）
 src/orchestrator/duplicate-guard.ts   ← 业务错误（GuardBlockedError）
 src/tools/registry.ts                ← 工具错误（ToolNotFoundError, ToolPreflightError）

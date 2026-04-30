@@ -29,6 +29,7 @@ pilot-flow/
 │   │   ├── markdown.ts                 ← markdownBlock, divider, escapeHtml, formatArtifactTarget
 │   │   ├── path-utils.ts               ← getPath, resolveExecutable
 │   │   ├── array-utils.ts              ← unique, chunk, firstBy
+│   │   ├── errors.ts                   ← PilotFlowError + typed subclasses
 │   │   └── id.ts                       ← generateRunId, buildDedupeKey, buildIdempotencyKey
 │   │
 │   ├── safety/                         ← 安全层（零业务依赖）
@@ -57,8 +58,11 @@ pilot-flow/
 │   │       ├── base-write.ts
 │   │       ├── task-create.ts
 │   │       ├── im-send.ts
+│   │       ├── entry-send.ts
+│   │       ├── entry-pin.ts
 │   │       ├── card-send.ts
-│   │       └── announcement-update.ts
+│   │       ├── announcement-update.ts
+│   │       └── contact-search.ts
 │   │
 │   ├── domain/                         ← 业务逻辑（依赖 types + shared，不依赖 infrastructure）
 │   │   ├── plan.ts                     ← Plan 构建 + 验证 + fallback
@@ -86,7 +90,9 @@ pilot-flow/
 │   │
 │   ├── gateway/                        ← 产品事件入口（Feishu-native）
 │   │   └── feishu/
-│   │       ├── webhook-server.ts       ← Node 内置 http 事件接收
+│   │       ├── event-source.ts         ← 事件来源接口：lark-cli WebSocket / webhook
+│   │       ├── lark-cli-source.ts      ← 近期默认：封装 lark-cli event +subscribe NDJSON
+│   │       ├── webhook-server.ts       ← 后续可选：Node 内置 http 事件接收
 │   │       ├── message-handler.ts      ← IM 消息处理
 │   │       ├── card-handler.ts         ← 卡片回调处理
 │   │       ├── mention-gate.ts         ← @mention / DM 过滤
@@ -156,6 +162,7 @@ orchestrator/ ──→ domain/ ──→ types/
 - `shared/` 被所有模块引用，但不引用任何模块
 - `gateway/` 是产品事件入口，负责把 Feishu 事件转成 session turns
 - `interfaces/` 是叶子，只被 `package.json` scripts 引用
+- Gateway first implementation should prefer `lark-cli event +subscribe` because the project already uses this path locally. `webhook-server.ts` is an optional transport once public callback delivery, signature verification, and encryption posture are verified.
 
 ## 模块职责边界
 

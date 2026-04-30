@@ -89,7 +89,7 @@ export function preflight(config: RuntimeConfig, toolName: string): PreflightRes
 
 **检查项**：
 - `mode === "live"` 时必须有 `baseToken`, `baseTableId`, `chatId`
-- `task.create` 还需要 `tasklistId`
+- `task.create` 支持无 `tasklistId` 时使用飞书默认任务入口；缺失时给 warning，不作为阻断项，除非运行参数显式要求写入指定 tasklist
 - `profile` 不能是空字符串
 
 ### safety/write-guard.ts
@@ -380,9 +380,11 @@ export function handleCardCallback(action: CardAction, orchestrator: Orchestrato
 
 | 模块 | 职责 | 输入 |
 |------|------|------|
-| `gateway/feishu/webhook-server.ts` | Node 内置 `http` 接收飞书 webhook 事件 | HTTP POST |
+| `gateway/feishu/event-source.ts` | 统一事件来源接口 | AsyncIterable |
+| `gateway/feishu/lark-cli-source.ts` | 第一阶段默认事件来源，封装 `lark-cli event +subscribe` NDJSON | stdout |
+| `gateway/feishu/webhook-server.ts` | 第二阶段可选 transport，Node 内置 `http` 接收飞书 webhook 事件 | HTTP POST |
 | `interfaces/cli/cli-trigger.ts` | CLI 手动触发运行 | `--input <file>` 或 stdin |
-| `interfaces/cli/card-listener.ts` | 卡片事件监听（长驻进程） | stdin JSON lines |
+| `interfaces/cli/card-listener.ts` | 人类/开发调试 wrapper，读取 `lark-cli event +subscribe` NDJSON 并转交 `gateway/feishu/*` handler | stdin JSON lines |
 | `interfaces/cli/pilot-cli.ts` | CLI 主入口（子命令路由） | argv |
 | `interfaces/cli/doctor.ts` | 健康检查 | 无 |
 | `interfaces/cli/flight-recorder-view.ts` | JSONL 飞行记录查看 | `--input <file>` |
