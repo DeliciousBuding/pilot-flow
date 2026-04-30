@@ -194,7 +194,7 @@ PilotFlow is still an MVP prototype, but it is packaged around product-grade fou
 
 ## 🧬 Agent Evolution
 
-PilotFlow is learning from Hermes at the runtime level: Agent loop, ToolRegistry, Feishu gateway, session queues, error classification, retry, hermetic tests, and trace-first operation. The next product layer is controlled self-evolution:
+PilotFlow has adopted selected Hermes-style runtime patterns: Agent loop, ToolRegistry, Feishu gateway, session queues, error classification, retry, hermetic tests, and trace-first operation. This is not a claim that PilotFlow is already a mature autonomous agent platform. The next product layer is controlled self-evolution:
 
 ```text
 Run trace -> Evaluation -> Improvement proposal -> Human approval -> Updated workflow/template/test
@@ -206,17 +206,17 @@ Detailed plan: [docs/AGENT_EVOLUTION.md](docs/AGENT_EVOLUTION.md).
 
 ## 🧩 Feishu-Native Surfaces
 
-| Surface | Product role | MVP status |
+| Surface | Product role | Current maturity |
 | --- | --- | --- |
-| IM | Main collaboration entry and summary channel | ✅ validated |
-| Cards | Execution plan, confirmation, risk decision | ✅ live send fixed, execution plan + risk decision prototypes, callback action protocol, bounded listener bridge |
-| Docs | Project brief and delivery documents | ✅ creation validated |
-| Base | Tasks, detected risks, artifacts, confirmations | ✅ live rich Project State table validated |
-| Task | Concrete owner/deadline action items | ✅ creation validated, optional open_id/contact assignee mapping |
-| Pinned Entry / Announcement | Stable project entrance | ✅ live pinned entry; announcement attempted and falls back on docx announcement API block |
-| Event subscription | Card callback listener first, `@PilotFlow` automatic trigger later | 🟡 listener bridge ready; platform card callback EventKey/config still needs validation |
-| Chat Tab / H5 | Lightweight cockpit and flight recorder | ✅ static recorder prototype |
-| Whiteboard / Calendar / Slides | Demo enhancement surfaces | ⏳ later |
+| IM | Main collaboration entry and summary channel | Live send validated; automatic group trigger pending |
+| Cards | Execution plan, confirmation, risk decision | Live send validated; real button callback pending |
+| Docs | Project brief and delivery documents | Live creation validated |
+| Base | Tasks, detected risks, artifacts, confirmations | Live Project State write validated |
+| Task | Concrete owner/deadline action items | Live creation validated; assignee mapping remains guarded |
+| Pinned Entry / Announcement | Stable project entrance | Pinned entry validated; native announcement falls back on current docx API block |
+| Event subscription | Card callback listener first, `@PilotFlow` automatic trigger later | Local listener bridge ready; platform callback proof pending |
+| Chat Tab / H5 | Lightweight cockpit and flight recorder | Static recorder prototype |
+| Whiteboard / Calendar / Slides | Demo enhancement surfaces | Later |
 
 ## 🧪 MVP Progress
 
