@@ -24,6 +24,14 @@ const COMMANDS = {
     description: "Check local PilotFlow runtime requirements without printing secrets.",
     steps: [{ script: "pilot:doctor:run", args: [] }]
   },
+  "live-check": {
+    description: "Check live Feishu targets before running PilotFlow writes.",
+    steps: [{ script: "pilot:live-check", args: [] }]
+  },
+  "callback-proof": {
+    description: "Capture proof that Feishu card callback events reach PilotFlow.",
+    steps: [{ script: "pilot:callback-proof", args: [] }]
+  },
   gateway: {
     description: "Run the TypeScript Feishu IM and card gateway bridge.",
     steps: [{ script: "pilot:gateway", args: [] }]
@@ -111,6 +119,8 @@ function renderHelp() {
     "  npm run pilot:demo -- --send-plan-card --no-auto-confirm",
     "  npm run pilot:recorder -- --input tmp/runs/latest-manual-run.jsonl --output tmp/flight-recorder/latest.html",
     "  npm run pilot:doctor",
+    "  npm run pilot:live-check -- --json",
+    "  npm run pilot:callback-proof -- --timeout 60s",
     "  npm run pilot:gateway -- --dry-run --max-events 1",
     "  npm run pilot:run -- --dry-run --input \"目标: 建立答辩项目空间\"",
     "  npm run pilot:agent-smoke -- --input \"@PilotFlow 建立答辩项目空间\"",

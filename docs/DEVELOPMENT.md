@@ -56,6 +56,8 @@ Keep `package.json` readable. Long or repeatable automation belongs in `scripts/
 | `npm run test:evals` | Run retrospective eval-pack tests |
 | `npm run test:one -- <alias>` | Run one focused test alias |
 | `npm run pilot:doctor` | Check local runtime requirements without printing secrets |
+| `npm run pilot:live-check -- --json` | Run read-only live Feishu target checks |
+| `npm run pilot:callback-proof -- --timeout 60s` | Capture sanitized card callback delivery proof |
 | `npm run pilot:run -- --dry-run` | Run the product-facing TS project loop with default Feishu-native surfaces |
 | `npm run pilot:demo` | Run the legacy manual dry-run demo |
 | `npm run pilot:package` | Regenerate the core machine-review package |
@@ -142,6 +144,8 @@ Known product boundary:
 | Broad refactor | `npm run pilot:check`, `npm test`, `npm run pilot:status`, `npm run pilot:audit` |
 | TypeScript domain or tools | `npm run ts:check`, `npm run test:ts`, `npm test` |
 | CLI/environment surface | `npm run test:one -- doctor`, `npm run test:interfaces`, `npm run pilot:doctor` |
+| Live target validation | `npm run test:ts`, `npm run pilot:live-check -- --json` |
+| Card callback proof | `npm run test:ts`, `npm run pilot:callback-proof -- --timeout 60s` |
 | Product run facade | `npm run test:ts`, `npm run pilot:run -- --dry-run --input "<intent>"` |
 | Planner logic | `npm run pilot:check`, `npm run test:one -- plan`, `npm run pilot:demo` |
 | Orchestrator logic | `npm run pilot:check`, `npm run test:one -- orchestrator`, `npm run pilot:demo` |

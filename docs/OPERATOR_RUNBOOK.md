@@ -35,6 +35,8 @@ lark-cli auth status --verify
 | Run retrospective eval tests | `npm run test:evals` |
 | Run one focused test | `npm run test:one -- <alias>` |
 | Check local environment | `npm run pilot:doctor` |
+| Check live Feishu targets | `npm run pilot:live-check -- --json` |
+| Capture card callback proof | `npm run pilot:callback-proof -- --timeout 60s` |
 | Run product project loop | `npm run pilot:run -- --dry-run` |
 | Run TS Feishu event gateway | `npm run pilot:gateway -- --dry-run --max-events 1` |
 | Run legacy manual demo loop | `npm run pilot:demo` |
@@ -61,6 +63,13 @@ npm run test:one -- retrospective-eval
 ```bash
 npm run pilot:doctor
 npm run pilot:doctor -- --verify-auth
+```
+
+Use `pilot:live-check` before a real write run. It performs read-only checks for `lark-cli`, profile auth, chat visibility, and Base table visibility. It ignores `PILOTFLOW_LLM_*` because this command only validates Feishu live targets.
+
+```bash
+npm run pilot:live-check
+npm run pilot:live-check -- --json
 ```
 
 ## Dry-Run Operation
@@ -145,6 +154,17 @@ Current boundary:
 - An approved `card.action.trigger` can resume the stored run through the same TS orchestrator path.
 - A plain-text `确认执行` sent later in the same chat can also resume the latest pending run for that chat.
 - Real tenant validation is still required before this path replaces the older JS live proof.
+
+## Callback Proof
+
+Use `pilot:callback-proof` after changing Open Platform callback settings or before a live presentation. It listens only for `card.action.trigger`, records sanitized JSONL proof under `tmp/proof/callback-proof.jsonl`, and does not run the project orchestrator.
+
+```bash
+npm run pilot:callback-proof -- --timeout 60s
+npm run pilot:callback-proof -- --timeout 60s --strict
+```
+
+`--strict` exits non-zero when no callback arrives. Raw payload capture is off by default; `--include-raw` is allowed only for ignored `tmp/` outputs.
 
 ## TypeScript Project Init Bridge
 
