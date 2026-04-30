@@ -17,6 +17,13 @@ test("loadRuntimeConfig preserves CLI and env names", () => {
   assert.equal(config.verbose, false);
 });
 
+test("loadRuntimeConfig accepts the public Task assignee env alias", () => {
+  const config = loadRuntimeConfig([], {
+    PILOTFLOW_TASK_ASSIGNEE_OPEN_ID: "ou_owner",
+  });
+  assert.equal(config.feishuTargets.ownerOpenId, "ou_owner");
+});
+
 test("loadRuntimeConfig loads complete LLM env", () => {
   const config = loadRuntimeConfig([], {
     PILOTFLOW_LLM_BASE_URL: "https://api.example.test",

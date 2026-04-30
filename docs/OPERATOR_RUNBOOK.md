@@ -9,7 +9,7 @@ For product scope, read [`PRODUCT_SPEC.md`](PRODUCT_SPEC.md). For module boundar
 | Requirement | Expected value |
 | --- | --- |
 | Node.js | `>=20` |
-| Feishu CLI | global `lark-cli >=1.0.21` |
+| Feishu CLI | global `lark-cli >=1.0.23` |
 | Demo profile | `pilotflow-contest` |
 | Progress sync profile | `cli_a935d47f8138dcd2` |
 
@@ -134,6 +134,12 @@ npm run pilot:demo -- --help
 | `PILOTFLOW_TASK_ASSIGNEE_OPEN_ID` | optional default assignee `open_id` for the first created Task |
 | `PILOTFLOW_LISTENER_MAX_EVENTS` | max event count for `pilot:listen:cards` |
 | `PILOTFLOW_LISTENER_TIMEOUT` | listener timeout such as `30s` or `2m` |
+| `PILOTFLOW_LLM_BASE_URL` | optional OpenAI-compatible base URL for the TS Agent loop |
+| `PILOTFLOW_LLM_API_KEY` | local-only LLM API key; never commit |
+| `PILOTFLOW_LLM_MODEL` | model name for the TS Agent loop |
+| `PILOTFLOW_LLM_FALLBACK_MODELS` | comma-separated future fallback model list |
+| `PILOTFLOW_LLM_MAX_TOKENS` | optional max token budget, default `4096` |
+| `PILOTFLOW_LLM_TEMPERATURE` | optional model temperature, default `0.1` |
 
 Do not commit `.env`; it is intentionally ignored.
 
@@ -167,7 +173,7 @@ Generated reports and run logs stay under ignored `tmp/`.
 
 ## TypeScript Kernel Rebuild Status
 
-The TypeScript rebuild is active but not yet the live CLI path. As of commit `4353182`, Day 0 through Day 2 are complete: strict TS foundation, domain modules, ToolRegistry, tool idempotency, and 9 Feishu tool definitions are implemented and covered by TS tests. Operators should still use the `pilot:*` commands above for live and dry-run demos until the TS orchestrator and CLI entrypoints are wired.
+The TypeScript rebuild is active but not yet the live CLI path. Day 0 through Day 4 are complete: strict TS foundation, domain modules, ToolRegistry, tool idempotency, 9 Feishu tool definitions, split TS orchestrator, OpenAI-compatible LLM client, retry/error classifier, Agent loop, session manager, and Feishu gateway boundary are implemented and covered by TS tests. Operators should still use the `pilot:*` commands above for live and dry-run demos until the TS CLI bridge passes the same checks.
 
 ## Known Platform Edges
 

@@ -34,7 +34,7 @@ export function loadRuntimeConfig(
       baseTableId: stringValue(flags["base-table-id"]) ?? env.PILOTFLOW_BASE_TABLE_ID,
       chatId: stringValue(flags["chat-id"]) ?? env.PILOTFLOW_TEST_CHAT_ID,
       tasklistId: stringValue(flags["tasklist-id"]) ?? env.PILOTFLOW_TASKLIST_ID,
-      ownerOpenId: stringValue(flags["owner-open-id"]) ?? env.PILOTFLOW_OWNER_OPEN_ID,
+      ownerOpenId: stringValue(flags["owner-open-id"]) ?? env.PILOTFLOW_OWNER_OPEN_ID ?? env.PILOTFLOW_TASK_ASSIGNEE_OPEN_ID,
     },
     duplicateGuard: {
       enabled: mode === "live" && !booleanFlag(flags["disable-duplicate-guard"], env.PILOTFLOW_DISABLE_DUPLICATE_GUARD),

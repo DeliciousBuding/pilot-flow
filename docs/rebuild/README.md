@@ -1,7 +1,7 @@
 # PilotFlow Hermes-Style Agent Kernel Rebuild
 
 > Created: 2026-04-30
-> Status: Day 0 through Day 3 implemented; Day 4 gateway, LLM client, and agent loop are next
+> Status: Day 0 through Day 4 implemented; CLI migration and live gateway wiring remain next
 > Intent: rebuild PilotFlow around an Agent kernel instead of continuing to pile features onto the current script-shaped prototype.
 
 This folder is the rebuild blueprint for turning PilotFlow into a Feishu-native Agent product kernel.
@@ -28,6 +28,7 @@ The decision is now intentionally stronger than the previous cleanup plan: Pilot
 | Day 1 | Done | `94f741e` added strict TS foundation, core types, shared utilities, safety, infrastructure, runtime config, and TS tests |
 | Day 2 | Done | `4353182` added TS domain modules, ToolRegistry, tool idempotency, and 9 Feishu tool definitions |
 | Day 3 | Done | TS `src/orchestrator/` split added with confirmation gate, deterministic tool sequence, atomic duplicate guard, cards/messages/state/resolver helpers, callback bridge, and 59 TS tests while keeping the JS prototype runnable |
+| Day 4 | Done | TS `src/llm/`, `src/agent/`, and `src/gateway/feishu/` added: OpenAI-compatible client, error classifier, retry, Agent loop, session manager, lark-cli NDJSON event parsing, mention gate, dedupe, per-chat queue, card/message handlers, webhook signature/token helpers, and 29 additional TS tests. Review fixes include stable card action dedupe, Agent live batch preflight, webhook fail-closed token checks, session history caps, retry integration, and public env alias alignment. Real public webhook delivery and JS CLI migration remain deferred. |
 
 ## Hermes Evidence Snapshot
 
