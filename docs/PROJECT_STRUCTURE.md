@@ -11,6 +11,8 @@ PilotFlow keeps product runtime, CLI interfaces, and generated review tooling in
 | Runtime helpers | `src/runtime/` | reusable execution primitives such as tool-step recording | product planning policy, CLI parsing |
 | Tool registry | `src/tools/registry.ts`, `src/tools/idempotency.ts` | LLM-safe tool registry, live confirmation enforcement, tool idempotency | project planning policy, UI entrypoints |
 | Feishu integration | `src/tools/feishu/`, `src/adapters/lark-cli/` | JS live executor, TS tool definitions, artifact normalization, command wrapping | product decisions, demo scripts |
+| Agent runtime | `src/agent/`, `src/llm/` | OpenAI-compatible LLM client, retry/error classification, while-next Agent loop, session state | Feishu transport details, public CLI parsing |
+| Feishu gateway | `src/gateway/feishu/` | Feishu event normalization, mention filtering, event dedupe, per-chat queue, message/card handlers | tool implementation, planner policy, generated review reports |
 | Runtime config and schemas | `src/config/`, `src/schemas/` | environment parsing, runtime options, JSON schemas | Feishu side effects |
 | CLI interfaces | `src/interfaces/cli/` | manual trigger, listener wrapper, recorder view, setup, command facade, doctor | generated review pack logic |
 | Review packs | `src/review-packs/` | readiness, submission, delivery, callback, permission, safety, and other generated Markdown materials | core product flow |
@@ -57,6 +59,6 @@ Use `review:*` only when regenerating one specific review pack or debugging a pa
 
 PilotFlow can run a real Feishu project-launch loop through a manual trigger and confirmation gate. It can create or send Doc, Base rows, Task, cards, pinned entry, final summary, and trace output.
 
-The Hermes-style TypeScript kernel rebuild has completed Day 0 through Day 3: strict TS foundation, domain modules, ToolRegistry, tool idempotency, 9 Feishu tool definitions, and the split TS orchestrator layer are in place. The old JS runtime is still intentionally retained until the TS gateway and CLI path pass the same live and dry-run checks.
+The Hermes-style TypeScript kernel rebuild has completed Day 0 through Day 4: strict TS foundation, domain modules, ToolRegistry, tool idempotency, 9 Feishu tool definitions, split TS orchestrator layer, minimal LLM client, Agent loop, session manager, and Feishu gateway boundary are in place. The old JS runtime is still intentionally retained until the TS gateway and CLI path pass the same live and dry-run checks.
 
-PilotFlow is not yet a fully unattended long-running Feishu bot. Card callback listener wiring exists locally, but real `card.action.trigger` delivery still needs Open Platform callback configuration verification. The stable fallback is text confirmation.
+PilotFlow is not yet a fully unattended long-running Feishu bot. Card callback listener wiring and gateway parsing exist locally, but real `card.action.trigger` delivery still needs Open Platform callback configuration verification. Public webhook transport remains a tested contract helper rather than the default product path. The stable fallback is text confirmation.

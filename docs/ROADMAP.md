@@ -29,7 +29,7 @@ flowchart LR
 | Traceability | Implemented | JSONL run log, Flight Recorder, and review-pack generators are available |
 | Review packaging | Implemented | Machine evidence can be regenerated locally; manual videos and screenshots remain outside Git |
 | Product cleanup | Implemented for JS prototype | Runtime entrypoints, review tooling, command facade, and public demo docs are separated |
-| TypeScript kernel rebuild | In progress | Day 0 through Day 2 complete; Day 3 orchestrator split is next |
+| TypeScript kernel rebuild | In progress | Day 0 through Day 4 complete; TS gateway, LLM client, Agent loop, and review-hardening tests are in place while JS CLI remains the live product path |
 
 ## Phase 0: Foundation
 
@@ -90,9 +90,9 @@ Exit condition: product runtime, review packaging, and documentation are visibly
 - [x] Day 0: external contracts checked and recorded in `docs/rebuild/CONTRACT_NOTES.md`.
 - [x] Day 1: strict TS foundation, shared utilities, safety layer, infrastructure, runtime config, and TS test bridge.
 - [x] Day 2: TS domain modules, ToolRegistry, tool idempotency, and 9 Feishu tool definitions.
-- [ ] Day 3: split the orchestrator into confirmation gate, tool sequence, duplicate guard, cards, project state, entry, summary, and resolver modules.
-- [ ] Day 4: add Feishu gateway, session queue, Agent loop, and mock-tested LLM provider.
-- [ ] Day 5: migrate review packs/tests and remove old JS runtime only after the TS path passes.
+- [x] Day 3: split the orchestrator into confirmation gate, tool sequence, duplicate guard, cards, project state, entry, summary, and resolver modules.
+- [x] Day 4: add Feishu gateway, session queue, Agent loop, and mock-tested LLM provider.
+- [ ] Day 5: bridge TS gateway/agent into CLI dry-run smoke paths, keep live migration guarded, and remove old JS runtime only after the TS path passes.
 
 Exit condition: TypeScript path can run the same dry-run and live-guarded project launch loop as the current JS prototype.
 
@@ -120,8 +120,8 @@ Exit condition: PilotFlow feels useful beyond the first project-launch flow whil
 
 ## Immediate Next Actions
 
-1. Implement TypeScript rebuild Day 3: orchestrator modules and regression tests.
-2. Keep the current JS prototype runnable while the TS orchestrator is being wired.
+1. Implement TypeScript rebuild Day 5: CLI bridge and dry-run smoke path for the TS gateway/Agent loop without replacing the stable JS live path.
+2. Keep the current JS prototype runnable until TS dry-run and live-guarded flows pass the same checks.
 3. Capture happy-path and failure-path media outside Git.
 4. Verify Open Platform card callback delivery or keep it explicitly marked as pending.
 5. Run `pilot:doctor`, `pilot:check`, tests, review package generation, status, and safety audit before any public handoff.

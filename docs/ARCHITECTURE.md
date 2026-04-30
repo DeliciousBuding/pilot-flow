@@ -33,7 +33,7 @@ flowchart TB
 
 | Component | Responsibility | Current status |
 | --- | --- | --- |
-| Trigger | Starts a run from manual input now, IM event later | manual trigger implemented |
+| Trigger | Starts a run from manual input now, IM event later | manual trigger implemented; TS Feishu gateway boundary added |
 | Planner | Converts input into project plan JSON | deterministic prototype planner implemented behind JS and TS provider boundaries |
 | Confirmation Gate | Stops side effects until human approval | flight plan card, dry-run auto-confirm, live text fallback, callback action protocol, and bounded callback listener implemented |
 | Duplicate Run Guard | Blocks accidental repeated live runs for the same project target | local guard file implemented under `tmp/run-guard/` |
@@ -46,6 +46,9 @@ flowchart TB
 | Risk Engine | Enriches planner risks and creates a decision summary | initial detector and risk decision card implemented |
 | Cockpit | Shows run state and replay | static Flight Recorder HTML view implemented |
 | Card Event Listener | Streams Feishu card callbacks and triggers approved runs | code-level listener and callback-trigger bridge implemented; live listener connected but callback delivery still pending |
+| LLM Client | Calls OpenAI-compatible chat completions with tool schemas | minimal TS client implemented with mock-fetch tests; real online success is not a rebuild gate |
+| Agent Loop | Runs while-next LLM -> tool calls -> registry -> tool output | TS loop implemented behind ToolRegistry and confirmation gate; deterministic orchestrator remains default path |
+| Feishu Gateway | Normalizes Feishu IM/card events before Agent/session routing | lark-cli NDJSON parser, mention gate, dedupe, per-chat queue, message/card handlers, and webhook contract helpers implemented |
 
 ## Run State
 
@@ -81,7 +84,9 @@ The current schemas live in `src/schemas`. The current planner is deterministic 
 
 Artifact normalization currently supports Feishu Doc, Base record batch writes, Task creation, card sends, project entry messages, announcement update attempts, pinned messages, IM message sends, and local run logs. Dry-run artifacts are marked `planned`; live artifacts are marked `created` once the corresponding `lark-cli` call succeeds. Optional announcement failures are marked `failed` and do not abort the run. Base record artifacts also expose fallback fields such as `owner`, `due_date`, `risk_level`, `source_run`, `source_message`, and `url` for Flight Recorder and demo inspection.
 
-The TypeScript rebuild path now has `src/tools/registry.ts`, `src/tools/idempotency.ts`, self-registering Feishu tool definitions under `src/tools/feishu/*.ts`, and a split `src/orchestrator/` layer. The TS orchestrator owns validation fallback, confirmation gating, batch preflight, deterministic tool sequencing, optional fallback handling, callback parsing, Project State row building, assignee/contact resolution, and an atomic duplicate guard with TTL cleanup. The existing JS runtime remains the live product path until the TS gateway and CLI entrypoints are wired.
+The TypeScript rebuild path now has `src/tools/registry.ts`, `src/tools/idempotency.ts`, self-registering Feishu tool definitions under `src/tools/feishu/*.ts`, a split `src/orchestrator/` layer, `src/llm/`, `src/agent/`, and `src/gateway/feishu/`. The TS orchestrator owns validation fallback, confirmation gating, batch preflight, deterministic tool sequencing, optional fallback handling, callback parsing, Project State row building, assignee/contact resolution, and an atomic duplicate guard with TTL cleanup. The Agent loop uses the same ToolRegistry schema/execute surface, so LLM-driven tool calls cannot bypass registry preflight or confirmation enforcement. The existing JS runtime remains the live product path until the TS gateway and CLI entrypoints are wired.
+
+The Feishu gateway follows the Hermes pattern in a reduced form: default event input is `lark-cli event +subscribe` NDJSON, not a public webhook. The gateway can parse message and card events, apply DM/@mention filtering, dedupe event IDs, and serialize work per chat. The webhook helper only implements signature and verification-token contract tests; real encrypted webhook payloads, public callback delivery, and synchronous card mutation are deferred until platform fixtures are verified.
 
 Plan validation runs immediately after planner output and before confirmation, preflight, duplicate-run guard, or any Feishu tool call. If required project-init fields fail validation, PilotFlow records `plan.validation_failed`, returns `needs_clarification`, and uses a safe fallback plan instead of creating Doc/Base/Task/IM artifacts.
 
@@ -165,6 +170,12 @@ PILOTFLOW_TASK_ASSIGNEE_OPEN_ID=<optional_default_open_id>
 PILOTFLOW_CONFIRMATION_TEXT=确认起飞
 PILOTFLOW_LISTENER_MAX_EVENTS=<optional_max_events>
 PILOTFLOW_LISTENER_TIMEOUT=<optional_timeout_like_30s>
+PILOTFLOW_LLM_BASE_URL=<openai_compatible_base_url>
+PILOTFLOW_LLM_API_KEY=<local_only_api_key>
+PILOTFLOW_LLM_MODEL=<model_name>
+PILOTFLOW_LLM_FALLBACK_MODELS=<comma_separated_optional_models>
+PILOTFLOW_LLM_MAX_TOKENS=4096
+PILOTFLOW_LLM_TEMPERATURE=0.1
 ```
 
 Live mode requires the confirmation text `确认起飞`. It also preflights required Base and chat targets before the first Feishu write so a missing target does not create a partial Doc-only run.

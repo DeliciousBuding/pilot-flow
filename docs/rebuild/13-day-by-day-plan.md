@@ -9,7 +9,8 @@
 - [x] Day 1 complete: strict TypeScript foundation, shared utilities, safety, infrastructure, runtime config, and TS test bridge are implemented.
 - [x] Day 2 complete: domain modules, `ToolRegistry`, tool idempotency, and 9 Feishu tool definitions are implemented in commit `4353182`.
 - [x] Day 3 complete: `src/orchestrator/` split is implemented with confirmation gate, deterministic sequence, duplicate guard, card/message/state helpers, callback bridge, and tests while keeping the JS prototype runnable.
-- [ ] Day 4 next: Feishu gateway, LLM client, and Agent loop wiring without deleting the JS public CLI path.
+- [x] Day 4 complete: Feishu gateway boundary, OpenAI-compatible LLM client, retry/error classifier, Agent loop, and session manager are implemented without deleting the JS public CLI path.
+- [ ] Day 5 next: CLI migration bridge, public command hardening, and a dry-run Feishu gateway smoke path.
 
 ## Day 0：合同核验 + 迁移闸门（~2 小时）
 
@@ -272,6 +273,15 @@ node dist/src/interfaces/cli/pilot-cli.js doctor
 ```
 
 **Day 4 完成标志**：CLI 入口可运行，OpenAI-compatible LLM client 有 mock fetch 测试，Agent loop 可完成至少一次 tool call round-trip，gateway 的 mention/dedupe/webhook verification 单测绿色。
+
+当前实现不要求真实模型在线成功，不要求公网 webhook 上线，也不替换现有 JS CLI 产品入口。已完成：
+
+- `src/llm/client.ts`：OpenAI-compatible `/v1/chat/completions` client，支持 tools、tool calls、usage、finish reason、超时和错误分类。
+- `src/llm/error-classifier.ts` / `src/llm/retry.ts`：Hermes-style 恢复提示形状，包括 retry、fallback、rotate、compress hints。
+- `src/agent/loop.ts`：while-next Agent loop，使用 `ToolRegistry.getSchemas()` / `ToolRegistry.execute()`，工具输出加围栏，live side-effect 工具确认失败时 fail-closed。
+- `src/agent/session-manager.ts`：Map + TTL + LRU 上限的轻量 session manager。
+- `src/gateway/feishu/`：`lark-cli event +subscribe` NDJSON 解析、mention gate、event dedupe、per-chat queue、message/card handlers、webhook signature/token contract helpers。
+- `tests/llm/`、`tests/agent/`、`tests/gateway/feishu/`：新增 29 项 TS 测试，覆盖 mock fetch、工具调用、畸形 JSON、确认拒绝、live batch preflight、retry、session 裁剪、事件解析、稳定业务去重、队列和 webhook contract。
 
 ---
 
