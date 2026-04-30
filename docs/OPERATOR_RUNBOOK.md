@@ -71,6 +71,7 @@ When run from the repository root, `pilot:live-check` loads local `.env` values 
 ```bash
 npm run pilot:live-check
 npm run pilot:live-check -- --json
+npm run pilot:live-check -- --strict --json
 ```
 
 ## Dry-Run Operation

@@ -26,6 +26,8 @@ test("buildLiveCheckReport checks live targets with redacted details", async () 
   });
 
   assert.equal(report.summary.failed, 0);
+  assert.equal(report.ready, false);
+  assert.equal(report.summary.actionable, 1);
   assert.equal(checkStatus(report.checks, "IM event receive scope"), "pass");
   assert.equal(checkStatus(report.checks, "IM event subscribe dry-run"), "pass");
   assert.equal(checkStatus(report.checks, "card callback subscribe dry-run"), "pass");
@@ -37,6 +39,7 @@ test("buildLiveCheckReport checks live targets with redacted details", async () 
 
   const rendered = renderLiveCheckReport(report);
   assert.match(rendered, /PilotFlow Live Check/u);
+  assert.match(rendered, /Ready: no/u);
   assert.match(rendered, /pilotflow-contest/u);
   assert.doesNotMatch(rendered, /oc_secret_chat_123456/u);
   assert.doesNotMatch(rendered, /bascn_secret_base_123456/u);
@@ -61,6 +64,8 @@ test("buildLiveCheckReport reports missing env without live API calls", async ()
   });
 
   assert.equal(report.summary.failed, 0);
+  assert.equal(report.ready, false);
+  assert.equal(report.summary.actionable > 0, true);
   assert.equal(report.summary.warned > 0, true);
   assert.equal(checkStatus(report.checks, "chat readable"), "warn");
   assert.equal(checkStatus(report.checks, "base table readable"), "warn");
@@ -83,6 +88,7 @@ test("buildLiveCheckReport warns when the IM event receive scope is missing", as
   const scopeCheck = report.checks.find((item) => item.name === "IM event receive scope");
   assert.equal(scopeCheck?.status, "warn");
   assert.match(scopeCheck?.detail ?? "", /im:message\.p2p_msg:readonly/u);
+  assert.equal(report.ready, false);
   assert.equal(report.nextActions.length, 2);
   assert.equal(report.nextActions[0]?.owner, "open_platform_admin");
   assert.equal(report.nextActions[0]?.severity, "warn");
@@ -215,6 +221,23 @@ test("buildLiveCheckReport reports configured bot mention identity without print
   const rendered = renderLiveCheckReport(report);
   assert.match(rendered, /PILOTFLOW_BOT_USER_ID is set/u);
   assert.doesNotMatch(rendered, /u_secret_bot_123456/u);
+});
+
+test("buildLiveCheckReport is ready when only non-actionable optional warnings remain", async () => {
+  const report = await buildLiveCheckReport({
+    env: {
+      PILOTFLOW_TEST_CHAT_ID: "oc_secret_chat_123456",
+      PILOTFLOW_BASE_TOKEN: "bascn_secret_base_123456",
+      PILOTFLOW_BASE_TABLE_ID: "tbl_secret_table_123456",
+      PILOTFLOW_BOT_USER_ID: "u_secret_bot_123456",
+    },
+    runCommand: async (bin: string, args: readonly string[]) => okResult([bin, ...args]),
+  });
+
+  assert.equal(checkStatus(report.checks, "tasklist configured"), "warn");
+  assert.equal(report.ready, true);
+  assert.equal(report.summary.actionable, 0);
+  assert.match(renderLiveCheckReport(report), /Ready: yes/u);
 });
 
 function okResult(command: readonly string[], stdout = "{}"): CommandResult {

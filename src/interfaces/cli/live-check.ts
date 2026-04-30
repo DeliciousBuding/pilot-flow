@@ -30,12 +30,14 @@ export interface LiveCheckAction {
 export interface LiveCheckReport {
   readonly generatedAt: string;
   readonly profile: string;
+  readonly ready: boolean;
   readonly checks: readonly LiveCheckItem[];
   readonly nextActions: readonly LiveCheckAction[];
   readonly summary: {
     readonly passed: number;
     readonly warned: number;
     readonly failed: number;
+    readonly actionable: number;
   };
 }
 
@@ -83,15 +85,18 @@ export async function buildLiveCheckReport(options: LiveCheckOptions = {}): Prom
       : "missing PILOTFLOW_BOT_USER_ID; gateway IM probe will fail before sending unless --bot-user-id or --probe-text is passed",
   });
 
+  const nextActions = buildNextActions(checks, runtime.profile);
   return {
     generatedAt: new Date().toISOString(),
     profile: runtime.profile,
+    ready: checks.every((item) => item.status !== "fail") && nextActions.length === 0,
     checks,
-    nextActions: buildNextActions(checks, runtime.profile),
+    nextActions,
     summary: {
       passed: checks.filter((item) => item.status === "pass").length,
       warned: checks.filter((item) => item.status === "warn").length,
       failed: checks.filter((item) => item.status === "fail").length,
+      actionable: nextActions.length,
     },
   };
 }
@@ -115,7 +120,8 @@ export function renderLiveCheckReport(report: LiveCheckReport): string {
     ...report.checks.map((item) => `| ${item.name} | ${item.status} | ${escapeCell(redactDetail(item.detail))} |`),
     "",
     ...renderNextActions(report.nextActions),
-    `Summary: ${report.summary.passed} passed, ${report.summary.warned} warned, ${report.summary.failed} failed.`,
+    `Ready: ${report.ready ? "yes" : "no"}`,
+    `Summary: ${report.summary.passed} passed, ${report.summary.warned} warned, ${report.summary.failed} failed, ${report.summary.actionable} actionable.`,
   ].join("\n");
 }
 
@@ -131,12 +137,13 @@ Options:
   --base-token <base>       Feishu Base token for read check.
   --base-table-id <table>   Feishu Base table id for read check.
   --json                    Print JSON report.
+  --strict                  Exit non-zero when known next actions remain.
   --help                    Show this help.
 `;
 }
 
 async function main(argv = process.argv.slice(2)): Promise<void> {
-  const parsed = parseArgs(argv, { boolean: ["json", "help", "h"] });
+  const parsed = parseArgs(argv, { boolean: ["json", "strict", "help", "h"] });
   if (parsed.flags.help === true || parsed.flags.h === true) {
     console.log(buildLiveCheckUsage());
     return;
@@ -148,7 +155,7 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
   } else {
     console.log(renderLiveCheckReport(report));
   }
-  if (report.summary.failed > 0) process.exitCode = 1;
+  if (report.summary.failed > 0 || (parsed.flags.strict === true && !report.ready)) process.exitCode = 1;
 }
 
 async function commandCheck(
