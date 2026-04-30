@@ -38,7 +38,7 @@ lark-cli auth status --verify
 | Check live Feishu targets | `npm run pilot:live-check -- --json` |
 | Capture card callback proof | `npm run pilot:callback-proof -- --timeout 60s` |
 | Run product project loop | `npm run pilot:run -- --dry-run` |
-| Run TS Feishu event gateway | `npm run pilot:gateway -- --dry-run --max-events 1` |
+| Run TS Feishu event gateway | `npm run pilot:gateway -- --dry-run --timeout 30s --max-events 1` |
 | Run legacy manual demo loop | `npm run pilot:demo` |
 | Run TS gateway/Agent smoke path | `npm run pilot:agent-smoke` |
 | Run TS project-init bridge | `npm run pilot:project-init-ts` |
@@ -148,8 +148,8 @@ npm run pilot:agent-smoke -- --json
 The TypeScript gateway can subscribe to `im.message.receive_v1` and `card.action.trigger`, apply mention filtering, open a waiting-confirmation project-init run from a Feishu mention, persist the pending run locally, and resume it after either an approved card callback or a same-chat text reply `确认执行`. This is a local event bridge, not yet a fully validated tenant bot loop.
 
 ```bash
-npm run pilot:gateway -- --dry-run --max-events 1
-npm run pilot:gateway -- --live --chat-id <chat> --base-token <base> --base-table-id <table>
+npm run pilot:gateway -- --dry-run --timeout 30s --max-events 1
+npm run pilot:gateway -- --live --timeout 60s --chat-id <chat> --base-token <base> --base-table-id <table>
 ```
 
 Current boundary:
@@ -158,6 +158,8 @@ Current boundary:
 - In `live`, the first mention should create the waiting-confirmation run and optional execution-plan card, then store the pending run under `tmp/state/pending-gateway-runs.json`.
 - An approved `card.action.trigger` can resume the stored run through the same TS orchestrator path.
 - A plain-text `确认执行` sent later in the same chat can also resume the latest pending run for that chat.
+- `--timeout` exits cleanly with `status: timeout` when no event arrives, so live probes do not hang forever.
+- Subscription failures return `status: subscribe_failed` and write sanitized stderr to the gateway JSONL log.
 - Real tenant validation is still required before this path replaces the older JS live proof.
 
 ## Callback Proof
@@ -269,7 +271,7 @@ The TypeScript rebuild is active. Day 0 through Day 7 are complete: strict TS fo
 
 | Edge | Current behavior |
 | --- | --- |
-| Card callback delivery | Code-level listener and trigger bridge exist; a live listener attempt connected but did not receive a real `card.action.trigger` event |
+| Card callback delivery | Code-level listener and trigger bridge exist; on 2026-05-01 a probe card was sent successfully, but the listener did not receive `card.action.trigger` within 30 seconds |
 | Group announcement | Native announcement update was attempted; the current test group returns `232097 Unable to operate docx type chat announcement` |
 | Manual media | Submission/readiness review separate machine evidence from videos, screenshots, and callback configuration proof |
 
@@ -299,6 +301,7 @@ Run the update from the workspace root because `--content @PERSONAL_PROGRESS.md`
 | Live mode stops before side effects | Confirm `PILOTFLOW_TEST_CHAT_ID`, `PILOTFLOW_BASE_TOKEN`, and `PILOTFLOW_BASE_TABLE_ID` |
 | Duplicate live run blocked | Use a new `PILOTFLOW_DEDUPE_KEY` or intentionally pass `--allow-duplicate-run` |
 | Card sends but button does not trigger | Regenerate Callback Verification Pack and inspect Open Platform callback configuration |
+| Gateway live probe appears stuck | Re-run with `--timeout 60s --json`; `timeout` means no event arrived, while `subscribe_failed` points to subscription, permission, or profile setup |
 | Callback proof returns `subscribe_failed` | Inspect the sanitized stderr in `tmp/proof/callback-proof.jsonl`, then check event subscription permissions and profile auth |
 | Announcement update fails | Keep pinned entry fallback; do not claim native announcement success for this group |
 | Contact lookup cannot assign owner | Use explicit `PILOTFLOW_OWNER_OPEN_ID_MAP_JSON` or keep text owner fallback |

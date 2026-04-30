@@ -3,6 +3,7 @@ import test from "node:test";
 import { mkdir, rm } from "node:fs/promises";
 import { join } from "node:path";
 import type { FeishuGatewayEvent } from "../../src/gateway/feishu/event-source.js";
+import { LarkCliSubscribeError } from "../../src/gateway/feishu/lark-cli-source.js";
 import { PendingRunStore } from "../../src/gateway/feishu/pending-run-store.js";
 import { runAgentGateway } from "../../src/interfaces/cli/agent-gateway.js";
 import type { ToolDefinition } from "../../src/types/tool.js";
@@ -26,6 +27,7 @@ test("runAgentGateway completes a dry-run mention path", async () => {
     });
 
     assert.equal(result.processedMessages, 1);
+    assert.equal(result.status, "completed");
     assert.equal(result.processedCards, 0);
     assert.equal(result.pendingRuns, 0);
     assert.equal(recorder.ofType("run.completed").length, 1);
@@ -58,6 +60,7 @@ test("runAgentGateway stores waiting live runs and resumes them from card callba
     });
 
     assert.equal(first.processedMessages, 1);
+    assert.equal(first.status, "completed");
     assert.equal(first.pendingRuns, 1);
     assert.equal(firstRecorder.ofType("run.waiting_confirmation").length, 1);
 
@@ -83,6 +86,7 @@ test("runAgentGateway stores waiting live runs and resumes them from card callba
     });
 
     assert.equal(second.processedCards, 1);
+    assert.equal(second.status, "completed");
     assert.equal(second.pendingRuns, 0);
     assert.equal(secondRecorder.ofType("run.completed").length, 1);
     assert.equal(secondRecorder.ofType("gateway.card_continuation_completed").length, 1);
@@ -115,6 +119,7 @@ test("runAgentGateway resumes pending live runs from plain text confirmation in 
     });
 
     assert.equal(first.processedMessages, 1);
+    assert.equal(first.status, "completed");
     assert.equal(first.pendingRuns, 1);
 
     const secondRecorder = new MemoryRecorder();
@@ -134,6 +139,7 @@ test("runAgentGateway resumes pending live runs from plain text confirmation in 
     });
 
     assert.equal(second.processedMessages, 1);
+    assert.equal(second.status, "completed");
     assert.equal(second.pendingRuns, 0);
     assert.equal(secondRecorder.ofType("run.completed").length, 1);
     assert.equal(secondRecorder.ofType("gateway.text_continuation_completed").length, 1);
@@ -164,9 +170,68 @@ test("runAgentGateway ignores confirmation text without a pending run", async ()
     });
 
     assert.equal(result.processedMessages, 0);
+    assert.equal(result.status, "completed");
     assert.equal(result.ignoredEvents, 1);
     assert.equal(recorder.ofType("run.completed").length, 0);
     assert.equal(recorder.ofType("gateway.text_confirmation_missing_pending_run").length, 1);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("runAgentGateway returns timeout when no gateway event arrives before the deadline", async () => {
+  const dir = join(process.cwd(), "tmp", "tests", `pilotflow-agent-gateway-timeout-${Date.now()}`);
+  await mkdir(dir, { recursive: true });
+
+  try {
+    const recorder = new MemoryRecorder();
+    const registry = createGatewayRegistry();
+    const result = await runAgentGateway({
+      argv: [
+        "--dry-run",
+        "--timeout", "1ms",
+        "--pending-store", join(dir, "pending.json"),
+        "--output", join(dir, "gateway.jsonl"),
+      ],
+      source: hangingEventSource(),
+      registry,
+      recorder,
+    });
+
+    assert.equal(result.status, "timeout");
+    assert.equal(result.processedMessages, 0);
+    assert.equal(result.pendingRuns, 0);
+    assert.equal(recorder.ofType("gateway.timeout").length, 1);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("runAgentGateway surfaces subscribe failures without leaking stderr secrets", async () => {
+  const dir = join(process.cwd(), "tmp", "tests", `pilotflow-agent-gateway-subscribe-${Date.now()}`);
+  await mkdir(dir, { recursive: true });
+
+  try {
+    const recorder = new MemoryRecorder();
+    const registry = createGatewayRegistry();
+    const result = await runAgentGateway({
+      argv: [
+        "--live",
+        "--pending-store", join(dir, "pending.json"),
+        "--chat-id", "oc_live",
+        "--base-token", "base_live",
+        "--base-table-id", "tbl_live",
+      ],
+      source: failingEventSource(),
+      registry,
+      recorder,
+    });
+
+    assert.equal(result.status, "subscribe_failed");
+    assert.equal(result.failure?.exitCode, 2);
+    assert.match(result.failure?.message ?? "", /event subscription failed/u);
+    assert.doesNotMatch(result.failure?.message ?? "", /secret-token/u);
+    assert.equal(recorder.ofType("gateway.subscribe_failed").length, 1);
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
@@ -266,6 +331,28 @@ function eventSource(events: readonly FeishuGatewayEvent[]) {
   return {
     async *events() {
       for (const event of events) yield event;
+    },
+    async close() {},
+  };
+}
+
+function hangingEventSource() {
+  return {
+    async *events(): AsyncIterable<FeishuGatewayEvent> {
+      await new Promise(() => undefined);
+    },
+    async close() {},
+  };
+}
+
+function failingEventSource() {
+  return {
+    async *events(): AsyncIterable<FeishuGatewayEvent> {
+      throw new LarkCliSubscribeError("lark-cli event subscription failed: token=[REDACTED]", {
+        command: ["lark-cli", "event", "+subscribe"],
+        exitCode: 2,
+        stderr: "token=[REDACTED]",
+      });
     },
     async close() {},
   };

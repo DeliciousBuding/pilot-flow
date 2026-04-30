@@ -68,7 +68,8 @@ Exit condition: a confirmed local command can create real Feishu artifacts and p
 - [x] Bounded card listener and callback-trigger bridge.
 - [x] Native group announcement attempt with pinned-entry fallback.
 - [x] Local TS IM mention gateway bridge with pending-run continuation for approved card callbacks and same-chat text confirmation.
-- [ ] Verify a real Feishu card button click reaches the listener and triggers the orchestrator; `pilot:callback-proof -- --send-probe-card` can now create its own clickable proof card.
+- [x] Add bounded gateway probes with structured `timeout` and `subscribe_failed` results.
+- [ ] Verify a real Feishu card button click reaches the listener and triggers the orchestrator; the 2026-05-01 probe card send succeeded, but no callback arrived within 30 seconds.
 - [ ] Capture a polished 6 to 8 minute happy-path walkthrough.
 - [ ] Capture a focused failure-path walkthrough or screenshot set.
 - [ ] Capture Open Platform permission and callback configuration screenshots.
@@ -137,8 +138,8 @@ Exit condition: PilotFlow feels useful beyond the first project-launch flow whil
 ## Immediate Next Actions
 
 1. Repeat `npm run pilot:run -- --live --confirm "确认执行"` with fresh dedupe keys, then compare the live artifacts with the older JS live proof.
-2. Verify Open Platform card callback delivery with `npm run pilot:callback-proof -- --send-probe-card --timeout 60s`, or document the exact platform/config blocker with screenshots and logs.
-3. Validate the new `pilot:gateway` path against the real tenant, then convert it into an allowlisted IM mention trigger after callback proof is understood.
+2. Inspect Open Platform callback/event settings for the `card.action.trigger` gap, then rerun `npm run pilot:callback-proof -- --send-probe-card --timeout 60s`.
+3. Validate the new `pilot:gateway -- --live --timeout 60s --json` path against the real tenant, then convert it into an allowlisted IM mention trigger after callback proof is understood.
 4. Promote Retrospective Eval cases into snapshot-backed fixtures from real successful and degraded runs.
 5. Capture happy-path and failure-path media outside Git, then rerun `pilot:status` until the package is no longer `needs_regeneration`.
 6. Only after the main Feishu loop is stable, design the first artifact approval card for worker previews.

@@ -6,7 +6,7 @@ import { EventDedupe } from "../../gateway/feishu/dedupe.js";
 import type { BotIdentity, FeishuCardEvent, FeishuGatewayEvent, FeishuMessageEvent } from "../../gateway/feishu/event-source.js";
 import type { EventSource } from "../../gateway/feishu/event-source.js";
 import { handleCardEvent } from "../../gateway/feishu/card-handler.js";
-import { LarkCliEventSource } from "../../gateway/feishu/lark-cli-source.js";
+import { LarkCliEventSource, LarkCliSubscribeError } from "../../gateway/feishu/lark-cli-source.js";
 import { handleMessageEvent } from "../../gateway/feishu/message-handler.js";
 import { stripSelfMention } from "../../gateway/feishu/mention-gate.js";
 import { PendingRunStore, toPendingRunOptions, type PendingRunRecord, type PendingRunOptions } from "../../gateway/feishu/pending-run-store.js";
@@ -37,12 +37,18 @@ export interface AgentGatewayOptions {
 }
 
 export interface AgentGatewayResult {
+  readonly status: "completed" | "timeout" | "subscribe_failed";
   readonly processedMessages: number;
   readonly processedCards: number;
   readonly ignoredEvents: number;
   readonly unsupportedEvents: number;
   readonly pendingRuns: number;
   readonly output?: string;
+  readonly failure?: {
+    readonly message: string;
+    readonly exitCode?: number | null;
+    readonly stderr?: string;
+  };
 }
 
 export async function runAgentGateway(options: AgentGatewayOptions = {}): Promise<AgentGatewayResult> {
@@ -79,6 +85,7 @@ export async function runAgentGateway(options: AgentGatewayOptions = {}): Promis
       "bot-user-id",
       "bot-name",
       "max-events",
+      "timeout",
       "mode",
     ],
   });
@@ -107,15 +114,35 @@ export async function runAgentGateway(options: AgentGatewayOptions = {}): Promis
   const bot = resolveBotIdentity(parsed.flags, env);
   const source = options.source ?? new LarkCliEventSource({ profile: runtime.profile, as: "bot", eventTypes: DEFAULT_EVENT_TYPES });
   const maxEvents = numberFlag(parsed.flags["max-events"]) ?? 0;
+  const timeoutMs = durationMs(stringFlag(parsed.flags.timeout));
 
   let processedMessages = 0;
   let processedCards = 0;
   let ignoredEvents = 0;
   let unsupportedEvents = 0;
   let seenEvents = 0;
+  let timedOut = false;
+  let failure: AgentGatewayResult["failure"] | undefined;
 
   try {
-    for await (const event of source.events()) {
+    const iterator = source.events()[Symbol.asyncIterator]();
+    while (true) {
+      const next = await nextWithTimeout(iterator, timeoutMs);
+      if (isTimeoutResult(next)) {
+        timedOut = true;
+        await recorder.record({
+          type: "gateway.timeout",
+          runId: "gateway",
+          timeoutMs,
+          processedMessages,
+          processedCards,
+          ignoredEvents,
+          unsupportedEvents,
+        } as never);
+        break;
+      }
+      if (next.done) break;
+      const event = next.value;
       seenEvents += 1;
       await recorder.record({
         type: "gateway.event_received",
@@ -192,18 +219,29 @@ export async function runAgentGateway(options: AgentGatewayOptions = {}): Promis
 
       if (maxEvents > 0 && seenEvents >= maxEvents) break;
     }
+  } catch (error) {
+    failure = subscribeFailure(error);
+    await recorder.record({
+      type: "gateway.subscribe_failed",
+      runId: "gateway",
+      message: failure.message,
+      exitCode: failure.exitCode,
+      stderr: failure.stderr,
+    } as never);
   } finally {
     if (recorderOwned) await recorder.close();
     await source.close();
   }
 
   return {
+    status: failure ? "subscribe_failed" : timedOut ? "timeout" : "completed",
     processedMessages,
     processedCards,
     ignoredEvents,
     unsupportedEvents,
     pendingRuns: await store.count(),
     output: options.recorder ? undefined : output,
+    failure,
   };
 }
 
@@ -261,11 +299,13 @@ export function renderAgentGateway(result: AgentGatewayResult): string {
   return [
     "PilotFlow TS Gateway",
     "",
+    `status: ${result.status}`,
     `processed_messages: ${result.processedMessages}`,
     `processed_cards: ${result.processedCards}`,
     `ignored_events: ${result.ignoredEvents}`,
     `unsupported_events: ${result.unsupportedEvents}`,
     `pending_runs: ${result.pendingRuns}`,
+    result.failure ? `failure: ${result.failure.message}` : undefined,
     result.output ? `output: ${result.output}` : undefined,
   ].filter((line): line is string => typeof line === "string").join("\n");
 }
@@ -280,6 +320,7 @@ Options:
   --dry-run                         Process events without live Feishu writes.
   --live                            Enable live Feishu mode.
   --max-events <n>                  Stop after handling n gateway events.
+  --timeout <duration>              Stop after duration, for example 60s or 2m.
   --output <path>                   JSONL gateway run log path.
   --pending-store <path>            Local store for waiting confirmation runs.
   --send-plan-card                  Send or dry-run an execution-plan card.
@@ -307,9 +348,45 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
   const result = await runAgentGateway({ argv });
   if (parsed.flags.json === true) {
     console.log(JSON.stringify(result, null, 2));
-    return;
+  } else {
+    console.log(renderAgentGateway(result));
   }
-  console.log(renderAgentGateway(result));
+  process.exitCode = result.status === "subscribe_failed" ? 2 : 0;
+}
+
+async function nextWithTimeout<T>(
+  iterator: AsyncIterator<T>,
+  timeoutMs: number,
+): Promise<IteratorResult<T> | { readonly timeout: true }> {
+  if (timeoutMs <= 0) return iterator.next();
+  let timer: NodeJS.Timeout | undefined;
+  try {
+    return await Promise.race([
+      iterator.next(),
+      new Promise<{ readonly timeout: true }>((resolve) => {
+        timer = setTimeout(() => resolve({ timeout: true }), timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+function isTimeoutResult<T>(value: IteratorResult<T> | { readonly timeout: true }): value is { readonly timeout: true } {
+  return "timeout" in value;
+}
+
+function subscribeFailure(error: unknown): NonNullable<AgentGatewayResult["failure"]> {
+  if (error instanceof LarkCliSubscribeError) {
+    return {
+      message: error.message,
+      exitCode: error.details.exitCode,
+      stderr: error.details.stderr,
+    };
+  }
+  return {
+    message: error instanceof Error ? error.message : String(error),
+  };
 }
 
 function buildMessageRunOptions(flags: Record<string, string | boolean>, mode: "dry-run" | "live", text: string): RunOptions {
@@ -391,6 +468,17 @@ function numberFlag(value: unknown): number | undefined {
   if (typeof value !== "string" || value.length === 0) return undefined;
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function durationMs(value: string | undefined): number {
+  if (!value) return 0;
+  const match = /^(\d+)(ms|s|m)?$/u.exec(value.trim());
+  if (!match) throw new Error(`Invalid duration: ${value}`);
+  const amount = Number(match[1]);
+  const unit = match[2] ?? "ms";
+  if (unit === "m") return amount * 60_000;
+  if (unit === "s") return amount * 1_000;
+  return amount;
 }
 
 function boolWithDefault(value: unknown, fallback: boolean): boolean {
