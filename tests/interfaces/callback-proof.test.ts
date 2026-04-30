@@ -109,6 +109,42 @@ test("runCallbackProof starts listening before sending a callback probe card", a
   }
 });
 
+test("runCallbackProof only counts callbacks for the sent probe run id", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "pilotflow-callback-proof-match-"));
+  const output = join(dir, "callback-proof.jsonl");
+
+  try {
+    const result = await runCallbackProof({
+      argv: [
+        "--output", output,
+        "--send-probe-card",
+        "--dry-run",
+        "--chat-id", "oc_probe",
+        "--probe-run-id", "callback-proof-match",
+        "--max-events", "2",
+      ],
+      env: {},
+      source: eventSource([
+        cardEvent("evt-wrong", "other-run"),
+        cardEvent("evt-match", "callback-proof-match"),
+      ]),
+      runCommand: async (bin, args) => okResult([bin, ...args]),
+      now: () => "2026-05-01T00:00:00.000Z",
+    });
+
+    assert.equal(result.status, "observed");
+    assert.equal(result.observedCallbacks, 1);
+    assert.equal(result.ignoredEvents, 1);
+
+    const log = await readFile(output, "utf8");
+    assert.match(log, /"runId":"callback-proof-match"/u);
+    assert.match(log, /"reason":"probe_run_id_mismatch"/u);
+    assert.doesNotMatch(log, /"type":"callback_proof.callback_observed","runId":"other-run"/u);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 test("runCallbackProof returns probe_failed when the probe card send fails", async () => {
   const dir = await mkdtemp(join(tmpdir(), "pilotflow-callback-proof-probe-failed-"));
   const output = join(dir, "callback-proof.jsonl");

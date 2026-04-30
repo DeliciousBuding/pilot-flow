@@ -77,6 +77,7 @@ export async function runCallbackProof(options: CallbackProofOptions = {}): Prom
   let timedOut = false;
   let failure: CallbackProofResult["failure"] | undefined;
   let probe: CallbackProofProbeResult = { status: "not_sent" };
+  let expectedProbeRunId: string | undefined;
 
   await recorder.record({ type: "callback_proof.started", runId: "callback-proof", output, strict, includeRaw, timestamp: now() });
 
@@ -85,6 +86,7 @@ export async function runCallbackProof(options: CallbackProofOptions = {}): Prom
     let nextEvent = nextWithTimeout(iterator, timeoutMs);
     if (parsed.flags["send-probe-card"] === true) {
       const probeRunId = stringFlag(parsed.flags["probe-run-id"]) ?? buildProbeRunId(now);
+      expectedProbeRunId = probeRunId;
       const startup = await observeListenerStartup(nextEvent, LISTENER_STARTUP_GRACE_MS);
       if (startup.status === "rejected") throw startup.error;
       if (startup.status === "settled") nextEvent = settledNext(startup.value);
@@ -132,6 +134,19 @@ export async function runCallbackProof(options: CallbackProofOptions = {}): Prom
           const result = await handleCardEvent(event, {
             dedupe,
             onAction: async (action) => {
+              if (expectedProbeRunId && action.runId !== expectedProbeRunId) {
+                ignoredEvents += 1;
+                await recorder.record({
+                  type: "callback_proof.callback_ignored",
+                  runId: "callback-proof",
+                  gatewayEventId: event.id,
+                  reason: "probe_run_id_mismatch",
+                  observedRunId: action.runId || "unknown-run",
+                  expectedRunId: expectedProbeRunId,
+                  timestamp: now(),
+                });
+                return;
+              }
               observedCallbacks += 1;
               await recorder.record({
                 type: "callback_proof.callback_observed",

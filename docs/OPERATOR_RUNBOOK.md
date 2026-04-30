@@ -178,6 +178,7 @@ npm run pilot:callback-proof -- --timeout 60s --strict
 `--send-probe-card` starts the listener first, then sends a small Feishu interactive card to `--chat-id` or `PILOTFLOW_TEST_CHAT_ID`. Click its `确认执行` button from Feishu to test whether Open Platform delivers `card.action.trigger` back to the local listener. Use `--dry-run` with `--send-probe-card` to inspect the card-send command without writing to Feishu. `--strict` exits non-zero when no callback arrives. Raw payload capture is off by default; `--include-raw` is allowed only for ignored `tmp/` outputs.
 
 When `--send-probe-card` is used, callback proof gives the listener a short startup window before sending the card. If `lark-cli event +subscribe` exits during startup or before any event arrives, the command returns `subscribe_failed` and records sanitized stderr in the proof JSONL. If the listener starts but the probe card cannot be sent, it returns `probe_failed`. Treat `timeout_no_callback` as a different case: the listener stayed up, but no button event arrived during the window.
+When a probe card is sent, callback proof only counts callbacks whose `pilotflow_run_id` matches the current probe run id; other PilotFlow card callbacks are recorded as ignored evidence.
 
 ## TypeScript Project Init Bridge
 
