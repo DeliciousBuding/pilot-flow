@@ -1,7 +1,7 @@
-import { readFile } from "node:fs/promises";
+import { readFile, rm } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
 import { JsonlRecorder } from "../../infrastructure/jsonl-recorder.js";
-import { createProjectInitPlannerProvider } from "../../domain/plan.js";
+import { createProjectInitPlannerProvider, normalizeProjectInputText } from "../../domain/plan.js";
 import { DuplicateGuard } from "../../orchestrator/duplicate-guard.js";
 import { Orchestrator, type RunOptions, type RunResult } from "../../orchestrator/orchestrator.js";
 import { TextConfirmationGate } from "../../orchestrator/confirmation-gate.js";
@@ -76,6 +76,7 @@ export async function runAgentProjectInit(options: AgentProjectInitOptions = {})
   const runtime = loadRuntimeConfig(argv, deterministicRuntimeEnv(loadCliEnv(options.env, options.cwd)));
   const input = await resolveInput(parsed.flags);
   const output = stringFlag(parsed.flags.output) ?? defaultOutputPath();
+  await rm(output, { force: true });
   const registry = new ToolRegistry();
   registerFeishuTools(registry);
   const recorder = new JsonlRecorder(output);
@@ -88,7 +89,7 @@ export async function runAgentProjectInit(options: AgentProjectInitOptions = {})
     runtime,
   });
 
-  const result = await orchestrator.run(input, runOptions(parsed.flags, runtime));
+  const result = await orchestrator.run(input, runOptions(parsed.flags, runtime, input));
   await recorder.close();
   return {
     status: result.status,
@@ -157,11 +158,11 @@ Options:
 
 async function resolveInput(flags: Record<string, string | boolean>): Promise<string> {
   const inputFile = stringFlag(flags["input-file"]);
-  if (inputFile) return readFile(inputFile, "utf8");
-  return stringFlag(flags.input) ?? DEFAULT_INPUT;
+  if (inputFile) return normalizeProjectInputText(await readFile(inputFile, "utf8"));
+  return normalizeProjectInputText(stringFlag(flags.input) ?? DEFAULT_INPUT);
 }
 
-function runOptions(flags: Record<string, string | boolean>, runtime: RuntimeConfig): RunOptions {
+function runOptions(flags: Record<string, string | boolean>, runtime: RuntimeConfig, input: string): RunOptions {
   return {
     autoConfirm: autoConfirm(flags, runtime),
     confirmationText: stringFlag(flags.confirm),
@@ -174,7 +175,7 @@ function runOptions(flags: Record<string, string | boolean>, runtime: RuntimeCon
     ownerOpenIdMap: ownerMap(flags["owner-open-id-map-json"]),
     taskAssigneeOpenId: stringFlag(flags["owner-open-id"]) ?? runtime.feishuTargets.ownerOpenId,
     dedupeKey: stringFlag(flags["dedupe-key"]),
-    sourceMessage: stringFlag(flags.input),
+    sourceMessage: input,
   };
 }
 

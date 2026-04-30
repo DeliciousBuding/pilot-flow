@@ -27,7 +27,7 @@ The product direction is coherent, but the implementation is still a strong engi
 - the team works where it already works: Feishu IM, Cards, Docs, Base, and Tasks
 - the Agent drives the project run, but humans keep approval over side effects
 - every run leaves evidence: plan, artifacts, fallbacks, and trace
-- pending platform edges are explicit, especially `pilot:run` live parity, real card callback delivery, automatic IM trigger, and announcement fallback behavior
+- pending platform edges are explicit, especially repeated `pilot:run` live parity, real card callback delivery, automatic IM trigger, and announcement fallback behavior
 
 ## Product Scope
 

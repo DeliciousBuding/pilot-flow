@@ -1,6 +1,6 @@
-import { mkdtemp, writeFile } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
+import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { tmpdir } from "node:os";
 import type { Artifact, ArtifactType } from "../../types/artifact.js";
 import type { ToolContext, ToolResult } from "../../types/tool.js";
 import type { CommandResult } from "../../infrastructure/command-runner.js";
@@ -38,6 +38,10 @@ export function assertLiveArgLength(label: string, value: string, ctx: Pick<Tool
   throw new Error(`${label} is too long for argv-based live execution (${value.length} > ${maxLength}); use file/stdin transport first`);
 }
 
+export function singleLineArg(value: string): string {
+  return value.replace(/\s*\r?\n\s*/g, " ").trim();
+}
+
 export function dryRunArtifact(type: ArtifactType, title: string, ctx: ToolContext, suffix: string): ToolResult {
   return {
     success: true,
@@ -60,10 +64,11 @@ export function dryRunArtifacts(artifacts: readonly Artifact[], output: string):
 }
 
 export async function writeTempBody(prefix: string, body: string, extension: string): Promise<string> {
-  const dir = await mkdtemp(join(tmpdir(), `pilotflow-${prefix}-`));
+  const dir = join("tmp", "tool-bodies", `pilotflow-${sanitizePathSegment(prefix)}-${randomUUID()}`);
+  await mkdir(dir, { recursive: true });
   const file = join(dir, `body.${extension}`);
   await writeFile(file, body, "utf8");
-  return file;
+  return file.replaceAll("\\", "/");
 }
 
 export function artifactFromCommand(
@@ -100,4 +105,8 @@ export function firstString(values: readonly unknown[]): string | undefined {
 
 function missingTarget(key: string): never {
   throw new Error(`Missing required live target: ${key}`);
+}
+
+function sanitizePathSegment(value: string): string {
+  return value.replace(/[^A-Za-z0-9_-]/g, "-").slice(0, 40) || "body";
 }

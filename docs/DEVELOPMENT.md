@@ -7,7 +7,7 @@ This guide is for contributors changing PilotFlow code. Operational commands and
 Required:
 
 - Node.js `>=20`
-- global `lark-cli >=1.0.21`
+- global `lark-cli >=1.0.23`
 - Feishu activity tenant profile `pilotflow-contest`
 
 Install dependencies:
@@ -108,12 +108,17 @@ Implemented runtime capabilities:
 - tool-step recording and optional fallback in `src/runtime/tool-step-runner.js`
 - product-facing `pilot:run` facade in `src/interfaces/cli/pilot-run.ts`, which wraps the TS project-init path and enables plan card, entry message, pinned entry, and risk card by default
 - local `.env` loading for CLI entry points that need Feishu target/profile values, without overriding explicit env passed by tests or callers
+- one-line IM-style project field parsing in the TS planner, covering common labels such as `目标`, `成员`, `交付物`, `截止时间`, and `风险`
+- Windows/npm caret cleanup for CLI input before planning and before storing the Base `source_message`
+- repo-relative ignored temp body files under `tmp/tool-bodies/` for `lark-cli docs +create --content @file`
+- multiline-safe text IM sending through JSON `--content` instead of raw argv text
+- per-run reset of default JSONL output files so `latest-live-run.jsonl` and `latest-manual-run.jsonl` represent one current run
 - retrospective eval runner in `src/review-packs/retrospective-eval.js`
 - preview-only Review Worker contract in `src/agent/review-worker.ts`
 
 Known product boundary:
 
-- PilotFlow can run a real Feishu project-launch loop through manual trigger and confirmation gate.
+- PilotFlow can run a real Feishu project-launch loop through the product-facing `pilot:run` command and confirmation gate.
 - It is not yet a fully unattended long-running Feishu bot.
 - Card callback listener wiring exists, but real `card.action.trigger` delivery still needs Open Platform configuration verification.
 - Group announcement update is attempted but falls back to pinned entry in the current test group.

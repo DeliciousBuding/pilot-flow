@@ -37,6 +37,30 @@ deliverables_v2: brief; demo`);
   assert.equal(fields.deliverables_v2, "brief; demo");
 });
 
+test("parseDemoInput extracts common project fields from one-line IM text", () => {
+  const fields = parseDemoInput("目标: PilotFlow live smoke 前置验证 成员: 产品, 技术 交付物: 只读检查报告, 运行日志 截止时间: 2026-05-01 风险: 真实写入前需要确认目标可读");
+  const plan = createProjectInitPlan("目标: PilotFlow live smoke 前置验证 成员: 产品, 技术 交付物: 只读检查报告, 运行日志 截止时间: 2026-05-01 风险: 真实写入前需要确认目标可读");
+
+  assert.equal(fields["目标"], "PilotFlow live smoke 前置验证");
+  assert.equal(fields["成员"], "产品, 技术");
+  assert.equal(fields["交付物"], "只读检查报告, 运行日志");
+  assert.equal(fields["截止时间"], "2026-05-01");
+  assert.equal(fields["风险"], "真实写入前需要确认目标可读");
+  assert.deepEqual(plan.members, ["产品", "技术"]);
+  assert.deepEqual(plan.deliverables, ["只读检查报告", "运行日志"]);
+  assert.deepEqual(plan.missing_info, []);
+});
+
+test("parseDemoInput removes Windows npm caret escaping from inline input", () => {
+  const plan = createProjectInitPlan("^目标:^ PilotFlow^ live^ smoke^ 前置验证^ 成员:^ 产品,^ 技术^ 交付物:^ 只读检查报告,^ 运行日志^ 截止时间:^ 2026-05-01^ 风险:^ 真实写入前需要确认目标可读^");
+
+  assert.equal(plan.goal, "PilotFlow live smoke 前置验证");
+  assert.deepEqual(plan.members, ["产品", "技术"]);
+  assert.deepEqual(plan.deliverables, ["只读检查报告", "运行日志"]);
+  assert.equal(plan.deadline, "2026-05-01");
+  assert.equal(plan.risks[0]?.title, "真实写入前需要确认目标可读");
+});
+
 test("validatePlan rejects invalid shape and length limits", () => {
   const validation = validatePlan({
     intent: "project_init",

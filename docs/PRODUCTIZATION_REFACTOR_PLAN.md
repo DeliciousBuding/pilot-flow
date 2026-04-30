@@ -23,7 +23,7 @@ Generated review material, capture checklists, and judge-facing reports are usef
 
 ## Target Structure
 
-This structure describes the cleaned JS prototype. The active Hermes-style TypeScript rebuild extends it with `src/tools/registry.ts`, `src/tools/idempotency.ts`, and future `src/orchestrator/`, `src/gateway/feishu/`, and `src/agent/` modules. Do not use this document to delete JS runtime files; use `docs/rebuild/14-delete-list.md` and only after the TS path passes.
+This structure describes the cleaned JS prototype and the TypeScript migration boundary. The active Hermes-style TypeScript rebuild now includes `src/tools/registry.ts`, `src/tools/idempotency.ts`, `src/orchestrator/`, `src/gateway/feishu/`, `src/agent/`, and `src/llm/`. Do not use this document to delete JS runtime files; use `docs/rebuild/14-delete-list.md` and only after repeated TS live parity and callback-driven continuation are proven.
 
 ```text
 pilot-flow/

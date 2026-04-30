@@ -1,6 +1,6 @@
 import { runCommand } from "../../infrastructure/command-runner.js";
 import type { ToolDefinition, ToolResult } from "../../types/tool.js";
-import { artifactFromCommand, assertLiveArgLength, getPath, optionalStringInput, requireStringInput } from "./common.js";
+import { artifactFromCommand, assertLiveArgLength, getPath, optionalStringInput, requireStringInput, singleLineArg } from "./common.js";
 import { buildToolIdempotencyKey } from "../idempotency.js";
 
 export const taskCreateTool: ToolDefinition = {
@@ -26,8 +26,8 @@ export const taskCreateTool: ToolDefinition = {
     },
   },
   handler: async (input, ctx): Promise<ToolResult> => {
-    const summary = requireStringInput(input, "summary");
-    const description = requireStringInput(input, "description");
+    const summary = singleLineArg(requireStringInput(input, "summary"));
+    const description = singleLineArg(requireStringInput(input, "description"));
     assertLiveArgLength("--summary", summary, ctx, 200);
     assertLiveArgLength("--description", description, ctx, 2_000);
     const args = [

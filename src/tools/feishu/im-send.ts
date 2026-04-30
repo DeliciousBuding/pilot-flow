@@ -50,11 +50,13 @@ export function textMessageSchema(name: string, description: string): ToolDefini
 
 export function textMessageArgs(tool: string, input: Record<string, unknown>, ctx: { readonly runId: string; readonly sequence: number; readonly dryRun: boolean; readonly targets?: Record<string, string | undefined> }, text: string): string[] {
   assertLiveArgLength("--text", text, ctx, 2_000);
+  const content = JSON.stringify({ text });
   return [
     "im", "+messages-send",
     "--as", "user",
     "--chat-id", targetOrInput(ctx as Parameters<typeof targetOrInput>[0], input, "chatId"),
-    "--text", text,
+    "--msg-type", "text",
+    "--content", content,
     "--idempotency-key", buildToolIdempotencyKey({ runId: ctx.runId, tool, sequence: ctx.sequence }),
   ];
 }

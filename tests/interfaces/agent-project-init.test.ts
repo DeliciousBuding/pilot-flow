@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import test from "node:test";
@@ -39,6 +39,49 @@ test("runAgentProjectInit completes the TS orchestrator dry-run bridge", async (
     const log = await readFile(output, "utf8");
     assert.match(log, /"type":"run.completed"/u);
     assert.match(log, /"tool":"doc.create"/u);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("runAgentProjectInit stores sanitized source message from Windows npm input", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "pilotflow-agent-project-"));
+  try {
+    const output = join(dir, "run.jsonl");
+    await runAgentProjectInit({
+      argv: [
+        "--dry-run",
+        "--input",
+        "^目标:^ PilotFlow^ live^ smoke^ 成员:^ 产品,^ 技术^ 交付物:^ Brief^ 截止时间:^ 2026-05-01^",
+        "--output",
+        output,
+      ],
+      env: {},
+    });
+
+    const log = await readFile(output, "utf8");
+    assert.match(log, /PilotFlow live smoke/u);
+    assert.doesNotMatch(log, /\^目标/u);
+    assert.doesNotMatch(log, /Brief\^/u);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("runAgentProjectInit resets the output JSONL before writing a new run", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "pilotflow-agent-project-"));
+  try {
+    const output = join(dir, "run.jsonl");
+    await writeFile(output, "stale run\n", "utf8");
+
+    await runAgentProjectInit({
+      argv: ["--dry-run", "--input", "目标: 新运行\n成员: 产品\n交付物: Brief\n截止时间: 2026-05-01", "--output", output],
+      env: {},
+    });
+
+    const log = await readFile(output, "utf8");
+    assert.doesNotMatch(log, /stale run/u);
+    assert.match(log, /"type":"run.created"/u);
   } finally {
     await rm(dir, { recursive: true, force: true });
   }

@@ -16,6 +16,20 @@ const STEP_STATUSES = new Set<StepStatus>(["pending", "running", "failed", "skip
 const CONFIRMATION_STATUSES = new Set<ConfirmationStatus>(["pending", "approved", "rejected", "expired"]);
 const RISK_LEVELS = new Set<RiskLevel>(["low", "medium", "high", "critical"]);
 const RISK_STATUSES = new Set<RiskStatus>(["open", "accepted", "mitigated", "closed"]);
+const INLINE_FIELD_LABELS = [
+  "goal",
+  "目标",
+  "members",
+  "成员",
+  "负责人",
+  "deliverables",
+  "交付物",
+  "成果",
+  "deadline",
+  "截止时间",
+  "risks",
+  "风险",
+];
 
 export interface PlannerProvider {
   readonly provider?: string;
@@ -56,8 +70,9 @@ export function createProjectInitPlannerProvider({ type = DETERMINISTIC_PROVIDER
 }
 
 export function createProjectInitPlan(inputText: string): ProjectInitPlan {
-  const fields = parseDemoInput(inputText);
-  const firstLine = inputText.split(/\r?\n/).find((line) => line.trim().length > 0)?.trim();
+  const normalizedInput = normalizeProjectInputText(inputText);
+  const fields = parseDemoInput(normalizedInput);
+  const firstLine = normalizedInput.split(/\r?\n/).find((line) => line.trim().length > 0)?.trim();
   const goal = fields.goal ?? fields["目标"] ?? firstLine ?? "Launch a project from group discussion";
   const members = splitList(fields.members ?? fields["成员"] ?? fields["负责人"]);
   const deliverables = splitList(fields.deliverables ?? fields["交付物"] ?? fields["成果"]);
@@ -104,7 +119,14 @@ export function createProjectInitPlan(inputText: string): ProjectInitPlan {
 
 export function parseDemoInput(inputText: string): Record<string, string> {
   const result: Record<string, string> = {};
-  for (const line of inputText.split(/\r?\n/)) {
+  for (const line of normalizeProjectInputText(inputText).split(/\r?\n/)) {
+    const inlineFields = parseInlineKnownFields(line);
+    if (inlineFields.length > 0) {
+      for (const [key, value] of inlineFields) {
+        result[key] = value;
+      }
+      continue;
+    }
     const match = line.match(/^([\w\u4e00-\u9fff ]+):\s*(.+)$/u);
     if (!match) continue;
     const key = normalizeFieldKey(match[1] ?? "");
@@ -112,6 +134,25 @@ export function parseDemoInput(inputText: string): Record<string, string> {
     if (key && value) result[key] = value;
   }
   return result;
+}
+
+export function normalizeProjectInputText(value: string): string {
+  return value.replaceAll("^", "");
+}
+
+function parseInlineKnownFields(line: string): readonly (readonly [string, string])[] {
+  const labelPattern = INLINE_FIELD_LABELS.map(escapeRegExp).join("|");
+  const matcher = new RegExp(`(^|\\s)(${labelPattern}):\\s*`, "giu");
+  const matches = [...line.matchAll(matcher)];
+  if (matches.length <= 1) return [];
+
+  return matches.map((match, index): readonly [string, string] => {
+    const rawKey = match[2] ?? "";
+    const valueStart = match.index + match[0].length;
+    const nextMatch = matches[index + 1];
+    const valueEnd = nextMatch ? nextMatch.index : line.length;
+    return [normalizeFieldKey(rawKey), line.slice(valueStart, valueEnd).trim()];
+  }).filter(([, value]) => value.length > 0);
 }
 
 export function validatePlan(plan: unknown): DetailedPlanValidationResult {
@@ -284,6 +325,10 @@ function requireEnum<T extends string>(value: unknown, allowed: ReadonlySet<T>, 
 
 function normalizeFieldKey(key: string): string {
   return key.trim().toLowerCase().replaceAll(" ", "_");
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function splitList(value = ""): readonly string[] {

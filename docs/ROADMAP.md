@@ -29,7 +29,7 @@ flowchart LR
 | Traceability | Implemented | JSONL run log, Flight Recorder, and review packs make runs inspectable. |
 | Review packaging | Implemented but auxiliary | Useful for competition evidence; it must not become the product center. |
 | Product cleanup | Mostly implemented | Runtime entrypoints, review tooling, command facade, and public demo docs are separated. |
-| TypeScript kernel rebuild | Dry-run ready, live pending | Day 0 through Day 7 are implemented; `pilot:run` live parity is not yet proven. |
+| TypeScript kernel rebuild | Dry-run and single live run validated | Day 0 through Day 7 are implemented; `pilot:run` has one real live Feishu proof, while repeated parity and callback checks remain. |
 | Hermes-style evolution | Review loop only | Retrospective, eval, and preview worker exist; memory, compression, approval cards, and real worker orchestration remain future work. |
 
 For the authoritative maturity boundary, read [`PRODUCT_REALITY_CHECK.md`](PRODUCT_REALITY_CHECK.md).
@@ -97,10 +97,10 @@ Exit condition: product runtime, review packaging, and documentation are visibly
 - [x] Day 3: split the orchestrator into confirmation gate, tool sequence, duplicate guard, cards, project state, entry, summary, and resolver modules.
 - [x] Day 4: add Feishu gateway, session queue, Agent loop, and mock-tested LLM provider.
 - [x] Day 5: bridge TS gateway/agent into CLI dry-run smoke paths and keep live migration guarded.
-- [x] Day 6: bridge TS runtime into a live-guarded project-init path; old JS runtime removal remains gated by real live validation.
+- [x] Day 6: bridge TS runtime into a live-guarded project-init path; old JS runtime removal remains gated by repeated live parity and callback validation.
 - [x] Day 7: add `pilot:run` product facade, retrospective eval runner, and preview-only Review Worker contract.
 
-Exit condition: TypeScript path can run the same dry-run and live-guarded project launch loop as the current JS prototype, then pass real Feishu live validation before old runtime removal.
+Exit condition: TypeScript path can run the same dry-run and live-guarded project launch loop as the current JS prototype, then pass repeated real Feishu validation before old runtime removal.
 
 ## Phase 4: Strong MVP Enhancements
 
@@ -136,11 +136,10 @@ Exit condition: PilotFlow feels useful beyond the first project-launch flow whil
 
 ## Immediate Next Actions
 
-1. Configure real live targets, then validate `npm run pilot:run -- --live --confirm "确认执行"` against the activity tenant.
-2. Compare the `pilot:run` live artifacts with the older JS live proof; do not remove the JS path until parity is proven.
-3. Verify Open Platform card callback delivery with a real `card.action.trigger` event, or document the exact platform/config blocker with screenshots and logs.
-4. Validate the new `pilot:gateway` path against the real tenant, then convert it into an allowlisted IM mention trigger after callback proof is understood.
-5. Promote Retrospective Eval cases into snapshot-backed fixtures from real successful and degraded runs.
-6. Capture happy-path and failure-path media outside Git, then rerun `pilot:status` until the package is no longer `needs_regeneration`.
-7. Only after the main Feishu loop is stable, design the first artifact approval card for worker previews.
-8. Run `pilot:doctor`, `pilot:check`, tests, review package generation, status, and safety audit before any public handoff.
+1. Repeat `npm run pilot:run -- --live --confirm "确认执行"` with fresh dedupe keys, then compare the live artifacts with the older JS live proof.
+2. Verify Open Platform card callback delivery with a real `card.action.trigger` event, or document the exact platform/config blocker with screenshots and logs.
+3. Validate the new `pilot:gateway` path against the real tenant, then convert it into an allowlisted IM mention trigger after callback proof is understood.
+4. Promote Retrospective Eval cases into snapshot-backed fixtures from real successful and degraded runs.
+5. Capture happy-path and failure-path media outside Git, then rerun `pilot:status` until the package is no longer `needs_regeneration`.
+6. Only after the main Feishu loop is stable, design the first artifact approval card for worker previews.
+7. Run `pilot:doctor`, `pilot:check`, tests, review package generation, status, and safety audit before any public handoff.

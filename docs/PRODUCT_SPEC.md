@@ -45,8 +45,8 @@ PilotFlow should be described by its maturity level, not as a finished enterpris
 | Level | Meaning | Current state |
 | --- | --- | --- |
 | Concept | Product positioning and target workflow are defined | complete |
-| Validated prototype | Real Feishu APIs can create visible artifacts | current for the older JS live path |
-| Demo-ready MVP | Main path is stable enough for evaluation with captured proof | in progress; TS `pilot:run` live proof and capture evidence pending |
+| Validated prototype | Real Feishu APIs can create visible artifacts | current for both older JS live path and one `pilot:run` TS live path |
+| Demo-ready MVP | Main path is stable enough for evaluation with captured proof | in progress; repeated TS live checks, callback proof, and capture evidence pending |
 | Team pilot | Real group trigger, callback confirmation, and repeated team use | planned |
 | Productized service | Deployment, tenancy, audit, permissions, and support model | later |
 

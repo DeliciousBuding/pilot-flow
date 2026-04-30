@@ -105,10 +105,11 @@ type, title, owner, due_date, status, risk_level, source_run, source_message, ur
 
 ## Live Feishu Operation
 
-Live writes require explicit confirmation:
+Live writes require explicit confirmation. The product-facing TypeScript path passed a real Feishu live smoke on 2026-05-01; use a fresh dedupe key when repeating the same scenario.
 
 ```bash
 npm run pilot:run -- --live --confirm "确认执行"
+npm run pilot:run -- --live --confirm "确认执行" --allow-duplicate-run --dedupe-key "live-smoke-<yyyymmdd>-<purpose>" --input "目标: PilotFlow live smoke 验证 成员: 产品, 技术 交付物: 飞书文档, Base状态记录, 群内总结 截止时间: 2026-05-01 风险: Tasklist未配置时任务工具应降级"
 ```
 
 Useful live flags:
@@ -123,6 +124,8 @@ Useful live flags:
 | `--owner-open-id-map-json <json>` | Map planner owner labels to Feishu `open_id` |
 | `--auto-lookup-owner-contact` | Search Feishu Contacts when no explicit owner map matches |
 | `--allow-duplicate-run` | Bypass duplicate-run protection intentionally |
+
+By default `pilot:run` writes live traces to `tmp/runs/latest-live-run.jsonl` and dry-run traces to `tmp/runs/latest-manual-run.jsonl`. The output file is reset at the start of each run so the "latest" log does not mix stale failures with the current result. Pass `--output <path>` when preserving multiple run logs side by side.
 
 Show all runtime options:
 
@@ -170,7 +173,7 @@ npm run pilot:callback-proof -- --timeout 60s --strict
 
 ## TypeScript Project Init Bridge
 
-The TypeScript project-init bridge runs the deterministic project planner through the split TS orchestrator, `ToolRegistry`, Feishu tool definitions, duplicate guard, and JSONL recorder. It is the migration path toward the future TS runtime, but `pilot:demo` remains the stable live demo path until TS live validation is complete.
+The TypeScript project-init bridge runs the deterministic project planner through the split TS orchestrator, `ToolRegistry`, Feishu tool definitions, duplicate guard, and JSONL recorder. The preferred product command is `pilot:run`, which wraps this bridge with the normal product surfaces. The older JS path remains available until repeated TS live parity and callback-driven continuation are proven.
 
 ```bash
 npm run pilot:project-init-ts
@@ -178,7 +181,7 @@ npm run pilot:project-init-ts -- --dry-run --send-entry-message --send-risk-card
 npm run pilot:project-init-ts -- --live --confirm "确认执行" --send-entry-message --send-risk-card
 ```
 
-Live mode is guarded: without `--confirm "确认执行"` it waits before tool calls; with confirmation but missing live targets it fails preflight before Feishu writes.
+Live mode is guarded: without `--confirm "确认执行"` it waits before tool calls; with confirmation but missing live targets it fails preflight before Feishu writes. CLI input is normalized before planning, so one-line IM-style fields such as `目标: ... 成员: ... 交付物: ... 截止时间: ... 风险: ...` are parsed correctly, and Windows/npm caret escaping is stripped from the stored source message.
 
 ## Runtime Variables
 
@@ -257,7 +260,7 @@ Generated reports and run logs stay under ignored `tmp/`.
 
 ## TypeScript Kernel Rebuild Status
 
-The TypeScript rebuild is active. Day 0 through Day 7 are complete: strict TS foundation, domain modules, ToolRegistry, tool idempotency, 9 Feishu tool definitions, split TS orchestrator, OpenAI-compatible LLM client, retry/error classifier, Agent loop, session manager, Feishu gateway boundary, dry-run CLI smoke bridge, live-guarded project-init bridge, `pilot:run`, Retrospective Eval, and Review Worker preview contract are implemented and covered by tests. `pilot:run` is now the preferred product-facing dry-run entry over the TS path. For official live Feishu demos, keep the JS-backed `pilot:demo` available until `pilot:run` passes the same real target checks.
+The TypeScript rebuild is active. Day 0 through Day 7 are complete: strict TS foundation, domain modules, ToolRegistry, tool idempotency, 9 Feishu tool definitions, split TS orchestrator, OpenAI-compatible LLM client, retry/error classifier, Agent loop, session manager, Feishu gateway boundary, dry-run CLI smoke bridge, live-guarded project-init bridge, `pilot:run`, Retrospective Eval, and Review Worker preview contract are implemented and covered by tests. `pilot:run` is now the preferred product-facing dry-run and operator live entry. On 2026-05-01 it completed a real Feishu run with Doc/Base/Task/cards/pinned entry/summary/run log; keep the JS-backed `pilot:demo` available until repeated TS live parity and real callback continuation are proven.
 
 ## Known Platform Edges
 

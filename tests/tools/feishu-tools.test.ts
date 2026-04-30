@@ -1,8 +1,11 @@
 import assert from "node:assert/strict";
+import { rm, stat } from "node:fs/promises";
 import test from "node:test";
 import { MemoryRecorder } from "../helpers/memory-recorder.js";
 import { feishuTools, registerFeishuTools } from "../../src/tools/feishu/index.js";
 import { registry as globalRegistry, ToolPreflightError, ToolRegistry } from "../../src/tools/registry.js";
+import { singleLineArg, writeTempBody } from "../../src/tools/feishu/common.js";
+import { textMessageArgs } from "../../src/tools/feishu/im-send.js";
 import type { ToolContext } from "../../src/types/tool.js";
 
 test("registerFeishuTools registers all Day 2 Feishu tool definitions", () => {
@@ -98,6 +101,30 @@ test("entry.pin live preflight requires chatId even though it is optional", asyn
     }),
     ToolPreflightError,
   );
+});
+
+test("writeTempBody creates lark-cli compatible relative files under ignored tmp", async () => {
+  const file = await writeTempBody("doc-create", "# Brief", "md");
+  try {
+    assert.equal(file.startsWith("tmp/"), true);
+    assert.equal(file.includes(".."), false);
+    assert.equal(await stat(file).then((item) => item.isFile()), true);
+  } finally {
+    await rm(file, { force: true });
+  }
+});
+
+test("text message live args use JSON content so multiline text is argv-safe", () => {
+  const args = textMessageArgs("im.send", {}, { runId: "run-1", sequence: 1, dryRun: false, targets: { chatId: "oc_1" } }, "line 1\nline 2");
+
+  assert.equal(args.includes("--content"), true);
+  assert.equal(args.includes("--text"), false);
+  assert.equal(args.some((arg) => /\r|\n/.test(arg)), false);
+  assert.equal(args.includes('{"text":"line 1\\nline 2"}'), true);
+});
+
+test("singleLineArg collapses multiline values for argv-only lark-cli fields", () => {
+  assert.equal(singleLineArg("Task\n\nOwner: 产品"), "Task Owner: 产品");
 });
 
 function toolCtx(recorder: MemoryRecorder): ToolContext {

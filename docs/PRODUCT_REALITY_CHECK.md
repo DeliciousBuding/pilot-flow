@@ -8,7 +8,7 @@ This document provides an honest, boundary-setting assessment of PilotFlow's cur
 
 PilotFlow already proves a real Feishu-native project-launch loop: a confirmed run can create project documents, write structured state, create tasks, send cards/messages, pin an entry message, and record a replayable trace. That is a meaningful product spine.
 
-The areas still in progress include: the automatic IM-to-agent loop, real card button callback delivery, repeated team usage, persistent memory, worker approval cards, and deployment. The TypeScript runtime is architecturally healthier than the original JS prototype, but its `pilot:run` live path still needs the same real Feishu validation as the earlier JS path before the old path can be retired.
+The areas still in progress include: the automatic IM-to-agent loop, real card button callback delivery, repeated team usage, persistent memory, worker approval cards, and deployment. The TypeScript runtime is architecturally healthier than the original JS prototype, and the product-facing `pilot:run` path has now passed one real live Feishu run. That is enough to treat it as the preferred operator path, but not enough to retire the older JS path before repeated parity checks and callback validation.
 
 ## Current Maturity
 
@@ -17,7 +17,7 @@ The areas still in progress include: the automatic IM-to-agent loop, real card b
 | Product direction | Solid | "AI project operations officer inside Feishu" is clearer than "generic agent" or "coding assistant". |
 | Feishu API proof | Real but partial | IM, Card send, Doc, Base, Task, pinned entry, risk card, and final summary have been validated through live paths. |
 | End-user flow | Operator-driven prototype | A local operator command can run the loop; normal user flow through a production bot is in progress. |
-| `pilot:run` TS path | Dry-run ready, live pending | Good product facade and safer defaults exist; real live validation is the next gate. |
+| `pilot:run` TS path | Single live run validated | Product facade and safer defaults exist; 2026-05-01 live run created Doc/Base/Task/cards/pinned entry/summary/trace. Repeated parity and callback checks are still needed. |
 | `pilot:gateway` TS path | Local bridge implemented | It can consume message/card events and resume stored confirmation runs locally through card callbacks or a same-chat `确认执行`, but real tenant validation is still pending. |
 | Card callback | Not complete | Payload, parser, listener, and trigger bridge exist; real `card.action.trigger` delivery is still unproven. |
 | Group announcement | Fallback only | Native announcement was attempted, but the current group returns a docx announcement API block; pinned entry is the reliable route. |
@@ -31,7 +31,8 @@ The areas still in progress include: the automatic IM-to-agent loop, real card b
 
 - `npm run pilot:check`, `npm test`, `npm run pilot:audit`, and `npm run pilot:doctor` give useful local quality gates.
 - `npm run pilot:run -- --dry-run` gives a product-facing dry-run of the TypeScript project-init path.
-- The older JS live path has validated Feishu Doc, Base, Task, IM, cards, pinned entry, risk card, and JSONL trace behavior.
+- `npm run pilot:run -- --live --confirm "确认执行"` passed a real Feishu write run on 2026-05-01 with run ID `run-f7a6ad4e-1bb8-4e7d-90ed-88a70621175b`, creating a Doc, Base records, a Task, execution/risk cards, pinned entry, final IM summary, and a 55-line JSONL trace at `tmp/runs/latest-live-run.jsonl`.
+- The older JS live path has also validated Feishu Doc, Base, Task, IM, cards, pinned entry, risk card, and JSONL trace behavior.
 - The TS gateway can now keep a waiting-confirmation run in local state and resume it from the same chat with plain-text `确认执行` even before real card callback delivery is proven.
 - `Flight Recorder` and generated review packs make runs inspectable instead of opaque.
 - The repo structure is cleaner than the earlier sprint state: product CLI, review packs, runtime, gateway, tools, and docs are separated.
@@ -64,7 +65,7 @@ PilotFlow should learn Hermes as runtime discipline, not as an excuse to add unc
 
 The next real product work should stay inside Feishu:
 
-1. Prove `pilot:run -- --live --confirm "确认执行"` against the real activity tenant targets.
+1. Repeat `pilot:run -- --live --confirm "确认执行"` against real activity tenant targets and compare artifacts with older JS proof before deleting the legacy path.
 2. Make real card button callback delivery work or document the exact Open Platform blocker with proof.
 3. Turn the current local trigger into an allowlisted Feishu IM mention trigger.
 4. Persist project state and memory in Feishu-native surfaces first: Base, Doc, Task, pinned entry, cards.
@@ -77,8 +78,8 @@ The next real product work should stay inside Feishu:
 - Do not claim mature multi-agent orchestration.
 - Do not claim real card callback success until a real `card.action.trigger` event reaches the listener and starts the run.
 - Do not claim native group announcement success for the current test group.
-- Do not claim `pilot:run` live parity until a real live run creates the expected Feishu artifacts and trace.
+- Do not claim `pilot:run` is production-ready or can replace the JS path permanently until repeated live runs and callback-driven continuation are validated.
 
 ## Current Verdict
 
-PilotFlow has a real product spine and meaningful Feishu proof. The completion level is that of a strong engineering prototype with a clear path forward. The highest-priority next steps are proving the TypeScript product path live, closing the Feishu callback gap, and turning Hermes-style architecture into fewer, stricter runtime paths — not adding more pack generators or broad agent ideas.
+PilotFlow has a real product spine and meaningful Feishu proof. The completion level is that of a strong engineering prototype with a clear path forward. The highest-priority next steps are repeating TypeScript product-path live checks, closing the Feishu callback gap, and turning Hermes-style architecture into fewer, stricter runtime paths, not adding more pack generators or broad agent ideas.
