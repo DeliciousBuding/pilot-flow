@@ -128,8 +128,8 @@
 - [x] **T18** demo 全流程彩排：中文输入 dry-run + Flight Recorder + retrospective
   - 产出：16 产物，55 events，Flight Recorder HTML 和证据包已生成
 
-- [ ] **T19** PERSONAL_PROGRESS 更新：将 sprint 产出写入阶段成果文档
+- [x] **T19** PERSONAL_PROGRESS 更新：sprint 产出已写入阶段成果文档，飞书已同步（revision 283）
   - 产出：更新后的 PERSONAL_PROGRESS.md + 飞书同步
 
-- [ ] **T20** 复赛提交模板更新：将最新进展写入飞书复赛模板
-  - 产出：更新后的飞书复赛文档
+- [x] **T20** 复赛提交模板更新：最新进展已写入飞书复赛模板
+  - 产出：飞书复赛文档 revision 8，含工程化落地（165 测试）和 LLM 集成信息
