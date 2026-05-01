@@ -119,3 +119,17 @@
 - 完成：T15（集成测试，3 个新用例：缺失字段、重复运行、中文输入解析）
 - 全量测试：165 pass, 0 fail
 - 全部 16 个任务已完成
+
+### P6：Demo 准备与合并（2026-05-02 02:40）
+
+- [x] **T17** sprint-main 合并回 main：10+ commit 已合并，19 文件，1343 行新增
+  - 产出：main 分支包含所有 sprint 产出，已推送到 GitHub
+
+- [x] **T18** demo 全流程彩排：中文输入 dry-run + Flight Recorder + retrospective
+  - 产出：16 产物，55 events，Flight Recorder HTML 和证据包已生成
+
+- [ ] **T19** PERSONAL_PROGRESS 更新：将 sprint 产出写入阶段成果文档
+  - 产出：更新后的 PERSONAL_PROGRESS.md + 飞书同步
+
+- [ ] **T20** 复赛提交模板更新：将最新进展写入飞书复赛模板
+  - 产出：更新后的飞书复赛文档
