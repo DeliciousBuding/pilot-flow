@@ -269,15 +269,6 @@ function buildNextActions(checks: readonly LiveCheckItem[], profile: string): re
   const bus = byName.get("event bus status");
   const bot = byName.get("bot mention identity");
 
-  if (imScope?.status === "warn") {
-    actions.push({
-      severity: "warn",
-      owner: "open_platform_admin",
-      reason: "IM event delivery is blocked before runtime code can receive group mentions.",
-      action: `Open Feishu Open Platform for this app, enable im:message.p2p_msg:readonly, publish or make the permission effective, then run: lark-cli auth login --profile ${profile} --scope "im:message.p2p_msg:readonly"`,
-    });
-  }
-
   if (subscribe?.status === "fail") {
     actions.push({
       severity: "fail",

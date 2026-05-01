@@ -162,9 +162,9 @@ Current boundary:
 - A plain-text `确认执行` sent later in the same chat can also resume the latest pending run for that chat.
 - `--timeout` exits cleanly with `status: timeout` when no event arrives, so live probes do not hang forever.
 - `--send-probe-message` starts the listener first, then sends a one-line IM smoke request to the test chat. The default probe requires `PILOTFLOW_BOT_USER_ID` or `--bot-user-id` so the message contains a structured bot mention. Use `--probe-text` only when sending a custom probe intentionally.
-- In live mode, `--send-probe-message` first checks `im:message.p2p_msg:readonly`. If the scope is missing, it fails before sending the probe message.
+- In live mode, `--send-probe-message` still checks whether the current token shows `im:message.p2p_msg:readonly`, but it no longer treats that as a hard stop. Use the actual send result and event delivery to judge the app-level path.
 - Subscription failures return `status: subscribe_failed` and write sanitized stderr to the gateway JSONL log.
-- Gateway JSON output includes `nextActions` for missing IM scope, missing bot mention identity, missing probe chat, subscription failure, and probe timeout cases.
+- Gateway JSON output includes `nextActions` for missing bot mention identity, missing probe chat, subscription failure, and probe timeout cases.
 - Real tenant validation is still required before this path replaces the older JS live proof.
 
 ## Callback Proof
@@ -310,8 +310,7 @@ Run the update from the workspace root because `--content @PERSONAL_PROGRESS.md`
 | Card sends but button does not trigger | Regenerate Callback Verification Pack and inspect Open Platform callback configuration |
 | Gateway live probe appears stuck | Re-run with `--timeout 60s --json`; `timeout` means no event arrived, while `subscribe_failed` points to subscription, permission, or profile setup |
 | Gateway probe fails before sending | Set `PILOTFLOW_BOT_USER_ID` or pass `--bot-user-id`; the default probe needs a structured bot mention |
-| Gateway probe fails with missing IM receive scope | Enable and authorize `im:message.p2p_msg:readonly` in the Open Platform app, then rerun `pilot:live-check` |
-| Gateway probe message sends but no event arrives | Check `pilot:live-check` for missing `im:message.p2p_msg:readonly` or a running event bus, then inspect Open Platform event subscription, bot availability, app publication state, and long-connection mode |
+| Gateway probe message sends but no event arrives | Check `pilot:live-check` for a running event bus and bot identity, then inspect Open Platform event subscription, app-level IM permission, app publication state, and long-connection mode |
 | Callback proof returns `subscribe_failed` | Inspect the sanitized stderr in `tmp/proof/callback-proof.jsonl`, then check event subscription permissions and profile auth |
 | Announcement update fails | Keep pinned entry fallback; do not claim native announcement success for this group |
 | Contact lookup cannot assign owner | Use explicit `PILOTFLOW_OWNER_OPEN_ID_MAP_JSON` or keep text owner fallback |

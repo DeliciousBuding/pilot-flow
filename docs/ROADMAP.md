@@ -78,7 +78,7 @@ Exit condition: a confirmed local command can create real Feishu artifacts and p
 - [x] Add a live-check dry-run check for the callback probe card send command.
 - [x] Add a live-check event bus status check to catch competing local subscribers.
 - [x] Refuse live gateway IM probes before sending when `im:message.p2p_msg:readonly` is missing.
-- [x] Add structured live-check next actions for IM event blockers.
+- [x] Clarify live-check IM scope as diagnostic only.
 - [x] Add owner and severity metadata to live-check next actions.
 - [x] Add strict live-check readiness for submission and recording gates.
 - [x] Add structured gateway next actions for probe and subscription blockers.
@@ -156,7 +156,7 @@ Exit condition: PilotFlow feels useful beyond the first project-launch flow whil
 
 1. Repeat `npm run pilot:run -- --live --confirm "确认执行"` with fresh dedupe keys, then compare the live artifacts with the older JS live proof.
 2. Inspect Open Platform callback/event settings for the `card.action.trigger` gap, then rerun `npm run pilot:callback-proof -- --send-probe-card --timeout 60s`.
-3. Enable/authorize `im:message.p2p_msg:readonly`, inspect Open Platform long-connection and `im.message.receive_v1` settings, then rerun `pilot:gateway -- --live --send-probe-message --timeout 60s --max-events 1 --json`.
+3. Recheck `pilot:gateway -- --live --send-probe-message --timeout 60s --max-events 1 --json` and inspect Open Platform long-connection, `im.message.receive_v1`, and app-level IM permission if no event arrives.
 4. Promote Retrospective Eval cases into snapshot-backed fixtures from real successful and degraded runs.
 5. Capture happy-path and failure-path media outside Git, then rerun `pilot:status` until the package is no longer `needs_regeneration`.
 6. Only after the main Feishu loop is stable, design the first artifact approval card for worker previews.

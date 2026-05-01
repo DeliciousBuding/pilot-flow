@@ -159,64 +159,64 @@ export async function runAgentGateway(options: AgentGatewayOptions = {}): Promis
       const eventScope = runtime.mode === "live"
         ? await checkProbeEventReceiveScope({ profile: runtime.profile, command })
         : { status: "ok" as const };
+      const probeMessage = buildProbeMessage({
+        bot,
+        runId: probeRunId,
+        customText: stringFlag(parsed.flags["probe-text"]),
+      });
       if (eventScope.status === "failed") {
+        await recorder.record({
+          type: "gateway.probe_message_warning",
+          runId: probeRunId,
+          warning: eventScope.warning,
+        } as never);
+      }
+      if (probeMessage.status === "failed") {
         probe = {
           status: "failed",
           runId: probeRunId,
-          error: eventScope.error,
+          error: probeMessage.error,
         };
         await recorder.record({
           type: "gateway.probe_message_failed",
           runId: probeRunId,
-          error: eventScope.error,
+          error: probeMessage.error,
         } as never);
       } else {
-        const probeMessage = buildProbeMessage({
-          bot,
+        const iterator = source.events()[Symbol.asyncIterator]();
+        const nextEvent = nextWithTimeout(iterator, timeoutMs);
+        probe = await sendProbeMessage({
+          chatId: stringFlag(parsed.flags["probe-chat-id"]) ?? runtime.feishuTargets.chatId,
+          profile: runtime.profile,
+          dryRun: runtime.mode === "dry-run",
+          text: probeMessage.text,
+          mentionMode: probeMessage.mentionMode,
           runId: probeRunId,
-          customText: stringFlag(parsed.flags["probe-text"]),
+          command,
+          recorder,
         });
-        if (probeMessage.status === "failed") {
+        if (eventScope.status === "failed") {
           probe = {
-            status: "failed",
-            runId: probeRunId,
-            error: probeMessage.error,
+            ...probe,
+            warning: eventScope.warning,
           };
-          await recorder.record({
-            type: "gateway.probe_message_failed",
-            runId: probeRunId,
-            error: probeMessage.error,
-          } as never);
-        } else {
-          const iterator = source.events()[Symbol.asyncIterator]();
-          const nextEvent = nextWithTimeout(iterator, timeoutMs);
-          probe = await sendProbeMessage({
-            chatId: stringFlag(parsed.flags["probe-chat-id"]) ?? runtime.feishuTargets.chatId,
-            profile: runtime.profile,
-            dryRun: runtime.mode === "dry-run",
-            text: probeMessage.text,
-            mentionMode: probeMessage.mentionMode,
-            runId: probeRunId,
-            command,
-            recorder,
-          });
-          await processGatewayEvents({
-            iterator,
-            firstNextEvent: nextEvent,
-            timeoutMs,
-            maxEvents,
-            bot,
-            sessions,
-            dedupe,
-            queue,
-            recorder,
-            store,
-            orchestrator,
-            parsedFlags: parsed.flags,
-            runtimeMode: runtime.mode,
-            counters,
-          });
         }
+        await processGatewayEvents({
+          iterator,
+          firstNextEvent: nextEvent,
+          timeoutMs,
+          maxEvents,
+          bot,
+          sessions,
+          dedupe,
+          queue,
+          recorder,
+          store,
+          orchestrator,
+          parsedFlags: parsed.flags,
+          runtimeMode: runtime.mode,
+          counters,
+        });
       }
     } else {
       const iterator = source.events()[Symbol.asyncIterator]();
@@ -496,7 +496,7 @@ Options:
 async function checkProbeEventReceiveScope(options: {
   readonly profile?: string;
   readonly command: typeof runCommand;
-}): Promise<{ readonly status: "ok" } | { readonly status: "failed"; readonly error: string }> {
+}): Promise<{ readonly status: "ok" } | { readonly status: "failed"; readonly warning: string }> {
   try {
     await options.command("lark-cli", ["auth", "check", "--scope", "im:message.p2p_msg:readonly"], {
       profile: options.profile,
@@ -506,7 +506,7 @@ async function checkProbeEventReceiveScope(options: {
   } catch {
     return {
       status: "failed",
-      error: "Missing im:message.p2p_msg:readonly; refusing to send gateway IM probe because im.message.receive_v1 cannot be delivered until the app scope and user authorization are updated.",
+      warning: "Current token does not show im:message.p2p_msg:readonly; continuing gateway probe because this may be an app-level permission that is not visible in user auth status.",
     };
   }
 }
@@ -662,14 +662,6 @@ function buildNextActions(result: AgentGatewayResult, profile: string): readonly
 
   if (result.probe.status === "failed") {
     const error = result.probe.error ?? "";
-    if (/im:message\.p2p_msg:readonly/u.test(error)) {
-      return [
-        {
-          reason: "IM event delivery is blocked before the gateway can receive probe messages.",
-          action: `Enable im:message.p2p_msg:readonly in Feishu Open Platform, publish or make it effective, then run lark-cli auth login --profile ${profile} --scope "im:message.p2p_msg:readonly" and rerun pilot:live-check.`,
-        },
-      ];
-    }
     if (/PILOTFLOW_BOT_USER_ID|bot-user-id/u.test(error)) {
       return [
         {

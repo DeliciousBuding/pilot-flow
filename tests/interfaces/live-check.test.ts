@@ -89,12 +89,12 @@ test("buildLiveCheckReport warns when the IM event receive scope is missing", as
   assert.equal(scopeCheck?.status, "warn");
   assert.match(scopeCheck?.detail ?? "", /im:message\.p2p_msg:readonly/u);
   assert.equal(report.ready, false);
-  assert.equal(report.nextActions.length, 2);
-  assert.equal(report.nextActions[0]?.owner, "open_platform_admin");
+  assert.equal(report.nextActions.length, 1);
+  assert.equal(report.nextActions[0]?.owner, "local_operator");
   assert.equal(report.nextActions[0]?.severity, "warn");
-  assert.match(report.nextActions[0]?.action ?? "", /lark-cli auth login --profile pilotflow-contest --scope "im:message\.p2p_msg:readonly"/u);
+  assert.match(report.nextActions[0]?.action ?? "", /PILOTFLOW_BOT_USER_ID/u);
   assert.match(renderLiveCheckReport(report), /Next actions:/u);
-  assert.match(renderLiveCheckReport(report), /Open Platform admin:/u);
+  assert.match(renderLiveCheckReport(report), /Local operator:/u);
 });
 
 test("buildLiveCheckReport fails when the IM event subscribe command cannot be constructed", async () => {
