@@ -7,8 +7,8 @@ import { EventDedupe } from "../../gateway/feishu/dedupe.js";
 import type { BotIdentity, FeishuMessageEvent } from "../../gateway/feishu/event-source.js";
 import { parseLarkCliEventLine } from "../../gateway/feishu/lark-cli-source.js";
 import { handleMessageEvent } from "../../gateway/feishu/message-handler.js";
+import { createLlmClient, type LlmClient, type LlmResponse } from "../../llm/client.js";
 import { parseArgs } from "../../shared/parse-args.js";
-import type { LlmClient, LlmResponse } from "../../llm/client.js";
 import type { ConfirmationGate } from "../../orchestrator/confirmation-gate.js";
 import { registerFeishuTools } from "../../tools/feishu/index.js";
 import { ToolRegistry } from "../../tools/registry.js";
@@ -48,13 +48,14 @@ export async function runAgentSmoke(options: AgentSmokeOptions = {}): Promise<Ag
   const event = messageEventFromLine(options.eventLine ?? buildMockMessageEventLine(options.input ?? DEFAULT_INPUT));
   const bot: BotIdentity = { openId: "ou_pilotflow_bot", userId: "u_pilotflow_bot", name: "PilotFlow" };
 
+  const llm = resolveSmokeLlm(options.input ?? DEFAULT_INPUT, process.env);
   const handled = await handleMessageEvent(event, {
     bot,
     sessions,
     dedupe: new EventDedupe({ ttlMs: 60 * 60 * 1000, maxEntries: 128 }),
     queue: new ChatQueue(),
     runAgent: async (text: string, session: Session): Promise<AgentLoopResult> => runAgentLoop(text, session.messages.slice(0, -1), {
-      llm: createSmokeLlm(text),
+      llm,
       tools,
       recorder,
       runtime,
@@ -174,6 +175,22 @@ function createSmokeLlm(text: string): LlmClient {
   };
 }
 
+function resolveSmokeLlm(text: string, env: NodeJS.ProcessEnv): LlmClient {
+  const baseUrl = env.PILOTFLOW_LLM_BASE_URL;
+  const apiKey = env.PILOTFLOW_LLM_API_KEY;
+  const model = env.PILOTFLOW_LLM_MODEL;
+  if (baseUrl && apiKey && model) {
+    return createLlmClient({
+      baseUrl,
+      apiKey,
+      model,
+      maxTokens: env.PILOTFLOW_LLM_MAX_TOKENS ? Number(env.PILOTFLOW_LLM_MAX_TOKENS) : 4096,
+      temperature: env.PILOTFLOW_LLM_TEMPERATURE ? Number(env.PILOTFLOW_LLM_TEMPERATURE) : undefined,
+    });
+  }
+  return createSmokeLlm(text);
+}
+
 function messageEventFromLine(line: string): FeishuMessageEvent {
   const event = parseLarkCliEventLine(line);
   if (!event || event.kind !== "message") {
@@ -202,9 +219,7 @@ function numberFlag(value: unknown): number | undefined {
 
 function smokeRuntimeEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   const next: NodeJS.ProcessEnv = { ...env, PILOTFLOW_FEISHU_MODE: "dry-run" };
-  for (const key of Object.keys(next)) {
-    if (key.startsWith("PILOTFLOW_LLM_")) delete next[key];
-  }
+  // Preserve PILOTFLOW_LLM_* vars so resolveSmokeLlm can use real LLM when configured
   return next;
 }
 

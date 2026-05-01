@@ -64,3 +64,24 @@
 ### 轮次 2（2026-05-02 00:45）
 - 完成：T01（演示脚本更新，含失败路径和时间标注）、T04（架构文档 220→368 行，新增提取引擎/编排/幂等/错误处理）、T06（可复用性文档）、T07（竞品策略融入 PRODUCT_SPEC 和 PROJECT_BRIEF）、T08（代码清洁验证）
 - 全部 9 个任务已完成
+
+### P4：新一轮（2026-05-02 00:55）
+
+- [ ] **T10** LLM Planner 集成：将 TS Agent loop 接入真实 LLM 规划
+  - 当前：deterministic prototype planner，用正则提取字段
+  - 目标：Agent loop 能通过 LLM 理解意图并生成计划
+  - 路径：`src/llm/`（已有 OpenAI-compatible client）、`src/agent/`（已有 Agent loop）
+  - 产出：LLM planner 可通过 `npm run pilot:agent-smoke` 验证
+
+- [ ] **T11** 答辩 Q&A 文档：编写评委可能问的问题和标准回答
+  - 路径：`docs/demo/QA_GUIDE.md`
+  - 覆盖：OpenClaw 对比、AI 技术深度、可复用性、Demo 稳定性
+  - 产出：Q&A 文档
+
+- [ ] **T12** 测试增强：为 TS 核心模块补充测试
+  - 覆盖：gateway event handling、session persistence、card callback parsing
+  - 产出：新增测试用例
+
+- [ ] **T13** Demo 截图清单：列出需要截图的 5 个关键画面
+  - 路径：`docs/demo/SCREENSHOT_CHECKLIST.md`
+  - 产出：截图清单文档
