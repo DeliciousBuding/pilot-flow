@@ -158,6 +158,16 @@
 - [x] **T25** 代码质量扫描：无 TODO/FIXME/HACK，无硬编码值
   - 产出：代码干净，无需修复
 
+### P9：一致性审查（2026-05-02 03:45）
+
+- [ ] **T26** 文档一致性审查：检查所有 demo 文档是否与评分标准对齐
+  - 检查：DEMO_PLAYBOOK、QA_GUIDE、SCREENSHOT_CHECKLIST、SUBMISSION_CHECKLIST、JUDGE_ONE_PAGER
+  - 确保：口径一致、命令最新、竞品定位统一
+  - 产出：一致性审查报告，如有问题则修复
+
+- [x] **T27** sprint-main 最终合并回 main：已是最新（5bd1578）
+  - 产出：main 分支包含所有最新产出
+
 - [x] **T23** 竞赛提交检查清单：提交前检查文档
   - 路径：docs/demo/SUBMISSION_CHECKLIST.md
   - 产出：含 GitHub、飞书、录屏、截图、答辩 5 大类检查项
