@@ -133,3 +133,17 @@
 
 - [x] **T20** 复赛提交模板更新：最新进展已写入飞书复赛模板
   - 产出：飞书复赛文档 revision 8，含工程化落地（165 测试）和 LLM 集成信息
+
+### P7：最终打磨（2026-05-02 03:20）
+
+- [x] **T21** sprint-main 再次合并回 main：已合并并推送
+  - 产出：main 分支最新（7f8ffcb）
+
+- [ ] **T22** 代码注释审查：确保核心模块有足够注释，评委能看懂
+  - 覆盖：src/agent/loop.ts、src/tools/registry.ts、src/orchestrator/
+  - 产出：关键函数有简明注释
+  - 状态：subagent 运行中
+
+- [x] **T23** 竞赛提交检查清单：提交前检查文档
+  - 路径：docs/demo/SUBMISSION_CHECKLIST.md
+  - 产出：含 GitHub、飞书、录屏、截图、答辩 5 大类检查项
