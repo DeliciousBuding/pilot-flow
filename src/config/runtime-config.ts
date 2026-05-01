@@ -4,7 +4,7 @@ import { ConfigurationError } from "../shared/errors.js";
 import type { RuntimeConfig, RunMode } from "../types/config.js";
 
 const DEFAULT_PROFILE = "pilotflow-contest";
-const DEFAULT_STORAGE_PATH = "tmp/run-guard/project-init-runs.json";
+const DEFAULT_STORAGE_PATH = "tmp/run-guard/project-init-runs";
 
 export function loadRuntimeConfig(
   argv: readonly string[] = process.argv.slice(2),

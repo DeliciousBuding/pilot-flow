@@ -24,8 +24,8 @@ flowchart LR
 | Area | Status | Boundary |
 | --- | --- | --- |
 | Manual project launch loop | Useful prototype | The older JS path has real Feishu proof; it is not a production bot. |
-| Feishu-native surfaces | Partially live validated | IM, Cards, Doc, Base, Task, pinned entry, risk card, and summary are real; TS mention gateway exists locally, but announcement and callback are not complete. |
-| Human confirmation | Stable fallback | Text confirmation works; real card button confirmation remains pending. |
+| Feishu-native surfaces | Partially live validated | IM, Cards, Doc, Base, Task, pinned entry, risk card, summary, IM event delivery, and card callback delivery are real; announcement remains fallback-only. |
+| Human confirmation | Event path partly verified | Text confirmation works; real card button event delivery is verified, but callback-driven project continuation still needs a live run. |
 | Traceability | Implemented | JSONL run log, Flight Recorder, and review packs make runs inspectable. |
 | Review packaging | Implemented but auxiliary | Useful for competition evidence; it must not become the product center. |
 | Product cleanup | Mostly implemented | Runtime entrypoints, review tooling, command facade, and public demo docs are separated. |
@@ -85,8 +85,9 @@ Exit condition: a confirmed local command can create real Feishu artifacts and p
 - [x] Add structured callback-proof next actions for timeout and subscription failure cases.
 - [x] Start callback-proof listener before sending the probe card, and classify probe send failures separately.
 - [x] Fail callback-proof before sending a probe card when event subscription fails during startup.
-- [ ] Verify a real Feishu card button click reaches the listener and triggers the orchestrator; the 2026-05-01 probe card send succeeded, but no callback arrived within 30 seconds.
-- [ ] Verify `im.message.receive_v1` delivery; the structured mention probe now sends, but no IM event arrived within 60 seconds.
+- [x] Verify a real Feishu card button click reaches the listener; on 2026-05-01 `callback-proof-20260501T035106067Z` observed `card.action.trigger`.
+- [x] Verify `im.message.receive_v1` delivery; on 2026-05-01 the structured mention probe reached `pilot:gateway` and created one pending run.
+- [ ] Verify the real card callback resumes a pending project run through `pilot:gateway`.
 - [ ] Capture a polished 6 to 8 minute happy-path walkthrough.
 - [ ] Capture a focused failure-path walkthrough or screenshot set.
 - [ ] Capture Open Platform permission and callback configuration screenshots.
@@ -122,7 +123,7 @@ Exit condition: TypeScript path can run the same dry-run and live-guarded projec
 
 ## Phase 4: Strong MVP Enhancements
 
-- [ ] Mobile-friendly confirmation once callback delivery is verified.
+- [ ] Mobile-friendly confirmation after callback-driven project continuation is verified.
 - [ ] Desktop or Chat Tab cockpit for run status, artifacts, risks, and retry decisions.
 - [x] Run Retrospective Pack generated from Flight Recorder traces.
 - [x] Add initial Retrospective Eval runner for optional fallback, missing owner, TBD deadline, planner validation fallback, and tool failure trace.
@@ -155,8 +156,8 @@ Exit condition: PilotFlow feels useful beyond the first project-launch flow whil
 ## Immediate Next Actions
 
 1. Repeat `npm run pilot:run -- --live --confirm "确认执行"` with fresh dedupe keys, then compare the live artifacts with the older JS live proof.
-2. Inspect Open Platform callback/event settings for the `card.action.trigger` gap, then rerun `npm run pilot:callback-proof -- --send-probe-card --timeout 60s`.
-3. Recheck `pilot:gateway -- --live --send-probe-message --timeout 60s --max-events 1 --json` and inspect Open Platform long-connection, `im.message.receive_v1`, and app-level IM permission if no event arrives.
+2. Run `pilot:gateway -- --live` through a pending-run card confirmation and verify the callback resumes the orchestrator.
+3. Recheck `pilot:gateway -- --live --send-probe-message --timeout 60s --max-events 1 --json` before recording.
 4. Promote Retrospective Eval cases into snapshot-backed fixtures from real successful and degraded runs.
 5. Capture happy-path and failure-path media outside Git, then rerun `pilot:status` until the package is no longer `needs_regeneration`.
 6. Only after the main Feishu loop is stable, design the first artifact approval card for worker previews.

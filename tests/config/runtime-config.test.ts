@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { basename } from "node:path";
 import { loadRuntimeConfig } from "../../src/config/runtime-config.js";
 
 test("loadRuntimeConfig preserves CLI and env names", () => {
@@ -13,6 +14,7 @@ test("loadRuntimeConfig preserves CLI and env names", () => {
   assert.equal(config.feishuTargets.chatId, "oc_1");
   assert.equal(config.feishuTargets.baseToken, "base-token");
   assert.equal(config.duplicateGuard.enabled, true);
+  assert.equal(basename(config.duplicateGuard.storagePath), "project-init-runs");
   assert.equal(config.autoConfirm, false);
   assert.equal(config.verbose, false);
 });

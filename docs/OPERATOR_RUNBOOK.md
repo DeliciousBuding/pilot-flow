@@ -165,7 +165,8 @@ Current boundary:
 - In live mode, `--send-probe-message` still checks whether the current token shows `im:message.p2p_msg:readonly`, but it no longer treats that as a hard stop. Use the actual send result and event delivery to judge the app-level path.
 - Subscription failures return `status: subscribe_failed` and write sanitized stderr to the gateway JSONL log.
 - Gateway JSON output includes `nextActions` for missing bot mention identity, missing probe chat, subscription failure, and probe timeout cases.
-- Real tenant validation is still required before this path replaces the older JS live proof.
+- On 2026-05-01 the structured mention probe reached the listener and created one pending run.
+- Full callback-driven continuation still needs a live gateway run before this path replaces the older JS live proof.
 
 ## Callback Proof
 
@@ -271,14 +272,14 @@ Generated reports and run logs stay under ignored `tmp/`.
 
 ## TypeScript Kernel Rebuild Status
 
-The TypeScript rebuild is active. Day 0 through Day 7 are complete: strict TS foundation, domain modules, ToolRegistry, tool idempotency, 9 Feishu tool definitions, split TS orchestrator, OpenAI-compatible LLM client, retry/error classifier, Agent loop, session manager, Feishu gateway boundary, dry-run CLI smoke bridge, live-guarded project-init bridge, `pilot:run`, Retrospective Eval, and Review Worker preview contract are implemented and covered by tests. `pilot:run` is now the preferred product-facing dry-run and operator live entry. On 2026-05-01 it completed a real Feishu run with Doc/Base/Task/cards/pinned entry/summary/run log; keep the JS-backed `pilot:demo` available until repeated TS live parity and real callback continuation are proven.
+The TypeScript rebuild is active. Day 0 through Day 7 are complete: strict TS foundation, domain modules, ToolRegistry, tool idempotency, 9 Feishu tool definitions, split TS orchestrator, OpenAI-compatible LLM client, retry/error classifier, Agent loop, session manager, Feishu gateway boundary, dry-run CLI smoke bridge, live-guarded project-init bridge, `pilot:run`, Retrospective Eval, and Review Worker preview contract are implemented and covered by tests. `pilot:run` is now the preferred product-facing dry-run and operator live entry. On 2026-05-01 it completed a real Feishu run with Doc/Base/Task/cards/pinned entry/summary/run log. The same day, the long-connection event path received both `im.message.receive_v1` and `card.action.trigger` probe events. Keep the JS-backed `pilot:demo` available until repeated TS live parity and callback-driven continuation are proven.
 
 ## Known Platform Edges
 
 | Edge | Current behavior |
 | --- | --- |
-| Card callback delivery | Code-level listener and trigger bridge exist; on 2026-05-01 a probe card was sent successfully, but the listener did not receive `card.action.trigger` within 30 seconds |
-| IM event delivery | On 2026-05-01 a structured mention probe was sent after `PILOTFLOW_BOT_USER_ID` was configured, but no `im.message.receive_v1` reached the listener within 60 seconds |
+| Card callback delivery | On 2026-05-01 `pilot:callback-proof -- --send-probe-card` observed a real `card.action.trigger`; pending-run continuation still needs a full gateway run |
+| IM event delivery | On 2026-05-01 a structured mention probe reached `pilot:gateway` as `im.message.receive_v1` and created one pending run |
 | Group announcement | Native announcement update was attempted; the current test group returns `232097 Unable to operate docx type chat announcement` |
 | Manual media | Submission/readiness review separate machine evidence from videos, screenshots, and callback configuration proof |
 
