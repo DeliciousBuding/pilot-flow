@@ -139,10 +139,15 @@
 - [x] **T21** sprint-main 再次合并回 main：已合并并推送
   - 产出：main 分支最新（7f8ffcb）
 
-- [ ] **T22** 代码注释审查：确保核心模块有足够注释，评委能看懂
-  - 覆盖：src/agent/loop.ts、src/tools/registry.ts、src/orchestrator/
-  - 产出：关键函数有简明注释
-  - 状态：subagent 运行中
+- [x] **T22** 代码注释审查：5 处核心函数添加简明中文注释
+  - 覆盖：runAgentLoop、prepareToolCalls、ToolRegistry.register、ToolRegistry.execute、resolveSmokeLlm
+  - 产出：注释已添加，编译通过，165 测试通过
+
+### 轮次 9（2026-05-02 03:25）
+- 完成：T21（合并 main）、T22（代码注释）、T23（提交检查清单）
+- 全量测试：165 pass, 0 fail
+- main 分支已更新（840049d）
+- 全部 23 个任务已完成
 
 - [x] **T23** 竞赛提交检查清单：提交前检查文档
   - 路径：docs/demo/SUBMISSION_CHECKLIST.md
