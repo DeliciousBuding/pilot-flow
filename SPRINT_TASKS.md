@@ -96,9 +96,9 @@
   - 路径：`src/interfaces/cli/pilot-run.ts`
   - 产出：更清晰的终端输出格式
 
-- [ ] **T15** 集成测试：端到端 dry-run 链路测试
-  - 覆盖：正常路径、缺失字段、重复运行
-  - 产出：新增集成测试用例
+- [x] **T15** 集成测试：端到端 dry-run 链路测试
+  - 覆盖：正常路径、缺失字段、重复运行、中文输入解析
+  - 产出：3 个新集成测试用例，pilot-run 总计 10 个测试通过
 
 - [x] **T16** demo 输入场景化：用校园答辩项目替换技术化默认输入
   - 路径：`src/interfaces/cli/fixtures/demo_input_project_init.txt`
@@ -108,3 +108,14 @@
 - 完成：T12（测试增强，7 个新测试用例）
   - 新增：mention-gate user_id/name 匹配、message-handler P2P DM 处理、session-manager get() 惰性清理和 turnCount 重置、card-handler cancel 动作、card-callback cancel 提取和未知动作处理
   - 27 个相关测试全部通过；2 个 interfaces 测试预置失败（环境配置问题，非本次变更引起）
+
+### 轮次 7（2026-05-02 02:20）
+- 完成：T13（截图清单）、T14（输出美化）、T16（中文 demo 输入）
+- 修复：smokeRuntimeEnv 部分 LLM 配置导致 ConfigurationError、pilot-run 输出格式破坏测试断言
+- 全量测试：162 pass, 0 fail
+- 审查 subagent 发现问题并修复
+
+### 轮次 8（2026-05-02 02:30）
+- 完成：T15（集成测试，3 个新用例：缺失字段、重复运行、中文输入解析）
+- 全量测试：165 pass, 0 fail
+- 全部 16 个任务已完成

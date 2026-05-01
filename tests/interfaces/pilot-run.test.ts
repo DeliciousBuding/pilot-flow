@@ -115,3 +115,68 @@ test("runPilotRun loads local .env without overriding explicit dry-run default",
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
+
+test("runPilotRun handles incomplete input with missing fields gracefully", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "pilotflow-pilot-run-missing-"));
+  try {
+    const output = join(dir, "run.jsonl");
+    const result = await runPilotRun({
+      argv: ["--dry-run", "--input", "目标: 建答辩项目空间", "--output", output],
+      env: {},
+    });
+
+    assert.equal(result.status, "completed");
+    assert.equal(result.mode, "dry-run");
+    const log = await readFile(output, "utf8");
+    assert.match(log, /"type":"run.completed"/u);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("runPilotRun blocks duplicate live runs unless allow-duplicate-run is set", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "pilotflow-pilot-run-dup-"));
+  try {
+    const output1 = join(dir, "run1.jsonl");
+    const output2 = join(dir, "run2.jsonl");
+
+    const result1 = await runPilotRun({
+      argv: ["--dry-run", "--input", "目标: 建立答辩项目空间 成员: 产品 交付物: Brief 截止时间: 2026-05-07", "--output", output1],
+      env: {},
+    });
+    assert.equal(result1.status, "completed");
+
+    const result2 = await runPilotRun({
+      argv: ["--dry-run", "--input", "目标: 建立答辩项目空间 成员: 产品 交付物: Brief 截止时间: 2026-05-07", "--output", output2],
+      env: {},
+    });
+    assert.equal(result2.status, "completed");
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("runPilotRun parses Chinese campus scenario input correctly", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "pilotflow-pilot-run-cn-"));
+  try {
+    const output = join(dir, "run.jsonl");
+    const result = await runPilotRun({
+      argv: [
+        "--dry-run",
+        "--input",
+        "目标: 为飞书 AI 校园挑战赛准备答辩项目空间 成员: 唐丁 交付物: 项目简报, 任务清单, 风险清单 截止时间: 2026-05-07",
+        "--output",
+        output,
+      ],
+      env: {},
+    });
+
+    assert.equal(result.status, "completed");
+    assert.equal(result.artifactCount > 0, true);
+    const log = await readFile(output, "utf8");
+    assert.match(log, /飞书/u);
+    assert.match(log, /run\.completed/u);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
