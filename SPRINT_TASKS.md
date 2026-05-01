@@ -160,10 +160,9 @@
 
 ### P9：一致性审查（2026-05-02 03:45）
 
-- [ ] **T26** 文档一致性审查：检查所有 demo 文档是否与评分标准对齐
-  - 检查：DEMO_PLAYBOOK、QA_GUIDE、SCREENSHOT_CHECKLIST、SUBMISSION_CHECKLIST、JUDGE_ONE_PAGER
-  - 确保：口径一致、命令最新、竞品定位统一
-  - 产出：一致性审查报告，如有问题则修复
+- [x] **T26** 文档一致性审查：发现并修复 2 处不一致
+  - 修复：效率对比表格与 README 对齐、竞品对比表补充"工作流"维度
+  - 产出：所有 demo 文档口径一致，命令最新，无 GPT 口癖
 
 - [x] **T27** sprint-main 最终合并回 main：已是最新（5bd1578）
   - 产出：main 分支包含所有最新产出
