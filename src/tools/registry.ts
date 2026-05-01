@@ -45,6 +45,7 @@ export class ToolRegistry {
   private readonly tools = new Map<string, ToolDefinition>();
   private readonly llmNameToName = new Map<string, string>();
 
+  // 注册工具定义，同时维护内部名 -> LLM 名的双向映射，防止重名
   register(definition: ToolDefinition): void {
     if (this.tools.has(definition.name)) {
       throw new ToolAlreadyRegisteredError(definition.name);
@@ -60,6 +61,7 @@ export class ToolRegistry {
     this.llmNameToName.set(llmName, definition.name);
   }
 
+  // 执行工具：名称解析 -> 输入校验 -> 前置检查 -> 记录事件 -> 调用 handler
   async execute(name: string, rawInput: unknown, ctx: ToolContext): Promise<ToolResult> {
     const internalName = this.resolveName(name);
     const tool = this.tools.get(internalName);

@@ -175,6 +175,7 @@ function createSmokeLlm(text: string): LlmClient {
   };
 }
 
+// LLM 未配置时 fallback 到 mock，保证 dry-run 始终可用
 function resolveSmokeLlm(text: string, env: NodeJS.ProcessEnv): LlmClient {
   const baseUrl = env.PILOTFLOW_LLM_BASE_URL;
   const apiKey = env.PILOTFLOW_LLM_API_KEY;

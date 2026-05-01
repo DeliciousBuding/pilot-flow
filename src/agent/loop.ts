@@ -25,6 +25,7 @@ export interface AgentLoopResult {
   readonly toolCallsMade: number;
 }
 
+// Agent 主循环：LLM 调用 -> 工具执行 -> 结果回传，迭代至无工具调用或达上限
 export async function runAgentLoop(
   userMessage: string,
   history: readonly SessionMessage[],
@@ -113,6 +114,7 @@ interface ToolCallRejection {
   readonly errorClass: string;
 }
 
+// 预校验工具调用：解析参数、检查工具存在性、验证必需 targets，失败则收集拒绝原因
 async function prepareToolCalls(response: LlmResponse, config: AgentLoopConfig): Promise<PreparedToolCalls> {
   const calls: PreparedToolCall[] = [];
   const rejections: ToolCallRejection[] = [];
