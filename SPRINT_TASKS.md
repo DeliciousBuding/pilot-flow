@@ -74,9 +74,17 @@
   - 路径：`docs/demo/QA_GUIDE.md`
   - 产出：含快速应答卡的 Q&A 文档
 
-- [ ] **T12** 测试增强：为 TS 核心模块补充测试
+- [x] **T12** 测试增强：为 TS 核心模块补充测试
   - 覆盖：gateway event handling、session persistence、card callback parsing
-  - 产出：新增测试用例
+  - 产出：新增 7 个测试用例，27 个相关测试全部通过
+  - 已覆盖场景：
+    - mention-gate: DM 接受、open_id/user_id/name/@_all 匹配（原 2 + 新 2）
+    - message-handler: 完整消息流 + mention 过滤 + P2P DM 处理（原 2 + 新 1）
+    - session-manager: TTL 过期、容量驱逐、maxTurns 历史截断、get() 惰性清理、turnCount 重置（原 3 + 新 2）
+    - card-handler: confirm_execute 去重、cancel 动作处理（原 2 + 新 1）
+    - card-callback: confirm_execute 提取、legacy flight_plan、cancel 决策、未知动作返回 null（原 2 + 新 2）
+    - registry: dry-run 跳过 preflight/确认、工具注册/执行/错误处理（已完整覆盖）
+    - feishu-tools: dry-run 产物、可选工具语义（已完整覆盖）
 
 - [x] **T13** Demo 截图清单：5 张必截 + 2 张可选，对应评分标准
   - 路径：`docs/demo/SCREENSHOT_CHECKLIST.md`
@@ -95,3 +103,8 @@
 - [x] **T16** demo 输入场景化：用校园答辩项目替换技术化默认输入
   - 路径：`src/interfaces/cli/fixtures/demo_input_project_init.txt`
   - 产出：中文场景化 demo 输入，dry-run 验证通过（13 产物）
+
+### 轮次 6（2026-05-02 02:10）
+- 完成：T12（测试增强，7 个新测试用例）
+  - 新增：mention-gate user_id/name 匹配、message-handler P2P DM 处理、session-manager get() 惰性清理和 turnCount 重置、card-handler cancel 动作、card-callback cancel 提取和未知动作处理
+  - 27 个相关测试全部通过；2 个 interfaces 测试预置失败（环境配置问题，非本次变更引起）

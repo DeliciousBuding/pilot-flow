@@ -70,13 +70,10 @@ export function renderPilotRun(result: PilotRunResult): string {
     "",
     `surfaces: ${surfaces.join(", ")}`,
     "",
-    "--- Artifacts ---",
-    `count: ${result.artifactCount}`,
-    `log: ${result.output}`,
-    "",
-    "--- Next Steps ---",
-    `  npm run pilot:recorder -- --input ${result.output} --output tmp/flight-recorder/latest.html`,
-    `  npm run pilot:package`,
+    `next: npm run pilot:recorder -- --input ${result.output} --output tmp/flight-recorder/latest.html`,
+    `next: npm run review:retrospective -- --input ${result.output} --output tmp/run-retrospective/RUN_RETROSPECTIVE.md`,
+    `next: npm run review:retrospective-eval -- --input ${result.output} --output tmp/retrospective-eval/RETROSPECTIVE_EVAL.md`,
+    "next: npm run pilot:package",
   ].join("\n");
 }
 

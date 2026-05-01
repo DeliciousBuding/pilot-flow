@@ -219,7 +219,13 @@ function numberFlag(value: unknown): number | undefined {
 
 function smokeRuntimeEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   const next: NodeJS.ProcessEnv = { ...env, PILOTFLOW_FEISHU_MODE: "dry-run" };
-  // Preserve PILOTFLOW_LLM_* vars so resolveSmokeLlm can use real LLM when configured
+  // Keep LLM config only when all three are present; delete partial config to avoid ConfigurationError
+  const hasAll = env.PILOTFLOW_LLM_BASE_URL && env.PILOTFLOW_LLM_API_KEY && env.PILOTFLOW_LLM_MODEL;
+  if (!hasAll) {
+    for (const key of Object.keys(next)) {
+      if (key.startsWith("PILOTFLOW_LLM_")) delete next[key];
+    }
+  }
   return next;
 }
 
