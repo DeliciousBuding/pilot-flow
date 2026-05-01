@@ -200,6 +200,67 @@ git push origin main
 
 If push fails, record the error and keep the local commit.
 
+## Extending PilotFlow
+
+PilotFlow's Agent architecture is designed for extensibility. Any team can add new tools without modifying the core orchestrator.
+
+### Adding a New Feishu Tool
+
+1. Create a tool definition file in `src/tools/feishu/`:
+
+```typescript
+// src/tools/feishu/my-new-tool.ts
+import { registerFeishuTool } from './index';
+
+registerFeishuTool({
+  name: 'my.new.tool',
+  llmName: 'my_new_tool',
+  description: 'What this tool does',
+  parameters: { /* JSON Schema */ },
+  execute: async (args, context) => {
+    // Tool implementation
+    // context.confirmed === true means human approved
+    // Return artifact for Flight Recorder
+  },
+  requiresConfirmation: true, // Set false for read-only tools
+  safeForDryRun: true,
+});
+```
+
+2. Import the file in `src/tools/feishu/index.ts` — it self-registers.
+3. Add tests in `tests/`.
+4. Run `npm run test:one -- <alias>` to verify.
+
+### Adding a Non-Feishu Tool
+
+For tools that don't use `lark-cli` (e.g., webhooks, file operations), register directly in `src/tools/registry.ts`:
+
+```typescript
+registry.register({
+  name: 'custom.my.tool',
+  llmName: 'custom_my_tool',
+  description: 'What this tool does',
+  parameters: { /* JSON Schema */ },
+  execute: async (args, context) => { /* ... */ },
+});
+```
+
+### Customizing the Planner
+
+The current planner is a deterministic prototype in `src/core/planner/project-init-planner.js`. To swap in an LLM planner:
+
+1. Implement the same `ProjectInitPlanner` interface.
+2. Register it as a provider in the orchestrator.
+3. The confirmation gate, tool registry, and Flight Recorder work unchanged.
+
+### Reusing in Other Teams
+
+The Agent architecture (planner → confirmation → tool router → recorder) is not specific to project management. Other teams can reuse the infrastructure for different domain workflows by:
+
+- Swapping the planner for a different intent parser
+- Registering domain-specific tools
+- Customizing the plan schema in `src/schemas/`
+
 ## Secret Handling
 
 - Do not commit `.env`, local secrets, tokens, App Secrets, screenshots with tokens, or copied auth responses.

@@ -45,10 +45,8 @@
 
 ### P2：差异化与可复用（评分维度2，25%）
 
-- [ ] **T06** 可复用性文档：在 README 或 docs 中补充：
-  - 如何扩展新工具（工具注册表接入步骤）
-  - 如何接入新的飞书能力
-  - 产出：更新后的文档
+- [x] **T06** 可复用性文档：在 docs/DEVELOPMENT.md 中补充扩展指南
+  - 产出：新增 "Extending PilotFlow" 章节，含工具接入步骤、自定义规划器、团队复用指南
 
 - [ ] **T07** 竞品策略融入：把 `18_competitive_strategy_report.md` 的结论融入：
   - `docs/PRODUCT_SPEC.md` 的差异化部分
@@ -57,8 +55,8 @@
 
 ### P3：工程质量
 
-- [ ] **T08** 代码清洁：扫描并清理 TODO、console.log、临时注释
-  - 产出：清理后的代码
+- [x] **T08** 代码清洁：扫描并清理 TODO、console.log、临时注释
+  - 产出：0 TODO/FIXME，console.log 仅在 CLI 入口（正常）
 
 - [x] **T09** TypeScript 编译检查：`npx tsc --noEmit` 无报错
   - 产出：编译通过（pilot:check 包含 tsc --noEmit）
