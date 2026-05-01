@@ -154,6 +154,63 @@ test("runAgentGateway resumes pending live runs from plain text confirmation in 
   }
 });
 
+test("runAgentGateway does not execute a pending run for non-confirm card actions", async () => {
+  const dir = join(process.cwd(), "tmp", "tests", `pilotflow-agent-gateway-card-action-${Date.now()}-d`);
+  await mkdir(dir, { recursive: true });
+  const storePath = join(dir, "pending.json");
+
+  try {
+    const firstRecorder = new MemoryRecorder();
+    const firstRegistry = createGatewayRegistry();
+    const first = await runAgentGateway({
+      argv: [
+        "--live",
+        "--pending-store", storePath,
+        "--chat-id", "oc_live",
+        "--base-token", "base_live",
+        "--base-table-id", "tbl_live",
+        "--storage-path", join(dir, "guard-live-1"),
+        "--send-plan-card",
+      ],
+      source: eventSource([messageEvent("@PilotFlow 建一个项目", "om_live_cancel_1", "oc_live")]),
+      env: {},
+      registry: firstRegistry,
+      recorder: firstRecorder,
+    });
+
+    assert.equal(first.pendingRuns, 1);
+    const pending = await new PendingRunStore({ storagePath: storePath }).list();
+    const runId = pending[0]?.runId ?? "";
+    assert.ok(runId.length > 0);
+
+    const secondRecorder = new MemoryRecorder();
+    const secondRegistry = createGatewayRegistry();
+    const second = await runAgentGateway({
+      argv: [
+        "--live",
+        "--pending-store", storePath,
+        "--chat-id", "oc_live",
+        "--base-token", "base_live",
+        "--base-table-id", "tbl_live",
+        "--storage-path", join(dir, "guard-live-2"),
+      ],
+      source: eventSource([cardEvent(runId, "cancel")]),
+      env: {},
+      registry: secondRegistry,
+      recorder: secondRecorder,
+    });
+
+    assert.equal(second.processedCards, 1);
+    assert.equal(second.status, "completed");
+    assert.equal(second.pendingRuns, 0);
+    assert.equal(secondRecorder.ofType("run.completed").length, 0);
+    assert.equal(secondRecorder.ofType("gateway.card_continuation_completed").length, 0);
+    assert.equal(secondRecorder.ofType("gateway.card_action_recorded").length, 1);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 test("runAgentGateway ignores confirmation text without a pending run", async () => {
   const dir = join(process.cwd(), "tmp", "tests", `pilotflow-agent-gateway-live-${Date.now()}-d`);
   await mkdir(dir, { recursive: true });
@@ -485,7 +542,7 @@ function plainMessageEvent(text: string, id: string, chatId: string): FeishuGate
   };
 }
 
-function cardEvent(runId: string): FeishuGatewayEvent {
+function cardEvent(runId: string, action = "confirm_execute"): FeishuGatewayEvent {
   return {
     kind: "card",
     id: "evt_card_1",
@@ -494,7 +551,7 @@ function cardEvent(runId: string): FeishuGatewayEvent {
         action: {
           value: {
             pilotflow_card: "execution_plan",
-            pilotflow_action: "confirm_execute",
+            pilotflow_action: action,
             pilotflow_run_id: runId,
           },
         },

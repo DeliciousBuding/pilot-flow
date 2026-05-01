@@ -370,6 +370,18 @@ async function processGatewayEvents(config: {
             } as never);
             return;
           }
+          if (action.decision.next !== "run_full_project_init") {
+            if (action.decision.next === "stop_run") await config.store.delete(action.runId);
+            await config.recorder.record({
+              type: "gateway.card_action_recorded",
+              runId: action.runId,
+              card: action.card,
+              action: action.action,
+              status: action.decision.status,
+              next: action.decision.next,
+            } as never);
+            return;
+          }
           const result = await config.orchestrator.run(pending.inputText, buildApprovedRunOptions(pending.options));
           await config.store.delete(action.runId);
           await config.recorder.record({
