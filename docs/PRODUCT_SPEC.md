@@ -38,6 +38,25 @@ Teams that already coordinate in Feishu group chats and need lightweight project
 | Traceable | Every run records tool calls, artifacts, errors, and fallbacks |
 | Practical | The MVP should solve a real workflow before adding agent theater |
 
+## Competitive Positioning
+
+PilotFlow sits in the gap between existing Feishu AI capabilities:
+
+| Layer | Existing solution | What it covers | What it does not cover |
+| --- | --- | --- | --- |
+| Agent infrastructure | OpenClaw (飞书官方 Agent 插件) | Tool access, flow orchestration, exec approvals | Group-collaboration semantics, project workflow, business-level confirmation |
+| Meeting capture | 飞书妙记 | Meeting transcription → todos → tasks | Pre-meeting and post-meeting group chat decisions |
+| Project management | 飞书项目 | Project space, workflow engine, AI reports | Instant group-chat project initiation |
+| General AI | ChatGPT, Notion AI | Text generation, Q&A | Real Feishu artifact creation, confirmation gates, run traces |
+
+PilotFlow's value is not in tool access (OpenClaw covers that) but in **project operations productization**: turning group-chat discussion into a confirmed, traceable, auditable project run.
+
+Core differentiators:
+
+1. **Group-chat native entry**: Starts from where projects actually happen — IM discussion, not meeting rooms or project dashboards
+2. **Business-level confirmation gate**: Previews Doc/Base/Task/risk/entry before creation, not shell-level exec approvals
+3. **Business-level Flight Recorder**: Records who initiated, what was confirmed, which Feishu objects were created — not engineering-level trace logs
+
 ## Product Maturity Model
 
 PilotFlow should be described by its maturity level, not as a finished enterprise platform.

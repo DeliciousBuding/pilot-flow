@@ -20,9 +20,9 @@
 
 ### P0：Demo 可演示（评分维度1，50%）
 
-- [ ] **T01** 录屏脚本：编写成功路径和失败路径的演示脚本，控制在 6-8 分钟
-  - 路径：`pilot-flow/docs/demo/DEMO_PLAYBOOK.md` 已有初版，需要更新为最新命令
-  - 产出：更新后的演示脚本
+- [x] **T01** 录屏脚本：更新演示脚本，控制在 6-8 分钟
+  - 路径：`pilot-flow/docs/demo/DEMO_PLAYBOOK.md`
+  - 产出：更新后的演示脚本，含失败路径、时间标注、最新命令
 
 - [x] **T02** dry-run 完整验证：确保 `npm run pilot:run -- --dry-run` 全流程通过
   - 产出：status completed, 16 artifacts, run-63881b28
@@ -33,11 +33,8 @@
 
 ### P1：AI 技术深度（评分维度3，25%）
 
-- [ ] **T04** 架构文档增强：在 `docs/ARCHITECTURE.md` 中补充：
-  - 结构化提取引擎的设计细节（如何从自然语言中解析项目字段）
-  - 工具编排逻辑（顺序执行、降级策略、幂等保护）
-  - 错误处理与重试策略
-  - 产出：更新后的 ARCHITECTURE.md
+- [x] **T04** 架构文档增强：在 `docs/ARCHITECTURE.md` 中补充结构化提取引擎、工具编排、幂等保护、错误处理
+  - 产出：ARCHITECTURE.md 从 220 行扩展到 368 行，含 4 个新章节
 
 - [x] **T05** 测试覆盖率：确保核心模块测试通过
   - 命令：`npm test`，`npm run test:ts`
@@ -48,10 +45,8 @@
 - [x] **T06** 可复用性文档：在 docs/DEVELOPMENT.md 中补充扩展指南
   - 产出：新增 "Extending PilotFlow" 章节，含工具接入步骤、自定义规划器、团队复用指南
 
-- [ ] **T07** 竞品策略融入：把 `18_competitive_strategy_report.md` 的结论融入：
-  - `docs/PRODUCT_SPEC.md` 的差异化部分
-  - `docs/PROJECT_BRIEF.md` 的方案亮点
-  - 产出：更新后的文档
+- [x] **T07** 竞品策略融入：在 PRODUCT_SPEC.md 和 PROJECT_BRIEF.md 中补充竞品定位
+  - 产出：PRODUCT_SPEC.md 新增 "Competitive Positioning" 章节，PROJECT_BRIEF.md 新增 "Why Not OpenClaw" 对比表
 
 ### P3：工程质量
 
@@ -65,4 +60,7 @@
 
 ### 轮次 1（2026-05-02 00:35）
 - 完成：T02（dry-run 通过，16 产物）、T03（Flight Recorder HTML 生成）、T05（154 测试全通过）、T09（TS 编译通过）
-- 下一轮：T01（录屏脚本）+ T04（架构文档增强）
+
+### 轮次 2（2026-05-02 00:45）
+- 完成：T01（演示脚本更新，含失败路径和时间标注）、T04（架构文档 220→368 行，新增提取引擎/编排/幂等/错误处理）、T06（可复用性文档）、T07（竞品策略融入 PRODUCT_SPEC 和 PROJECT_BRIEF）、T08（代码清洁验证）
+- 全部 9 个任务已完成

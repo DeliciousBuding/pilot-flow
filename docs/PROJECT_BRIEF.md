@@ -14,6 +14,16 @@ Team work often starts from an IM conversation, but the important project signal
 
 PilotFlow uses an AI Agent as the primary workflow driver. The user gives natural language instructions from IM. The Agent understands intent, creates an execution plan, asks for missing information, requests human confirmation, invokes Feishu tools, writes project artifacts, tracks risk, and sends a delivery summary back to the group.
 
+## Why Not Just Use OpenClaw or Feishu Native
+
+| Existing solution | What it does well | Gap that PilotFlow fills |
+| --- | --- | --- |
+| OpenClaw (飞书官方插件) | Agent tool access, flow orchestration | No group-collaboration semantics, no project workflow, personal-assistant oriented |
+| 飞书妙记 | Meeting → todos → tasks | Only covers post-meeting, not pre/post-meeting group chat |
+| 飞书项目 | Project space, workflow engine | Heavy configuration, not designed for instant group-chat initiation |
+
+PilotFlow occupies the **group-chat instant collaboration** layer: the messy, fast-moving discussion that happens before formal meetings and outside structured project spaces.
+
 ## Product Narrative
 
 PilotFlow should be presented as a Feishu-native operating layer for lightweight project work:
