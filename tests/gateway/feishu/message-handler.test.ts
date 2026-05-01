@@ -72,3 +72,31 @@ test("handleMessageEvent ignores group messages without bot mention", async () =
   assert.equal(result.status, "ignored");
   assert.equal(result.reason, "not_mentioned");
 });
+
+test("handleMessageEvent processes P2P (DM) messages without requiring mention", async () => {
+  const sessions = new SessionManager({ ttlMs: 1000, maxTurns: 10, maxSessions: 5 }, () => 1_000);
+  const calls: string[] = [];
+
+  const result = await handleMessageEvent({
+    kind: "message",
+    id: "om_dm_1",
+    chatId: "oc_dm_1",
+    chatType: "p2p",
+    text: "帮我建项目",
+    senderOpenId: "ou_user",
+    raw: {},
+  }, {
+    bot: { openId: "ou_bot", userId: "u_bot", name: "PilotFlow" },
+    sessions,
+    dedupe: new EventDedupe(),
+    queue: new ChatQueue(),
+    runAgent: async (text, session) => {
+      calls.push(`${text}|${session.chatId}`);
+      return { finalResponse: "done", messages: [], iterations: 1, toolCallsMade: 0 };
+    },
+  });
+
+  assert.equal(result.status, "processed");
+  assert.deepEqual(calls, ["帮我建项目|oc_dm_1"]);
+  assert.equal(sessions.get("oc_dm_1")?.messages.at(-1)?.content, "done");
+});

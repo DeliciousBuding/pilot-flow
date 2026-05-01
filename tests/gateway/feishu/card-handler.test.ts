@@ -33,3 +33,35 @@ test("handleCardEvent dedupes repeated business actions across different event i
   assert.equal(second.status, "ignored");
   assert.equal(actions, 1);
 });
+
+test("handleCardEvent processes cancel action and returns stop_run decision", async () => {
+  const dedupe = new EventDedupe({ ttlMs: 1000, maxEntries: 10 }, () => 1_000);
+  const onActionCalls: string[] = [];
+  const event = {
+    kind: "card" as const,
+    id: "evt-cancel-1",
+    raw: {
+      event: {
+        action: {
+          value: {
+            pilotflow_card: "execution_plan",
+            pilotflow_action: "cancel",
+            pilotflow_run_id: "run-2",
+          },
+        },
+        operator: { open_id: "ou_user" },
+      },
+    },
+  };
+
+  const result = await handleCardEvent(event, {
+    dedupe,
+    onAction: async (action) => { onActionCalls.push(action.action); },
+  });
+
+  assert.equal(result.status, "processed");
+  assert.equal(result.action?.action, "cancel");
+  assert.equal(result.action?.decision.status, "cancelled");
+  assert.equal(result.action?.decision.next, "stop_run");
+  assert.deepEqual(onActionCalls, ["cancel"]);
+});

@@ -15,3 +15,13 @@ test("stripSelfMention removes leading and trailing bot mention text", () => {
   assert.equal(stripSelfMention("@PilotFlow 帮我建项目", "PilotFlow"), "帮我建项目");
   assert.equal(stripSelfMention("帮我建项目 @PilotFlow", "PilotFlow"), "帮我建项目");
 });
+
+test("shouldAcceptMessage matches group mentions by user_id when open_id is absent", () => {
+  assert.equal(shouldAcceptMessage({ chatType: "group", mentions: [{ id: { user_id: "u_bot" } }] }, bot), true);
+  assert.equal(shouldAcceptMessage({ chatType: "group", mentions: [{ id: { user_id: "someone_else" } }] }, bot), false);
+});
+
+test("shouldAcceptMessage matches group mentions by name", () => {
+  assert.equal(shouldAcceptMessage({ chatType: "group", mentions: [{ name: "PilotFlow" }] }, bot), true);
+  assert.equal(shouldAcceptMessage({ chatType: "group", mentions: [{ name: "OtherBot" }] }, bot), false);
+});

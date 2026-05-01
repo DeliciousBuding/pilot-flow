@@ -1,5 +1,5 @@
-Goal: Launch PilotFlow MVP for a Feishu-native project operations demo
-Members: Product Owner, Agent Engineer, Feishu Integration Owner, Demo Owner
-Deliverables: Project brief, task board, risk list, final summary
-Deadline: 2026-05-02
-Risks: missing Feishu group scope, card callback delay, owner mapping failure
+目标：为飞书 AI 校园挑战赛准备答辩项目空间
+成员：唐丁（产品+技术）、评委老师（评审）
+交付物：项目简报文档、任务清单、风险清单、答辩演示材料
+截止时间：2026-05-07
+风险：卡片回调尚未完全验证、录屏材料待补充、现场网络可能不稳定

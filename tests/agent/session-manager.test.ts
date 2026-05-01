@@ -43,3 +43,31 @@ test("SessionManager.addMessage enforces maxTurns history cap", () => {
   assert.deepEqual(manager.get("chat-1")?.messages.map((message) => message.content), ["2", "3", "4", "5"]);
   assert.equal(manager.get("chat-1")?.turnCount, 5);
 });
+
+test("SessionManager.get returns undefined and lazily deletes expired session", () => {
+  let now = 1_000;
+  const manager = new SessionManager({ ttlMs: 100, maxTurns: 10, maxSessions: 5 }, () => now);
+
+  manager.getOrCreate("chat-1");
+  assert.equal(manager.size, 1);
+
+  now += 101;
+  assert.equal(manager.get("chat-1"), undefined);
+  assert.equal(manager.size, 0);
+});
+
+test("SessionManager.getOrCreate resets turnCount when session expires and is recreated", () => {
+  let now = 1_000;
+  const manager = new SessionManager({ ttlMs: 100, maxTurns: 10, maxSessions: 5 }, () => now);
+
+  const first = manager.getOrCreate("chat-1");
+  manager.addMessage("chat-1", { role: "user", content: "1" });
+  manager.addMessage("chat-1", { role: "assistant", content: "2" });
+  assert.equal(first.turnCount, 2);
+
+  now += 101;
+  const second = manager.getOrCreate("chat-1");
+  assert.notEqual(second, first);
+  assert.equal(second.turnCount, 0);
+  assert.equal(second.messages.length, 0);
+});

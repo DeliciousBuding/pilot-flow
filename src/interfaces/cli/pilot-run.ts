@@ -57,19 +57,26 @@ export function buildPilotRunArgv(argv: readonly string[]): string[] {
 }
 
 export function renderPilotRun(result: PilotRunResult): string {
+  const base = renderAgentProjectInit(result);
+  const surfaces = [
+    result.productSurfaces.planCard ? "plan_card" : null,
+    result.productSurfaces.entryMessage ? "entry_message" : null,
+    result.productSurfaces.pinnedEntry ? "pinned_entry" : null,
+    result.productSurfaces.riskCard ? "risk_card" : null,
+  ].filter(Boolean);
+
   return [
-    renderAgentProjectInit(result),
+    base,
     "",
-    "Product surfaces:",
-    `plan_card: ${result.productSurfaces.planCard ? "enabled" : "disabled"}`,
-    `entry_message: ${result.productSurfaces.entryMessage ? "enabled" : "disabled"}`,
-    `pinned_entry: ${result.productSurfaces.pinnedEntry ? "enabled" : "disabled"}`,
-    `risk_card: ${result.productSurfaces.riskCard ? "enabled" : "disabled"}`,
+    `surfaces: ${surfaces.join(", ")}`,
     "",
-    `next: npm run pilot:recorder -- --input ${result.output} --output tmp/flight-recorder/latest.html`,
-    `next: npm run review:retrospective -- --input ${result.output} --output tmp/run-retrospective/RUN_RETROSPECTIVE.md`,
-    `next: npm run review:retrospective-eval -- --input ${result.output} --output tmp/retrospective-eval/RETROSPECTIVE_EVAL.md`,
-    "next: npm run pilot:package",
+    "--- Artifacts ---",
+    `count: ${result.artifactCount}`,
+    `log: ${result.output}`,
+    "",
+    "--- Next Steps ---",
+    `  npm run pilot:recorder -- --input ${result.output} --output tmp/flight-recorder/latest.html`,
+    `  npm run pilot:package`,
   ].join("\n");
 }
 
