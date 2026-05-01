@@ -45,6 +45,46 @@ Starting from a single requirement in the group chat, PilotFlow completes the lo
 
 Every step is logged in JSONL run logs with Flight Recorder visual replay support.
 
+## AI's Key Role
+
+PilotFlow's AI doesn't just generate text — it drives the entire Feishu workflow.
+
+| Stage | What AI does | Feishu output |
+| --- | --- | --- |
+| Understand intent | Extract goals, members, deliverables, deadline, risks from chat | Structured project data |
+| Generate plan | Break down into executable steps with owners and deadlines | Execution plan card |
+| Detect risks | Identify missing owners, vague deadlines, incomplete deliverables | Risk decision card |
+| Route tools | Select and execute Feishu tools in sequence based on the plan | Docs, Base, Tasks |
+| Record everything | Log every tool call, artifact, fallback, and error | JSONL run log |
+
+Technically, PilotFlow uses a four-layer design: **Agent architecture + Feishu tool registry + confirmation gate + run trace**. Not a one-off script — an extensible, auditable Agent runtime.
+
+## Efficiency Comparison
+
+Example: setting up a new project workspace.
+
+| Step | Manual | PilotFlow |
+| --- | --- | --- |
+| Summarize discussion | Scroll through chat, 5-10 min | Auto-extract, seconds |
+| Write project doc | Open doc editor, 10-15 min | Auto-generate, seconds |
+| Create Base table | Build table, fill fields, 5 min | Auto-write, seconds |
+| Create tasks | Create one by one, assign, 5 min | Batch create, seconds |
+| Post group announcement | Edit, send, pin | Auto-send and pin |
+| Log the process | Don't, or screenshot manually | Auto-generate replayable log |
+| **Total** | **30+ min, 5 tools, easy to miss steps** | **One message, fully automatic, logged** |
+
+## Differentiation
+
+| Dimension | PilotFlow | Generic AI assistants | Manual |
+| --- | --- | --- | --- |
+| Feishu artifacts | Creates real Docs, Base, Tasks directly | Generates text, copy-paste needed | Create each manually |
+| Confirmation | Required before side effects | No side-effect control | None |
+| Run trace | Every step logged, replayable | Not traceable | Not traceable |
+| Risk detection | Auto-detects and surfaces risks | Not involved | Human judgment |
+| Feishu-native | Cards, Docs, Base, Tasks, pinned entry — all integrated | No Feishu integration | Scattered across tools |
+
+Reusability: Agent architecture + tool registry design means any team can extend with new tools, not limited to current Feishu capabilities.
+
 ## Who Uses It
 
 | Team type | Typical scenario | Why it fits |
