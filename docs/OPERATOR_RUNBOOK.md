@@ -214,7 +214,7 @@ Live mode is guarded: without `--confirm "确认执行"` it waits before tool ca
 | `PILOTFLOW_DEDUPE_KEY` | optional stable key for duplicate-run protection |
 | `PILOTFLOW_ALLOW_DUPLICATE_RUN` | `true` or `1` to bypass duplicate-run protection |
 | `PILOTFLOW_DISABLE_DUPLICATE_GUARD` | `true` or `1` to disable duplicate-run protection |
-| `PILOTFLOW_DUPLICATE_GUARD_PATH` | local guard file path, default `tmp/run-guard/project-init-runs.json` |
+| `PILOTFLOW_STORAGE_PATH` | local duplicate guard directory, default `tmp/run-guard/project-init-runs` |
 | `PILOTFLOW_OWNER_OPEN_ID_MAP_JSON` | JSON object mapping owner labels to Feishu `open_id` |
 | `PILOTFLOW_AUTO_LOOKUP_OWNER_CONTACT` | `true` or `1` to search Feishu Contacts |
 | `PILOTFLOW_TASK_ASSIGNEE_OPEN_ID` | optional default assignee `open_id` for the first created Task |

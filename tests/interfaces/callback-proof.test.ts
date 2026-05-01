@@ -145,6 +145,40 @@ test("runCallbackProof only counts callbacks for the sent probe run id", async (
   }
 });
 
+test("runCallbackProof stops after the sent probe callback is observed", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "pilotflow-callback-proof-stop-"));
+  const output = join(dir, "callback-proof.jsonl");
+
+  try {
+    const result = await runCallbackProof({
+      argv: [
+        "--output", output,
+        "--send-probe-card",
+        "--dry-run",
+        "--chat-id", "oc_probe",
+        "--probe-run-id", "callback-proof-stop",
+      ],
+      env: {},
+      source: eventSource([
+        cardEvent("evt-match", "callback-proof-stop"),
+        cardEvent("evt-extra", "other-run"),
+      ]),
+      runCommand: async (bin, args) => okResult([bin, ...args]),
+      now: () => "2026-05-01T00:00:00.000Z",
+    });
+
+    assert.equal(result.status, "observed");
+    assert.equal(result.observedCallbacks, 1);
+    assert.equal(result.ignoredEvents, 0);
+
+    const log = await readFile(output, "utf8");
+    assert.match(log, /"gatewayEventId":"evt-match"/u);
+    assert.doesNotMatch(log, /evt-extra/u);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 test("runCallbackProof returns probe_failed when the probe card send fails", async () => {
   const dir = await mkdtemp(join(tmpdir(), "pilotflow-callback-proof-probe-failed-"));
   const output = join(dir, "callback-proof.jsonl");

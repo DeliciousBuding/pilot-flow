@@ -78,6 +78,7 @@ export async function runCallbackProof(options: CallbackProofOptions = {}): Prom
   let failure: CallbackProofResult["failure"] | undefined;
   let probe: CallbackProofProbeResult = { status: "not_sent" };
   let expectedProbeRunId: string | undefined;
+  let stopAfterObservedCallback = false;
 
   await recorder.record({ type: "callback_proof.started", runId: "callback-proof", output, strict, includeRaw, timestamp: now() });
 
@@ -148,6 +149,7 @@ export async function runCallbackProof(options: CallbackProofOptions = {}): Prom
                 return;
               }
               observedCallbacks += 1;
+              stopAfterObservedCallback = true;
               await recorder.record({
                 type: "callback_proof.callback_observed",
                 runId: action.runId || "unknown-run",
@@ -166,7 +168,7 @@ export async function runCallbackProof(options: CallbackProofOptions = {}): Prom
             await recorder.record({ type: "callback_proof.callback_ignored", runId: "callback-proof", gatewayEventId: event.id, reason: result.reason, timestamp: now() });
           }
         }
-        if (maxEvents > 0 && seenEvents >= maxEvents) {
+        if (stopAfterObservedCallback || (maxEvents > 0 && seenEvents >= maxEvents)) {
           nextEvent.cancel();
           break;
         }
