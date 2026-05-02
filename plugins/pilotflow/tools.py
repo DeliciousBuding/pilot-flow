@@ -83,7 +83,11 @@ def _evict_caches():
         expired_plans = [k for k, ts in _plan_generated.items() if now - ts >= _PLAN_GATE_TTL]
         for k in expired_plans:
             del _plan_generated[k]
-        evicted_plans = len(expired_plans)
+        # Evict stale pending plans (abandoned generate_plan calls)
+        expired_pending = [k for k in _pending_plans if k not in _plan_generated]
+        for k in expired_pending:
+            del _pending_plans[k]
+        evicted_plans = len(expired_plans) + len(expired_pending)
 
     if evicted_members or evicted_plans:
         logger.info("cache eviction: %d members, %d plans", evicted_members, evicted_plans)

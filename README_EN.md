@@ -111,6 +111,7 @@ uv run hermes gateway
 | Entry Point | Meeting / workspace | Feishu group chat @mention |
 | Workflow | Meeting → todo / project flow | One sentence → docs + tasks + messages |
 | AI Capability | None | LLM understands intent, auto-executes |
+| Learning | None | Hermes memory integration, gets smarter with use |
 | Extensibility | Fixed features | Hermes plugin ecosystem |
 
 ## Documentation
