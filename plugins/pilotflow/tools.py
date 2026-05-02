@@ -107,18 +107,22 @@ def _clear_plan_gate(chat_id: str):
         _plan_generated.pop(chat_id, None)
 
 
-def _register_project(title: str, members: list, deadline: str, status: str, artifacts: list):
-    """Register a project in the in-memory registry for query_status."""
+def _register_project(title: str, members: list, deadline: str, status: str, artifacts: list,
+                      app_token: str = "", table_id: str = "", record_id: str = ""):
+    """Register a project in the in-memory registry for query_status and update_project."""
     with _project_registry_lock:
         if len(_project_registry) >= _PROJECT_REGISTRY_MAX:
             oldest = min(_project_registry, key=lambda k: _project_registry[k].get("created_at", 0))
             del _project_registry[oldest]
         _project_registry[title] = {
-            "members": members,
+            "members": list(members),
             "deadline": deadline,
             "status": status,
             "created_at": time.time(),
             "artifacts": artifacts,
+            "app_token": app_token,
+            "table_id": table_id,
+            "record_id": record_id,
         }
 
 
@@ -470,8 +474,8 @@ def _create_task(summary: str, description: str) -> Optional[str]:
         return None
 
 
-def _create_bitable(title: str, owner: str, deadline: str, risks: list, chat_id: str) -> Optional[str]:
-    """Create a Feishu Bitable with project status record."""
+def _create_bitable(title: str, owner: str, deadline: str, risks: list, chat_id: str) -> Optional[dict]:
+    """Create a Feishu Bitable with project status record. Returns metadata dict or None."""
     client = _get_client()
     if not client:
         return None
@@ -507,12 +511,14 @@ def _create_bitable(title: str, owner: str, deadline: str, risks: list, chat_id:
         rec_resp = client.bitable.v1.app_table_record.create(
             CreateAppTableRecordRequest.builder().app_token(app_token).table_id(table_id).request_body(record).build()
         )
+        record_id = ""
         if rec_resp.success():
-            logger.info("bitable record created")
+            record_id = rec_resp.data.record.record_id or ""
+            logger.info("bitable record created: %s", record_id)
 
         _set_permission(app_token, "bitable")
         _add_editors(app_token, "bitable", chat_id)
-        return url
+        return {"url": url, "app_token": app_token, "table_id": table_id, "record_id": record_id}
     except Exception as e:
         logger.warning("create bitable error: %s", e)
         return None
@@ -528,15 +534,17 @@ def _create_calendar_event(title: str, goal: str, deadline: str) -> Optional[str
         from lark_oapi.api.calendar.v4 import (
             CreateCalendarEventRequest, CalendarEvent, EventTime,
         )
-        # Parse deadline as UTC+8 (China Standard Time) midnight
+        # Parse deadline as UTC+8 (China Standard Time) 9:00 AM
         dt = datetime.datetime.strptime(deadline, "%Y-%m-%d")
-        dt = dt.replace(tzinfo=datetime.timezone(datetime.timedelta(hours=8)))
-        ts = str(int(dt.timestamp()))
-        event_time = EventTime.builder().time_stamp(ts).build()
+        dt = dt.replace(hour=9, tzinfo=datetime.timezone(datetime.timedelta(hours=8)))
+        ts_start = str(int(dt.timestamp()))
+        ts_end = str(int((dt + datetime.timedelta(hours=1)).timestamp()))
+        start_time = EventTime.builder().time_stamp(ts_start).build()
+        end_time = EventTime.builder().time_stamp(ts_end).build()
         event = (
             CalendarEvent.builder()
             .summary(f"📌 截止: {title}").description(goal)
-            .start_event(event_time).end_event(event_time).build()
+            .start_event(start_time).end_event(end_time).build()
         )
         req = CreateCalendarEventRequest.builder().calendar_id("primary").request_body(event).build()
         resp = client.calendar.v4.calendar_event.create(req)
@@ -796,7 +804,8 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
         artifacts.append(f"文档: {doc_url}")
 
     # 2. Create bitable (lark_oapi) — plain names for data fields
-    bitable_url = _create_bitable(title, member_plain, deadline, risks, chat_id)
+    bitable_meta = _create_bitable(title, member_plain, deadline, risks, chat_id)
+    bitable_url = bitable_meta["url"] if bitable_meta else None
     if bitable_url:
         artifacts.append(f"多维表格: {bitable_url}")
 
@@ -828,8 +837,13 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
     if not artifacts:
         return tool_error("创建失败，请检查飞书应用凭证配置。")
 
-    # Register in memory for query_status
-    _register_project(title, members, deadline, "进行中", artifacts)
+    # Register in memory for query_status and update_project
+    _register_project(
+        title, members, deadline, "进行中", artifacts,
+        app_token=bitable_meta.get("app_token", "") if bitable_meta else "",
+        table_id=bitable_meta.get("table_id", "") if bitable_meta else "",
+        record_id=bitable_meta.get("record_id", "") if bitable_meta else "",
+    )
 
     return tool_result(json.dumps({
         "status": "project_space_created",
@@ -981,6 +995,35 @@ def _handle_query_status(params: Dict[str, Any], **kwargs) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Bitable update helper
+# ---------------------------------------------------------------------------
+
+def _update_bitable_record(app_token: str, table_id: str, record_id: str, fields: dict) -> bool:
+    """Update a bitable record with new field values."""
+    client = _get_client()
+    if not client or not app_token or not table_id or not record_id:
+        return False
+    try:
+        from lark_oapi.api.bitable.v1 import UpdateAppTableRecordRequest, AppTableRecord
+        record = AppTableRecord.builder().fields(fields).build()
+        req = (
+            UpdateAppTableRecordRequest.builder()
+            .app_token(app_token).table_id(table_id).record_id(record_id)
+            .request_body(record).build()
+        )
+        resp = client.bitable.v1.app_table_record.update(req)
+        if resp.success():
+            logger.info("bitable record updated: %s %s", record_id, fields)
+            return True
+        else:
+            logger.warning("update bitable record failed: %s", resp.msg)
+            return False
+    except Exception as e:
+        logger.warning("update bitable record error: %s", e)
+        return False
+
+
+# ---------------------------------------------------------------------------
 # Tool: pilotflow_update_project
 # ---------------------------------------------------------------------------
 
@@ -1008,7 +1051,7 @@ PILOTFLOW_UPDATE_PROJECT_SCHEMA = {
 
 
 def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
-    """Update a project's properties."""
+    """Update a project: modify registry, update bitable, send notification."""
     project_name = params.get("project_name", "")
     action = params.get("action", "")
     value = params.get("value", "")
@@ -1019,7 +1062,16 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
     if not action or not value:
         return tool_error("请指定操作类型和新值")
 
-    # Build update message
+    # Look up project in registry (fuzzy match: project_name is substring of registry key)
+    with _project_registry_lock:
+        project = _project_registry.get(project_name)
+        if not project:
+            for title, info in _project_registry.items():
+                if project_name in title or title in project_name:
+                    project = info
+                    project_name = title
+                    break
+
     action_labels = {
         "update_deadline": "截止时间",
         "add_member": "成员",
@@ -1027,10 +1079,48 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
     }
     action_label = action_labels.get(action, action)
 
-    # Send update notification via Hermes
+    bitable_updated = False
+    registry_updated = False
+
+    # 1. Update in-memory registry
+    if project:
+        with _project_registry_lock:
+            if action == "update_deadline":
+                project["deadline"] = value
+                registry_updated = True
+            elif action == "add_member":
+                if value not in project["members"]:
+                    project["members"].append(value)
+                registry_updated = True
+            elif action == "update_status":
+                project["status"] = value
+                registry_updated = True
+
+        # 2. Update bitable record
+        bitable_fields = {}
+        if action == "update_deadline":
+            bitable_fields["截止时间"] = value
+        elif action == "add_member":
+            current = ", ".join(project.get("members", []))
+            bitable_fields["负责人"] = current
+        elif action == "update_status":
+            bitable_fields["状态"] = value
+
+        if bitable_fields and project.get("app_token"):
+            bitable_updated = _update_bitable_record(
+                project["app_token"], project["table_id"], project["record_id"],
+                bitable_fields,
+            )
+
+    # 3. Send notification via Hermes
     if chat_id:
         member_at = _format_at(value, chat_id) if action == "add_member" else value
-        msg = f"📝 项目更新: {project_name}\n{action_label} → {member_at}"
+        parts = [f"📝 项目更新: {project_name}", f"{action_label} → {member_at}"]
+        if bitable_updated:
+            parts.append("✅ 状态表已同步")
+        elif project and not bitable_updated:
+            parts.append("⚠️ 状态表同步失败")
+        msg = "\n".join(parts)
         _hermes_send(chat_id, msg)
 
     return tool_result(json.dumps({
@@ -1038,8 +1128,11 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
         "project": project_name,
         "action": action,
         "value": value,
+        "registry_updated": registry_updated,
+        "bitable_updated": bitable_updated,
         "instructions": (
             f"用中文回复：已更新项目「{project_name}」的{action_label}为 {value}。"
-            "不要显示工具名或英文。"
+            + ("状态表已同步。" if bitable_updated else "")
+            + "不要显示工具名或英文。"
         ),
     }, ensure_ascii=False))

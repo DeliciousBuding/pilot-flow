@@ -96,6 +96,26 @@ PilotFlow 是飞书群聊中的 AI 项目运行官。用户在群里 @PilotFlow 
 - INSTALL.md 修复验证命令（加 sys.path）
 - INSTALL.md 统一模型名为 gpt-5.5
 
+### 第七阶段：功能真实性修复（v0.9.2-v0.9.3）
+
+竞赛评审审计发现的核心问题：功能声称与实现不符。
+
+**v0.9.2 — 文档一致性修复：**
+- ARCHITECTURE.md 补全 6 个工具 + 多轮管理流程
+- README_EN.md 模型名统一为 gpt-5.5
+- PRODUCT_SPEC.md 移除已删除的互动按钮描述
+- INNOVATION.md 重新分类功能状态
+- query_status 新增内存项目注册表（解决 tenant token 无法查询任务的问题）
+- 日历事件使用 UTC+8 时区
+
+**v0.9.3 — update_project 从通知变为真实更新：**
+- `_handle_update_project` 重写：更新内存注册表 + 更新多维表格记录 + 发送通知
+- `_create_bitable` 返回 app_token/table_id/record_id 元数据，支持后续更新
+- `_update_bitable_record` 新函数：调用 `app_table_record.update` API
+- 模糊匹配项目名称（子串匹配）
+- 日历事件修复为 9:00 AM 开始、1 小时时长（原来零时长）
+- 新增 15 个单元测试（模板检测、成员格式化、注册表、确认门控、缓存驱逐）
+
 ## 已验证能力
 
 | 能力 | 状态 | 技术实现 |
@@ -113,6 +133,7 @@ PilotFlow 是飞书群聊中的 AI 项目运行官。用户在群里 @PilotFlow 
 | 确认门控 | ✅ | 代码级拦截 + 线程安全 + 按群聊隔离 |
 | 项目模板识别 | ✅ | 答辩/sprint/活动/上线 模板自动建议 |
 | 项目状态查询 | ✅ | 内存项目注册表 + 飞书任务 API 双源查询 |
+| 多轮项目更新 | ✅ | 注册表更新 + 多维表格 record.update + 群通知 |
 | 消息走 Hermes | ✅ | registry.dispatch("send_message") |
 
 ## 技术决策
