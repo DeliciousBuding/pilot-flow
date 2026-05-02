@@ -1,15 +1,8 @@
 name: pilotflow
-version: 0.1.0
+version: 0.2.0
 description: PilotFlow — AI project operations officer for Feishu group chats
 author: Tang Ding
 kind: backend
 auto_load: true
 requires:
-  - lark-cli
-tools:
-  - feishu_doc_create
-  - feishu_base_write
-  - feishu_task_create
-  - feishu_card_send
-  - feishu_im_send
-  - feishu_pin_message
+  - lark-oapi

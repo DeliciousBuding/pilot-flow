@@ -1,7 +1,7 @@
 """PilotFlow project management tools.
 
 These tools provide project management workflow capabilities.
-They use lark-cli for Feishu API operations.
+They use lark_oapi SDK for Feishu API operations.
 """
 
 from __future__ import annotations
@@ -9,30 +9,318 @@ from __future__ import annotations
 import json
 import logging
 import os
-import subprocess
-import tempfile
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from tools.registry import tool_error, tool_result
 
 logger = logging.getLogger(__name__)
 
-PROFILE = os.environ.get("PILOTFLOW_LARK_PROFILE", "pilotflow-contest")
+# Feishu app credentials — read from env, shared with Hermes gateway
+APP_ID = os.environ.get("FEISHU_APP_ID", "")
+APP_SECRET = os.environ.get("FEISHU_APP_SECRET", "")
 CHAT_ID = os.environ.get("PILOTFLOW_TEST_CHAT_ID", "")
 BASE_TOKEN = os.environ.get("PILOTFLOW_BASE_TOKEN", "")
 BASE_TABLE_ID = os.environ.get("PILOTFLOW_BASE_TABLE_ID", "")
 
+# Lazy-loaded lark client
+_client = None
 
-def _run_lark(args: list[str]) -> tuple[bool, str, str]:
-    """Run lark-cli and return (ok, stdout, stderr)."""
-    cmd = ["lark-cli"] + args + ["--profile", PROFILE]
+
+def _get_client():
+    """Get or create a lark_oapi client."""
+    global _client
+    if _client is not None:
+        return _client
     try:
-        r = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
-        return r.returncode == 0, r.stdout, r.stderr
-    except subprocess.TimeoutExpired:
-        return False, "", "lark-cli timeout"
-    except FileNotFoundError:
-        return False, "", "lark-cli not found. Install: npm i -g @anthropic-ai/lark-cli"
+        import lark_oapi as lark
+        from lark_oapi.core.const import FEISHU_DOMAIN
+    except ImportError:
+        return None
+
+    app_id = APP_ID
+    app_secret = APP_SECRET
+    if not app_id or not app_secret:
+        logger.warning("FEISHU_APP_ID / FEISHU_APP_SECRET not set")
+        return None
+
+    _client = (
+        lark.Client.builder()
+        .app_id(app_id)
+        .app_secret(app_secret)
+        .domain(FEISHU_DOMAIN)
+        .log_level(lark.LogLevel.WARNING)
+        .build()
+    )
+    return _client
+
+
+def _check_available() -> bool:
+    """Check if PilotFlow dependencies are available."""
+    return _get_client() is not None
+
+
+# ---------------------------------------------------------------------------
+# @mention helpers
+# ---------------------------------------------------------------------------
+
+_member_cache: Dict[str, str] = {}  # name -> open_id
+
+
+def _resolve_member(name: str) -> Optional[str]:
+    """Resolve a display name to open_id via chat member list. Returns None if not found."""
+    if name in _member_cache:
+        return _member_cache[name]
+    if not CHAT_ID:
+        return None
+
+    client = _get_client()
+    if not client:
+        return None
+
+    try:
+        from lark_oapi.api.im.v1 import GetChatMembersRequest
+
+        req = (
+            GetChatMembersRequest.builder()
+            .chat_id(CHAT_ID)
+            .member_id_type("open_id")
+            .page_size(100)
+            .build()
+        )
+        resp = client.im.v1.chat_members.get(req)
+        if not resp.success():
+            logger.warning("get chat members failed: %s", resp.msg)
+            return None
+
+        items = resp.data.items or []
+        for m in items:
+            mname = (m.name or "").strip()
+            mid = m.member_id or ""
+            if mname and mid:
+                _member_cache[mname] = mid
+        return _member_cache.get(name)
+    except Exception as e:
+        logger.warning("resolve member failed: %s", e)
+        return None
+
+
+def _format_at(name: str) -> str:
+    """Format a name as a Feishu @mention tag if possible, else plain text."""
+    open_id = _resolve_member(name)
+    if open_id:
+        return f'<at user_id="{open_id}">{name}</at>'
+    return name
+
+
+def _format_members(members: List[str]) -> str:
+    """Format a list of member names with @mentions."""
+    return ", ".join(_format_at(m) for m in members)
+
+
+# ---------------------------------------------------------------------------
+# Feishu API wrappers
+# ---------------------------------------------------------------------------
+
+def _send_message(chat_id: str, text: str) -> bool:
+    """Send a text message to a Feishu chat."""
+    client = _get_client()
+    if not client:
+        return False
+    try:
+        import lark_oapi as lark
+        from lark_oapi.api.im.v1 import (
+            CreateMessageRequest,
+            CreateMessageRequestBody,
+        )
+
+        body = (
+            CreateMessageRequestBody.builder()
+            .receive_id(chat_id)
+            .msg_type("text")
+            .content(json.dumps({"text": text}))
+            .build()
+        )
+        req = (
+            CreateMessageRequest.builder()
+            .receive_id_type("chat_id")
+            .request_body(body)
+            .build()
+        )
+        resp = client.im.v1.message.create(req)
+        if resp.success():
+            logger.info("message sent to %s", chat_id)
+            return True
+        logger.warning("send message failed: %s", resp.msg)
+        return False
+    except Exception as e:
+        logger.warning("send message error: %s", e)
+        return False
+
+
+def _create_doc(title: str, markdown_content: str) -> Optional[str]:
+    """Create a Feishu document. Returns document URL or None."""
+    client = _get_client()
+    if not client:
+        return None
+    try:
+        import lark_oapi as lark
+        from lark_oapi.api.docx.v1 import (
+            CreateDocumentRequest,
+            CreateDocumentRequestBody,
+        )
+
+        body = (
+            CreateDocumentRequestBody.builder()
+            .title(title)
+            .build()
+        )
+        req = (
+            CreateDocumentRequest.builder()
+            .request_body(body)
+            .build()
+        )
+        resp = client.docx.v1.document.create(req)
+        if resp.success():
+            doc = resp.data.document
+            doc_id = doc.document_id
+            url = f"https://feishu.cn/docx/{doc_id}"
+            logger.info("doc created: %s", url)
+
+            # Write content blocks
+            _write_doc_content(doc_id, markdown_content)
+            return url
+        logger.warning("create doc failed: %s", resp.msg)
+        return None
+    except Exception as e:
+        logger.warning("create doc error: %s", e)
+        return None
+
+
+def _write_doc_content(doc_id: str, markdown: str):
+    """Write markdown content to a Feishu document."""
+    client = _get_client()
+    if not client:
+        return
+    try:
+        from lark_oapi.api.docx.v1 import (
+            CreateDocumentBlockChildrenRequest,
+            CreateDocumentBlockChildrenRequestBody,
+            Block,
+            Text,
+            TextElement,
+            TextRun,
+        )
+
+        # Split markdown into paragraphs and create text blocks
+        lines = markdown.split("\n")
+        children = []
+        for line in lines:
+            if not line.strip():
+                continue
+            # Create a text block for each line
+            text_run = TextRun.builder().content(line.strip()).build()
+            text_element = TextElement.builder().text_run(text_run).build()
+            text = Text.builder().elements([text_element]).build()
+            block = (
+                Block.builder()
+                .block_type(2)  # text block
+                .text(text)
+                .build()
+            )
+            children.append(block)
+
+        if not children:
+            return
+
+        body = (
+            CreateDocumentBlockChildrenRequestBody.builder()
+            .children(children)
+            .index(0)
+            .build()
+        )
+        req = (
+            CreateDocumentBlockChildrenRequest.builder()
+            .document_id(doc_id)
+            .block_id(doc_id)
+            .request_body(body)
+            .build()
+        )
+        resp = client.docx.v1.document_block_children.create(req)
+        if not resp.success():
+            logger.warning("write doc content failed: %s", resp.msg)
+    except Exception as e:
+        logger.warning("write doc content error: %s", e)
+
+
+def _create_task(summary: str, description: str) -> bool:
+    """Create a Feishu task."""
+    client = _get_client()
+    if not client:
+        return False
+    try:
+        from lark_oapi.api.task.v2 import (
+            CreateTaskRequest,
+            InputTask,
+        )
+
+        task = (
+            InputTask.builder()
+            .summary(summary)
+            .description(description)
+            .build()
+        )
+        req = CreateTaskRequest.builder().request_body(task).build()
+        resp = client.task.v2.task.create(req)
+        if resp.success():
+            logger.info("task created: %s", summary)
+            return True
+        logger.warning("create task failed: %s", resp.msg)
+        return False
+    except Exception as e:
+        logger.warning("create task error: %s", e)
+        return False
+
+
+def _create_base_record(title: str, owner: str, deadline: str, risks: list) -> bool:
+    """Write a record to Feishu Bitable."""
+    client = _get_client()
+    if not client or not BASE_TOKEN or not BASE_TABLE_ID:
+        return False
+    try:
+        from lark_oapi.api.bitable.v1 import (
+            CreateAppTableRecordRequest,
+            AppTableRecord,
+        )
+
+        fields = {
+            "type": "project",
+            "title": title,
+            "owner": owner or "TBD",
+            "due_date": deadline or "TBD",
+            "status": "active",
+            "risk_level": "high" if risks else "low",
+        }
+        record = (
+            AppTableRecord.builder()
+            .fields(fields)
+            .build()
+        )
+        req = (
+            CreateAppTableRecordRequest.builder()
+            .app_token(BASE_TOKEN)
+            .table_id(BASE_TABLE_ID)
+            .request_body(record)
+            .build()
+        )
+        resp = client.bitable.v1.app_table_record.create(req)
+        if resp.success():
+            logger.info("base record created")
+            return True
+        logger.warning("create base record failed: %s", resp.msg)
+        return False
+    except Exception as e:
+        logger.warning("create base record error: %s", e)
+        return False
 
 
 # ---------------------------------------------------------------------------
@@ -62,17 +350,11 @@ def _handle_generate_plan(params: Dict[str, Any]) -> str:
     """Parse user input and return a structured project plan."""
     text = params.get("input_text", "")
 
-    # This tool returns structured data for the LLM to use.
-    # The LLM will call Feishu tools (doc_create, task_create, etc.) separately.
     return tool_result(json.dumps({
         "status": "plan_generated",
         "input": text,
         "instructions": (
-            "请根据以上输入生成项目执行计划，然后依次调用飞书工具创建产物：\n"
-            "1. feishu_doc_create — 创建项目文档\n"
-            "2. feishu_task_create — 创建任务\n"
-            "3. feishu_im_send — 发送项目入口消息\n"
-            "4. feishu_im_send — 发送交付总结"
+            "请根据以上输入生成项目执行计划，然后调用 pilotflow_create_project_space 创建产物。"
         ),
     }, ensure_ascii=False))
 
@@ -142,7 +424,7 @@ PILOTFLOW_CREATE_PROJECT_SPACE_SCHEMA = {
     "name": "pilotflow_create_project_space",
     "description": (
         "一键创建项目空间：飞书文档 + 多维表格记录 + 飞书任务 + 项目入口消息。"
-        "需要先确认 PILOTFLOW_TEST_CHAT_ID、PILOTFLOW_BASE_TOKEN、PILOTFLOW_BASE_TABLE_ID 环境变量已配置。"
+        "成员名称会自动 @提及。"
     ),
     "parameters": {
         "type": "object",
@@ -193,90 +475,50 @@ def _handle_create_project_space(params: Dict[str, Any]) -> str:
         return tool_error("缺少 PILOTFLOW_TEST_CHAT_ID 环境变量")
 
     artifacts = []
+    member_display = _format_members(members) if members else "TBD"
 
     # 1. Create project doc
     doc_content = f"# {title}\n\n## 目标\n{goal}\n\n"
     if members:
         doc_content += f"## 成员\n{', '.join(members)}\n\n"
     if deliverables:
-        doc_content += f"## 交付物\n" + "\n".join(f"- {d}" for d in deliverables) + "\n\n"
+        doc_content += "## 交付物\n" + "\n".join(f"- {d}" for d in deliverables) + "\n\n"
     if deadline:
         doc_content += f"## 截止时间\n{deadline}\n\n"
     if risks:
-        doc_content += f"## 风险\n" + "\n".join(f"- {r}" for r in risks) + "\n\n"
+        doc_content += "## 风险\n" + "\n".join(f"- {r}" for r in risks) + "\n\n"
 
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False, encoding="utf-8") as f:
-        f.write(doc_content)
-        tmp_path = f.name
-
-    try:
-        ok, stdout, stderr = _run_lark([
-            "docs", "+create",
-            "--api-version", "v2",
-            "--as", "bot",
-            "--title", f"{title} - 项目简报",
-            "--doc-format", "markdown",
-            "--content", f"@{tmp_path}",
-        ])
-        if ok:
-            artifacts.append(f"文档: {title} - 项目简报")
-        else:
-            logger.warning("doc create failed: %s", stderr)
-    finally:
-        os.unlink(tmp_path)
+    doc_url = _create_doc(f"{title} - 项目简报", doc_content)
+    if doc_url:
+        artifacts.append(f"文档: {doc_url}")
+    else:
+        logger.warning("doc create failed, continuing")
 
     # 2. Write base record
-    if BASE_TOKEN and BASE_TABLE_ID:
-        record = {
-            "fields": {
-                "type": "project",
-                "title": title,
-                "owner": ", ".join(members) if members else "TBD",
-                "due_date": deadline or "TBD",
-                "status": "active",
-                "risk_level": "high" if risks else "low",
-            }
-        }
-        ok, stdout, stderr = _run_lark([
-            "base", "+record-batch-create",
-            "--as", "bot",
-            "--base-token", BASE_TOKEN,
-            "--table-id", BASE_TABLE_ID,
-            "--json", json.dumps([record]),
-        ])
-        if ok:
-            artifacts.append("多维表格: 项目状态记录")
+    ok = _create_base_record(title, member_display, deadline, risks)
+    if ok:
+        artifacts.append("多维表格: 项目状态记录")
 
-    # 3. Create task
+    # 3. Create tasks
     if deliverables:
-        for d in deliverables[:3]:  # Max 3 tasks
-            ok, stdout, stderr = _run_lark([
-                "task", "+create",
-                "--as", "bot",
-                "--summary", f"{d}",
-                "--description", f"项目: {title}\n负责人: {', '.join(members) if members else 'TBD'}",
-            ])
-            if ok:
+        for d in deliverables[:3]:
+            if _create_task(d, f"项目: {title}\n负责人: {member_display}"):
                 artifacts.append(f"任务: {d}")
 
-    # 4. Send entry message
-    entry_text = f"📌 项目入口: {title}\n目标: {goal}"
+    # 4. Send entry message with @mentions
+    entry_text = f"📌 项目入口: {title}\n🎯 目标: {goal}"
     if members:
-        entry_text += f"\n成员: {', '.join(members)}"
+        entry_text += f"\n👥 成员: {member_display}"
     if deadline:
-        entry_text += f"\n截止: {deadline}"
+        entry_text += f"\n⏰ 截止: {deadline}"
+    if doc_url:
+        entry_text += f"\n📄 文档: {doc_url}"
 
-    ok, stdout, stderr = _run_lark([
-        "im", "+messages-send",
-        "--as", "bot",
-        "--chat-id", CHAT_ID,
-        "--text", entry_text,
-    ])
-    if ok:
+    if _send_message(CHAT_ID, entry_text):
         artifacts.append("项目入口消息")
 
     if not artifacts:
-        return tool_error("未能创建任何产物，请检查环境变量和 lark-cli 配置。")
+        return tool_error("未能创建任何产物，请检查 FEISHU_APP_ID / FEISHU_APP_SECRET 配置。")
 
     return tool_result(json.dumps({
         "status": "project_space_created",
@@ -323,13 +565,7 @@ def _handle_send_summary(params: Dict[str, Any]) -> str:
         summary += f"  • {a}\n"
     summary += f"\n状态: {status}"
 
-    ok, stdout, stderr = _run_lark([
-        "im", "+messages-send",
-        "--as", "bot",
-        "--chat-id", CHAT_ID,
-        "--text", summary,
-    ])
-    if not ok:
-        return tool_error(f"发送总结失败: {stderr}")
+    if not _send_message(CHAT_ID, summary):
+        return tool_error("发送总结失败")
 
     return tool_result(f"已发送项目总结到群聊: {title}")

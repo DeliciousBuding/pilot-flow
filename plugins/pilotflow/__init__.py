@@ -15,13 +15,8 @@ from plugins.pilotflow.tools import (
     _handle_detect_risks,
     _handle_create_project_space,
     _handle_send_summary,
+    _check_available,
 )
-
-
-def _check_pilotflow_available() -> bool:
-    """Check if PilotFlow dependencies are available."""
-    import shutil
-    return shutil.which("lark-cli") is not None
 
 
 _TOOLS = (
@@ -40,6 +35,6 @@ def register(ctx) -> None:
             toolset="pilotflow",
             schema=schema,
             handler=handler,
-            check_fn=_check_pilotflow_available,
+            check_fn=_check_available,
             emoji=emoji,
         )
