@@ -8,8 +8,8 @@
 
 [English Version](README_EN.md)
 
-[![Feishu](https://img.shields.io/badge/飞书-原生-00A4FF)]()
-[![Hermes](https://img.shields.io/badge/Hermes-插件-6f42c1)]()
+[![Feishu](https://img.shields.io/badge/飞书-原生-00A4FF)](https://open.feishu.cn/)
+[![Hermes](https://img.shields.io/badge/Hermes-插件-6f42c1)](https://github.com/NousResearch/hermes-agent)
 [![GitHub stars](https://img.shields.io/github/stars/DeliciousBuding/PilotFlow?style=social)](https://github.com/DeliciousBuding/PilotFlow/stargazers)
 
 </div>
