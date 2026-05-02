@@ -893,15 +893,24 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
     with _plan_lock:
         _pending_plans.pop(chat_id, None)
 
+    # Pre-formatted display lines for LLM to present directly
+    display_items = [f"✅ 项目空间已创建: {title}"]
+    if doc_url:
+        display_items.append(f"📄 文档: {doc_url}")
+    if bitable_url:
+        display_items.append(f"📊 状态表: {bitable_url}")
+    if deliverables:
+        display_items.append(f"📋 任务: {', '.join(deliverables)}")
+    display_items.append("💬 已通知群成员")
+
     return tool_result(json.dumps({
         "status": "project_space_created",
         "title": title,
         "artifacts": artifacts,
+        "display": display_items,
         "instructions": (
-            "用中文回复结果摘要（不要显示工具名或英文）：\n"
-            "✅ 项目空间已创建\n"
-            "📄 文档：（链接）\n📊 状态表：（链接）\n"
-            "📋 任务：xxx、xxx\n💬 已通知群成员"
+            "用中文回复结果摘要（不要显示工具名或英文）。\n"
+            "直接使用 display 列表逐行展示，或自行组织语言。"
         ),
         "message": f"已创建 {len(artifacts)} 个产物: {', '.join(artifacts)}",
     }, ensure_ascii=False))
