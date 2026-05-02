@@ -899,6 +899,8 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
         display_items.append(f"📄 文档: {doc_url}")
     if bitable_url:
         display_items.append(f"📊 状态表: {bitable_url}")
+    if members:
+        display_items.append(f"👥 成员: {', '.join(members)}")
     if deliverables:
         display_items.append(f"📋 任务: {', '.join(deliverables)}")
     display_items.append("💬 已通知群成员")
