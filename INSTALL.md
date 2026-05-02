@@ -59,20 +59,21 @@ PILOTFLOW_BASE_TABLE_ID=your-table-id
 
 ```yaml
 model:
-  default: mimo-v2.5-pro
+  default: gpt-5.5
   provider: vectorcontrol
 
 providers:
   vectorcontrol:
     base_url: https://api.vectorcontrol.tech/v1
     key_env: OPENAI_API_KEY
-    model: mimo-v2.5-pro
+    model: gpt-5.5
 
 gateway:
   default_platform: feishu
   platforms:
     feishu:
       connection_mode: websocket
+      group_policy: open
 ```
 
 ### 获取配置值
