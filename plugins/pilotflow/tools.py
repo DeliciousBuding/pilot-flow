@@ -581,6 +581,24 @@ def _create_bitable(title: str, owner: str, deadline: str, risks: list, chat_id:
         return None
 
 
+def _deadline_countdown(iso_date: str) -> str:
+    """Return a countdown string with urgency emoji, or '' if unparseable."""
+    import datetime as _dt
+    try:
+        dl = _dt.date.fromisoformat(iso_date)
+        days_left = (dl - _dt.date.today()).days
+        if days_left < 0:
+            return f"\U0001f534 已逾期 {abs(days_left)} 天"
+        elif days_left <= 3:
+            return f"\U0001f534 剩余 {days_left} 天"
+        elif days_left <= 7:
+            return f"\U0001f7e1 剩余 {days_left} 天"
+        else:
+            return f"\U0001f7e2 剩余 {days_left} 天"
+    except (ValueError, TypeError):
+        return ""
+
+
 def _create_calendar_event(title: str, goal: str, deadline: str) -> Optional[str]:
     """Create a calendar event for the project deadline. Returns description on success."""
     client = _get_client()
@@ -998,22 +1016,8 @@ def _handle_query_status(params: Dict[str, Any], **kwargs) -> str:
             deadline = info.get("deadline", "TBD")
             status = info.get("status", "进行中")
             # Deadline countdown with urgency indicators
-            countdown = ""
-            if deadline and deadline not in ("TBD", "待确认", ""):
-                try:
-                    import datetime as _dt
-                    dl = _dt.date.fromisoformat(deadline)
-                    days_left = (dl - _dt.date.today()).days
-                    if days_left < 0:
-                        countdown = f" | \U0001f534 已逾期 {abs(days_left)} 天"
-                    elif days_left <= 3:
-                        countdown = f" | \U0001f534 剩余 {days_left} 天"
-                    elif days_left <= 7:
-                        countdown = f" | \U0001f7e1 剩余 {days_left} 天"
-                    else:
-                        countdown = f" | \U0001f7e2 剩余 {days_left} 天"
-                except (ValueError, TypeError):
-                    pass
+            cd = _deadline_countdown(deadline)
+            countdown = f" | {cd}" if cd else ""
             projects.append({
                 "name": title,
                 "source": f"成员: {member_str} | 截止: {deadline}{countdown} | {status}",
@@ -1201,20 +1205,9 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
         parts = [f"📝 项目更新: {project_name}", f"{action_label} → {member_at}"]
         # Add countdown for deadline updates
         if action == "update_deadline":
-            try:
-                import datetime as _dt
-                dl = _dt.date.fromisoformat(value)
-                days_left = (dl - _dt.date.today()).days
-                if days_left < 0:
-                    parts.append(f"🔴 已逾期 {abs(days_left)} 天")
-                elif days_left <= 3:
-                    parts.append(f"🔴 剩余 {days_left} 天")
-                elif days_left <= 7:
-                    parts.append(f"🟡 剩余 {days_left} 天")
-                else:
-                    parts.append(f"🟢 剩余 {days_left} 天")
-            except (ValueError, TypeError):
-                pass
+            cd = _deadline_countdown(value)
+            if cd:
+                parts.append(cd)
         if bitable_updated:
             parts.append("✅ 状态表已同步")
         elif project and not bitable_updated:
