@@ -424,11 +424,11 @@ def _create_calendar_event(title: str, goal: str, deadline: str):
     try:
         import datetime
         from lark_oapi.api.calendar.v4 import (
-            CreateCalendarEventRequest, CalendarEvent, CalendarEventTime,
+            CreateCalendarEventRequest, CalendarEvent, EventTime,
         )
         dt = datetime.datetime.strptime(deadline, "%Y-%m-%d")
         ts = str(int(dt.timestamp()))
-        event_time = CalendarEventTime.builder().timestamp(ts).build()
+        event_time = EventTime.builder().time_stamp(ts).build()
         event = (
             CalendarEvent.builder()
             .summary(f"📌 截止: {title}").description(goal)

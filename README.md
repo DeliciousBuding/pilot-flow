@@ -63,7 +63,7 @@ Hermes Agent 运行时（LLM + 飞书网关 + 工具注册表）
 
 - **底座**：Hermes 提供 Agent runtime、飞书 WebSocket 网关、LLM 调度
 - **插件**：PilotFlow 提供项目管理工作流和飞书 API 工具（lark_oapi SDK 直连）
-- **LLM**：mimo-v2.5-pro，通过 OpenAI 兼容接口调用
+- **LLM**：gpt-5.5，通过 OpenAI 兼容接口调用
 - **权限**：创建文档/表格后自动开放链接访问 + 给群成员加编辑权限
 - **@mention**：调用 im.chat.members.get 解析群成员，文档内用 mention_user 元素
 
