@@ -18,8 +18,19 @@ metadata:
 - 答辩、演示、demo
 - 建立、创建、准备
 - 任务、计划、成员
+- 截止时间、状态、进展
 
-## 工作流程（严格按顺序执行）
+## 能力总览
+
+PilotFlow 提供 6 个工具：
+1. **pilotflow_generate_plan** — 从自然语言提取项目信息，生成计划
+2. **pilotflow_detect_risks** — 检测项目计划中的风险
+3. **pilotflow_create_project_space** — 一键创建项目空间（文档+表格+任务+消息）
+4. **pilotflow_send_summary** — 发送执行总结
+5. **pilotflow_query_status** — 查询项目状态，发送看板卡片
+6. **pilotflow_update_project** — 更新项目（改截止时间、加成员、改状态）
+
+## 场景一：创建新项目
 
 ### 第一步：提取信息
 
@@ -55,7 +66,25 @@ metadata:
 
 ### 第五步：发送总结
 
-调用「发送项目总结」发送执行总结。
+调用 pilotflow_send_summary 发送执行总结。
+
+## 场景二：查询项目状态
+
+当用户问「项目进展如何」「有哪些项目」「项目状态」时：
+- 调用 pilotflow_query_status
+- 工具会发送一个飞书互动卡片到群聊
+
+## 场景三：更新项目
+
+当用户说「改截止时间」「加成员」「改状态」时：
+- 调用 pilotflow_update_project
+- 支持：update_deadline、add_member、update_status
+
+## 场景四：项目模板
+
+当用户提到「答辩」「sprint」「活动」「上线」等关键词时：
+- pilotflow_generate_plan 会自动识别模板
+- 建议使用模板的交付物和工期
 
 ## 语言要求
 
