@@ -40,6 +40,7 @@ Mention @PilotFlow with a requirement in plain language. It extracts goals, memb
 | **@mention Support** | Auto-resolves group member names to @mentions in docs and messages |
 | **Auto Permissions** | Created docs automatically open link access |
 | **Plug and Play** | Built on Hermes runtime — `cp -r` to install |
+| **Gets Smarter** | Hermes memory integration — remembers project patterns and common members for next time |
 
 ## Architecture
 
@@ -130,8 +131,8 @@ uv run hermes gateway
 | Phase 1 | Plugin foundation: Feishu tools + project workflow | ✅ Done |
 | Phase 2 | LLM-driven intent understanding and plan generation | ✅ Done |
 | Phase 3 | lark_oapi SDK + @mention + formatted docs + auto permissions | ✅ Done |
-| Phase 4 | Confirmation gate + risk detection + interactive cards | In Progress |
-| Phase 5 | Multi-turn project management, calendar integration, approval flows | Planned |
+| Phase 4 | Confirmation gate + risk detection + multi-turn management + project dashboard | ✅ Done |
+| Phase 5 | Hermes memory integration + smart templates + calendar integration | ✅ Done |
 
 ## Acknowledgments
 
