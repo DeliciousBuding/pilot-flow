@@ -577,19 +577,20 @@ def _handle_generate_plan(params: Dict[str, Any], **kwargs) -> str:
         "status": "plan_generated",
         "input": text,
         "instructions": (
-            "【必须遵守的工作流】\n\n"
-            "第一步：向用户展示执行计划（中文格式）：\n"
+            "【输出规则 - 必须遵守】\n\n"
+            "1. 绝对不要向用户展示工具名称、工具调用过程或英文内容\n"
+            "2. 绝对不要说「正在调用xxx工具」或显示 pilotflow_xxx 这样的名称\n"
+            "3. 你的回复只能是以下格式的中文计划：\n\n"
             "📋 执行计划\n"
-            "- 目标：xxx\n"
-            "- 成员：xxx\n"
-            "- 交付物：xxx\n"
-            "- 截止时间：xxx\n\n"
-            "然后问用户：「确认执行？」\n\n"
-            "第二步：等待用户回复。只有用户说「确认」「可以」「好的」「行」才继续。\n"
-            "如果用户没有明确确认，不要执行任何操作。\n\n"
-            "第三步：用户确认后，调用 pilotflow_create_project_space 创建产物。\n"
-            "产物包括：飞书文档、多维表格、飞书任务、群消息。\n\n"
-            "⚠️ 禁止跳过等待确认的步骤。"
+            "🎯 目标：xxx\n"
+            "👥 成员：xxx\n"
+            "📦 交付物：xxx\n"
+            "⏰ 截止时间：xxx\n\n"
+            "确认执行？\n\n"
+            "4. 成员名称直接写中文名，不要加任何前缀\n"
+            "5. 等用户回复「确认」「可以」「好的」后才能执行\n"
+            "6. 用户确认后再调用 create_project_space 工具\n"
+            "7. 执行完成后，只回复结果摘要，不要显示工具调用过程"
         ),
     }, ensure_ascii=False))
 
@@ -769,6 +770,7 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
         "status": "project_space_created",
         "title": title,
         "artifacts": artifacts,
+        "instructions": "用中文回复结果摘要，格式如下（不要显示工具名或英文）：\n✅ 项目空间已创建\n📄 文档：（链接）\n📊 状态表：（链接）\n📋 任务：xxx、xxx\n💬 已通知群成员",
         "message": f"已创建 {len(artifacts)} 个产物: {', '.join(artifacts)}",
     }, ensure_ascii=False))
 
