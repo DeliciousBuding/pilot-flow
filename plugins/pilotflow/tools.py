@@ -23,6 +23,9 @@ CHAT_ID = os.environ.get("PILOTFLOW_TEST_CHAT_ID", "")
 # Lazy-loaded lark client
 _client = None
 
+# Confirmation gate: tracks whether generate_plan was called
+_plan_generated = False
+
 
 def _get_client():
     """Get or create a lark_oapi client."""
@@ -566,24 +569,27 @@ PILOTFLOW_GENERATE_PLAN_SCHEMA = {
 
 def _handle_generate_plan(params: Dict[str, Any], **kwargs) -> str:
     """Parse user input and return a structured project plan."""
+    global _plan_generated
     text = params.get("input_text", "")
+    _plan_generated = True
 
     return tool_result(json.dumps({
         "status": "plan_generated",
         "input": text,
         "instructions": (
-            "请根据以上输入提取项目信息（目标、成员、交付物、截止时间），然后：\n\n"
-            "1. 向用户展示执行计划（用中文，格式清晰）：\n"
-            "   📋 执行计划\n"
-            "   目标：xxx\n"
-            "   成员：xxx\n"
-            "   交付物：xxx\n"
-            "   截止时间：xxx\n"
-            "   风险：xxx（如有）\n\n"
-            "2. 询问用户：「确认执行？」\n\n"
-            "3. 等待用户明确回复「确认」「确认执行」「可以」等肯定词\n\n"
-            "4. 用户确认后，调用 pilotflow_create_project_space 创建产物\n\n"
-            "⚠️ 重要：不要跳过确认步骤，不要自行执行。"
+            "【必须遵守的工作流】\n\n"
+            "第一步：向用户展示执行计划（中文格式）：\n"
+            "📋 执行计划\n"
+            "- 目标：xxx\n"
+            "- 成员：xxx\n"
+            "- 交付物：xxx\n"
+            "- 截止时间：xxx\n\n"
+            "然后问用户：「确认执行？」\n\n"
+            "第二步：等待用户回复。只有用户说「确认」「可以」「好的」「行」才继续。\n"
+            "如果用户没有明确确认，不要执行任何操作。\n\n"
+            "第三步：用户确认后，调用 pilotflow_create_project_space 创建产物。\n"
+            "产物包括：飞书文档、多维表格、飞书任务、群消息。\n\n"
+            "⚠️ 禁止跳过等待确认的步骤。"
         ),
     }, ensure_ascii=False))
 
@@ -693,6 +699,14 @@ PILOTFLOW_CREATE_PROJECT_SPACE_SCHEMA = {
 
 def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
     """Create a complete project space in Feishu."""
+    global _plan_generated
+    if not _plan_generated:
+        return tool_error(
+            "请先调用 pilotflow_generate_plan 生成计划，展示给用户确认后再调用此工具。"
+            "直接执行会被拦截。"
+        )
+    _plan_generated = False  # Reset gate
+
     title = params.get("title", "项目")
     goal = params.get("goal", "")
     members = params.get("members", [])
