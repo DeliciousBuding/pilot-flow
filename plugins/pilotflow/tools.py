@@ -626,10 +626,11 @@ def _get_chat_members() -> list:
         return []
 
 PILOTFLOW_GENERATE_PLAN_SCHEMA = {
-    "name": "生成项目计划",
+    "name": "pilotflow_generate_plan",
     "description": (
-        "从用户的自然语言输入中提取项目信息，生成结构化的项目执行计划。"
-        "返回提取结果和确认门控指令。必须在用户确认后才能执行创建操作。"
+        "【必须首先调用】当用户提到项目、答辩、任务、计划等关键词时，必须先调用此工具。"
+        "从用户的自然语言中提取项目信息（目标、成员、交付物、截止时间），"
+        "然后向用户展示执行计划并等待确认。用户确认后才能调用 pilotflow_create_project_space。"
     ),
     "parameters": {
         "type": "object",
@@ -656,7 +657,7 @@ def _handle_generate_plan(params: Dict[str, Any], **kwargs) -> str:
         "status": "plan_generated",
         "input": text,
         "instructions": (
-            "请从输入中提取项目信息，然后调用「创建项目空间」工具。\n\n"
+            "请从输入中提取项目信息，然后调用 pilotflow_create_project_space。\n\n"
             "【输出规则 - 必须遵守】\n"
             "1. 绝对不要向用户展示工具名称或英文内容\n"
             "2. 只回复中文摘要，不要显示工具调用过程\n"
@@ -670,7 +671,7 @@ def _handle_generate_plan(params: Dict[str, Any], **kwargs) -> str:
 # ---------------------------------------------------------------------------
 
 PILOTFLOW_DETECT_RISKS_SCHEMA = {
-    "name": "检测项目风险",
+    "name": "pilotflow_detect_risks",
     "description": (
         "检测项目计划中的潜在风险：负责人缺失、截止时间模糊、交付物不明确等。"
         "返回风险列表和建议处理方式。"
@@ -727,10 +728,11 @@ def _handle_detect_risks(params: Dict[str, Any], **kwargs) -> str:
 # ---------------------------------------------------------------------------
 
 PILOTFLOW_CREATE_PROJECT_SPACE_SCHEMA = {
-    "name": "创建项目空间",
+    "name": "pilotflow_create_project_space",
     "description": (
-        "一键创建项目空间：飞书文档 + 多维表格记录 + 飞书任务 + 项目入口消息。"
-        "成员名称会自动 @提及。"
+        "【必须在用户确认后调用】一键创建项目空间：飞书文档（格式化+@提及+自动开权限）"
+        "+ 多维表格（项目状态台账+记录） + 飞书任务 + 群入口消息。"
+        "必须先调用 pilotflow_generate_plan 并等用户确认后才能调用此工具。"
     ),
     "parameters": {
         "type": "object",
@@ -773,7 +775,7 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
     global _plan_generated
     if not _plan_generated:
         return tool_error(
-            "请先调用「生成项目计划」工具，展示给用户确认后再调用此工具。"
+            "请先调用 pilotflow_generate_plan 生成计划，展示给用户确认后再调用此工具。"
             "直接执行会被拦截。"
         )
     _plan_generated = False  # Reset gate
@@ -853,7 +855,7 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
 # ---------------------------------------------------------------------------
 
 PILOTFLOW_SEND_SUMMARY_SCHEMA = {
-    "name": "发送项目总结",
+    "name": "pilotflow_send_summary",
     "description": "向飞书群发送项目执行总结，包含已创建的产物列表。",
     "parameters": {
         "type": "object",
