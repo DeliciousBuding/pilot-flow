@@ -19,8 +19,6 @@ logger = logging.getLogger(__name__)
 APP_ID = os.environ.get("FEISHU_APP_ID", "")
 APP_SECRET = os.environ.get("FEISHU_APP_SECRET", "")
 CHAT_ID = os.environ.get("PILOTFLOW_TEST_CHAT_ID", "")
-BASE_TOKEN = os.environ.get("PILOTFLOW_BASE_TOKEN", "")
-BASE_TABLE_ID = os.environ.get("PILOTFLOW_BASE_TABLE_ID", "")
 
 # Lazy-loaded lark client
 _client = None
@@ -382,50 +380,107 @@ def _create_task(summary: str, description: str) -> bool:
         return False
 
 
-def _create_base_record(title: str, owner: str, deadline: str, risks: list) -> bool:
-    """Write a record to Feishu Bitable. Retries once on failure."""
+def _create_bitable(title: str, owner: str, deadline: str, risks: list) -> Optional[str]:
+    """Create a new Feishu Bitable with project status record. Returns URL or None."""
     client = _get_client()
-    if not client or not BASE_TOKEN or not BASE_TABLE_ID:
-        return False
+    if not client:
+        return None
     try:
         from lark_oapi.api.bitable.v1 import (
+            CreateAppRequest,
+            App,
             CreateAppTableRecordRequest,
             AppTableRecord,
+            CreateAppTableFieldRequest,
+            AppTableField,
         )
 
-        fields = {
-            "type": "project",
-            "title": title,
-            "owner": owner or "TBD",
-            "due_date": deadline or "TBD",
-            "status": "active",
-            "risk_level": "high" if risks else "low",
+        # 1. Create bitable app
+        app_body = App.builder().name(f"{title} - 项目状态").build()
+        app_req = CreateAppRequest.builder().request_body(app_body).build()
+        app_resp = client.bitable.v1.app.create(app_req)
+        if not app_resp.success():
+            logger.warning("create bitable failed: %s (code=%s)", app_resp.msg, app_resp.code)
+            return None
+
+        app_token = app_resp.data.app.app_token
+        table_id = app_resp.data.app.default_table_id
+        url = app_resp.data.app.url
+        logger.info("bitable created: %s", url)
+
+        # 2. Add fields to default table
+        for fname in ["类型", "负责人", "截止时间", "状态", "风险等级"]:
+            field = AppTableField.builder().field_name(fname).type(1).build()
+            freq = (
+                CreateAppTableFieldRequest.builder()
+                .app_token(app_token)
+                .table_id(table_id)
+                .request_body(field)
+                .build()
+            )
+            client.bitable.v1.app_table_field.create(freq)
+
+        # 3. Write project record
+        record_fields = {
+            "类型": "project",
+            "负责人": owner or "TBD",
+            "截止时间": deadline or "TBD",
+            "状态": "进行中",
+            "风险等级": "高" if risks else "低",
         }
-        record = (
-            AppTableRecord.builder()
-            .fields(fields)
-            .build()
-        )
-        req = (
+        record = AppTableRecord.builder().fields(record_fields).build()
+        rec_req = (
             CreateAppTableRecordRequest.builder()
-            .app_token(BASE_TOKEN)
-            .table_id(BASE_TABLE_ID)
+            .app_token(app_token)
+            .table_id(table_id)
             .request_body(record)
             .build()
         )
-        for attempt in range(2):
-            resp = client.bitable.v1.app_table_record.create(req)
-            if resp.success():
-                logger.info("base record created")
-                return True
-            logger.warning("create base record attempt %d failed: %s (code=%s)",
-                           attempt + 1, resp.msg, getattr(resp, 'code', '?'))
-            if attempt == 0:
-                time.sleep(1)
-        return False
+        rec_resp = client.bitable.v1.app_table_record.create(rec_req)
+        if rec_resp.success():
+            logger.info("bitable record created")
+        else:
+            logger.warning("create bitable record failed: %s", rec_resp.msg)
+
+        # 4. Set permission: anyone with link can view
+        _set_bitable_permission(app_token)
+
+        return url
     except Exception as e:
-        logger.warning("create base record error: %s", e)
-        return False
+        logger.warning("create bitable error: %s", e)
+        return None
+
+
+def _set_bitable_permission(app_token: str):
+    """Set bitable permission: anyone with link can view."""
+    client = _get_client()
+    if not client:
+        return
+    try:
+        from lark_oapi.api.drive.v1 import (
+            PatchPermissionPublicRequest,
+            PermissionPublicRequest,
+        )
+
+        body = (
+            PermissionPublicRequest.builder()
+            .link_share_entity("anyone_readable")
+            .build()
+        )
+        req = (
+            PatchPermissionPublicRequest.builder()
+            .token(app_token)
+            .type("bitable")
+            .request_body(body)
+            .build()
+        )
+        resp = client.drive.v1.permission_public.patch(req)
+        if resp.success():
+            logger.info("bitable permission set: %s", app_token)
+        else:
+            logger.warning("set bitable permission failed: %s", resp.msg)
+    except Exception as e:
+        logger.warning("set bitable permission error: %s", e)
 
 
 # ---------------------------------------------------------------------------
@@ -610,10 +665,10 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
     else:
         logger.warning("doc create failed, continuing")
 
-    # 2. Write base record
-    ok = _create_base_record(title, member_display, deadline, risks)
-    if ok:
-        artifacts.append("多维表格: 项目状态记录")
+    # 2. Create bitable with project status
+    bitable_url = _create_bitable(title, member_display, deadline, risks)
+    if bitable_url:
+        artifacts.append(f"多维表格: {bitable_url}")
 
     # 3. Create tasks
     if deliverables:
@@ -629,6 +684,8 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
         entry_text += f"\n⏰ 截止: {deadline}"
     if doc_url:
         entry_text += f"\n📄 文档: {doc_url}"
+    if bitable_url:
+        entry_text += f"\n📊 状态: {bitable_url}"
 
     if _send_message(CHAT_ID, entry_text):
         artifacts.append("项目入口消息")
