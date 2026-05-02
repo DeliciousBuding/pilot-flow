@@ -20,10 +20,10 @@ from plugins.pilotflow.tools import (
 
 
 _TOOLS = (
-    ("pilotflow_generate_plan", PILOTFLOW_GENERATE_PLAN_SCHEMA, _handle_generate_plan, "📋"),
-    ("pilotflow_detect_risks", PILOTFLOW_DETECT_RISKS_SCHEMA, _handle_detect_risks, "⚠️"),
-    ("pilotflow_create_project_space", PILOTFLOW_CREATE_PROJECT_SPACE_SCHEMA, _handle_create_project_space, "🚀"),
-    ("pilotflow_send_summary", PILOTFLOW_SEND_SUMMARY_SCHEMA, _handle_send_summary, "📊"),
+    ("生成项目计划", PILOTFLOW_GENERATE_PLAN_SCHEMA, _handle_generate_plan, "📋"),
+    ("检测项目风险", PILOTFLOW_DETECT_RISKS_SCHEMA, _handle_detect_risks, "⚠️"),
+    ("创建项目空间", PILOTFLOW_CREATE_PROJECT_SPACE_SCHEMA, _handle_create_project_space, "🚀"),
+    ("发送项目总结", PILOTFLOW_SEND_SUMMARY_SCHEMA, _handle_send_summary, "📊"),
 )
 
 
