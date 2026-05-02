@@ -1,8 +1,8 @@
 # ✈️ PilotFlow
 
-**Hermes/OpenClaw 飞书项目管理插件**
+**Hermes 飞书项目管理插件**
 
-把飞书群聊中的项目讨论，自动转化为确认过的计划、文档、任务和状态跟踪。
+在飞书群里 @PilotFlow 说一句需求，自动创建飞书文档、任务和项目入口消息。
 
 [English Version](README_EN.md)
 
@@ -16,7 +16,7 @@
 
 **PilotFlow 是飞书群里的 AI 项目运行官。**
 
-在飞书群里 @PilotFlow 说一句需求，它自动提取目标、成员、交付物和截止时间，生成执行计划，确认后一键创建飞书文档、多维表格、任务和项目入口。
+在飞书群里 @PilotFlow 说一句需求，它自动提取目标、成员、交付物和截止时间，调用飞书 API 创建真实文档、任务和项目入口消息。全程 LLM 驱动，即插即用。
 
 ## 为什么需要 PilotFlow
 
@@ -24,83 +24,81 @@
 | --- | --- |
 | 群聊讨论散落，关键信息丢失 | AI 自动提取目标、成员、交付物、截止时间 |
 | 手动建项目空间要 30 分钟 | 一句话触发，全套飞书产物自动创建 |
-| AI 生成的文字要复制粘贴 | 直接调飞书 API 创建真实文档、表格、任务 |
-| AI 操作不可控 | 确认门控：不确认不执行 |
-| 出了问题不知道哪一步 | 全程运行记录，可追溯 |
+| AI 生成的文字要复制粘贴 | 直接调飞书 API 创建真实文档、任务 |
+| 出了问题不知道哪一步 | 全程日志，可追溯 |
 
 ## 核心优势
 
 | 优势 | 说明 |
 | --- | --- |
 | **入口最自然** | 飞书群里 @机器人直接开始，不用打开别的工具 |
-| **AI 干真活** | 调飞书 API 创建真实文档、表格、任务，不是生成文字 |
-| **人始终有控制权** | 每次写入前先展示计划，确认了才执行 |
-| **每步有记录** | 出了问题能查到是哪一步、哪个工具、什么结果 |
-| **即插即用** | 基于 Hermes/OpenClaw 运行时，不重复造轮子 |
+| **AI 干真活** | lark_oapi SDK 直连飞书 API，创建真实文档、任务 |
+| **成员 @提及** | 文档和消息中自动 @提及项目成员 |
+| **文档自动开权限** | 创建的文档自动开放链接访问，无需手动设置 |
+| **即插即用** | 基于 Hermes 运行时，`cp -r` 即可安装 |
 
 ## 技术架构
 
 ```
-Hermes/OpenClaw 运行时（Agent + 飞书网关 + 工具注册表）
-  └── PilotFlow 插件（项目管理工作流 + 飞书项目工具）
+Hermes Agent 运行时（LLM + 飞书网关 + 工具注册表）
+  └── PilotFlow 插件（项目管理工作流 + lark_oapi 飞书工具）
 ```
 
-- **底座**：Hermes 提供 Agent runtime、飞书网关、会话管理、工具注册
-- **插件**：PilotFlow 提供项目管理工作流和飞书项目操作工具
-- **不重复造轮子**：飞书消息、文档、任务等基础能力由 Hermes 提供
+- **底座**：Hermes 提供 Agent runtime、飞书 WebSocket 网关、LLM 调度
+- **插件**：PilotFlow 提供项目管理工作流和飞书 API 工具（lark_oapi SDK 直连）
+- **LLM**：mimo-v2.5-pro，通过 OpenAI 兼容接口调用
 
-## 安装
+## 快速开始
 
 详见 [INSTALL.md](INSTALL.md)
 
 ```bash
 # 1. 安装 Hermes
 git clone https://github.com/NousResearch/hermes-agent.git
-cd hermes-agent && uv sync
+cd hermes-agent && uv sync --extra feishu
 
 # 2. 安装 PilotFlow 插件
 git clone https://github.com/DeliciousBuding/PilotFlow.git
 cp -r PilotFlow/plugins/pilotflow hermes-agent/plugins/
+cp -r PilotFlow/skills/pilotflow hermes-agent/skills/
 
-# 3. 配置环境变量
-cp PilotFlow/.env.example hermes-agent/.env
-# 编辑 .env 填入飞书配置和 LLM API key
+# 3. 配置
+cp PilotFlow/.env.example ~/.hermes/.env
+# 编辑 ~/.hermes/.env 填入飞书凭证和 LLM API key
 
 # 4. 启动
-cd hermes-agent && uv run hermes
+uv run hermes gateway
 ```
 
-## 已验证的飞书能力
+## 已验证的能力
 
-| 能力 | 产品价值 |
+| 能力 | 说明 |
 | --- | --- |
-| 飞书 IM 消息 | 项目发起与结果回传 |
-| 飞书互动卡片 | 计划展示与确认交互 |
-| 飞书文档 | 自动生成项目 Brief |
-| 飞书多维表格 | 项目状态台账 |
-| 飞书任务 | 行动项，支持负责人分配 |
-| 项目入口消息 | 群内固定项目导航 |
-| 风险裁决卡 | 群内风险识别与裁决 |
-| 运行记录 | 全流程日志与异常追踪 |
+| 飞书文档创建 | 格式化 markdown（标题、列表、分隔线），自动开放链接权限 |
+| 飞书任务创建 | 自动创建任务，支持描述 |
+| 群消息发送 | 项目入口消息、交付总结 |
+| @mention | 文档内和群消息中自动 @提及成员（解析群成员列表） |
+| LLM 驱动 | mimo-v2.5-pro 理解中文意图，自动选择工具 |
+| 端到端验证 | 飞书群 @PilotFlow → LLM → 创建飞书产物，~17秒完成 |
 
 ## 竞品定位
 
-| 维度 | OpenClaw | 飞书妙记/项目 | PilotFlow |
-| --- | --- | --- | --- |
-| 定位 | 通用 Agent 基础设施 | 会议纪要/项目空间 | 群聊项目运行官 |
-| 入口 | 个人助手 | 会议/工作台 | 飞书群聊 |
-| 工作流 | 通用 flow，用户自己编排 | 会议→待办/项目流程 | 内置项目运行闭环 |
-| 确认机制 | 底层命令审批 | 无 | 项目语义级审批 |
-| 运行追溯 | 工程级 trace | 无 | 业务级审计 |
+| 维度 | 飞书妙记/项目 | PilotFlow |
+| --- | --- | --- |
+| 定位 | 会议纪要/项目空间 | 群聊项目运行官 |
+| 入口 | 会议/工作台 | 飞书群聊 @mention |
+| 工作流 | 会议→待办/项目流程 | 一句话→文档+任务+消息 |
+| AI 能力 | 无 | LLM 理解意图，自动执行 |
+| 可扩展性 | 固定功能 | Hermes 插件生态 |
 
 ## 文档
 
 | 文档 | 说明 |
 | --- | --- |
-| [安装指南](INSTALL.md) | Hermes/OpenClaw 安装步骤 |
+| [安装指南](INSTALL.md) | 安装步骤 |
 | [产品规格](docs/PRODUCT_SPEC.md) | 用户承诺、功能分级 |
 | [架构设计](docs/ARCHITECTURE.md) | 组件、状态模型、工具路由 |
-| [演示材料](docs/demo/README.md) | 演示脚本、Q&A、截图清单 |
+| [个人进度](PERSONAL_PROGRESS.md) | 开发进度和验证结果 |
 
 ## 路线图
 
@@ -119,6 +117,5 @@ cd hermes-agent && uv run hermes
 ## 致谢
 
 - [Hermes Agent](https://github.com/NousResearch/hermes-agent) — Agent 运行时底座
-- [OpenClaw](https://openclaw.ai) — 飞书 Agent 集成参考
 - 飞书 / Lark 开放平台
 - 飞书 AI 校园挑战赛

@@ -1,8 +1,8 @@
 # ✈️ PilotFlow
 
-**Hermes/OpenClaw Project Management Plugin for Feishu**
+**Hermes Project Management Plugin for Feishu**
 
-Turn project discussions in Feishu group chats into confirmed plans, documents, tasks, and status tracking — automatically.
+Mention @PilotFlow in a Feishu group chat with a requirement, and it automatically creates Feishu docs, tasks, and project entry messages.
 
 [中文版](README.md)
 
@@ -16,7 +16,7 @@ Turn project discussions in Feishu group chats into confirmed plans, documents, 
 
 **PilotFlow is an AI project operator living in your Feishu group chat.**
 
-Mention @PilotFlow with a requirement in plain language. It extracts goals, members, deliverables, and deadlines, generates an execution plan, and — once confirmed — creates Feishu docs, bitable records, tasks, and a project entry message in one shot.
+Mention @PilotFlow with a requirement in plain language. It extracts goals, members, deliverables, and deadlines, then calls Feishu APIs to create real documents, tasks, and project entry messages. Fully LLM-driven, plug and play.
 
 ## Why PilotFlow
 
@@ -24,92 +24,91 @@ Mention @PilotFlow with a requirement in plain language. It extracts goals, memb
 | --- | --- |
 | Key decisions lost in chat threads | AI extracts goals, members, deliverables, deadlines |
 | Setting up a project space takes 30 min | One sentence triggers the full Feishu artifact suite |
-| AI output requires copy-paste | Calls Feishu API directly to create real docs, tables, tasks |
-| AI actions are uncontrollable | Confirmation gate: nothing executes until you approve |
-| No traceability when things go wrong | Full run log with every step recorded |
+| AI output requires copy-paste | Calls Feishu API directly to create real docs, tasks |
+| No traceability when things go wrong | Full logging for every step |
 
 ## Core Strengths
 
 | Strength | Description |
 | --- | --- |
 | **Most Natural Entry Point** | @mention the bot in Feishu — no extra tools needed |
-| **AI Does Real Work** | Creates real Feishu docs, tables, tasks via API — not just text |
-| **Human Always in Control** | Plan preview before execution; nothing happens without confirmation |
-| **Every Step Logged** | Full audit trail: which tool, what result, when |
-| **Plug and Play** | Built on Hermes/OpenClaw runtime — no wheel reinvention |
+| **AI Does Real Work** | lark_oapi SDK connects directly to Feishu API |
+| **@mention Support** | Auto-resolves group member names to @mentions in docs and messages |
+| **Auto Permissions** | Created docs automatically open link access |
+| **Plug and Play** | Built on Hermes runtime — `cp -r` to install |
 
 ## Architecture
 
 ```
-Hermes/OpenClaw Runtime (Agent + Feishu Gateway + Tool Registry)
-  └── PilotFlow Plugin (Project Management Workflow + Feishu Project Tools)
+Hermes Agent Runtime (LLM + Feishu Gateway + Tool Registry)
+  └── PilotFlow Plugin (Project Management Workflow + lark_oapi Feishu Tools)
 ```
 
-- **Base**: Hermes provides Agent runtime, Feishu gateway, session management, tool registry
-- **Plugin**: PilotFlow provides project management workflow and Feishu project tools
-- **No duplication**: Feishu messaging, docs, tasks — all provided by Hermes
+- **Base**: Hermes provides Agent runtime, Feishu WebSocket gateway, LLM orchestration
+- **Plugin**: PilotFlow provides project management workflow and Feishu API tools (lark_oapi SDK)
+- **LLM**: mimo-v2.5-pro via OpenAI-compatible API
 
-## Installation
+## Quick Start
 
 See [INSTALL.md](INSTALL.md) for detailed steps.
 
 ```bash
 # 1. Install Hermes
 git clone https://github.com/NousResearch/hermes-agent.git
-cd hermes-agent && uv sync
+cd hermes-agent && uv sync --extra feishu
 
 # 2. Install PilotFlow plugin
 git clone https://github.com/DeliciousBuding/PilotFlow.git
 cp -r PilotFlow/plugins/pilotflow hermes-agent/plugins/
+cp -r PilotFlow/skills/pilotflow hermes-agent/skills/
 
-# 3. Configure environment
-cp PilotFlow/.env.example hermes-agent/.env
-# Edit .env with your Feishu credentials and LLM API key
+# 3. Configure
+cp PilotFlow/.env.example ~/.hermes/.env
+# Edit ~/.hermes/.env with Feishu credentials and LLM API key
 
 # 4. Start
-cd hermes-agent && uv run hermes
+uv run hermes gateway
 ```
 
-## Verified Feishu Capabilities
+## Verified Capabilities
 
-| Capability | Product Value |
+| Capability | Description |
 | --- | --- |
-| Feishu IM Messages | Project initiation and result delivery |
-| Interactive Cards | Plan display and confirmation UI |
-| Feishu Docs | Auto-generated project briefs |
-| Feishu Bitable | Project status ledger |
-| Feishu Tasks | Action items with assignee support |
-| Project Entry Message | Pinned project navigation in group |
-| Risk Decision Card | In-group risk identification and resolution |
-| Run Log | Full-process logging and error tracing |
+| Feishu Doc Creation | Formatted markdown (headings, lists, dividers), auto-open permissions |
+| Feishu Task Creation | Auto-creates tasks with descriptions |
+| Group Messaging | Project entry messages, delivery summaries |
+| @mention | Auto-resolves group member names in docs and messages |
+| LLM-Driven | mimo-v2.5-pro understands Chinese intent, selects tools automatically |
+| End-to-End Verified | Feishu group @PilotFlow → LLM → Feishu artifacts, ~17 seconds |
 
 ## Competitive Positioning
 
-| Dimension | OpenClaw | Feishu Miaoji/Projects | PilotFlow |
-| --- | --- | --- | --- |
-| Positioning | General Agent infrastructure | Meeting notes / project space | Group chat project operator |
-| Entry Point | Personal assistant | Meeting / workspace | Feishu group chat |
-| Workflow | General flow, user self-orchestrates | Meeting → todo / project flow | Built-in project ops loop |
-| Confirmation | Low-level command approval | None | Project-level semantic approval |
-| Traceability | Engineering-level trace | None | Business-level audit |
+| Dimension | Feishu Miaoji/Projects | PilotFlow |
+| --- | --- | --- |
+| Positioning | Meeting notes / project space | Group chat project operator |
+| Entry Point | Meeting / workspace | Feishu group chat @mention |
+| Workflow | Meeting → todo / project flow | One sentence → docs + tasks + messages |
+| AI Capability | None | LLM understands intent, auto-executes |
+| Extensibility | Fixed features | Hermes plugin ecosystem |
 
 ## Documentation
 
 | Document | Description |
 | --- | --- |
-| [Installation Guide](INSTALL.md) | Hermes/OpenClaw setup steps |
+| [Installation Guide](INSTALL.md) | Setup steps |
 | [Product Spec](docs/PRODUCT_SPEC.md) | User commitments, feature tiers |
 | [Architecture Design](docs/ARCHITECTURE.md) | Components, state model, tool routing |
-| [Demo Materials](docs/demo/README.md) | Demo script, Q&A, screenshot checklist |
+| [Personal Progress](PERSONAL_PROGRESS.md) | Development progress and verification results |
 
 ## Roadmap
 
 | Phase | Goal | Status |
 | --- | --- | --- |
-| Phase 1 | Plugin foundation: Feishu tools + project workflow | Done |
-| Phase 2 | LLM-driven intent understanding and plan generation | Done |
-| Phase 3 | Confirmation gate + risk detection + run log | In Progress |
-| Phase 4 | Multi-project spaces, Worker preview, self-evolution | Planned |
+| Phase 1 | Plugin foundation: Feishu tools + project workflow | ✅ Done |
+| Phase 2 | LLM-driven intent understanding and plan generation | ✅ Done |
+| Phase 3 | lark_oapi SDK + @mention + formatted docs + auto permissions | ✅ Done |
+| Phase 4 | Confirmation gate + risk detection + run log | In Progress |
+| Phase 5 | Multi-project spaces, Worker preview, self-evolution | Planned |
 
 ## Star History
 
@@ -118,6 +117,5 @@ cd hermes-agent && uv run hermes
 ## Acknowledgments
 
 - [Hermes Agent](https://github.com/NousResearch/hermes-agent) — Agent runtime base
-- [OpenClaw](https://openclaw.ai) — Feishu Agent integration reference
 - Feishu / Lark Open Platform
 - Feishu AI Campus Challenge
