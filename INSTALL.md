@@ -51,8 +51,6 @@ FEISHU_GROUP_POLICY=open
 
 # PilotFlow 配置
 PILOTFLOW_TEST_CHAT_ID=oc_xxxxxxxxxxxxxxxx
-PILOTFLOW_BASE_TOKEN=your-bitable-token
-PILOTFLOW_BASE_TABLE_ID=your-table-id
 ```
 
 同时配置 Hermes 模型（`~/.hermes/config.yaml`）：
@@ -84,8 +82,6 @@ gateway:
 | `FEISHU_APP_SECRET` | 同上，点击查看 |
 | `FEISHU_GROUP_POLICY` | 设为 `open` 允许所有群消息，或 `allowlist` 配合白名单 |
 | `PILOTFLOW_TEST_CHAT_ID` | 飞书群设置 → 群号 → 以 `oc_` 开头 |
-| `PILOTFLOW_BASE_TOKEN` | 飞书多维表格 URL 中的 token 部分 |
-| `PILOTFLOW_BASE_TABLE_ID` | 飞书多维表格 URL 中的 table 部分 |
 
 ## 第四步：飞书应用配置
 

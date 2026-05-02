@@ -40,7 +40,7 @@ PilotFlow 是飞书群聊中的 AI 项目运行官。用户在群里 @PilotFlow 
 ```
 飞书群 @PilotFlow → Hermes gateway 收消息 → LLM 理解意图
 → 调用 pilotflow_create_project_space → 创建飞书文档 + 任务 + 群消息
-→ bot 回复用户，~17秒完成
+→ bot 回复用户，~30秒完成
 ```
 
 ## 已验证能力
