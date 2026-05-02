@@ -1072,6 +1072,9 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
                     project_name = title
                     break
 
+    if not project:
+        return tool_error(f"项目「{project_name}」未找到。请先创建项目后再更新。")
+
     action_labels = {
         "update_deadline": "截止时间",
         "add_member": "成员",

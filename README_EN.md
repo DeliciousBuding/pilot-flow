@@ -94,6 +94,12 @@ uv run hermes gateway
 | Feishu Task Creation | Auto-creates tasks linked to project |
 | @mention | Resolves group members, mention_user in docs, `<at>` tags in messages |
 | Permission Management | Auto: link viewable + group members as editors |
+| Confirmation Gate | Shows plan card first, waits for user to confirm before executing |
+| Project Templates | Auto-detects keywords (defense/sprint/event/launch), suggests deliverables and timeline |
+| Multi-turn Management | Update deadline, add members, change status — syncs to bitable |
+| Project Dashboard | Query project status, send card to group chat |
+| Risk Detection | Auto-detect missing members, vague deadlines, unclear deliverables |
+| Calendar Integration | Auto-create deadline calendar event (UTC+8) |
 | LLM-Driven | gpt-5.5 understands Chinese intent, selects tools automatically |
 | End-to-End Verified | Feishu group @PilotFlow → LLM → 5 Feishu artifacts, ~30 seconds |
 
