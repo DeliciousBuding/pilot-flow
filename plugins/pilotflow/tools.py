@@ -163,6 +163,83 @@ def _send_message(chat_id: str, text: str) -> bool:
         return False
 
 
+def _send_confirmation_card(chat_id: str, title: str, goal: str, members: list,
+                            deliverables: list, deadline: str) -> bool:
+    """Send an interactive confirmation card with a button."""
+    client = _get_client()
+    if not client:
+        return False
+    try:
+        from lark_oapi.api.im.v1 import CreateMessageRequest, CreateMessageRequestBody
+
+        member_text = ", ".join(members) if members else "TBD"
+        deliverable_text = ", ".join(deliverables) if deliverables else "TBD"
+
+        card = {
+            "config": {"wide_screen_mode": True},
+            "header": {
+                "title": {"tag": "plain_text", "content": "📋 执行计划"},
+                "template": "blue",
+            },
+            "elements": [
+                {
+                    "tag": "div",
+                    "text": {
+                        "tag": "lark_md",
+                        "content": (
+                            f"**项目：** {title}\n"
+                            f"**目标：** {goal}\n"
+                            f"**成员：** {member_text}\n"
+                            f"**交付物：** {deliverable_text}\n"
+                            f"**截止时间：** {deadline or 'TBD'}"
+                        ),
+                    },
+                },
+                {"tag": "hr"},
+                {
+                    "tag": "action",
+                    "actions": [
+                        {
+                            "tag": "button",
+                            "text": {"tag": "plain_text", "content": "✅ 确认执行"},
+                            "type": "primary",
+                            "value": {"action": "confirm_project", "title": title},
+                        },
+                        {
+                            "tag": "button",
+                            "text": {"tag": "plain_text", "content": "❌ 取消"},
+                            "type": "default",
+                            "value": {"action": "cancel_project"},
+                        },
+                    ],
+                },
+            ],
+        }
+
+        body = (
+            CreateMessageRequestBody.builder()
+            .receive_id(chat_id)
+            .msg_type("interactive")
+            .content(json.dumps(card, ensure_ascii=False))
+            .build()
+        )
+        req = (
+            CreateMessageRequest.builder()
+            .receive_id_type("chat_id")
+            .request_body(body)
+            .build()
+        )
+        resp = client.im.v1.message.create(req)
+        if resp.success():
+            logger.info("confirmation card sent to %s", chat_id)
+            return True
+        logger.warning("send card failed: %s", resp.msg)
+        return False
+    except Exception as e:
+        logger.warning("send card error: %s", e)
+        return False
+
+
 def _set_doc_permission(doc_id: str):
     """Set document permission: anyone with link can view."""
     client = _get_client()
@@ -573,24 +650,17 @@ def _handle_generate_plan(params: Dict[str, Any], **kwargs) -> str:
     text = params.get("input_text", "")
     _plan_generated = True
 
+    # Store plan data for the card (extracted by LLM from input)
+    # The LLM should pass structured data, but we return instructions
     return tool_result(json.dumps({
         "status": "plan_generated",
         "input": text,
         "instructions": (
-            "【输出规则 - 必须遵守】\n\n"
-            "1. 绝对不要向用户展示工具名称、工具调用过程或英文内容\n"
-            "2. 绝对不要说「正在调用xxx工具」或显示 pilotflow_xxx 这样的名称\n"
-            "3. 你的回复只能是以下格式的中文计划：\n\n"
-            "📋 执行计划\n"
-            "🎯 目标：xxx\n"
-            "👥 成员：xxx\n"
-            "📦 交付物：xxx\n"
-            "⏰ 截止时间：xxx\n\n"
-            "确认执行？\n\n"
-            "4. 成员名称直接写中文名，不要加任何前缀\n"
-            "5. 等用户回复「确认」「可以」「好的」后才能执行\n"
-            "6. 用户确认后再调用 create_project_space 工具\n"
-            "7. 执行完成后，只回复结果摘要，不要显示工具调用过程"
+            "请从输入中提取项目信息，然后调用 pilotflow_create_project_space。\n\n"
+            "【输出规则 - 必须遵守】\n"
+            "1. 绝对不要向用户展示工具名称或英文内容\n"
+            "2. 只回复中文摘要，不要显示工具调用过程\n"
+            "3. 执行完成后回复结果摘要：✅ 已创建 + 产物链接"
         ),
     }, ensure_ascii=False))
 
@@ -720,6 +790,9 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
 
     artifacts = []
     member_display = _format_members(members) if members else "TBD"
+
+    # 0. Send confirmation card
+    _send_confirmation_card(CHAT_ID, title, goal, members, deliverables, deadline)
 
     # 1. Create project doc
     doc_content = f"# {title}\n\n## 目标\n{goal}\n\n"
