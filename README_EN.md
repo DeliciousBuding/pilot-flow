@@ -74,16 +74,28 @@ cp PilotFlow/.env.example ~/.hermes/.env
 uv run hermes gateway
 ```
 
+## Deep Feishu Integration
+
+| Feishu Capability | Integration |
+| --- | --- |
+| **Feishu Docs** | Auto-create project brief, formatted markdown, @mention members |
+| **Bitable** | Auto-create project status ledger, write records, real-time tracking |
+| **Feishu Tasks** | Auto-create tasks, link to project, assign owners |
+| **Group Messages** | Project entry message (@members + doc/table/deadline links) |
+| **@mention** | Resolve group member list, mention_user in docs, `<at>` tags in messages |
+| **Permission Management** | Auto-open link access + add group members as editors |
+
 ## Verified Capabilities
 
 | Capability | Description |
 | --- | --- |
-| Feishu Doc Creation | Formatted markdown (headings, lists, dividers), auto-open permissions |
-| Feishu Task Creation | Auto-creates tasks with descriptions |
-| Group Messaging | Project entry messages, delivery summaries |
-| @mention | Auto-resolves group member names in docs and messages |
+| Feishu Doc Creation | Formatted markdown, @mention, auto permissions + editor access for group members |
+| Bitable | Auto-create project status ledger, write records, auto permissions + editor access |
+| Feishu Task Creation | Auto-creates tasks linked to project |
+| @mention | Resolves group members, mention_user in docs, `<at>` tags in messages |
+| Permission Management | Auto: link viewable + group members as editors |
 | LLM-Driven | mimo-v2.5-pro understands Chinese intent, selects tools automatically |
-| End-to-End Verified | Feishu group @PilotFlow → LLM → Feishu artifacts, ~17 seconds |
+| End-to-End Verified | Feishu group @PilotFlow → LLM → 5 Feishu artifacts, ~30 seconds |
 
 ## Competitive Positioning
 
