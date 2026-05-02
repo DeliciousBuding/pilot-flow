@@ -106,10 +106,11 @@ cd hermes-agent && uv run hermes
 
 | 阶段 | 目标 | 状态 |
 | --- | --- | --- |
-| Phase 1 | 插件基础：飞书工具 + 项目管理工作流 | 已完成 |
-| Phase 2 | LLM 驱动的意图理解和计划生成 | 已完成 |
-| Phase 3 | 确认门控 + 风险检测 + 运行记录 | 进行中 |
-| Phase 4 | 多项目空间、Worker 预览、自我进化 | 计划中 |
+| Phase 1 | 插件基础：飞书工具 + 项目管理工作流 | ✅ 已完成 |
+| Phase 2 | LLM 驱动的意图理解和计划生成 | ✅ 已完成 |
+| Phase 3 | lark_oapi SDK 直连 + @mention + 格式化文档 + 权限自动开放 | ✅ 已完成 |
+| Phase 4 | 确认门控 + 风险检测 + 运行记录 | 进行中 |
+| Phase 5 | 多项目空间、Worker 预览、自我进化 | 计划中 |
 
 ## Star History
 
