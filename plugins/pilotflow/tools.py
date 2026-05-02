@@ -12,6 +12,7 @@ import json
 import logging
 import os
 import re
+import threading
 import time
 from typing import Any, Dict, List, Optional
 
@@ -25,12 +26,18 @@ APP_SECRET = os.environ.get("FEISHU_APP_SECRET", "")
 
 # Lazy-loaded lark client (only for doc/task/bitable — NOT for messaging)
 _client = None
+_client_lock = threading.Lock()
 
-# Confirmation gate
+# Confirmation gate (per-session, thread-safe)
+_plan_lock = threading.Lock()
 _plan_generated = False
 
 # @mention regex
 _AT_PATTERN = re.compile(r'<at user_id="(ou_[^"]+)">([^<]+)</at>')
+
+# Member cache with TTL (5 minutes)
+_member_cache: Dict[str, tuple] = {}  # name -> (open_id, timestamp)
+_MEMBER_CACHE_TTL = 300
 
 
 # ---------------------------------------------------------------------------
@@ -64,7 +71,11 @@ def _hermes_send_card(chat_id: str, card_json: dict) -> bool:
             "message": json.dumps(card_json, ensure_ascii=False),
             "msg_type": "interactive",
         })
-        return '"error"' not in result
+        try:
+            data = json.loads(result)
+            return data.get("ok") is True or data.get("success") is True
+        except (json.JSONDecodeError, TypeError):
+            return "error" not in result.lower()
     except Exception as e:
         logger.warning("hermes send card failed: %s", e)
         return False
@@ -79,26 +90,25 @@ def _get_client():
     global _client
     if _client is not None:
         return _client
-    try:
-        import lark_oapi as lark
-        from lark_oapi.core.const import FEISHU_DOMAIN
-    except ImportError:
-        logger.warning("lark_oapi not installed. Run: uv sync --extra feishu")
-        return None
-
-    if not APP_ID or not APP_SECRET:
-        logger.warning("FEISHU_APP_ID / FEISHU_APP_SECRET not set")
-        return None
-
-    _client = (
-        lark.Client.builder()
-        .app_id(APP_ID)
-        .app_secret(APP_SECRET)
-        .domain(FEISHU_DOMAIN)
-        .log_level(lark.LogLevel.WARNING)
-        .build()
-    )
-    return _client
+    with _client_lock:
+        if _client is not None:
+            return _client
+        try:
+            import lark_oapi as lark
+            from lark_oapi.core.const import FEISHU_DOMAIN
+        except ImportError:
+            logger.warning("lark_oapi not installed. Run: uv sync --extra feishu")
+            return None
+        if not APP_ID or not APP_SECRET:
+            logger.warning("FEISHU_APP_ID / FEISHU_APP_SECRET not set")
+            return None
+        _client = (
+            lark.Client.builder()
+            .app_id(APP_ID).app_secret(APP_SECRET)
+            .domain(FEISHU_DOMAIN).log_level(lark.LogLevel.WARNING)
+            .build()
+        )
+        return _client
 
 
 def _check_available() -> bool:
@@ -132,13 +142,15 @@ def _get_chat_id(kwargs: dict) -> str:
 # @mention helpers
 # ---------------------------------------------------------------------------
 
-_member_cache: Dict[str, str] = {}
-
 
 def _resolve_member(name: str, chat_id: str) -> Optional[str]:
-    """Resolve a display name to open_id via chat member list."""
+    """Resolve a display name to open_id via chat member list (with TTL cache)."""
+    now = time.time()
+    # Check cache with TTL
     if name in _member_cache:
-        return _member_cache[name]
+        oid, ts = _member_cache[name]
+        if now - ts < _MEMBER_CACHE_TTL:
+            return oid
     if not chat_id:
         return None
 
@@ -151,10 +163,7 @@ def _resolve_member(name: str, chat_id: str) -> Optional[str]:
 
         req = (
             GetChatMembersRequest.builder()
-            .chat_id(chat_id)
-            .member_id_type("open_id")
-            .page_size(100)
-            .build()
+            .chat_id(chat_id).member_id_type("open_id").page_size(100).build()
         )
         resp = client.im.v1.chat_members.get(req)
         if not resp.success():
@@ -166,8 +175,9 @@ def _resolve_member(name: str, chat_id: str) -> Optional[str]:
             mname = (m.name or "").strip()
             mid = m.member_id or ""
             if mname and mid:
-                _member_cache[mname] = mid
-        return _member_cache.get(name)
+                _member_cache[mname] = (mid, now)
+        entry = _member_cache.get(name)
+        return entry[0] if entry else None
     except Exception as e:
         logger.warning("resolve member failed: %s", e)
         return None
@@ -324,7 +334,9 @@ def _create_doc(title: str, markdown_content: str, chat_id: str) -> Optional[str
         if children:
             body = CreateDocumentBlockChildrenRequestBody.builder().children(children).index(0).build()
             r = CreateDocumentBlockChildrenRequest.builder().document_id(doc_id).block_id(doc_id).request_body(body).build()
-            client.docx.v1.document_block_children.create(r)
+            write_resp = client.docx.v1.document_block_children.create(r)
+            if not write_resp.success():
+                logger.warning("write doc content failed: %s", write_resp.msg)
 
         # Permissions + editors
         _set_permission(doc_id, "docx")
@@ -504,19 +516,68 @@ PILOTFLOW_GENERATE_PLAN_SCHEMA = {
 }
 
 
+# Project templates for intelligent suggestions
+_TEMPLATES = {
+    "答辩": {
+        "deliverables": ["项目简报", "PPT", "演示脚本"],
+        "suggested_deadline_days": 7,
+        "description": "答辩项目模板：包含项目简报、PPT和演示脚本",
+    },
+    "sprint": {
+        "deliverables": ["需求文档", "技术方案", "测试用例"],
+        "suggested_deadline_days": 14,
+        "description": "Sprint 模板：包含需求文档、技术方案和测试用例",
+    },
+    "活动": {
+        "deliverables": ["活动方案", "预算表", "宣传物料"],
+        "suggested_deadline_days": 10,
+        "description": "活动策划模板：包含活动方案、预算表和宣传物料",
+    },
+    "上线": {
+        "deliverables": ["上线方案", "回滚方案", "监控配置"],
+        "suggested_deadline_days": 3,
+        "description": "产品上线模板：包含上线方案、回滚方案和监控配置",
+    },
+}
+
+
+def _detect_template(text: str) -> Optional[dict]:
+    """Detect project template from user input."""
+    for keyword, template in _TEMPLATES.items():
+        if keyword in text.lower():
+            return template
+    return None
+
+
 def _handle_generate_plan(params: Dict[str, Any], **kwargs) -> str:
     """Parse user input and return a structured project plan."""
     global _plan_generated
-    _plan_generated = True
+    with _plan_lock:
+        _plan_generated = True
+
+    text = params.get("input_text", "")
+    template = _detect_template(text)
+
+    template_hint = ""
+    if template:
+        template_hint = (
+            f"\n\n【模板建议】检测到「{text}」可能适用模板：\n"
+            f"- 建议交付物：{', '.join(template['deliverables'])}\n"
+            f"- 建议工期：{template['suggested_deadline_days']} 天\n"
+            f"如果用户没有指定交付物，可以建议使用这些。"
+        )
+
     return tool_result(json.dumps({
         "status": "plan_generated",
-        "input": params.get("input_text", ""),
+        "input": text,
+        "template": template["description"] if template else None,
         "instructions": (
             "请从输入中提取项目信息，然后调用 pilotflow_create_project_space。\n\n"
             "【输出规则 - 必须遵守】\n"
             "1. 绝对不要向用户展示工具名称或英文内容\n"
             "2. 只回复中文摘要，不要显示工具调用过程\n"
             "3. 执行完成后回复结果摘要：✅ 已创建 + 产物链接"
+            f"{template_hint}"
         ),
     }, ensure_ascii=False))
 
@@ -594,9 +655,10 @@ PILOTFLOW_CREATE_PROJECT_SPACE_SCHEMA = {
 def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
     """Create a complete project space in Feishu."""
     global _plan_generated
-    if not _plan_generated:
-        return tool_error("请先调用 pilotflow_generate_plan 生成计划，展示给用户确认后再调用此工具。")
-    _plan_generated = False
+    with _plan_lock:
+        if not _plan_generated:
+            return tool_error("请先调用 pilotflow_generate_plan 生成计划，展示给用户确认后再调用此工具。")
+        _plan_generated = False
 
     title = params.get("title", "项目")
     goal = params.get("goal", "")
