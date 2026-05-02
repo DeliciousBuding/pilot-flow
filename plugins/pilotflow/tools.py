@@ -651,9 +651,11 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
     if _hermes_send(chat_id, entry_text):
         artifacts.append("项目入口消息")
 
-    # 6. Calendar event (lark_oapi)
-    if deadline:
+    # 6. Calendar event (best effort)
+    try:
         _create_calendar_event(title, goal, deadline)
+    except Exception:
+        pass  # Calendar is optional
 
     if not artifacts:
         return tool_error("创建失败，请检查飞书应用凭证配置。")
