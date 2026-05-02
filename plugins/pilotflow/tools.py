@@ -997,9 +997,26 @@ def _handle_query_status(params: Dict[str, Any], **kwargs) -> str:
             member_str = ", ".join(info.get("members", [])) or "TBD"
             deadline = info.get("deadline", "TBD")
             status = info.get("status", "进行中")
+            # Deadline countdown with urgency indicators
+            countdown = ""
+            if deadline and deadline not in ("TBD", "待确认", ""):
+                try:
+                    import datetime as _dt
+                    dl = _dt.date.fromisoformat(deadline)
+                    days_left = (dl - _dt.date.today()).days
+                    if days_left < 0:
+                        countdown = f" | \U0001f534 已逾期 {abs(days_left)} 天"
+                    elif days_left <= 3:
+                        countdown = f" | \U0001f534 剩余 {days_left} 天"
+                    elif days_left <= 7:
+                        countdown = f" | \U0001f7e1 剩余 {days_left} 天"
+                    else:
+                        countdown = f" | \U0001f7e2 剩余 {days_left} 天"
+                except (ValueError, TypeError):
+                    pass
             projects.append({
                 "name": title,
-                "source": f"成员: {member_str} | 截止: {deadline} | {status}",
+                "source": f"成员: {member_str} | 截止: {deadline}{countdown} | {status}",
             })
 
     # 2. Secondary: try Feishu task API (requires user token, may fail)
