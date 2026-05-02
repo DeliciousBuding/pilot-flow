@@ -47,6 +47,18 @@ PilotFlow 是飞书群聊中的 AI 项目运行官。用户在群里 @PilotFlow 
 → LLM 调用 pilotflow_update_project → 发送更新通知
 ```
 
+### 第五阶段：质量加固（v0.9）
+
+代码质量全面审计和修复：
+- 确认门控从全局布尔值改为按 chat_id 隔离，支持多群并发
+- 成员缓存增加定期过期清理，防止内存泄漏
+- 任务创建移除静默重试，返回明确成功/失败状态
+- 日历事件创建结果透明化，成功时计入产物列表
+- SKILL.md/DESCRIPTION.md 职责分离（完整 vs 发现提示）
+- 修复工具数量声明（7→6，与实际注册一致）
+- 新增 AGENTS.md 供 Claude Code agent 使用
+- plugin.yaml 版本同步至 0.9.0
+
 ## 已验证能力
 
 | 能力 | 状态 | 技术实现 |
@@ -61,7 +73,7 @@ PilotFlow 是飞书群聊中的 AI 项目运行官。用户在群里 @PilotFlow 
 | 多维表格自建 | ✅ | 自动创建表格、字段、记录、权限 |
 | LLM 意图理解 | ✅ | gpt-5.5 + pilotflow skill |
 | 端到端群聊触发 | ✅ | Hermes gateway WebSocket，~30秒 5个产物 |
-| 确认门控 | ✅ | 代码级拦截 + 线程安全 |
+| 确认门控 | ✅ | 代码级拦截 + 线程安全 + 按群聊隔离 |
 | 项目模板识别 | ✅ | 答辩/sprint/活动/上线 模板自动建议 |
 | 项目状态查询 | ✅ | pilotflow_query_status 工具 |
 | 消息走 Hermes | ✅ | registry.dispatch("send_message") |

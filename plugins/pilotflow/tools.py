@@ -28,16 +28,60 @@ APP_SECRET = os.environ.get("FEISHU_APP_SECRET", "")
 _client = None
 _client_lock = threading.Lock()
 
-# Confirmation gate (per-session, thread-safe)
+# Confirmation gate (per-chat_id, thread-safe)
 _plan_lock = threading.Lock()
-_plan_generated = False
+_plan_generated: Dict[str, float] = {}  # chat_id -> timestamp
+_PLAN_GATE_TTL = 600  # 10 minutes
 
 # @mention regex
 _AT_PATTERN = re.compile(r'<at user_id="(ou_[^"]+)">([^<]+)</at>')
 
-# Member cache with TTL (5 minutes)
+# Member cache with TTL (5 minutes) and periodic eviction
 _member_cache: Dict[str, tuple] = {}  # name -> (open_id, timestamp)
 _MEMBER_CACHE_TTL = 300
+_last_cache_eviction = 0.0
+_CACHE_EVICTION_INTERVAL = 300  # evict every 5 minutes
+
+
+def _evict_caches():
+    """Periodically clean expired entries from all caches."""
+    global _last_cache_eviction
+    now = time.time()
+    if now - _last_cache_eviction < _CACHE_EVICTION_INTERVAL:
+        return
+    _last_cache_eviction = now
+    # Evict member cache
+    expired = [k for k, (_, ts) in _member_cache.items() if now - ts >= _MEMBER_CACHE_TTL]
+    for k in expired:
+        del _member_cache[k]
+    # Evict plan gate
+    with _plan_lock:
+        expired_plans = [k for k, ts in _plan_generated.items() if now - ts >= _PLAN_GATE_TTL]
+        for k in expired_plans:
+            del _plan_generated[k]
+    if expired or expired_plans:
+        logger.info("cache eviction: %d members, %d plans", len(expired), len(expired_plans))
+
+
+def _check_plan_gate(chat_id: str) -> bool:
+    """Check if a plan was generated for this chat_id within TTL."""
+    with _plan_lock:
+        ts = _plan_generated.get(chat_id)
+        if ts and time.time() - ts < _PLAN_GATE_TTL:
+            return True
+        return False
+
+
+def _set_plan_gate(chat_id: str):
+    """Mark plan as generated for this chat_id."""
+    with _plan_lock:
+        _plan_generated[chat_id] = time.time()
+
+
+def _clear_plan_gate(chat_id: str):
+    """Clear the plan gate for this chat_id after execution."""
+    with _plan_lock:
+        _plan_generated.pop(chat_id, None)
 
 
 # ---------------------------------------------------------------------------
@@ -145,6 +189,7 @@ def _get_chat_id(kwargs: dict) -> str:
 
 def _resolve_member(name: str, chat_id: str) -> Optional[str]:
     """Resolve a display name to open_id via chat member list (with TTL cache)."""
+    _evict_caches()
     now = time.time()
     # Check cache with TTL
     if name in _member_cache:
@@ -347,27 +392,24 @@ def _create_doc(title: str, markdown_content: str, chat_id: str) -> Optional[str
         return None
 
 
-def _create_task(summary: str, description: str) -> bool:
-    """Create a Feishu task."""
+def _create_task(summary: str, description: str) -> Optional[str]:
+    """Create a Feishu task. Returns task summary on success, None on failure."""
     client = _get_client()
     if not client:
-        return False
+        return None
     try:
         from lark_oapi.api.task.v2 import CreateTaskRequest, InputTask
         task = InputTask.builder().summary(summary).description(description).build()
         req = CreateTaskRequest.builder().request_body(task).build()
-        for attempt in range(2):
-            resp = client.task.v2.task.create(req)
-            if resp.success():
-                logger.info("task created: %s", summary)
-                return True
-            logger.warning("create task attempt %d failed: %s", attempt + 1, resp.msg)
-            if attempt == 0:
-                time.sleep(1)
-        return False
+        resp = client.task.v2.task.create(req)
+        if resp.success():
+            logger.info("task created: %s", summary)
+            return summary
+        logger.warning("create task failed: %s", resp.msg)
+        return None
     except Exception as e:
         logger.warning("create task error: %s", e)
-        return False
+        return None
 
 
 def _create_bitable(title: str, owner: str, deadline: str, risks: list, chat_id: str) -> Optional[str]:
@@ -416,11 +458,11 @@ def _create_bitable(title: str, owner: str, deadline: str, risks: list, chat_id:
         return None
 
 
-def _create_calendar_event(title: str, goal: str, deadline: str):
-    """Create a calendar event for the project deadline."""
+def _create_calendar_event(title: str, goal: str, deadline: str) -> Optional[str]:
+    """Create a calendar event for the project deadline. Returns description on success."""
     client = _get_client()
     if not client or not deadline:
-        return
+        return None
     try:
         import datetime
         from lark_oapi.api.calendar.v4 import (
@@ -438,10 +480,13 @@ def _create_calendar_event(title: str, goal: str, deadline: str):
         resp = client.calendar.v4.calendar_event.create(req)
         if resp.success():
             logger.info("calendar event created for %s", deadline)
+            return f"日历事件: {deadline}"
         else:
             logger.warning("create calendar event failed: %s", resp.msg)
+            return None
     except Exception as e:
         logger.warning("create calendar event error: %s", e)
+        return None
 
 
 # ---------------------------------------------------------------------------
@@ -551,9 +596,9 @@ def _detect_template(text: str) -> Optional[dict]:
 
 def _handle_generate_plan(params: Dict[str, Any], **kwargs) -> str:
     """Parse user input and return a structured project plan."""
-    global _plan_generated
-    with _plan_lock:
-        _plan_generated = True
+    chat_id = _get_chat_id(kwargs)
+    if chat_id:
+        _set_plan_gate(chat_id)
 
     text = params.get("input_text", "")
     template = _detect_template(text)
@@ -654,11 +699,13 @@ PILOTFLOW_CREATE_PROJECT_SPACE_SCHEMA = {
 
 def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
     """Create a complete project space in Feishu."""
-    global _plan_generated
-    with _plan_lock:
-        if not _plan_generated:
-            return tool_error("请先调用 pilotflow_generate_plan 生成计划，展示给用户确认后再调用此工具。")
-        _plan_generated = False
+    chat_id = _get_chat_id(kwargs)
+    if not chat_id:
+        return tool_error("无法获取群聊 ID，请确认 PILOTFLOW_TEST_CHAT_ID 已配置。")
+
+    if not _check_plan_gate(chat_id):
+        return tool_error("请先调用 pilotflow_generate_plan 生成计划，展示给用户确认后再调用此工具。")
+    _clear_plan_gate(chat_id)
 
     title = params.get("title", "项目")
     goal = params.get("goal", "")
@@ -666,10 +713,6 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
     deliverables = params.get("deliverables", [])
     deadline = params.get("deadline", "")
     risks = params.get("risks", [])
-
-    chat_id = _get_chat_id(kwargs)
-    if not chat_id:
-        return tool_error("无法获取群聊 ID，请确认 PILOTFLOW_TEST_CHAT_ID 已配置。")
 
     artifacts = []
     member_display = _format_members(members, chat_id) if members else "TBD"
@@ -701,8 +744,9 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
     # 4. Create tasks (lark_oapi)
     if deliverables:
         for d in deliverables[:3]:
-            if _create_task(d, f"项目: {title}\n负责人: {member_display}"):
-                artifacts.append(f"任务: {d}")
+            task_name = _create_task(d, f"项目: {title}\n负责人: {member_display}")
+            if task_name:
+                artifacts.append(f"任务: {task_name}")
 
     # 5. Send entry message (via Hermes)
     entry_text = f"📌 项目入口: {title}\n🎯 目标: {goal}"
@@ -717,11 +761,10 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
     if _hermes_send(chat_id, entry_text):
         artifacts.append("项目入口消息")
 
-    # 6. Calendar event (best effort)
-    try:
-        _create_calendar_event(title, goal, deadline)
-    except Exception:
-        pass  # Calendar is optional
+    # 6. Calendar event (best effort, logged)
+    cal_result = _create_calendar_event(title, goal, deadline)
+    if cal_result:
+        artifacts.append(cal_result)
 
     if not artifacts:
         return tool_error("创建失败，请检查飞书应用凭证配置。")
