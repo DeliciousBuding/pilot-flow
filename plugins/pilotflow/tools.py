@@ -196,11 +196,37 @@ def _create_doc(title: str, markdown_content: str) -> Optional[str]:
         return None
 
 
+import re
+
+_AT_PATTERN = re.compile(r'<at user_id="(ou_[^"]+)">([^<]+)</at>')
+
+
 def _make_text_elements(text: str):
-    """Create TextElement list from plain text, preserving <at> tags."""
-    from lark_oapi.api.docx.v1 import TextElement, TextRun
-    # Simple: one TextRun per line content
-    return [TextElement.builder().text_run(TextRun.builder().content(text).build()).build()]
+    """Create TextElement list, splitting <at> tags into mention_user elements."""
+    from lark_oapi.api.docx.v1 import TextElement, TextRun, MentionUser
+
+    parts = _AT_PATTERN.split(text)  # [before, uid, name, after, uid, name, ...]
+    if len(parts) == 1:
+        # No <at> tags
+        return [TextElement.builder().text_run(TextRun.builder().content(text).build()).build()]
+
+    elements = []
+    i = 0
+    while i < len(parts):
+        if parts[i]:
+            # Plain text segment
+            elements.append(
+                TextElement.builder().text_run(TextRun.builder().content(parts[i]).build()).build()
+            )
+        if i + 2 < len(parts):
+            # <at user_id="parts[i+1]">parts[i+2]</at>
+            user_id = parts[i + 1]
+            mention = MentionUser.builder().user_id(user_id).build()
+            elements.append(TextElement.builder().mention_user(mention).build())
+            i += 3
+        else:
+            i += 1
+    return elements
 
 
 def _markdown_to_blocks(markdown: str):
@@ -513,7 +539,7 @@ def _handle_create_project_space(params: Dict[str, Any]) -> str:
     # 1. Create project doc
     doc_content = f"# {title}\n\n## 目标\n{goal}\n\n"
     if members:
-        doc_content += f"## 成员\n{', '.join(members)}\n\n"
+        doc_content += f"## 成员\n{_format_members(members)}\n\n"
     if deliverables:
         doc_content += "## 交付物\n" + "\n".join(f"- {d}" for d in deliverables) + "\n\n"
     if deadline:
