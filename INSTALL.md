@@ -42,7 +42,7 @@ cp PilotFlow/.env.example ~/.hermes/.env
 # LLM 配置
 OPENAI_BASE_URL=https://api.vectorcontrol.tech/v1
 OPENAI_API_KEY=your-api-key-here
-OPENAI_MODEL=mimo-v2.5-pro
+OPENAI_MODEL=gpt-5.5
 
 # 飞书应用凭证
 FEISHU_APP_ID=cli_xxxxxxxxxxxxxxxx
@@ -94,6 +94,10 @@ gateway:
    - `docx:document:create` — 创建文档
    - `task:task:create` — 创建任务
    - `im:chat.members:read` — 读取群成员（@mention）
+   - `bitable:app:create` — 创建多维表格
+   - `drive:permission:member:create` — 添加文档协作者
+   - `drive:permission:public:patch` — 设置文档链接分享权限
+   - `calendar:calendar:event:create` — 创建日历事件（可选）
 
 ## 第五步：启动
 
@@ -108,7 +112,11 @@ uv run hermes gateway
 
 ```bash
 cd hermes-agent
-uv run python -c "from plugins.pilotflow import register; print('PilotFlow loaded OK')"
+uv run python -c "
+import sys; sys.path.insert(0, '.')
+from plugins.pilotflow import register
+print('PilotFlow loaded OK')
+"
 ```
 
 ## 常见问题

@@ -27,6 +27,7 @@ APP_SECRET = os.environ.get("FEISHU_APP_SECRET", "")
 # Lazy-loaded lark client (only for doc/task/bitable — NOT for messaging)
 _client = None
 _client_lock = threading.Lock()
+_client_ready = False  # cache _check_available result
 
 # Confirmation gate (per-chat_id, thread-safe)
 _plan_lock = threading.Lock()
@@ -36,12 +37,23 @@ _PLAN_GATE_TTL = 600  # 10 minutes
 # @mention regex
 _AT_PATTERN = re.compile(r'<at user_id="(ou_[^"]+)">([^<]+)</at>')
 
-# Member cache with TTL (5 minutes) and periodic eviction
+# Member cache with TTL and thread-safe eviction
 _member_cache: Dict[str, tuple] = {}  # name -> (open_id, timestamp)
+_member_cache_lock = threading.Lock()
 _MEMBER_CACHE_TTL = 300
 _last_cache_eviction = 0.0
-_CACHE_EVICTION_INTERVAL = 300  # evict every 5 minutes
+_CACHE_EVICTION_INTERVAL = 300
 
+# Max editors to add per document (prevent unbounded API calls)
+_MAX_EDITORS = 20
+
+# lark_oapi client timeout (seconds)
+_CLIENT_TIMEOUT = 10
+
+
+# ---------------------------------------------------------------------------
+# Cache management (thread-safe)
+# ---------------------------------------------------------------------------
 
 def _evict_caches():
     """Periodically clean expired entries from all caches."""
@@ -50,17 +62,23 @@ def _evict_caches():
     if now - _last_cache_eviction < _CACHE_EVICTION_INTERVAL:
         return
     _last_cache_eviction = now
-    # Evict member cache
-    expired = [k for k, (_, ts) in _member_cache.items() if now - ts >= _MEMBER_CACHE_TTL]
-    for k in expired:
-        del _member_cache[k]
-    # Evict plan gate
+
+    evicted_members = 0
+    with _member_cache_lock:
+        expired = [k for k, (_, ts) in _member_cache.items() if now - ts >= _MEMBER_CACHE_TTL]
+        for k in expired:
+            del _member_cache[k]
+        evicted_members = len(expired)
+
+    evicted_plans = 0
     with _plan_lock:
         expired_plans = [k for k, ts in _plan_generated.items() if now - ts >= _PLAN_GATE_TTL]
         for k in expired_plans:
             del _plan_generated[k]
-    if expired or expired_plans:
-        logger.info("cache eviction: %d members, %d plans", len(expired), len(expired_plans))
+        evicted_plans = len(expired_plans)
+
+    if evicted_members or evicted_plans:
+        logger.info("cache eviction: %d members, %d plans", evicted_members, evicted_plans)
 
 
 def _check_plan_gate(chat_id: str) -> bool:
@@ -89,40 +107,42 @@ def _clear_plan_gate(chat_id: str):
 # ---------------------------------------------------------------------------
 
 def _hermes_send(chat_id: str, text: str) -> bool:
-    """Send a message via Hermes's send_message tool."""
+    """Send a message via Hermes's send_message tool.
+
+    registry.dispatch returns JSON: {"error": "..."} on failure, or the
+    handler's raw return string on success.
+    """
+    result = registry.dispatch("send_message", {
+        "action": "send",
+        "target": f"feishu:{chat_id}",
+        "message": text,
+    })
     try:
-        result = registry.dispatch("send_message", {
-            "action": "send",
-            "target": f"feishu:{chat_id}",
-            "message": text,
-        })
-        try:
-            data = json.loads(result)
-            return data.get("ok") is True or data.get("success") is True
-        except (json.JSONDecodeError, TypeError):
-            return "error" not in result.lower()
-    except Exception as e:
-        logger.warning("hermes send failed: %s", e)
-        return False
+        data = json.loads(result)
+        if isinstance(data, dict) and "error" in data:
+            logger.warning("hermes send error: %s", data["error"])
+            return False
+        return True
+    except (json.JSONDecodeError, TypeError):
+        return isinstance(result, str) and bool(result)
 
 
 def _hermes_send_card(chat_id: str, card_json: dict) -> bool:
     """Send an interactive card via Hermes's send_message tool."""
+    result = registry.dispatch("send_message", {
+        "action": "send",
+        "target": f"feishu:{chat_id}",
+        "message": json.dumps(card_json, ensure_ascii=False),
+        "msg_type": "interactive",
+    })
     try:
-        result = registry.dispatch("send_message", {
-            "action": "send",
-            "target": f"feishu:{chat_id}",
-            "message": json.dumps(card_json, ensure_ascii=False),
-            "msg_type": "interactive",
-        })
-        try:
-            data = json.loads(result)
-            return data.get("ok") is True or data.get("success") is True
-        except (json.JSONDecodeError, TypeError):
-            return "error" not in result.lower()
-    except Exception as e:
-        logger.warning("hermes send card failed: %s", e)
-        return False
+        data = json.loads(result)
+        if isinstance(data, dict) and "error" in data:
+            logger.warning("hermes send card error: %s", data["error"])
+            return False
+        return True
+    except (json.JSONDecodeError, TypeError):
+        return isinstance(result, str) and bool(result)
 
 
 # ---------------------------------------------------------------------------
@@ -130,7 +150,7 @@ def _hermes_send_card(chat_id: str, card_json: dict) -> bool:
 # ---------------------------------------------------------------------------
 
 def _get_client():
-    """Get or create a lark_oapi client for doc/task/bitable operations."""
+    """Get or create a lark_oapi client with explicit timeout."""
     global _client
     if _client is not None:
         return _client
@@ -150,35 +170,40 @@ def _get_client():
             lark.Client.builder()
             .app_id(APP_ID).app_secret(APP_SECRET)
             .domain(FEISHU_DOMAIN).log_level(lark.LogLevel.WARNING)
+            .timeout(_CLIENT_TIMEOUT)
             .build()
         )
         return _client
 
 
 def _check_available() -> bool:
-    """Check if PilotFlow dependencies are available."""
-    return _get_client() is not None
+    """Check if PilotFlow dependencies are available (cached)."""
+    global _client_ready
+    if _client_ready:
+        return True
+    _client_ready = _get_client() is not None
+    return _client_ready
 
 
 # ---------------------------------------------------------------------------
-# Chat ID resolution (from env or session)
+# Chat ID resolution (from kwargs, session context, or env)
 # ---------------------------------------------------------------------------
 
 def _get_chat_id(kwargs: dict) -> str:
-    """Get chat_id from kwargs, session, or env."""
+    """Get chat_id from kwargs, session context, or env var fallback."""
     # 1. From tool kwargs (gateway may inject)
     chat_id = kwargs.get("chat_id", "")
     if chat_id:
         return chat_id
-    # 2. From session context
+    # 2. From Hermes session context
     try:
         from gateway.session_context import get_session_env
-        env = get_session_env()
-        if env and hasattr(env, "chat_id"):
-            return env.chat_id
+        session_chat_id = get_session_env("HERMES_SESSION_CHAT_ID", "")
+        if session_chat_id:
+            return session_chat_id
     except Exception:
         pass
-    # 3. From env var (fallback)
+    # 3. From env var (testing fallback)
     return os.environ.get("PILOTFLOW_TEST_CHAT_ID", "")
 
 
@@ -191,11 +216,12 @@ def _resolve_member(name: str, chat_id: str) -> Optional[str]:
     """Resolve a display name to open_id via chat member list (with TTL cache)."""
     _evict_caches()
     now = time.time()
-    # Check cache with TTL
-    if name in _member_cache:
-        oid, ts = _member_cache[name]
-        if now - ts < _MEMBER_CACHE_TTL:
-            return oid
+    # Check cache with TTL (thread-safe)
+    with _member_cache_lock:
+        entry = _member_cache.get(name)
+        if entry and now - entry[1] < _MEMBER_CACHE_TTL:
+            return entry[0]
+
     if not chat_id:
         return None
 
@@ -215,14 +241,15 @@ def _resolve_member(name: str, chat_id: str) -> Optional[str]:
             logger.warning("get chat members failed: %s", resp.msg)
             return None
 
-        items = resp.data.items or []
-        for m in items:
-            mname = (m.name or "").strip()
-            mid = m.member_id or ""
-            if mname and mid:
-                _member_cache[mname] = (mid, now)
-        entry = _member_cache.get(name)
-        return entry[0] if entry else None
+        items = resp.data.items if resp.data else []
+        with _member_cache_lock:
+            for m in items:
+                mname = (m.name or "").strip()
+                mid = m.member_id or ""
+                if mname and mid:
+                    _member_cache[mname] = (mid, now)
+            entry = _member_cache.get(name)
+            return entry[0] if entry else None
     except Exception as e:
         logger.warning("resolve member failed: %s", e)
         return None
@@ -237,8 +264,13 @@ def _format_at(name: str, chat_id: str) -> str:
 
 
 def _format_members(members: List[str], chat_id: str) -> str:
-    """Format member names with @mentions."""
+    """Format member names with @mentions (for docs and messages)."""
     return ", ".join(_format_at(m, chat_id) for m in members)
+
+
+def _member_names_plain(members: List[str]) -> str:
+    """Format member names as plain text (for bitable, no @mention markup)."""
+    return ", ".join(members)
 
 
 # ---------------------------------------------------------------------------
@@ -271,7 +303,7 @@ def _set_permission(token: str, doc_type: str):
 
 
 def _add_editors(token: str, doc_type: str, chat_id: str):
-    """Add chat members as editors."""
+    """Add chat members as editors (capped at _MAX_EDITORS)."""
     if not chat_id:
         return
     client = _get_client()
@@ -287,17 +319,23 @@ def _add_editors(token: str, doc_type: str, chat_id: str):
         )
         resp = client.im.v1.chat_members.get(req)
         if not resp.success():
+            logger.warning("get members for editors failed: %s", resp.msg)
             return
-        members = [m.member_id for m in (resp.data.items or []) if m.member_id]
-        for mid in members:
+        members = [m.member_id for m in (resp.data.items if resp.data else []) if m.member_id]
+        added = 0
+        for mid in members[:_MAX_EDITORS]:
             member = Member.builder().member_type("openid").member_id(mid).perm("full_access").build()
             r = (
                 CreatePermissionMemberRequest.builder()
                 .token(token).type(doc_type).need_notification(False)
                 .request_body(member).build()
             )
-            client.drive.v1.permission_member.create(r)
-        logger.info("added %d editors to %s %s", len(members), doc_type, token)
+            perm_resp = client.drive.v1.permission_member.create(r)
+            if perm_resp.success():
+                added += 1
+            else:
+                logger.warning("add editor %s failed: %s", mid, perm_resp.msg)
+        logger.info("added %d/%d editors to %s %s", added, len(members), doc_type, token)
     except Exception as e:
         logger.warning("add editors error: %s", e)
 
@@ -324,7 +362,7 @@ def _make_text_elements(text: str):
 
 def _markdown_to_blocks(markdown: str):
     """Convert markdown to Feishu docx Block objects."""
-    from lark_oapi.api.docx.v1 import Block, Text
+    from lark_oapi.api.docx.v1 import Block, Text, Divider as DocDivider
     blocks = []
     for line in markdown.split("\n"):
         stripped = line.strip()
@@ -346,7 +384,7 @@ def _markdown_to_blocks(markdown: str):
             t = Text.builder().elements(_make_text_elements(stripped[stripped.find(". ") + 2:])).build()
             blocks.append(Block.builder().block_type(13).ordered(t).build())
         elif stripped in ("---", "***", "___"):
-            blocks.append(Block.builder().block_type(22).divider({}).build())
+            blocks.append(Block.builder().block_type(22).divider(DocDivider.builder().build()).build())
         else:
             t = Text.builder().elements(_make_text_elements(stripped)).build()
             blocks.append(Block.builder().block_type(2).text(t).build())
@@ -436,9 +474,11 @@ def _create_bitable(title: str, owner: str, deadline: str, risks: list, chat_id:
 
         for fname in ["类型", "负责人", "截止时间", "状态", "风险等级"]:
             field = AppTableField.builder().field_name(fname).type(1).build()
-            client.bitable.v1.app_table_field.create(
+            field_resp = client.bitable.v1.app_table_field.create(
                 CreateAppTableFieldRequest.builder().app_token(app_token).table_id(table_id).request_body(field).build()
             )
+            if not field_resp.success():
+                logger.warning("create bitable field '%s' failed: %s", fname, field_resp.msg)
 
         record = AppTableRecord.builder().fields({
             "类型": "project", "负责人": owner or "TBD", "截止时间": deadline or "TBD",
@@ -476,7 +516,7 @@ def _create_calendar_event(title: str, goal: str, deadline: str) -> Optional[str
             .summary(f"📌 截止: {title}").description(goal)
             .start_event(event_time).end_event(event_time).build()
         )
-        req = CreateCalendarEventRequest.builder().request_body(event).build()
+        req = CreateCalendarEventRequest.builder().calendar_id("primary").request_body(event).build()
         resp = client.calendar.v4.calendar_event.create(req)
         if resp.success():
             logger.info("calendar event created for %s", deadline)
@@ -495,7 +535,7 @@ def _create_calendar_event(title: str, goal: str, deadline: str) -> Optional[str
 
 def _build_confirmation_card(title: str, goal: str, members: list,
                              deliverables: list, deadline: str) -> dict:
-    """Build a Feishu interactive card JSON."""
+    """Build a Feishu interactive card JSON for plan confirmation."""
     member_text = ", ".join(members) if members else "TBD"
     deliverable_text = ", ".join(deliverables) if deliverables else "TBD"
     return {
@@ -518,24 +558,6 @@ def _build_confirmation_card(title: str, goal: str, members: list,
                     ),
                 },
             },
-            {"tag": "hr"},
-            {
-                "tag": "action",
-                "actions": [
-                    {
-                        "tag": "button",
-                        "text": {"tag": "plain_text", "content": "✅ 确认执行"},
-                        "type": "primary",
-                        "value": {"action": "confirm_project", "title": title},
-                    },
-                    {
-                        "tag": "button",
-                        "text": {"tag": "plain_text", "content": "❌ 取消"},
-                        "type": "default",
-                        "value": {"action": "cancel_project"},
-                    },
-                ],
-            },
         ],
     }
 
@@ -547,14 +569,20 @@ def _build_confirmation_card(title: str, goal: str, members: list,
 PILOTFLOW_GENERATE_PLAN_SCHEMA = {
     "name": "pilotflow_generate_plan",
     "description": (
-        "【必须首先调用】当用户提到项目、答辩、任务、计划等关键词时，必须先调用此工具。"
-        "从用户的自然语言中提取项目信息（目标、成员、交付物、截止时间），"
-        "然后向用户展示执行计划并等待确认。用户确认后才能调用 pilotflow_create_project_space。"
+        "【创建项目的第一步 — 必须首先调用】当用户在群里 @机器人 并提到项目、答辩、任务、计划、"
+        "创建、准备等关键词时，必须先调用此工具。此工具会：\n"
+        "1. 设置确认门控（允许后续调用 create_project_space）\n"
+        "2. 检测项目模板（答辩/sprint/活动/上线）并提供建议\n"
+        "3. 返回结构化指令，指导你从用户消息中提取：项目标题、目标、成员、交付物、截止时间\n\n"
+        "调用后，你必须：\n"
+        "- 向用户展示提取到的项目信息（中文）\n"
+        "- 询问「确认执行？」\n"
+        "- 等用户明确回复「确认」「可以」「好的」「行」「ok」后，才能调用 pilotflow_create_project_space"
     ),
     "parameters": {
         "type": "object",
         "properties": {
-            "input_text": {"type": "string", "description": "用户的原始输入文本。"},
+            "input_text": {"type": "string", "description": "用户的原始输入文本，包含项目描述。"},
         },
         "required": ["input_text"],
     },
@@ -617,10 +645,15 @@ def _handle_generate_plan(params: Dict[str, Any], **kwargs) -> str:
         "input": text,
         "template": template["description"] if template else None,
         "instructions": (
-            "请从输入中提取项目信息，然后调用 pilotflow_create_project_space。\n\n"
+            "请从输入中提取以下项目信息：\n"
+            "- title: 项目标题\n- goal: 项目目标\n"
+            "- members: 成员列表（中文名）\n"
+            "- deliverables: 交付物列表\n- deadline: 截止时间（YYYY-MM-DD格式）\n\n"
+            "提取后向用户展示计划，问「确认执行？」。"
+            "用户确认后调用 pilotflow_create_project_space。\n\n"
             "【输出规则 - 必须遵守】\n"
             "1. 绝对不要向用户展示工具名称或英文内容\n"
-            "2. 只回复中文摘要，不要显示工具调用过程\n"
+            "2. 只回复中文，不要显示工具调用过程\n"
             "3. 执行完成后回复结果摘要：✅ 已创建 + 产物链接"
             f"{template_hint}"
         ),
@@ -634,8 +667,8 @@ def _handle_generate_plan(params: Dict[str, Any], **kwargs) -> str:
 PILOTFLOW_DETECT_RISKS_SCHEMA = {
     "name": "pilotflow_detect_risks",
     "description": (
-        "检测项目计划中的潜在风险：负责人缺失、截止时间模糊、交付物不明确等。"
-        "返回风险列表和建议处理方式。"
+        "检测项目计划中的潜在风险。检查：成员是否为空、交付物是否为空、截止时间是否明确。"
+        "返回风险列表和处理建议。在展示计划给用户时可以调用此工具进行风险预检。"
     ),
     "parameters": {
         "type": "object",
@@ -678,19 +711,24 @@ def _handle_detect_risks(params: Dict[str, Any], **kwargs) -> str:
 PILOTFLOW_CREATE_PROJECT_SPACE_SCHEMA = {
     "name": "pilotflow_create_project_space",
     "description": (
-        "【必须在用户确认后调用】一键创建项目空间：飞书文档（格式化+@提及+自动开权限）"
-        "+ 多维表格（项目状态台账+记录） + 飞书任务 + 群入口消息。"
-        "必须先调用 pilotflow_generate_plan 并等用户确认后才能调用此工具。"
+        "【必须在用户确认后调用】一键创建飞书项目空间，包含以下产物：\n"
+        "1. 飞书文档（格式化 markdown + @提及成员 + 自动开链接权限 + 给成员加编辑权）\n"
+        "2. 多维表格（项目状态台账 + 记录 + 自动开权限）\n"
+        "3. 飞书任务（每个交付物一个任务）\n"
+        "4. 群入口消息（@成员 + 文档/表格/截止时间链接）\n"
+        "5. 日历事件（截止时间提醒）\n\n"
+        "前置条件：必须先调用 pilotflow_generate_plan 并等用户回复「确认」。"
+        "如果用户没确认就调用，会返回错误。"
     ),
     "parameters": {
         "type": "object",
         "properties": {
-            "title": {"type": "string", "description": "项目标题。"},
-            "goal": {"type": "string", "description": "项目目标。"},
-            "members": {"type": "array", "items": {"type": "string"}, "description": "项目成员。"},
-            "deliverables": {"type": "array", "items": {"type": "string"}, "description": "交付物列表。"},
-            "deadline": {"type": "string", "description": "截止时间。"},
-            "risks": {"type": "array", "items": {"type": "string"}, "description": "已知风险。"},
+            "title": {"type": "string", "description": "项目标题（必填），如「答辩项目」。"},
+            "goal": {"type": "string", "description": "项目目标（必填），一句话描述项目要达成什么。"},
+            "members": {"type": "array", "items": {"type": "string"}, "description": "项目成员列表，写中文名，如[\"张三\", \"李四\"]。"},
+            "deliverables": {"type": "array", "items": {"type": "string"}, "description": "交付物列表，如[\"项目简报\", \"PPT\"]。"},
+            "deadline": {"type": "string", "description": "截止时间，格式 YYYY-MM-DD，如「2026-05-10」。"},
+            "risks": {"type": "array", "items": {"type": "string"}, "description": "已知风险，如[\"时间紧张\"]。"},
         },
         "required": ["title", "goal"],
     },
@@ -715,16 +753,15 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
     risks = params.get("risks", [])
 
     artifacts = []
+    # Use plain names for bitable (no @mention markup)
+    member_plain = _member_names_plain(members) if members else "TBD"
+    # Use @mention format for docs and messages
     member_display = _format_members(members, chat_id) if members else "TBD"
 
-    # 1. Send confirmation card (via Hermes)
-    card = _build_confirmation_card(title, goal, members, deliverables, deadline)
-    _hermes_send_card(chat_id, card)
-
-    # 2. Create doc (lark_oapi)
+    # 1. Create doc (lark_oapi) — with @mention in content
     doc_content = f"# {title}\n\n## 目标\n{goal}\n\n"
     if members:
-        doc_content += f"## 成员\n{_format_members(members, chat_id)}\n\n"
+        doc_content += f"## 成员\n{member_display}\n\n"
     if deliverables:
         doc_content += "## 交付物\n" + "\n".join(f"- {d}" for d in deliverables) + "\n\n"
     if deadline:
@@ -736,19 +773,19 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
     if doc_url:
         artifacts.append(f"文档: {doc_url}")
 
-    # 3. Create bitable (lark_oapi)
-    bitable_url = _create_bitable(title, member_display, deadline, risks, chat_id)
+    # 2. Create bitable (lark_oapi) — plain names for data fields
+    bitable_url = _create_bitable(title, member_plain, deadline, risks, chat_id)
     if bitable_url:
         artifacts.append(f"多维表格: {bitable_url}")
 
-    # 4. Create tasks (lark_oapi)
+    # 3. Create tasks (lark_oapi)
     if deliverables:
         for d in deliverables[:3]:
-            task_name = _create_task(d, f"项目: {title}\n负责人: {member_display}")
+            task_name = _create_task(d, f"项目: {title}\n负责人: {member_plain}")
             if task_name:
                 artifacts.append(f"任务: {task_name}")
 
-    # 5. Send entry message (via Hermes)
+    # 4. Send entry message (via Hermes) — @mention members
     entry_text = f"📌 项目入口: {title}\n🎯 目标: {goal}"
     if members:
         entry_text += f"\n👥 成员: {member_display}"
@@ -761,7 +798,7 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
     if _hermes_send(chat_id, entry_text):
         artifacts.append("项目入口消息")
 
-    # 6. Calendar event (best effort, logged)
+    # 5. Calendar event (best effort)
     cal_result = _create_calendar_event(title, goal, deadline)
     if cal_result:
         artifacts.append(cal_result)
@@ -773,7 +810,12 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
         "status": "project_space_created",
         "title": title,
         "artifacts": artifacts,
-        "instructions": "用中文回复结果摘要，格式如下（不要显示工具名或英文）：\n✅ 项目空间已创建\n📄 文档：（链接）\n📊 状态表：（链接）\n📋 任务：xxx、xxx\n💬 已通知群成员",
+        "instructions": (
+            "用中文回复结果摘要（不要显示工具名或英文）：\n"
+            "✅ 项目空间已创建\n"
+            "📄 文档：（链接）\n📊 状态表：（链接）\n"
+            "📋 任务：xxx、xxx\n💬 已通知群成员"
+        ),
         "message": f"已创建 {len(artifacts)} 个产物: {', '.join(artifacts)}",
     }, ensure_ascii=False))
 
@@ -784,13 +826,16 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
 
 PILOTFLOW_SEND_SUMMARY_SCHEMA = {
     "name": "pilotflow_send_summary",
-    "description": "向飞书群发送项目执行总结，包含已创建的产物列表。",
+    "description": (
+        "向飞书群发送项目执行总结消息。包含已创建的产物列表和项目状态。"
+        "通常在 pilotflow_create_project_space 之后调用，发送一条汇总消息到群聊。"
+    ),
     "parameters": {
         "type": "object",
         "properties": {
             "title": {"type": "string", "description": "项目标题。"},
             "artifacts": {"type": "array", "items": {"type": "string"}, "description": "已创建的产物列表。"},
-            "status": {"type": "string", "description": "项目状态。"},
+            "status": {"type": "string", "description": "项目状态，默认 completed。"},
         },
         "required": ["title", "artifacts"],
     },
@@ -824,8 +869,8 @@ def _handle_send_summary(params: Dict[str, Any], **kwargs) -> str:
 PILOTFLOW_QUERY_STATUS_SCHEMA = {
     "name": "pilotflow_query_status",
     "description": (
-        "查询项目状态。当用户问「项目进展如何」「项目状态」「有哪些项目」时调用此工具。"
-        "返回项目列表和状态信息。"
+        "查询项目状态并向群聊发送看板卡片。当用户问「项目进展如何」「有哪些项目」「项目状态」时调用。"
+        "会查询飞书任务列表，构建项目看板卡片发送到群聊。"
     ),
     "parameters": {
         "type": "object",
@@ -846,21 +891,23 @@ def _handle_query_status(params: Dict[str, Any], **kwargs) -> str:
     if not client:
         return tool_error("飞书客户端未初始化")
 
-    # Collect project data from multiple sources
+    # Collect project data
     projects = []
 
-    # 1. Search tasks
+    # Search tasks (requires user token — may fail with tenant token)
     try:
         from lark_oapi.api.task.v2 import ListTaskRequest
         req = ListTaskRequest.builder().page_size(20).build()
         resp = client.task.v2.task.list(req)
-        if resp.success() and resp.data.items:
+        if resp.success() and resp.data and resp.data.items:
             for t in resp.data.items[:5]:
                 projects.append({"name": t.summary or "无标题", "source": "任务"})
-    except Exception:
-        pass
+        elif not resp.success():
+            logger.info("list tasks failed (may need user token): %s", resp.msg)
+    except Exception as e:
+        logger.info("list tasks error: %s", e)
 
-    # 2. Build dashboard card
+    # Build dashboard card
     if not projects:
         projects.append({"name": "暂无项目记录", "source": "请先创建项目"})
 
@@ -894,7 +941,7 @@ def _handle_query_status(params: Dict[str, Any], **kwargs) -> str:
     if chat_id:
         _hermes_send_card(chat_id, card)
 
-    summary = f"📊 项目看板\n\n"
+    summary = "📊 项目看板\n\n"
     for p in projects:
         summary += f"  • {p['name']} ({p['source']})\n"
 
@@ -908,8 +955,9 @@ def _handle_query_status(params: Dict[str, Any], **kwargs) -> str:
 PILOTFLOW_UPDATE_PROJECT_SCHEMA = {
     "name": "pilotflow_update_project",
     "description": (
-        "更新项目信息。当用户说「改截止时间」「加成员」「改项目状态」时调用此工具。"
-        "支持更新截止时间、添加成员、修改状态。"
+        "发送项目更新通知到群聊。当用户说「改截止时间」「加成员」「改项目状态」时调用。"
+        "会向群聊发送一条更新通知消息，@提及相关成员。"
+        "支持三种操作：update_deadline（改截止时间）、add_member（加成员）、update_status（改状态）。"
     ),
     "parameters": {
         "type": "object",
