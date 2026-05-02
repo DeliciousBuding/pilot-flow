@@ -45,7 +45,11 @@ def _hermes_send(chat_id: str, text: str) -> bool:
             "target": f"feishu:{chat_id}",
             "message": text,
         })
-        return '"ok": true' in result or '"success"' in result or '"error"' not in result
+        try:
+            data = json.loads(result)
+            return data.get("ok") is True or data.get("success") is True
+        except (json.JSONDecodeError, TypeError):
+            return "error" not in result.lower()
     except Exception as e:
         logger.warning("hermes send failed: %s", e)
         return False
