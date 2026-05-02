@@ -92,7 +92,7 @@ uv run hermes gateway
 | --- | --- |
 | Feishu Doc Creation | Formatted markdown, @mention, auto permissions + editor access for group members |
 | Bitable | Auto-create project status ledger, write records, auto permissions + editor access |
-| Feishu Task Creation | Auto-creates tasks linked to project |
+| Feishu Task Creation | Auto-creates tasks with assignee and deadline |
 | @mention | Resolves group members, mention_user in docs, `<at>` tags in messages |
 | Permission Management | Auto: link viewable + group members as editors |
 | Confirmation Gate | Shows plan card first, waits for user to confirm before executing |
