@@ -123,12 +123,8 @@ uv run hermes gateway
 | Phase 1 | Plugin foundation: Feishu tools + project workflow | ✅ Done |
 | Phase 2 | LLM-driven intent understanding and plan generation | ✅ Done |
 | Phase 3 | lark_oapi SDK + @mention + formatted docs + auto permissions | ✅ Done |
-| Phase 4 | Confirmation gate + risk detection + run log | In Progress |
-| Phase 5 | Multi-project spaces, Worker preview, self-evolution | Planned |
-
-## Star History
-
-[![Star History Chart](https://api.star-history.com/svg?repos=DeliciousBuding/PilotFlow&type=Date)](https://star-history.com/#DeliciousBuding/PilotFlow&Date)
+| Phase 4 | Confirmation gate + risk detection + interactive cards | In Progress |
+| Phase 5 | Multi-turn project management, calendar integration, approval flows | Planned |
 
 ## Acknowledgments
 

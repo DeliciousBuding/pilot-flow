@@ -127,12 +127,8 @@ uv run hermes gateway
 | Phase 1 | 插件基础：飞书工具 + 项目管理工作流 | ✅ 已完成 |
 | Phase 2 | LLM 驱动的意图理解和计划生成 | ✅ 已完成 |
 | Phase 3 | lark_oapi SDK 直连 + @mention + 格式化文档 + 权限自动开放 | ✅ 已完成 |
-| Phase 4 | 确认门控 + 风险检测 + 运行记录 | 进行中 |
-| Phase 5 | 多项目空间、Worker 预览、自我进化 | 计划中 |
-
-## Star History
-
-[![Star History Chart](https://api.star-history.com/svg?repos=DeliciousBuding/PilotFlow&type=Date)](https://star-history.com/#DeliciousBuding/PilotFlow&Date)
+| Phase 4 | 确认门控 + 风险检测 + 互动卡片 | 进行中 |
+| Phase 5 | 多轮项目管理、日历集成、审批流 | 计划中 |
 
 ## 致谢
 

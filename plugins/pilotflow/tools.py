@@ -625,6 +625,50 @@ def _get_chat_members() -> list:
     except Exception:
         return []
 
+
+def _create_calendar_event(title: str, goal: str, members: list, deadline: str):
+    """Create a calendar event for the project deadline."""
+    client = _get_client()
+    if not client or not deadline:
+        return
+    try:
+        import datetime
+        from lark_oapi.api.calendar.v4 import (
+            CreateCalendarEventRequest,
+            CreateCalendarEventRequestBody,
+            CalendarEvent,
+            CalendarEventTime,
+        )
+
+        # Parse deadline to timestamp
+        try:
+            dt = datetime.datetime.strptime(deadline, "%Y-%m-%d")
+            ts = str(int(dt.timestamp()))
+        except ValueError:
+            logger.warning("cannot parse deadline: %s", deadline)
+            return
+
+        event_time = CalendarEventTime.builder().timestamp(ts).build()
+        event = (
+            CalendarEvent.builder()
+            .summary(f"📌 截止: {title}")
+            .description(goal)
+            .start_event(event_time)
+            .end_event(event_time)
+            .build()
+        )
+        req = CreateCalendarEventRequest.builder().request_body(
+            CreateCalendarEventRequestBody.builder().event(event).build()
+        ).build()
+        resp = client.calendar.v4.calendar_event.create(req)
+        if resp.success():
+            logger.info("calendar event created for %s", deadline)
+        else:
+            logger.warning("create calendar event failed: %s", resp.msg)
+    except Exception as e:
+        logger.warning("create calendar event error: %s", e)
+
+
 PILOTFLOW_GENERATE_PLAN_SCHEMA = {
     "name": "pilotflow_generate_plan",
     "description": (
@@ -839,7 +883,11 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
         artifacts.append("项目入口消息")
 
     if not artifacts:
-        return tool_error("未能创建任何产物，请检查 FEISHU_APP_ID / FEISHU_APP_SECRET 配置。")
+        return tool_error("创建失败，请检查飞书应用凭证配置（FEISHU_APP_ID / FEISHU_APP_SECRET）。")
+
+    # 5. Create calendar event for deadline
+    if deadline:
+        _create_calendar_event(title, goal, members, deadline)
 
     return tool_result(json.dumps({
         "status": "project_space_created",
