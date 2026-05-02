@@ -1,3 +1,5 @@
+<div align="center">
+
 # ✈️ PilotFlow
 
 **Hermes Project Management Plugin for Feishu**
@@ -9,6 +11,8 @@ Mention @PilotFlow in a Feishu group chat with a requirement, and it automatical
 [![Feishu](https://img.shields.io/badge/Feishu-Native-00A4FF)]()
 [![Hermes](https://img.shields.io/badge/Hermes-Plugin-6f42c1)]()
 [![GitHub stars](https://img.shields.io/github/stars/DeliciousBuding/PilotFlow?style=social)](https://github.com/DeliciousBuding/PilotFlow/stargazers)
+
+</div>
 
 ---
 

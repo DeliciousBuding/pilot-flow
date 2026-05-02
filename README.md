@@ -1,3 +1,5 @@
+<div align="center">
+
 # ✈️ PilotFlow
 
 **Hermes 飞书项目管理插件**
@@ -9,6 +11,8 @@
 [![Feishu](https://img.shields.io/badge/飞书-原生-00A4FF)]()
 [![Hermes](https://img.shields.io/badge/Hermes-插件-6f42c1)]()
 [![GitHub stars](https://img.shields.io/github/stars/DeliciousBuding/PilotFlow?style=social)](https://github.com/DeliciousBuding/PilotFlow/stargazers)
+
+</div>
 
 ---
 
