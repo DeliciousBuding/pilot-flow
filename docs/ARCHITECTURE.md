@@ -34,7 +34,7 @@
 
 | 组件 | 职责 |
 | --- | --- |
-| LLM 调度 | 调用 mimo-v2.5-pro，解析用户意图，选择工具 |
+| LLM 调度 | 调用 gpt-5.5，解析用户意图，选择工具 |
 | 飞书网关 | WebSocket 连接、@mention 解析、消息收发 |
 | 工具注册表 | 插件注册工具、工具发现、handler 调度 |
 
@@ -51,10 +51,14 @@
 | --- | --- | --- |
 | `pilotflow_generate_plan` | 从自然语言提取项目信息 | 结构化项目计划 + 确认门控指令 |
 | `pilotflow_detect_risks` | 检测计划中的潜在风险 | 风险列表 + 建议 |
-| `pilotflow_create_project_space` | 一键创建全套项目产物 | 文档 + 任务 + 群消息 |
+| `pilotflow_create_project_space` | 一键创建全套项目产物 | 文档 + 表格 + 任务 + 群消息 + 日历 |
 | `pilotflow_send_summary` | 发送执行总结到群聊 | 总结消息 |
+| `pilotflow_query_status` | 查询项目状态，发送看板卡片 | 项目看板卡片 |
+| `pilotflow_update_project` | 发送项目更新通知 | 更新通知（@成员） |
 
 ## 工具调用流程
+
+### 创建项目
 
 ```
 用户 @PilotFlow → 飞书网关收到消息
@@ -62,9 +66,18 @@
   → LLM 展示计划，等待用户确认
   → 用户确认后，调用 pilotflow_create_project_space
     → lark_oapi: 创建飞书文档（格式化 + @mention + 自动开权限）
+    → lark_oapi: 创建多维表格（项目状态台账 + 记录 + 权限）
     → lark_oapi: 创建飞书任务
-    → lark_oapi: 发送项目入口消息到群
-  → 调用 pilotflow_send_summary 发送总结
+    → Hermes: 发送项目入口消息到群（@成员 + 链接）
+    → lark_oapi: 创建日历事件（截止时间提醒）
+```
+
+### 多轮管理
+
+```
+用户: "项目进展如何？" → LLM 调用 pilotflow_query_status → 发送看板卡片
+用户: "把截止时间改成5月10日" → LLM 调用 pilotflow_update_project → 发送更新通知
+用户: "把张三加到项目" → LLM 调用 pilotflow_update_project → @提及新成员
 ```
 
 ## 依赖关系

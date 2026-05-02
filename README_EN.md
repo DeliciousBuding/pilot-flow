@@ -50,7 +50,7 @@ Hermes Agent Runtime (LLM + Feishu Gateway + Tool Registry)
 
 - **Base**: Hermes provides Agent runtime, Feishu WebSocket gateway, LLM orchestration
 - **Plugin**: PilotFlow provides project management workflow and Feishu API tools (lark_oapi SDK)
-- **LLM**: mimo-v2.5-pro via OpenAI-compatible API
+- **LLM**: gpt-5.5 via OpenAI-compatible API
 
 ## Quick Start
 
@@ -94,7 +94,7 @@ uv run hermes gateway
 | Feishu Task Creation | Auto-creates tasks linked to project |
 | @mention | Resolves group members, mention_user in docs, `<at>` tags in messages |
 | Permission Management | Auto: link viewable + group members as editors |
-| LLM-Driven | mimo-v2.5-pro understands Chinese intent, selects tools automatically |
+| LLM-Driven | gpt-5.5 understands Chinese intent, selects tools automatically |
 | End-to-End Verified | Feishu group @PilotFlow → LLM → 5 Feishu artifacts, ~30 seconds |
 
 ## Competitive Positioning

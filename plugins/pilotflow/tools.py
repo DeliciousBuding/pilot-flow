@@ -47,6 +47,11 @@ _CACHE_EVICTION_INTERVAL = 300
 # Max editors to add per document (prevent unbounded API calls)
 _MAX_EDITORS = 20
 
+# In-memory project registry (populated by create_project_space, read by query_status)
+_project_registry: Dict[str, dict] = {}  # title -> {members, deadline, status, created_at, artifacts}
+_project_registry_lock = threading.Lock()
+_PROJECT_REGISTRY_MAX = 50
+
 # lark_oapi client timeout (seconds)
 _CLIENT_TIMEOUT = 10
 
@@ -100,6 +105,21 @@ def _clear_plan_gate(chat_id: str):
     """Clear the plan gate for this chat_id after execution."""
     with _plan_lock:
         _plan_generated.pop(chat_id, None)
+
+
+def _register_project(title: str, members: list, deadline: str, status: str, artifacts: list):
+    """Register a project in the in-memory registry for query_status."""
+    with _project_registry_lock:
+        if len(_project_registry) >= _PROJECT_REGISTRY_MAX:
+            oldest = min(_project_registry, key=lambda k: _project_registry[k].get("created_at", 0))
+            del _project_registry[oldest]
+        _project_registry[title] = {
+            "members": members,
+            "deadline": deadline,
+            "status": status,
+            "created_at": time.time(),
+            "artifacts": artifacts,
+        }
 
 
 # ---------------------------------------------------------------------------
@@ -508,7 +528,9 @@ def _create_calendar_event(title: str, goal: str, deadline: str) -> Optional[str
         from lark_oapi.api.calendar.v4 import (
             CreateCalendarEventRequest, CalendarEvent, EventTime,
         )
+        # Parse deadline as UTC+8 (China Standard Time) midnight
         dt = datetime.datetime.strptime(deadline, "%Y-%m-%d")
+        dt = dt.replace(tzinfo=datetime.timezone(datetime.timedelta(hours=8)))
         ts = str(int(dt.timestamp()))
         event_time = EventTime.builder().time_stamp(ts).build()
         event = (
@@ -806,6 +828,9 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
     if not artifacts:
         return tool_error("创建失败，请检查飞书应用凭证配置。")
 
+    # Register in memory for query_status
+    _register_project(title, members, deadline, "进行中", artifacts)
+
     return tool_result(json.dumps({
         "status": "project_space_created",
         "title": title,
@@ -870,7 +895,7 @@ PILOTFLOW_QUERY_STATUS_SCHEMA = {
     "name": "pilotflow_query_status",
     "description": (
         "查询项目状态并向群聊发送看板卡片。当用户问「项目进展如何」「有哪些项目」「项目状态」时调用。"
-        "会查询飞书任务列表，构建项目看板卡片发送到群聊。"
+        "会查询本会话中创建过的项目，构建项目看板卡片发送到群聊。"
     ),
     "parameters": {
         "type": "object",
@@ -887,25 +912,32 @@ def _handle_query_status(params: Dict[str, Any], **kwargs) -> str:
     query = params.get("query", "")
     chat_id = _get_chat_id(kwargs)
 
-    client = _get_client()
-    if not client:
-        return tool_error("飞书客户端未初始化")
-
-    # Collect project data
     projects = []
 
-    # Search tasks (requires user token — may fail with tenant token)
-    try:
-        from lark_oapi.api.task.v2 import ListTaskRequest
-        req = ListTaskRequest.builder().page_size(20).build()
-        resp = client.task.v2.task.list(req)
-        if resp.success() and resp.data and resp.data.items:
-            for t in resp.data.items[:5]:
-                projects.append({"name": t.summary or "无标题", "source": "任务"})
-        elif not resp.success():
-            logger.info("list tasks failed (may need user token): %s", resp.msg)
-    except Exception as e:
-        logger.info("list tasks error: %s", e)
+    # 1. Primary source: in-memory project registry (always works)
+    with _project_registry_lock:
+        for title, info in _project_registry.items():
+            member_str = ", ".join(info.get("members", [])) or "TBD"
+            deadline = info.get("deadline", "TBD")
+            status = info.get("status", "进行中")
+            projects.append({
+                "name": title,
+                "source": f"成员: {member_str} | 截止: {deadline} | {status}",
+            })
+
+    # 2. Secondary: try Feishu task API (requires user token, may fail)
+    if not projects:
+        client = _get_client()
+        if client:
+            try:
+                from lark_oapi.api.task.v2 import ListTaskRequest
+                req = ListTaskRequest.builder().page_size(20).build()
+                resp = client.task.v2.task.list(req)
+                if resp.success() and resp.data and resp.data.items:
+                    for t in resp.data.items[:5]:
+                        projects.append({"name": t.summary or "无标题", "source": "任务"})
+            except Exception:
+                pass
 
     # Build dashboard card
     if not projects:
