@@ -905,6 +905,8 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
         display_items.append(f"📋 任务: {', '.join(deliverables)}")
     if deadline:
         display_items.append(f"⏰ 截止: {deadline}")
+    if cal_result:
+        display_items.append("📅 日历提醒已创建")
     display_items.append("💬 已通知群成员")
 
     return tool_result(json.dumps({
