@@ -4,11 +4,11 @@
 
 ```
 ┌─────────────────────────────────────────┐
-│           Hermes/OpenClaw 运行时          │
+│           Hermes Agent 运行时            │
 │                                         │
 │  ┌──────────┐  ┌──────────┐  ┌────────┐ │
-│  │ Agent    │  │ 飞书网关   │  │ 工具   │ │
-│  │ Runtime  │  │ Gateway  │  │ 注册表  │ │
+│  │ LLM      │  │ 飞书网关   │  │ 工具   │ │
+│  │ 调度     │  │ Gateway  │  │ 注册表  │ │
 │  └────┬─────┘  └────┬─────┘  └───┬────┘ │
 │       │              │            │      │
 │       └──────────────┴────────────┘      │
@@ -21,7 +21,8 @@
 │           │  └───────┬───────┘  │        │
 │           │          │          │        │
 │           │  ┌───────┴───────┐  │        │
-│           │  │ 飞书项目工具   │  │        │
+│           │  │ lark_oapi     │  │        │
+│           │  │ 飞书 API 工具  │  │        │
 │           │  └───────────────┘  │        │
 │           └─────────────────────┘        │
 └─────────────────────────────────────────┘
@@ -33,63 +34,51 @@
 
 | 组件 | 职责 |
 | --- | --- |
-| Agent Runtime | LLM 调用、对话管理、工具调度 |
-| 飞书网关 | WebSocket 连接、@mention 解析、消息收发、互动卡片 |
-| 工具注册表 | 插件注册工具、工具发现、权限校验 |
+| LLM 调度 | 调用 mimo-v2.5-pro，解析用户意图，选择工具 |
+| 飞书网关 | WebSocket 连接、@mention 解析、消息收发 |
+| 工具注册表 | 插件注册工具、工具发现、handler 调度 |
 
 ### PilotFlow 插件
 
 | 组件 | 职责 |
 | --- | --- |
 | 项目管理工作流 | 意图提取 → 计划生成 → 确认门控 → 执行 → 总结 |
-| 飞书项目工具 | 封装 lark-cli 调用，提供文档、表格、任务、消息工具 |
+| lark_oapi 飞书工具 | 直连飞书 API，提供文档、任务、消息、@mention 工具 |
 
 ## 工具列表
 
 | 工具 | 说明 | 输出 |
 | --- | --- | --- |
-| `pilotflow_generate_plan` | 从自然语言提取项目信息 | 结构化项目计划 |
+| `pilotflow_generate_plan` | 从自然语言提取项目信息 | 结构化项目计划 + 确认门控指令 |
 | `pilotflow_detect_risks` | 检测计划中的潜在风险 | 风险列表 + 建议 |
-| `pilotflow_create_project_space` | 一键创建全套项目产物 | 文档 + 表格 + 任务 + 消息 |
+| `pilotflow_create_project_space` | 一键创建全套项目产物 | 文档 + 任务 + 群消息 |
 | `pilotflow_send_summary` | 发送执行总结到群聊 | 总结消息 |
 
-## 状态模型
+## 工具调用流程
 
 ```
-IDLE → PLAN_GENERATED → AWAITING_CONFIRMATION → EXECUTING → COMPLETED
-                                                     ↓
-                                                  FAILED → RETRY
+用户 @PilotFlow → 飞书网关收到消息
+  → LLM 理解意图，调用 pilotflow_generate_plan
+  → LLM 展示计划，等待用户确认
+  → 用户确认后，调用 pilotflow_create_project_space
+    → lark_oapi: 创建飞书文档（格式化 + @mention + 自动开权限）
+    → lark_oapi: 创建飞书任务
+    → lark_oapi: 发送项目入口消息到群
+  → 调用 pilotflow_send_summary 发送总结
 ```
-
-| 状态 | 触发条件 | 下一步 |
-| --- | --- | --- |
-| IDLE | 初始状态 | 收到用户消息 → PLAN_GENERATED |
-| PLAN_GENERATED | LLM 解析完成 | 展示计划 → AWAITING_CONFIRMATION |
-| AWAITING_CONFIRMATION | 计划卡片已发送 | 用户确认 → EXECUTING |
-| EXECUTING | 调用飞书 API | 全部成功 → COMPLETED，失败 → FAILED |
-| COMPLETED | 所有产物创建完成 | 发送总结 → IDLE |
-| FAILED | 某步 API 调用失败 | 重试或报错 |
-
-## 工具路由
-
-PilotFlow 工具通过 Hermes 工具注册表注册，使用 `pilotflow` toolset 前缀。LLM 根据用户意图选择调用：
-
-1. 用户 @PilotFlow → 飞书网关路由到 Agent
-2. Agent 分析意图，调用 `pilotflow_generate_plan`
-3. Agent 展示计划，等待确认
-4. 用户确认后，Agent 调用 `pilotflow_create_project_space`
-5. Agent 调用 `pilotflow_send_summary` 完成闭环
 
 ## 依赖关系
 
 ```
 PilotFlow 插件
-  ├── lark-cli（Feishu API 命令行工具）
+  ├── lark-oapi SDK（飞书 API Python SDK）
   ├── Hermes 工具注册表（tools/registry）
-  └── 环境变量（.env）
+  └── 环境变量（~/.hermes/.env）
 ```
 
-PilotFlow 不直接调用飞书 API，而是通过 lark-cli 间接调用。这样做的好处：
-- lark-cli 处理认证、重试、错误格式化
-- PilotFlow 代码保持简洁，专注业务逻辑
-- 可以在终端独立调试每个 API 调用
+PilotFlow 通过 lark_oapi SDK 直连飞书 API，无中间层：
+- 文档创建：`client.docx.v1.document.create`
+- 任务创建：`client.task.v2.task.create`
+- 消息发送：`client.im.v1.message.create`
+- 群成员查询：`client.im.v1.chat_members.get`
+- 权限设置：`client.drive.v1.permission_public.patch`

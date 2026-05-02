@@ -65,5 +65,5 @@ PilotFlow 发送交付总结
 
 - 仅支持飞书平台
 - 依赖 Hermes Agent 运行时
-- 依赖 lark-cli 工具
+- 依赖 lark-oapi SDK
 - 需要飞书应用权限
