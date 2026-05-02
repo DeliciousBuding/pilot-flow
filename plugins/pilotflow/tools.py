@@ -1,7 +1,9 @@
 """PilotFlow project management tools.
 
-These tools provide project management workflow capabilities.
-They use lark_oapi SDK for Feishu API operations.
+Orchestration layer that uses Hermes's built-in capabilities:
+- Messaging: via registry.dispatch("send_message")
+- Feishu API (doc/task/bitable): via lark_oapi SDK (Hermes doesn't have native tools for these)
+- Permissions, @mention: via lark_oapi SDK
 """
 
 from __future__ import annotations
@@ -9,26 +11,67 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
+import time
 from typing import Any, Dict, List, Optional
 
-from tools.registry import tool_error, tool_result
+from tools.registry import registry, tool_error, tool_result
 
 logger = logging.getLogger(__name__)
 
-# Feishu app credentials — read from env, shared with Hermes gateway
+# Feishu app credentials — read from env
 APP_ID = os.environ.get("FEISHU_APP_ID", "")
 APP_SECRET = os.environ.get("FEISHU_APP_SECRET", "")
-CHAT_ID = os.environ.get("PILOTFLOW_TEST_CHAT_ID", "")
 
-# Lazy-loaded lark client
+# Lazy-loaded lark client (only for doc/task/bitable — NOT for messaging)
 _client = None
 
-# Confirmation gate: tracks whether generate_plan was called
+# Confirmation gate
 _plan_generated = False
 
+# @mention regex
+_AT_PATTERN = re.compile(r'<at user_id="(ou_[^"]+)">([^<]+)</at>')
+
+
+# ---------------------------------------------------------------------------
+# Hermes integration: messaging via registry.dispatch
+# ---------------------------------------------------------------------------
+
+def _hermes_send(chat_id: str, text: str) -> bool:
+    """Send a message via Hermes's send_message tool."""
+    try:
+        result = registry.dispatch("send_message", {
+            "action": "send",
+            "target": f"feishu:{chat_id}",
+            "message": text,
+        })
+        return '"ok": true' in result or '"success"' in result or '"error"' not in result
+    except Exception as e:
+        logger.warning("hermes send failed: %s", e)
+        return False
+
+
+def _hermes_send_card(chat_id: str, card_json: dict) -> bool:
+    """Send an interactive card via Hermes's send_message tool."""
+    try:
+        result = registry.dispatch("send_message", {
+            "action": "send",
+            "target": f"feishu:{chat_id}",
+            "message": json.dumps(card_json, ensure_ascii=False),
+            "msg_type": "interactive",
+        })
+        return '"error"' not in result
+    except Exception as e:
+        logger.warning("hermes send card failed: %s", e)
+        return False
+
+
+# ---------------------------------------------------------------------------
+# lark_oapi client (for doc/task/bitable — Hermes doesn't have these)
+# ---------------------------------------------------------------------------
 
 def _get_client():
-    """Get or create a lark_oapi client."""
+    """Get or create a lark_oapi client for doc/task/bitable operations."""
     global _client
     if _client is not None:
         return _client
@@ -36,18 +79,17 @@ def _get_client():
         import lark_oapi as lark
         from lark_oapi.core.const import FEISHU_DOMAIN
     except ImportError:
+        logger.warning("lark_oapi not installed. Run: uv sync --extra feishu")
         return None
 
-    app_id = APP_ID
-    app_secret = APP_SECRET
-    if not app_id or not app_secret:
+    if not APP_ID or not APP_SECRET:
         logger.warning("FEISHU_APP_ID / FEISHU_APP_SECRET not set")
         return None
 
     _client = (
         lark.Client.builder()
-        .app_id(app_id)
-        .app_secret(app_secret)
+        .app_id(APP_ID)
+        .app_secret(APP_SECRET)
         .domain(FEISHU_DOMAIN)
         .log_level(lark.LogLevel.WARNING)
         .build()
@@ -61,17 +103,39 @@ def _check_available() -> bool:
 
 
 # ---------------------------------------------------------------------------
+# Chat ID resolution (from env or session)
+# ---------------------------------------------------------------------------
+
+def _get_chat_id(kwargs: dict) -> str:
+    """Get chat_id from kwargs, session, or env."""
+    # 1. From tool kwargs (gateway may inject)
+    chat_id = kwargs.get("chat_id", "")
+    if chat_id:
+        return chat_id
+    # 2. From session context
+    try:
+        from gateway.session_context import get_session_env
+        env = get_session_env()
+        if env and hasattr(env, "chat_id"):
+            return env.chat_id
+    except Exception:
+        pass
+    # 3. From env var (fallback)
+    return os.environ.get("PILOTFLOW_TEST_CHAT_ID", "")
+
+
+# ---------------------------------------------------------------------------
 # @mention helpers
 # ---------------------------------------------------------------------------
 
-_member_cache: Dict[str, str] = {}  # name -> open_id
+_member_cache: Dict[str, str] = {}
 
 
-def _resolve_member(name: str) -> Optional[str]:
-    """Resolve a display name to open_id via chat member list. Returns None if not found."""
+def _resolve_member(name: str, chat_id: str) -> Optional[str]:
+    """Resolve a display name to open_id via chat member list."""
     if name in _member_cache:
         return _member_cache[name]
-    if not CHAT_ID:
+    if not chat_id:
         return None
 
     client = _get_client()
@@ -83,7 +147,7 @@ def _resolve_member(name: str) -> Optional[str]:
 
         req = (
             GetChatMembersRequest.builder()
-            .chat_id(CHAT_ID)
+            .chat_id(chat_id)
             .member_id_type("open_id")
             .page_size(100)
             .build()
@@ -105,143 +169,25 @@ def _resolve_member(name: str) -> Optional[str]:
         return None
 
 
-def _format_at(name: str) -> str:
-    """Format a name as a Feishu @mention tag if possible, else plain text."""
-    open_id = _resolve_member(name)
+def _format_at(name: str, chat_id: str) -> str:
+    """Format a name as a Feishu @mention tag if possible."""
+    open_id = _resolve_member(name, chat_id)
     if open_id:
         return f'<at user_id="{open_id}">{name}</at>'
     return name
 
 
-def _format_members(members: List[str]) -> str:
-    """Format a list of member names with @mentions."""
-    return ", ".join(_format_at(m) for m in members)
+def _format_members(members: List[str], chat_id: str) -> str:
+    """Format member names with @mentions."""
+    return ", ".join(_format_at(m, chat_id) for m in members)
 
 
 # ---------------------------------------------------------------------------
-# Feishu API wrappers
+# Feishu API: doc/task/bitable (lark_oapi — no Hermes equivalent)
 # ---------------------------------------------------------------------------
 
-import time
-
-
-def _send_message(chat_id: str, text: str) -> bool:
-    """Send a text message to a Feishu chat. Retries once on failure."""
-    client = _get_client()
-    if not client:
-        return False
-    try:
-        from lark_oapi.api.im.v1 import (
-            CreateMessageRequest,
-            CreateMessageRequestBody,
-        )
-
-        body = (
-            CreateMessageRequestBody.builder()
-            .receive_id(chat_id)
-            .msg_type("text")
-            .content(json.dumps({"text": text}))
-            .build()
-        )
-        req = (
-            CreateMessageRequest.builder()
-            .receive_id_type("chat_id")
-            .request_body(body)
-            .build()
-        )
-        for attempt in range(2):
-            resp = client.im.v1.message.create(req)
-            if resp.success():
-                logger.info("message sent to %s", chat_id)
-                return True
-            logger.warning("send message attempt %d failed: %s", attempt + 1, resp.msg)
-            if attempt == 0:
-                time.sleep(1)
-        return False
-    except Exception as e:
-        logger.warning("send message error: %s", e)
-        return False
-
-
-def _send_confirmation_card(chat_id: str, title: str, goal: str, members: list,
-                            deliverables: list, deadline: str) -> bool:
-    """Send an interactive confirmation card with a button."""
-    client = _get_client()
-    if not client:
-        return False
-    try:
-        from lark_oapi.api.im.v1 import CreateMessageRequest, CreateMessageRequestBody
-
-        member_text = ", ".join(members) if members else "TBD"
-        deliverable_text = ", ".join(deliverables) if deliverables else "TBD"
-
-        card = {
-            "config": {"wide_screen_mode": True},
-            "header": {
-                "title": {"tag": "plain_text", "content": "📋 执行计划"},
-                "template": "blue",
-            },
-            "elements": [
-                {
-                    "tag": "div",
-                    "text": {
-                        "tag": "lark_md",
-                        "content": (
-                            f"**项目：** {title}\n"
-                            f"**目标：** {goal}\n"
-                            f"**成员：** {member_text}\n"
-                            f"**交付物：** {deliverable_text}\n"
-                            f"**截止时间：** {deadline or 'TBD'}"
-                        ),
-                    },
-                },
-                {"tag": "hr"},
-                {
-                    "tag": "action",
-                    "actions": [
-                        {
-                            "tag": "button",
-                            "text": {"tag": "plain_text", "content": "✅ 确认执行"},
-                            "type": "primary",
-                            "value": {"action": "confirm_project", "title": title},
-                        },
-                        {
-                            "tag": "button",
-                            "text": {"tag": "plain_text", "content": "❌ 取消"},
-                            "type": "default",
-                            "value": {"action": "cancel_project"},
-                        },
-                    ],
-                },
-            ],
-        }
-
-        body = (
-            CreateMessageRequestBody.builder()
-            .receive_id(chat_id)
-            .msg_type("interactive")
-            .content(json.dumps(card, ensure_ascii=False))
-            .build()
-        )
-        req = (
-            CreateMessageRequest.builder()
-            .receive_id_type("chat_id")
-            .request_body(body)
-            .build()
-        )
-        resp = client.im.v1.message.create(req)
-        if resp.success():
-            logger.info("confirmation card sent to %s", chat_id)
-            return True
-        logger.warning("send card failed: %s", resp.msg)
-        return False
-    except Exception as e:
-        logger.warning("send card error: %s", e)
-        return False
-
-
-def _set_doc_permission(doc_id: str):
-    """Set document permission: anyone with link can view."""
+def _set_permission(token: str, doc_type: str):
+    """Set permission: anyone with link can view."""
     client = _get_client()
     if not client:
         return
@@ -250,96 +196,66 @@ def _set_doc_permission(doc_id: str):
             PatchPermissionPublicRequest,
             PermissionPublicRequest,
         )
-
-        body = (
-            PermissionPublicRequest.builder()
-            .link_share_entity("anyone_readable")
-            .build()
-        )
+        body = PermissionPublicRequest.builder().link_share_entity("anyone_readable").build()
         req = (
             PatchPermissionPublicRequest.builder()
-            .token(doc_id)
-            .type("docx")
-            .request_body(body)
-            .build()
+            .token(token).type(doc_type)
+            .request_body(body).build()
         )
         resp = client.drive.v1.permission_public.patch(req)
         if resp.success():
-            logger.info("doc permission set: %s", doc_id)
+            logger.info("permission set: %s %s", doc_type, token)
         else:
-            logger.warning("set doc permission failed: %s", resp.msg)
+            logger.warning("set permission failed: %s", resp.msg)
     except Exception as e:
-        logger.warning("set doc permission error: %s", e)
+        logger.warning("set permission error: %s", e)
 
 
-def _create_doc(title: str, markdown_content: str) -> Optional[str]:
-    """Create a Feishu document. Returns document URL or None."""
+def _add_editors(token: str, doc_type: str, chat_id: str):
+    """Add chat members as editors."""
+    if not chat_id:
+        return
     client = _get_client()
     if not client:
-        return None
+        return
     try:
-        import lark_oapi as lark
-        from lark_oapi.api.docx.v1 import (
-            CreateDocumentRequest,
-            CreateDocumentRequestBody,
-        )
+        from lark_oapi.api.drive.v1 import CreatePermissionMemberRequest, Member
+        from lark_oapi.api.im.v1 import GetChatMembersRequest
 
-        body = (
-            CreateDocumentRequestBody.builder()
-            .title(title)
-            .build()
-        )
         req = (
-            CreateDocumentRequest.builder()
-            .request_body(body)
-            .build()
+            GetChatMembersRequest.builder()
+            .chat_id(chat_id).member_id_type("open_id").page_size(100).build()
         )
-        resp = client.docx.v1.document.create(req)
-        if resp.success():
-            doc = resp.data.document
-            doc_id = doc.document_id
-            url = f"https://feishu.cn/docx/{doc_id}"
-            logger.info("doc created: %s", url)
-
-            # Write content blocks
-            _write_doc_content(doc_id, markdown_content)
-            # Set permission: anyone with link can view + chat members as editors
-            _set_doc_permission(doc_id)
-            _add_chat_members_as_editors(doc_id, "docx")
-            return url
-        logger.warning("create doc failed: %s", resp.msg)
-        return None
+        resp = client.im.v1.chat_members.get(req)
+        if not resp.success():
+            return
+        members = [m.member_id for m in (resp.data.items or []) if m.member_id]
+        for mid in members:
+            member = Member.builder().member_type("openid").member_id(mid).perm("full_access").build()
+            r = (
+                CreatePermissionMemberRequest.builder()
+                .token(token).type(doc_type).need_notification(False)
+                .request_body(member).build()
+            )
+            client.drive.v1.permission_member.create(r)
+        logger.info("added %d editors to %s %s", len(members), doc_type, token)
     except Exception as e:
-        logger.warning("create doc error: %s", e)
-        return None
-
-
-import re
-
-_AT_PATTERN = re.compile(r'<at user_id="(ou_[^"]+)">([^<]+)</at>')
+        logger.warning("add editors error: %s", e)
 
 
 def _make_text_elements(text: str):
     """Create TextElement list, splitting <at> tags into mention_user elements."""
     from lark_oapi.api.docx.v1 import TextElement, TextRun, MentionUser
-
-    parts = _AT_PATTERN.split(text)  # [before, uid, name, after, uid, name, ...]
+    parts = _AT_PATTERN.split(text)
     if len(parts) == 1:
-        # No <at> tags
         return [TextElement.builder().text_run(TextRun.builder().content(text).build()).build()]
-
     elements = []
     i = 0
     while i < len(parts):
         if parts[i]:
-            # Plain text segment
-            elements.append(
-                TextElement.builder().text_run(TextRun.builder().content(parts[i]).build()).build()
-            )
+            elements.append(TextElement.builder().text_run(TextRun.builder().content(parts[i]).build()).build())
         if i + 2 < len(parts):
-            # <at user_id="parts[i+1]">parts[i+2]</at>
-            user_id = parts[i + 1]
-            mention = MentionUser.builder().user_id(user_id).build()
+            mention = MentionUser.builder().user_id(parts[i + 1]).build()
             elements.append(TextElement.builder().mention_user(mention).build())
             i += 3
         else:
@@ -348,104 +264,81 @@ def _make_text_elements(text: str):
 
 
 def _markdown_to_blocks(markdown: str):
-    """Convert markdown text to a list of Feishu docx Block objects."""
-    from lark_oapi.api.docx.v1 import Block, Text, TextElement, TextRun
-
-    lines = markdown.split("\n")
+    """Convert markdown to Feishu docx Block objects."""
+    from lark_oapi.api.docx.v1 import Block, Text
     blocks = []
-
-    for line in lines:
+    for line in markdown.split("\n"):
         stripped = line.strip()
         if not stripped:
             continue
-
-        # Heading: # ## ###
         if stripped.startswith("### "):
-            content = stripped[4:]
-            heading = Text.builder().elements(_make_text_elements(content)).build()
-            blocks.append(Block.builder().block_type(5).heading3(heading).build())
+            h = Text.builder().elements(_make_text_elements(stripped[4:])).build()
+            blocks.append(Block.builder().block_type(5).heading3(h).build())
         elif stripped.startswith("## "):
-            content = stripped[3:]
-            heading = Text.builder().elements(_make_text_elements(content)).build()
-            blocks.append(Block.builder().block_type(4).heading2(heading).build())
+            h = Text.builder().elements(_make_text_elements(stripped[3:])).build()
+            blocks.append(Block.builder().block_type(4).heading2(h).build())
         elif stripped.startswith("# "):
-            content = stripped[2:]
-            heading = Text.builder().elements(_make_text_elements(content)).build()
-            blocks.append(Block.builder().block_type(3).heading1(heading).build())
-        # Bullet list: - or *
+            h = Text.builder().elements(_make_text_elements(stripped[2:])).build()
+            blocks.append(Block.builder().block_type(3).heading1(h).build())
         elif stripped.startswith("- ") or stripped.startswith("* "):
-            content = stripped[2:]
-            bullet_text = Text.builder().elements(_make_text_elements(content)).build()
-            blocks.append(Block.builder().block_type(12).bullet(bullet_text).build())
-        # Ordered list: 1. 2. etc.
-        elif len(stripped) > 2 and stripped[0].isdigit() and stripped.find(". ") > 0:
-            idx = stripped.find(". ")
-            content = stripped[idx + 2:]
-            ordered_text = Text.builder().elements(_make_text_elements(content)).build()
-            blocks.append(Block.builder().block_type(13).ordered(ordered_text).build())
-        # Divider: ---
+            t = Text.builder().elements(_make_text_elements(stripped[2:])).build()
+            blocks.append(Block.builder().block_type(12).bullet(t).build())
+        elif len(stripped) > 2 and stripped[0].isdigit() and ". " in stripped:
+            t = Text.builder().elements(_make_text_elements(stripped[stripped.find(". ") + 2:])).build()
+            blocks.append(Block.builder().block_type(13).ordered(t).build())
         elif stripped in ("---", "***", "___"):
             blocks.append(Block.builder().block_type(22).divider({}).build())
-        # Normal text
         else:
-            text = Text.builder().elements(_make_text_elements(stripped)).build()
-            blocks.append(Block.builder().block_type(2).text(text).build())
-
+            t = Text.builder().elements(_make_text_elements(stripped)).build()
+            blocks.append(Block.builder().block_type(2).text(t).build())
     return blocks
 
 
-def _write_doc_content(doc_id: str, markdown: str):
-    """Write markdown content to a Feishu document with proper formatting."""
+def _create_doc(title: str, markdown_content: str, chat_id: str) -> Optional[str]:
+    """Create a Feishu document with formatted content, permissions, and editors."""
     client = _get_client()
     if not client:
-        return
+        return None
     try:
-        from lark_oapi.api.docx.v1 import (
-            CreateDocumentBlockChildrenRequest,
-            CreateDocumentBlockChildrenRequestBody,
-        )
+        from lark_oapi.api.docx.v1 import CreateDocumentRequest, CreateDocumentRequestBody
 
-        children = _markdown_to_blocks(markdown)
-        if not children:
-            return
-
-        body = (
-            CreateDocumentBlockChildrenRequestBody.builder()
-            .children(children)
-            .index(0)
-            .build()
-        )
-        req = (
-            CreateDocumentBlockChildrenRequest.builder()
-            .document_id(doc_id)
-            .block_id(doc_id)
-            .request_body(body)
-            .build()
-        )
-        resp = client.docx.v1.document_block_children.create(req)
+        req = CreateDocumentRequest.builder().request_body(
+            CreateDocumentRequestBody.builder().title(title).build()
+        ).build()
+        resp = client.docx.v1.document.create(req)
         if not resp.success():
-            logger.warning("write doc content failed: %s", resp.msg)
+            logger.warning("create doc failed: %s", resp.msg)
+            return None
+
+        doc_id = resp.data.document.document_id
+        url = f"https://feishu.cn/docx/{doc_id}"
+        logger.info("doc created: %s", url)
+
+        # Write content
+        from lark_oapi.api.docx.v1 import CreateDocumentBlockChildrenRequest, CreateDocumentBlockChildrenRequestBody
+        children = _markdown_to_blocks(markdown_content)
+        if children:
+            body = CreateDocumentBlockChildrenRequestBody.builder().children(children).index(0).build()
+            r = CreateDocumentBlockChildrenRequest.builder().document_id(doc_id).block_id(doc_id).request_body(body).build()
+            client.docx.v1.document_block_children.create(r)
+
+        # Permissions + editors
+        _set_permission(doc_id, "docx")
+        _add_editors(doc_id, "docx", chat_id)
+        return url
     except Exception as e:
-        logger.warning("write doc content error: %s", e)
+        logger.warning("create doc error: %s", e)
+        return None
 
 
 def _create_task(summary: str, description: str) -> bool:
-    """Create a Feishu task. Retries once on failure."""
+    """Create a Feishu task."""
     client = _get_client()
     if not client:
         return False
     try:
-        from lark_oapi.api.task.v2 import (
-            CreateTaskRequest,
-            InputTask,
-        )
-
-        task = (
-            InputTask.builder()
-            .summary(summary)
-            .description(description)
-            .build()
-        )
+        from lark_oapi.api.task.v2 import CreateTaskRequest, InputTask
+        task = InputTask.builder().summary(summary).description(description).build()
         req = CreateTaskRequest.builder().request_body(task).build()
         for attempt in range(2):
             resp = client.task.v2.task.create(req)
@@ -461,27 +354,21 @@ def _create_task(summary: str, description: str) -> bool:
         return False
 
 
-def _create_bitable(title: str, owner: str, deadline: str, risks: list) -> Optional[str]:
-    """Create a new Feishu Bitable with project status record. Returns URL or None."""
+def _create_bitable(title: str, owner: str, deadline: str, risks: list, chat_id: str) -> Optional[str]:
+    """Create a Feishu Bitable with project status record."""
     client = _get_client()
     if not client:
         return None
     try:
         from lark_oapi.api.bitable.v1 import (
-            CreateAppRequest,
-            App,
-            CreateAppTableRecordRequest,
-            AppTableRecord,
-            CreateAppTableFieldRequest,
-            AppTableField,
+            CreateAppRequest, App, CreateAppTableRecordRequest,
+            AppTableRecord, CreateAppTableFieldRequest, AppTableField,
         )
 
-        # 1. Create bitable app
         app_body = App.builder().name(f"{title} - 项目状态").build()
-        app_req = CreateAppRequest.builder().request_body(app_body).build()
-        app_resp = client.bitable.v1.app.create(app_req)
+        app_resp = client.bitable.v1.app.create(CreateAppRequest.builder().request_body(app_body).build())
         if not app_resp.success():
-            logger.warning("create bitable failed: %s (code=%s)", app_resp.msg, app_resp.code)
+            logger.warning("create bitable failed: %s", app_resp.msg)
             return None
 
         app_token = app_resp.data.app.app_token
@@ -489,144 +376,31 @@ def _create_bitable(title: str, owner: str, deadline: str, risks: list) -> Optio
         url = app_resp.data.app.url
         logger.info("bitable created: %s", url)
 
-        # 2. Add fields to default table
         for fname in ["类型", "负责人", "截止时间", "状态", "风险等级"]:
             field = AppTableField.builder().field_name(fname).type(1).build()
-            freq = (
-                CreateAppTableFieldRequest.builder()
-                .app_token(app_token)
-                .table_id(table_id)
-                .request_body(field)
-                .build()
+            client.bitable.v1.app_table_field.create(
+                CreateAppTableFieldRequest.builder().app_token(app_token).table_id(table_id).request_body(field).build()
             )
-            client.bitable.v1.app_table_field.create(freq)
 
-        # 3. Write project record
-        record_fields = {
-            "类型": "project",
-            "负责人": owner or "TBD",
-            "截止时间": deadline or "TBD",
-            "状态": "进行中",
-            "风险等级": "高" if risks else "低",
-        }
-        record = AppTableRecord.builder().fields(record_fields).build()
-        rec_req = (
-            CreateAppTableRecordRequest.builder()
-            .app_token(app_token)
-            .table_id(table_id)
-            .request_body(record)
-            .build()
+        record = AppTableRecord.builder().fields({
+            "类型": "project", "负责人": owner or "TBD", "截止时间": deadline or "TBD",
+            "状态": "进行中", "风险等级": "高" if risks else "低",
+        }).build()
+        rec_resp = client.bitable.v1.app_table_record.create(
+            CreateAppTableRecordRequest.builder().app_token(app_token).table_id(table_id).request_body(record).build()
         )
-        rec_resp = client.bitable.v1.app_table_record.create(rec_req)
         if rec_resp.success():
             logger.info("bitable record created")
-        else:
-            logger.warning("create bitable record failed: %s", rec_resp.msg)
 
-        # 4. Set permission: anyone with link can view + chat members as editors
-        _set_bitable_permission(app_token)
-        _add_chat_members_as_editors(app_token, "bitable")
-
+        _set_permission(app_token, "bitable")
+        _add_editors(app_token, "bitable", chat_id)
         return url
     except Exception as e:
         logger.warning("create bitable error: %s", e)
         return None
 
 
-def _set_bitable_permission(app_token: str):
-    """Set bitable permission: anyone with link can view."""
-    client = _get_client()
-    if not client:
-        return
-    try:
-        from lark_oapi.api.drive.v1 import (
-            PatchPermissionPublicRequest,
-            PermissionPublicRequest,
-        )
-
-        body = (
-            PermissionPublicRequest.builder()
-            .link_share_entity("anyone_readable")
-            .build()
-        )
-        req = (
-            PatchPermissionPublicRequest.builder()
-            .token(app_token)
-            .type("bitable")
-            .request_body(body)
-            .build()
-        )
-        resp = client.drive.v1.permission_public.patch(req)
-        if resp.success():
-            logger.info("bitable permission set: %s", app_token)
-        else:
-            logger.warning("set bitable permission failed: %s", resp.msg)
-    except Exception as e:
-        logger.warning("set bitable permission error: %s", e)
-
-
-def _add_chat_members_as_editors(token: str, doc_type: str):
-    """Add all chat members as editors to a doc or bitable."""
-    if not CHAT_ID:
-        return
-    client = _get_client()
-    if not client:
-        return
-    try:
-        from lark_oapi.api.drive.v1 import CreatePermissionMemberRequest, Member
-
-        # Get chat members
-        members = _get_chat_members()
-        for m in members:
-            member = (
-                Member.builder()
-                .member_type("openid")
-                .member_id(m)
-                .perm("full_access")
-                .build()
-            )
-            req = (
-                CreatePermissionMemberRequest.builder()
-                .token(token)
-                .type(doc_type)
-                .need_notification(False)
-                .request_body(member)
-                .build()
-            )
-            resp = client.drive.v1.permission_member.create(req)
-            if not resp.success():
-                logger.debug("add editor %s failed: %s", m, resp.msg)
-        logger.info("added %d editors to %s %s", len(members), doc_type, token)
-    except Exception as e:
-        logger.warning("add editors error: %s", e)
-
-
-def _get_chat_members() -> list:
-    """Get open_ids of all chat members."""
-    if not CHAT_ID:
-        return []
-    client = _get_client()
-    if not client:
-        return []
-    try:
-        from lark_oapi.api.im.v1 import GetChatMembersRequest
-
-        req = (
-            GetChatMembersRequest.builder()
-            .chat_id(CHAT_ID)
-            .member_id_type("open_id")
-            .page_size(100)
-            .build()
-        )
-        resp = client.im.v1.chat_members.get(req)
-        if resp.success():
-            return [m.member_id for m in (resp.data.items or []) if m.member_id]
-        return []
-    except Exception:
-        return []
-
-
-def _create_calendar_event(title: str, goal: str, members: list, deadline: str):
+def _create_calendar_event(title: str, goal: str, deadline: str):
     """Create a calendar event for the project deadline."""
     client = _get_client()
     if not client or not deadline:
@@ -634,32 +408,17 @@ def _create_calendar_event(title: str, goal: str, members: list, deadline: str):
     try:
         import datetime
         from lark_oapi.api.calendar.v4 import (
-            CreateCalendarEventRequest,
-            CreateCalendarEventRequestBody,
-            CalendarEvent,
-            CalendarEventTime,
+            CreateCalendarEventRequest, CalendarEvent, CalendarEventTime,
         )
-
-        # Parse deadline to timestamp
-        try:
-            dt = datetime.datetime.strptime(deadline, "%Y-%m-%d")
-            ts = str(int(dt.timestamp()))
-        except ValueError:
-            logger.warning("cannot parse deadline: %s", deadline)
-            return
-
+        dt = datetime.datetime.strptime(deadline, "%Y-%m-%d")
+        ts = str(int(dt.timestamp()))
         event_time = CalendarEventTime.builder().timestamp(ts).build()
         event = (
             CalendarEvent.builder()
-            .summary(f"📌 截止: {title}")
-            .description(goal)
-            .start_event(event_time)
-            .end_event(event_time)
-            .build()
+            .summary(f"📌 截止: {title}").description(goal)
+            .start_event(event_time).end_event(event_time).build()
         )
-        req = CreateCalendarEventRequest.builder().request_body(
-            CreateCalendarEventRequestBody.builder().event(event).build()
-        ).build()
+        req = CreateCalendarEventRequest.builder().request_body(event).build()
         resp = client.calendar.v4.calendar_event.create(req)
         if resp.success():
             logger.info("calendar event created for %s", deadline)
@@ -668,6 +427,61 @@ def _create_calendar_event(title: str, goal: str, members: list, deadline: str):
     except Exception as e:
         logger.warning("create calendar event error: %s", e)
 
+
+# ---------------------------------------------------------------------------
+# Confirmation card (sent via Hermes send_message)
+# ---------------------------------------------------------------------------
+
+def _build_confirmation_card(title: str, goal: str, members: list,
+                             deliverables: list, deadline: str) -> dict:
+    """Build a Feishu interactive card JSON."""
+    member_text = ", ".join(members) if members else "TBD"
+    deliverable_text = ", ".join(deliverables) if deliverables else "TBD"
+    return {
+        "config": {"wide_screen_mode": True},
+        "header": {
+            "title": {"tag": "plain_text", "content": "📋 执行计划"},
+            "template": "blue",
+        },
+        "elements": [
+            {
+                "tag": "div",
+                "text": {
+                    "tag": "lark_md",
+                    "content": (
+                        f"**项目：** {title}\n"
+                        f"**目标：** {goal}\n"
+                        f"**成员：** {member_text}\n"
+                        f"**交付物：** {deliverable_text}\n"
+                        f"**截止时间：** {deadline or 'TBD'}"
+                    ),
+                },
+            },
+            {"tag": "hr"},
+            {
+                "tag": "action",
+                "actions": [
+                    {
+                        "tag": "button",
+                        "text": {"tag": "plain_text", "content": "✅ 确认执行"},
+                        "type": "primary",
+                        "value": {"action": "confirm_project", "title": title},
+                    },
+                    {
+                        "tag": "button",
+                        "text": {"tag": "plain_text", "content": "❌ 取消"},
+                        "type": "default",
+                        "value": {"action": "cancel_project"},
+                    },
+                ],
+            },
+        ],
+    }
+
+
+# ---------------------------------------------------------------------------
+# Tool: pilotflow_generate_plan
+# ---------------------------------------------------------------------------
 
 PILOTFLOW_GENERATE_PLAN_SCHEMA = {
     "name": "pilotflow_generate_plan",
@@ -679,10 +493,7 @@ PILOTFLOW_GENERATE_PLAN_SCHEMA = {
     "parameters": {
         "type": "object",
         "properties": {
-            "input_text": {
-                "type": "string",
-                "description": "用户的原始输入文本。",
-            },
+            "input_text": {"type": "string", "description": "用户的原始输入文本。"},
         },
         "required": ["input_text"],
     },
@@ -692,14 +503,10 @@ PILOTFLOW_GENERATE_PLAN_SCHEMA = {
 def _handle_generate_plan(params: Dict[str, Any], **kwargs) -> str:
     """Parse user input and return a structured project plan."""
     global _plan_generated
-    text = params.get("input_text", "")
     _plan_generated = True
-
-    # Store plan data for the card (extracted by LLM from input)
-    # The LLM should pass structured data, but we return instructions
     return tool_result(json.dumps({
         "status": "plan_generated",
-        "input": text,
+        "input": params.get("input_text", ""),
         "instructions": (
             "请从输入中提取项目信息，然后调用 pilotflow_create_project_space。\n\n"
             "【输出规则 - 必须遵守】\n"
@@ -711,7 +518,7 @@ def _handle_generate_plan(params: Dict[str, Any], **kwargs) -> str:
 
 
 # ---------------------------------------------------------------------------
-# pilotflow_detect_risks
+# Tool: pilotflow_detect_risks
 # ---------------------------------------------------------------------------
 
 PILOTFLOW_DETECT_RISKS_SCHEMA = {
@@ -723,20 +530,9 @@ PILOTFLOW_DETECT_RISKS_SCHEMA = {
     "parameters": {
         "type": "object",
         "properties": {
-            "members": {
-                "type": "array",
-                "items": {"type": "string"},
-                "description": "项目成员列表。",
-            },
-            "deliverables": {
-                "type": "array",
-                "items": {"type": "string"},
-                "description": "交付物列表。",
-            },
-            "deadline": {
-                "type": "string",
-                "description": "截止时间。",
-            },
+            "members": {"type": "array", "items": {"type": "string"}, "description": "项目成员列表。"},
+            "deliverables": {"type": "array", "items": {"type": "string"}, "description": "交付物列表。"},
+            "deadline": {"type": "string", "description": "截止时间。"},
         },
         "required": ["members", "deliverables", "deadline"],
     },
@@ -759,16 +555,14 @@ def _handle_detect_risks(params: Dict[str, Any], **kwargs) -> str:
 
     if not risks:
         return tool_result("未检测到风险，计划信息完整。")
-
     return tool_result(json.dumps({
-        "risks_found": len(risks),
-        "risks": risks,
+        "risks_found": len(risks), "risks": risks,
         "instructions": "请将以上风险发送到群里，让用户确认处理方式。",
     }, ensure_ascii=False))
 
 
 # ---------------------------------------------------------------------------
-# pilotflow_create_project_space
+# Tool: pilotflow_create_project_space
 # ---------------------------------------------------------------------------
 
 PILOTFLOW_CREATE_PROJECT_SPACE_SCHEMA = {
@@ -781,33 +575,12 @@ PILOTFLOW_CREATE_PROJECT_SPACE_SCHEMA = {
     "parameters": {
         "type": "object",
         "properties": {
-            "title": {
-                "type": "string",
-                "description": "项目标题。",
-            },
-            "goal": {
-                "type": "string",
-                "description": "项目目标。",
-            },
-            "members": {
-                "type": "array",
-                "items": {"type": "string"},
-                "description": "项目成员。",
-            },
-            "deliverables": {
-                "type": "array",
-                "items": {"type": "string"},
-                "description": "交付物列表。",
-            },
-            "deadline": {
-                "type": "string",
-                "description": "截止时间。",
-            },
-            "risks": {
-                "type": "array",
-                "items": {"type": "string"},
-                "description": "已知风险。",
-            },
+            "title": {"type": "string", "description": "项目标题。"},
+            "goal": {"type": "string", "description": "项目目标。"},
+            "members": {"type": "array", "items": {"type": "string"}, "description": "项目成员。"},
+            "deliverables": {"type": "array", "items": {"type": "string"}, "description": "交付物列表。"},
+            "deadline": {"type": "string", "description": "截止时间。"},
+            "risks": {"type": "array", "items": {"type": "string"}, "description": "已知风险。"},
         },
         "required": ["title", "goal"],
     },
@@ -818,11 +591,8 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
     """Create a complete project space in Feishu."""
     global _plan_generated
     if not _plan_generated:
-        return tool_error(
-            "请先调用 pilotflow_generate_plan 生成计划，展示给用户确认后再调用此工具。"
-            "直接执行会被拦截。"
-        )
-    _plan_generated = False  # Reset gate
+        return tool_error("请先调用 pilotflow_generate_plan 生成计划，展示给用户确认后再调用此工具。")
+    _plan_generated = False
 
     title = params.get("title", "项目")
     goal = params.get("goal", "")
@@ -831,19 +601,21 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
     deadline = params.get("deadline", "")
     risks = params.get("risks", [])
 
-    if not CHAT_ID:
-        return tool_error("缺少 PILOTFLOW_TEST_CHAT_ID 环境变量")
+    chat_id = _get_chat_id(kwargs)
+    if not chat_id:
+        return tool_error("无法获取群聊 ID，请确认 PILOTFLOW_TEST_CHAT_ID 已配置。")
 
     artifacts = []
-    member_display = _format_members(members) if members else "TBD"
+    member_display = _format_members(members, chat_id) if members else "TBD"
 
-    # 0. Send confirmation card
-    _send_confirmation_card(CHAT_ID, title, goal, members, deliverables, deadline)
+    # 1. Send confirmation card (via Hermes)
+    card = _build_confirmation_card(title, goal, members, deliverables, deadline)
+    _hermes_send_card(chat_id, card)
 
-    # 1. Create project doc
+    # 2. Create doc (lark_oapi)
     doc_content = f"# {title}\n\n## 目标\n{goal}\n\n"
     if members:
-        doc_content += f"## 成员\n{_format_members(members)}\n\n"
+        doc_content += f"## 成员\n{_format_members(members, chat_id)}\n\n"
     if deliverables:
         doc_content += "## 交付物\n" + "\n".join(f"- {d}" for d in deliverables) + "\n\n"
     if deadline:
@@ -851,24 +623,22 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
     if risks:
         doc_content += "## 风险\n" + "\n".join(f"- {r}" for r in risks) + "\n\n"
 
-    doc_url = _create_doc(f"{title} - 项目简报", doc_content)
+    doc_url = _create_doc(f"{title} - 项目简报", doc_content, chat_id)
     if doc_url:
         artifacts.append(f"文档: {doc_url}")
-    else:
-        logger.warning("doc create failed, continuing")
 
-    # 2. Create bitable with project status
-    bitable_url = _create_bitable(title, member_display, deadline, risks)
+    # 3. Create bitable (lark_oapi)
+    bitable_url = _create_bitable(title, member_display, deadline, risks, chat_id)
     if bitable_url:
         artifacts.append(f"多维表格: {bitable_url}")
 
-    # 3. Create tasks
+    # 4. Create tasks (lark_oapi)
     if deliverables:
         for d in deliverables[:3]:
             if _create_task(d, f"项目: {title}\n负责人: {member_display}"):
                 artifacts.append(f"任务: {d}")
 
-    # 4. Send entry message with @mentions
+    # 5. Send entry message (via Hermes)
     entry_text = f"📌 项目入口: {title}\n🎯 目标: {goal}"
     if members:
         entry_text += f"\n👥 成员: {member_display}"
@@ -878,16 +648,15 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
         entry_text += f"\n📄 文档: {doc_url}"
     if bitable_url:
         entry_text += f"\n📊 状态: {bitable_url}"
-
-    if _send_message(CHAT_ID, entry_text):
+    if _hermes_send(chat_id, entry_text):
         artifacts.append("项目入口消息")
 
-    if not artifacts:
-        return tool_error("创建失败，请检查飞书应用凭证配置（FEISHU_APP_ID / FEISHU_APP_SECRET）。")
-
-    # 5. Create calendar event for deadline
+    # 6. Calendar event (lark_oapi)
     if deadline:
-        _create_calendar_event(title, goal, members, deadline)
+        _create_calendar_event(title, goal, deadline)
+
+    if not artifacts:
+        return tool_error("创建失败，请检查飞书应用凭证配置。")
 
     return tool_result(json.dumps({
         "status": "project_space_created",
@@ -899,7 +668,7 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
 
 
 # ---------------------------------------------------------------------------
-# pilotflow_send_summary
+# Tool: pilotflow_send_summary
 # ---------------------------------------------------------------------------
 
 PILOTFLOW_SEND_SUMMARY_SCHEMA = {
@@ -909,12 +678,8 @@ PILOTFLOW_SEND_SUMMARY_SCHEMA = {
         "type": "object",
         "properties": {
             "title": {"type": "string", "description": "项目标题。"},
-            "artifacts": {
-                "type": "array",
-                "items": {"type": "string"},
-                "description": "已创建的产物列表。",
-            },
-            "status": {"type": "string", "description": "项目状态（如 completed, in_progress）。"},
+            "artifacts": {"type": "array", "items": {"type": "string"}, "description": "已创建的产物列表。"},
+            "status": {"type": "string", "description": "项目状态。"},
         },
         "required": ["title", "artifacts"],
     },
@@ -922,20 +687,20 @@ PILOTFLOW_SEND_SUMMARY_SCHEMA = {
 
 
 def _handle_send_summary(params: Dict[str, Any], **kwargs) -> str:
-    """Send a delivery summary to the Feishu group."""
+    """Send a delivery summary via Hermes."""
     title = params.get("title", "")
     artifacts = params.get("artifacts", [])
     status = params.get("status", "completed")
 
-    if not CHAT_ID:
-        return tool_error("缺少 PILOTFLOW_TEST_CHAT_ID 环境变量")
+    chat_id = _get_chat_id(kwargs)
+    if not chat_id:
+        return tool_error("无法获取群聊 ID")
 
     summary = f"✅ {title} — 执行完成\n\n已创建产物:\n"
     for a in artifacts:
         summary += f"  • {a}\n"
     summary += f"\n状态: {status}"
 
-    if not _send_message(CHAT_ID, summary):
+    if not _hermes_send(chat_id, summary):
         return tool_error("发送总结失败")
-
     return tool_result(f"已发送项目总结到群聊: {title}")
