@@ -480,18 +480,49 @@ def _create_doc(title: str, markdown_content: str, chat_id: str) -> Optional[str
         return None
 
 
-def _create_task(summary: str, description: str) -> Optional[str]:
-    """Create a Feishu task. Returns task summary on success, None on failure."""
+def _create_task(summary: str, description: str,
+                 assignee_name: str = "", deadline: str = "",
+                 chat_id: str = "") -> Optional[str]:
+    """Create a Feishu task with optional assignee and deadline. Returns summary on success."""
     client = _get_client()
     if not client:
         return None
     try:
+        import datetime as _dt
         from lark_oapi.api.task.v2 import CreateTaskRequest, InputTask
-        task = InputTask.builder().summary(summary).description(description).build()
+
+        builder = InputTask.builder().summary(summary).description(description)
+
+        # Set deadline
+        if deadline:
+            try:
+                dt = _dt.datetime.strptime(deadline, "%Y-%m-%d")
+                dt = dt.replace(hour=18, tzinfo=_dt.timezone(_dt.timedelta(hours=8)))
+                builder = builder.due({
+                    "timestamp": str(int(dt.timestamp())),
+                    "is_all_day": False,
+                })
+            except (ValueError, AttributeError) as e:
+                logger.debug("task deadline skipped: %s", e)
+
+        # Assign member
+        if assignee_name and chat_id:
+            try:
+                open_id = _resolve_member(assignee_name, chat_id)
+                if open_id:
+                    builder = builder.members([{
+                        "id": open_id,
+                        "type": "user",
+                        "role": "assignee",
+                    }])
+            except (TypeError, AttributeError) as e:
+                logger.debug("task assign skipped: %s", e)
+
+        task = builder.build()
         req = CreateTaskRequest.builder().request_body(task).build()
         resp = client.task.v2.task.create(req)
         if resp.success():
-            logger.info("task created: %s", summary)
+            logger.info("task created: %s (assignee=%s, deadline=%s)", summary, assignee_name, deadline)
             return summary
         logger.warning("create task failed: %s", resp.msg)
         return None
@@ -818,9 +849,11 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
         artifacts.append(f"多维表格: {bitable_url}")
 
     # 3. Create tasks (lark_oapi)
+    # 3. Create tasks (lark_oapi) — with assignee + deadline
     if deliverables:
-        for d in deliverables[:3]:
-            task_name = _create_task(d, f"项目: {title}\n负责人: {member_plain}")
+        for i, d in enumerate(deliverables[:3]):
+            assignee = members[i % len(members)] if members else ""
+            task_name = _create_task(d, f"项目: {title}", assignee, deadline, chat_id)
             if task_name:
                 artifacts.append(f"任务: {task_name}")
 
