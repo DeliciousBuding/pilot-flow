@@ -585,38 +585,6 @@ def _create_calendar_event(title: str, goal: str, deadline: str) -> Optional[str
         return None
 
 
-# ---------------------------------------------------------------------------
-# Confirmation card (sent via Hermes send_message)
-# ---------------------------------------------------------------------------
-
-def _build_confirmation_card(title: str, goal: str, members: list,
-                             deliverables: list, deadline: str) -> dict:
-    """Build a Feishu interactive card JSON for plan confirmation."""
-    member_text = ", ".join(members) if members else "TBD"
-    deliverable_text = ", ".join(deliverables) if deliverables else "TBD"
-    return {
-        "config": {"wide_screen_mode": True},
-        "header": {
-            "title": {"tag": "plain_text", "content": "📋 执行计划"},
-            "template": "blue",
-        },
-        "elements": [
-            {
-                "tag": "div",
-                "text": {
-                    "tag": "lark_md",
-                    "content": (
-                        f"**项目：** {title}\n"
-                        f"**目标：** {goal}\n"
-                        f"**成员：** {member_text}\n"
-                        f"**交付物：** {deliverable_text}\n"
-                        f"**截止时间：** {deadline or 'TBD'}"
-                    ),
-                },
-            },
-        ],
-    }
-
 
 # ---------------------------------------------------------------------------
 # Tool: pilotflow_generate_plan
