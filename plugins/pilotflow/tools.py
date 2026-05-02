@@ -52,6 +52,9 @@ _project_registry: Dict[str, dict] = {}  # title -> {members, deadline, status, 
 _project_registry_lock = threading.Lock()
 _PROJECT_REGISTRY_MAX = 50
 
+# Pending plans (populated by generate_plan, validated by create_project_space)
+_pending_plans: Dict[str, dict] = {}  # chat_id -> plan params
+
 # lark_oapi client timeout (seconds)
 _CLIENT_TIMEOUT = 10
 
@@ -167,6 +170,25 @@ def _hermes_send_card(chat_id: str, card_json: dict) -> bool:
         return True
     except (json.JSONDecodeError, TypeError):
         return isinstance(result, str) and bool(result)
+
+
+def _save_to_hermes_memory(title: str, goal: str, members: list, deliverables: list, deadline: str):
+    """Save project creation pattern to Hermes memory for future suggestions."""
+    try:
+        member_str = ", ".join(members) if members else "none"
+        deliverable_str = ", ".join(deliverables) if deliverables else "none"
+        content = (
+            f"[Project Created] {title}: goal={goal}, members=[{member_str}], "
+            f"deliverables=[{deliverable_str}], deadline={deadline or 'none'}"
+        )
+        registry.dispatch("memory", {
+            "action": "add",
+            "target": "memory",
+            "content": content,
+        })
+        logger.info("saved project pattern to hermes memory: %s", title)
+    except Exception as e:
+        logger.debug("memory save skipped: %s", e)
 
 
 # ---------------------------------------------------------------------------
@@ -653,7 +675,7 @@ def _detect_template(text: str) -> Optional[dict]:
 
 
 def _handle_generate_plan(params: Dict[str, Any], **kwargs) -> str:
-    """Parse user input and return a structured project plan."""
+    """Parse user input and return a structured project plan with pre-populated scaffold."""
     chat_id = _get_chat_id(kwargs)
     if chat_id:
         _set_plan_gate(chat_id)
@@ -661,30 +683,44 @@ def _handle_generate_plan(params: Dict[str, Any], **kwargs) -> str:
     text = params.get("input_text", "")
     template = _detect_template(text)
 
+    # Build pre-populated plan scaffold from template
+    import datetime
+    plan = {"title": "", "goal": "", "members": [], "deliverables": [], "deadline": "", "risks": []}
+    if template:
+        plan["deliverables"] = list(template["deliverables"])
+        suggested = datetime.date.today() + datetime.timedelta(days=template["suggested_deadline_days"])
+        plan["deadline"] = suggested.strftime("%Y-%m-%d")
+
+    # Store pending plan for validation in create_project_space
+    if chat_id:
+        with _plan_lock:
+            _pending_plans[chat_id] = {"input": text, "template": template["description"] if template else None}
+
     template_hint = ""
     if template:
         template_hint = (
             f"\n\n【模板建议】检测到「{text}」可能适用模板：\n"
             f"- 建议交付物：{', '.join(template['deliverables'])}\n"
-            f"- 建议工期：{template['suggested_deadline_days']} 天\n"
-            f"如果用户没有指定交付物，可以建议使用这些。"
+            f"- 建议截止时间：{plan['deadline']}（{template['suggested_deadline_days']}天后）\n"
+            f"如果用户没有指定，请使用以上建议。"
         )
 
     return tool_result(json.dumps({
         "status": "plan_generated",
         "input": text,
         "template": template["description"] if template else None,
+        "plan": plan,
         "instructions": (
-            "请从输入中提取以下项目信息：\n"
+            "请从输入中提取项目信息，填入 plan 对象的各字段。\n"
             "- title: 项目标题\n- goal: 项目目标\n"
             "- members: 成员列表（中文名）\n"
             "- deliverables: 交付物列表\n- deadline: 截止时间（YYYY-MM-DD格式）\n\n"
             "提取后向用户展示计划，问「确认执行？」。"
-            "用户确认后调用 pilotflow_create_project_space。\n\n"
+            "用户确认后调用 pilotflow_create_project_space，传入 plan 中的所有字段。\n\n"
             "【输出规则 - 必须遵守】\n"
             "1. 绝对不要向用户展示工具名称或英文内容\n"
             "2. 只回复中文，不要显示工具调用过程\n"
-            "3. 执行完成后回复结果摘要：✅ 已创建 + 产物链接"
+            "3. 执行完成后回复结果摘要：已创建 + 产物链接"
             f"{template_hint}"
         ),
     }, ensure_ascii=False))
@@ -760,7 +796,7 @@ PILOTFLOW_CREATE_PROJECT_SPACE_SCHEMA = {
             "deadline": {"type": "string", "description": "截止时间，格式 YYYY-MM-DD，如「2026-05-10」。"},
             "risks": {"type": "array", "items": {"type": "string"}, "description": "已知风险，如[\"时间紧张\"]。"},
         },
-        "required": ["title", "goal"],
+        "required": ["title", "goal", "members", "deliverables"],
     },
 }
 
@@ -844,6 +880,13 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
         table_id=bitable_meta.get("table_id", "") if bitable_meta else "",
         record_id=bitable_meta.get("record_id", "") if bitable_meta else "",
     )
+
+    # Save project pattern to Hermes memory (越用越聪明)
+    _save_to_hermes_memory(title, goal, members, deliverables, deadline)
+
+    # Clean up pending plan
+    with _plan_lock:
+        _pending_plans.pop(chat_id, None)
 
     return tool_result(json.dumps({
         "status": "project_space_created",
