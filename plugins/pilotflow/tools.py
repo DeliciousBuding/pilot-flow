@@ -710,3 +710,48 @@ def _handle_send_summary(params: Dict[str, Any], **kwargs) -> str:
     if not _hermes_send(chat_id, summary):
         return tool_error("发送总结失败")
     return tool_result(f"已发送项目总结到群聊: {title}")
+
+
+# ---------------------------------------------------------------------------
+# Tool: pilotflow_query_status
+# ---------------------------------------------------------------------------
+
+PILOTFLOW_QUERY_STATUS_SCHEMA = {
+    "name": "pilotflow_query_status",
+    "description": (
+        "查询项目状态。当用户问「项目进展如何」「项目状态」「有哪些项目」时调用此工具。"
+        "返回项目列表和状态信息。"
+    ),
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "query": {"type": "string", "description": "用户的查询内容。"},
+        },
+        "required": ["query"],
+    },
+}
+
+
+def _handle_query_status(params: Dict[str, Any], **kwargs) -> str:
+    """Query project status from Feishu tasks."""
+    query = params.get("query", "")
+
+    client = _get_client()
+    if not client:
+        return tool_error("飞书客户端未初始化")
+
+    # Search tasks
+    try:
+        from lark_oapi.api.task.v2 import ListTaskRequest
+        req = ListTaskRequest.builder().page_size(20).build()
+        resp = client.task.v2.task.list(req)
+        if resp.success() and resp.data.items:
+            tasks = resp.data.items
+            summary = f"📊 项目状态查询\n\n找到 {len(tasks)} 个任务：\n"
+            for t in tasks[:10]:
+                summary += f"  • {t.summary or '无标题'}\n"
+            return tool_result(summary)
+        return tool_result("暂无项目任务记录。")
+    except Exception as e:
+        logger.warning("query status error: %s", e)
+        return tool_error(f"查询失败: {e}")
