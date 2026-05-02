@@ -162,6 +162,38 @@ def _send_message(chat_id: str, text: str) -> bool:
         return False
 
 
+def _set_doc_permission(doc_id: str):
+    """Set document permission: anyone with link can view."""
+    client = _get_client()
+    if not client:
+        return
+    try:
+        from lark_oapi.api.drive.v1 import (
+            PatchPermissionPublicRequest,
+            PermissionPublicRequest,
+        )
+
+        body = (
+            PermissionPublicRequest.builder()
+            .link_share_entity("anyone_readable")
+            .build()
+        )
+        req = (
+            PatchPermissionPublicRequest.builder()
+            .token(doc_id)
+            .type("docx")
+            .request_body(body)
+            .build()
+        )
+        resp = client.drive.v1.permission_public.patch(req)
+        if resp.success():
+            logger.info("doc permission set: %s", doc_id)
+        else:
+            logger.warning("set doc permission failed: %s", resp.msg)
+    except Exception as e:
+        logger.warning("set doc permission error: %s", e)
+
+
 def _create_doc(title: str, markdown_content: str) -> Optional[str]:
     """Create a Feishu document. Returns document URL or None."""
     client = _get_client()
@@ -193,6 +225,8 @@ def _create_doc(title: str, markdown_content: str) -> Optional[str]:
 
             # Write content blocks
             _write_doc_content(doc_id, markdown_content)
+            # Set permission: anyone with link can view
+            _set_doc_permission(doc_id)
             return url
         logger.warning("create doc failed: %s", resp.msg)
         return None
