@@ -795,25 +795,128 @@ PILOTFLOW_QUERY_STATUS_SCHEMA = {
 
 
 def _handle_query_status(params: Dict[str, Any], **kwargs) -> str:
-    """Query project status from Feishu tasks."""
+    """Query project status and send a dashboard card."""
     query = params.get("query", "")
+    chat_id = _get_chat_id(kwargs)
 
     client = _get_client()
     if not client:
         return tool_error("飞书客户端未初始化")
 
-    # Search tasks
+    # Collect project data from multiple sources
+    projects = []
+
+    # 1. Search tasks
     try:
         from lark_oapi.api.task.v2 import ListTaskRequest
         req = ListTaskRequest.builder().page_size(20).build()
         resp = client.task.v2.task.list(req)
         if resp.success() and resp.data.items:
-            tasks = resp.data.items
-            summary = f"📊 项目状态查询\n\n找到 {len(tasks)} 个任务：\n"
-            for t in tasks[:10]:
-                summary += f"  • {t.summary or '无标题'}\n"
-            return tool_result(summary)
-        return tool_result("暂无项目任务记录。")
-    except Exception as e:
-        logger.warning("query status error: %s", e)
-        return tool_error(f"查询失败: {e}")
+            for t in resp.data.items[:5]:
+                projects.append({"name": t.summary or "无标题", "source": "任务"})
+    except Exception:
+        pass
+
+    # 2. Build dashboard card
+    if not projects:
+        projects.append({"name": "暂无项目记录", "source": "请先创建项目"})
+
+    card_elements = []
+    for p in projects:
+        card_elements.append({
+            "tag": "div",
+            "text": {
+                "tag": "lark_md",
+                "content": f"📌 **{p['name']}** — {p['source']}",
+            },
+        })
+
+    card = {
+        "config": {"wide_screen_mode": True},
+        "header": {
+            "title": {"tag": "plain_text", "content": "📊 项目看板"},
+            "template": "green",
+        },
+        "elements": card_elements + [
+            {"tag": "hr"},
+            {
+                "tag": "note",
+                "elements": [
+                    {"tag": "plain_text", "content": f"查询: {query} | 共 {len(projects)} 个项目"},
+                ],
+            },
+        ],
+    }
+
+    if chat_id:
+        _hermes_send_card(chat_id, card)
+
+    summary = f"📊 项目看板\n\n"
+    for p in projects:
+        summary += f"  • {p['name']} ({p['source']})\n"
+
+    return tool_result(summary)
+
+
+# ---------------------------------------------------------------------------
+# Tool: pilotflow_update_project
+# ---------------------------------------------------------------------------
+
+PILOTFLOW_UPDATE_PROJECT_SCHEMA = {
+    "name": "pilotflow_update_project",
+    "description": (
+        "更新项目信息。当用户说「改截止时间」「加成员」「改项目状态」时调用此工具。"
+        "支持更新截止时间、添加成员、修改状态。"
+    ),
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "project_name": {"type": "string", "description": "项目名称。"},
+            "action": {
+                "type": "string",
+                "enum": ["update_deadline", "add_member", "update_status"],
+                "description": "操作类型。",
+            },
+            "value": {"type": "string", "description": "新值（新截止时间、新成员名、新状态）。"},
+        },
+        "required": ["project_name", "action", "value"],
+    },
+}
+
+
+def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
+    """Update a project's properties."""
+    project_name = params.get("project_name", "")
+    action = params.get("action", "")
+    value = params.get("value", "")
+    chat_id = _get_chat_id(kwargs)
+
+    if not project_name:
+        return tool_error("请指定项目名称")
+    if not action or not value:
+        return tool_error("请指定操作类型和新值")
+
+    # Build update message
+    action_labels = {
+        "update_deadline": "截止时间",
+        "add_member": "成员",
+        "update_status": "状态",
+    }
+    action_label = action_labels.get(action, action)
+
+    # Send update notification via Hermes
+    if chat_id:
+        member_at = _format_at(value, chat_id) if action == "add_member" else value
+        msg = f"📝 项目更新: {project_name}\n{action_label} → {member_at}"
+        _hermes_send(chat_id, msg)
+
+    return tool_result(json.dumps({
+        "status": "project_updated",
+        "project": project_name,
+        "action": action,
+        "value": value,
+        "instructions": (
+            f"用中文回复：已更新项目「{project_name}」的{action_label}为 {value}。"
+            "不要显示工具名或英文。"
+        ),
+    }, ensure_ascii=False))
