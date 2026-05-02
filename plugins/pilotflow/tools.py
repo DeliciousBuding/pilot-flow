@@ -252,7 +252,7 @@ def _get_chat_id(kwargs: dict) -> str:
         if session_chat_id:
             return session_chat_id
     except Exception:
-        pass
+        logger.debug("session context unavailable, using fallback")
     # 3. From env var (testing fallback)
     return os.environ.get("PILOTFLOW_TEST_CHAT_ID", "")
 
@@ -998,8 +998,8 @@ def _handle_query_status(params: Dict[str, Any], **kwargs) -> str:
                 if resp.success() and resp.data and resp.data.items:
                     for t in resp.data.items[:5]:
                         projects.append({"name": t.summary or "无标题", "source": "任务"})
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("task API fallback failed: %s", e)
 
     # Build dashboard card
     if not projects:
