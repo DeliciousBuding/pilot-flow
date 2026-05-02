@@ -1199,6 +1199,22 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
     if chat_id:
         member_at = _format_at(value, chat_id) if action == "add_member" else value
         parts = [f"📝 项目更新: {project_name}", f"{action_label} → {member_at}"]
+        # Add countdown for deadline updates
+        if action == "update_deadline":
+            try:
+                import datetime as _dt
+                dl = _dt.date.fromisoformat(value)
+                days_left = (dl - _dt.date.today()).days
+                if days_left < 0:
+                    parts.append(f"🔴 已逾期 {abs(days_left)} 天")
+                elif days_left <= 3:
+                    parts.append(f"🔴 剩余 {days_left} 天")
+                elif days_left <= 7:
+                    parts.append(f"🟡 剩余 {days_left} 天")
+                else:
+                    parts.append(f"🟢 剩余 {days_left} 天")
+            except (ValueError, TypeError):
+                pass
         if bitable_updated:
             parts.append("✅ 状态表已同步")
         elif project and not bitable_updated:
