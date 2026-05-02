@@ -223,8 +223,9 @@ def _create_doc(title: str, markdown_content: str) -> Optional[str]:
 
             # Write content blocks
             _write_doc_content(doc_id, markdown_content)
-            # Set permission: anyone with link can view
+            # Set permission: anyone with link can view + chat members as editors
             _set_doc_permission(doc_id)
+            _add_chat_members_as_editors(doc_id, "docx")
             return url
         logger.warning("create doc failed: %s", resp.msg)
         return None
@@ -442,8 +443,9 @@ def _create_bitable(title: str, owner: str, deadline: str, risks: list) -> Optio
         else:
             logger.warning("create bitable record failed: %s", rec_resp.msg)
 
-        # 4. Set permission: anyone with link can view
+        # 4. Set permission: anyone with link can view + chat members as editors
         _set_bitable_permission(app_token)
+        _add_chat_members_as_editors(app_token, "bitable")
 
         return url
     except Exception as e:
@@ -483,9 +485,65 @@ def _set_bitable_permission(app_token: str):
         logger.warning("set bitable permission error: %s", e)
 
 
-# ---------------------------------------------------------------------------
-# pilotflow_generate_plan
-# ---------------------------------------------------------------------------
+def _add_chat_members_as_editors(token: str, doc_type: str):
+    """Add all chat members as editors to a doc or bitable."""
+    if not CHAT_ID:
+        return
+    client = _get_client()
+    if not client:
+        return
+    try:
+        from lark_oapi.api.drive.v1 import CreatePermissionMemberRequest, Member
+
+        # Get chat members
+        members = _get_chat_members()
+        for m in members:
+            member = (
+                Member.builder()
+                .member_type("openid")
+                .member_id(m)
+                .perm("full_access")
+                .build()
+            )
+            req = (
+                CreatePermissionMemberRequest.builder()
+                .token(token)
+                .type(doc_type)
+                .need_notification(False)
+                .request_body(member)
+                .build()
+            )
+            resp = client.drive.v1.permission_member.create(req)
+            if not resp.success():
+                logger.debug("add editor %s failed: %s", m, resp.msg)
+        logger.info("added %d editors to %s %s", len(members), doc_type, token)
+    except Exception as e:
+        logger.warning("add editors error: %s", e)
+
+
+def _get_chat_members() -> list:
+    """Get open_ids of all chat members."""
+    if not CHAT_ID:
+        return []
+    client = _get_client()
+    if not client:
+        return []
+    try:
+        from lark_oapi.api.im.v1 import GetChatMembersRequest
+
+        req = (
+            GetChatMembersRequest.builder()
+            .chat_id(CHAT_ID)
+            .member_id_type("open_id")
+            .page_size(100)
+            .build()
+        )
+        resp = client.im.v1.chat_members.get(req)
+        if resp.success():
+            return [m.member_id for m in (resp.data.items or []) if m.member_id]
+        return []
+    except Exception:
+        return []
 
 PILOTFLOW_GENERATE_PLAN_SCHEMA = {
     "name": "pilotflow_generate_plan",
