@@ -56,6 +56,7 @@ from tools import (
     _handle_generate_plan,
     _handle_create_project_space,
     _handle_query_status,
+    _handle_update_project,
     _pending_plans,
     _card_action_refs,
     _plan_lock,
@@ -515,6 +516,63 @@ def test_dashboard_card_action_marks_state_project_done_after_restart(tmp_path):
     assert result["bitable_updated"] is False
     assert projects[0]["title"] == "重启看板项目"
     assert projects[0]["status"] == "已完成"
+
+
+def test_update_project_updates_sanitized_state_after_restart(tmp_path):
+    state_path = tmp_path / "pilotflow-projects.json"
+    with _project_registry_lock:
+        _project_registry.clear()
+
+    with patch.dict(os.environ, {"PILOTFLOW_STATE_PATH": str(state_path)}):
+        assert _save_project_state(
+            "重启更新项目",
+            "验证重启后自然语言更新",
+            ["张三"],
+            ["验收记录"],
+            "2026-05-20",
+            "进行中",
+            artifacts=["文档: https://example.invalid/doc"],
+        )
+        result = json.loads(_handle_update_project(
+            {"project_name": "重启更新", "action": "update_deadline", "value": "2026-05-25"},
+            chat_id="oc_state_update",
+        ))
+        projects = _load_project_state()
+
+    assert result["status"] == "project_updated"
+    assert result["project"] == "重启更新项目"
+    assert result["registry_updated"] is False
+    assert result["state_updated"] is True
+    assert result["bitable_updated"] is False
+    assert projects[0]["title"] == "重启更新项目"
+    assert projects[0]["deadline"] == "2026-05-25"
+    assert projects[0]["status"] == "进行中"
+
+
+def test_update_project_status_uses_sanitized_state_after_restart(tmp_path):
+    state_path = tmp_path / "pilotflow-projects.json"
+    with _project_registry_lock:
+        _project_registry.clear()
+
+    with patch.dict(os.environ, {"PILOTFLOW_STATE_PATH": str(state_path)}):
+        assert _save_project_state(
+            "重启状态项目",
+            "验证重启后改状态",
+            [],
+            ["验收记录"],
+            "2026-05-20",
+            "进行中",
+        )
+        result = json.loads(_handle_update_project(
+            {"project_name": "重启状态", "action": "update_status", "value": "暂停"},
+            chat_id="oc_state_status",
+        ))
+        projects = _load_project_state()
+
+    assert result["status"] == "project_updated"
+    assert result["project"] == "重启状态项目"
+    assert result["state_updated"] is True
+    assert projects[0]["status"] == "暂停"
 
 
 def test_project_entry_card_action_marks_project_done():

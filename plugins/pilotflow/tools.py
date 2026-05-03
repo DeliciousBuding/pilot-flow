@@ -2185,8 +2185,25 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
                     project_name = title
                     break
 
+    state_project = None
     if not project:
-        return tool_error(f"项目「{project_name}」未找到。请先创建项目后再更新。")
+        state_project = _find_project_state(project_name)
+        if not state_project:
+            return tool_error(f"项目「{project_name}」未找到。请先创建项目后再更新。")
+        if action == "add_member":
+            return tool_error("重启后的脱敏状态不保存成员名单。请在项目创建会话内加成员，或重新指定完整项目成员。")
+        project_name = state_project.get("title", project_name)
+        project = {
+            "goal": state_project.get("goal", ""),
+            "members": [],
+            "deliverables": state_project.get("deliverables", []),
+            "deadline": state_project.get("deadline", ""),
+            "status": state_project.get("status", "进行中"),
+            "artifacts": [],
+            "app_token": "",
+            "table_id": "",
+            "record_id": "",
+        }
 
     action_labels = {
         "update_deadline": "截止时间",
@@ -2197,20 +2214,34 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
 
     bitable_updated = False
     registry_updated = False
+    state_updated = False
 
     # 1. Update in-memory registry
     if project:
-        with _project_registry_lock:
+        if state_project:
             if action == "update_deadline":
                 project["deadline"] = value
-                registry_updated = True
-            elif action == "add_member":
-                if value not in project["members"]:
-                    project["members"].append(value)
-                registry_updated = True
             elif action == "update_status":
                 project["status"] = value
-                registry_updated = True
+        else:
+            with _project_registry_lock:
+                if action == "update_deadline":
+                    project["deadline"] = value
+                    registry_updated = True
+                elif action == "add_member":
+                    if value not in project["members"]:
+                        project["members"].append(value)
+                    registry_updated = True
+                elif action == "update_status":
+                    project["status"] = value
+                    registry_updated = True
+
+        if action in ("update_deadline", "update_status"):
+            state_updated = _save_project_state(
+                project_name, project.get("goal", ""), project.get("members", []),
+                project.get("deliverables", []), project.get("deadline", ""),
+                project.get("status", "进行中"), project.get("artifacts", []),
+            )
 
         # 2. Update bitable record
         bitable_fields = {}
@@ -2239,6 +2270,8 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
                 parts.append(cd)
         if bitable_updated:
             parts.append("✅ 状态表已同步")
+        elif state_updated:
+            parts.append("✅ 本地状态已更新")
         elif project and not bitable_updated:
             parts.append("⚠️ 状态表同步失败")
         msg = "\n".join(parts)
@@ -2250,10 +2283,11 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
         "action": action,
         "value": value,
         "registry_updated": registry_updated,
+        "state_updated": state_updated,
         "bitable_updated": bitable_updated,
         "instructions": (
             f"用中文回复：已更新项目「{project_name}」的{action_label}为 {value}。"
-            + ("状态表已同步。" if bitable_updated else "")
+            + ("状态表已同步。" if bitable_updated else "本地状态已更新。" if state_updated else "")
             + "不要显示工具名或英文。"
         ),
     })
