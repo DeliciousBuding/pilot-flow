@@ -3059,8 +3059,17 @@ def _handle_card_command(raw_args: str) -> str:
         }[data["status"]]
         _mark_card_message(message_id, feedback[0], feedback[1], feedback[2])
         return None
+    if data.get("status") == "project_status_sent":
+        project_title = data.get("project") or action_data.get("title") or "项目"
+        _mark_card_message(
+            message_id,
+            "项目详情已发送",
+            f"**{project_title}** 的详情卡片已发送到群聊。",
+            "blue",
+        )
+        return None
     if data.get("status") in (
-        "project_status_sent", "project_marked_done", "project_reopened", "project_risk_resolved",
+        "project_marked_done", "project_reopened", "project_risk_resolved",
         "project_reminder_sent", "dashboard_page_sent", "dashboard_filter_sent",
         "history_suggestions_applied",
     ):

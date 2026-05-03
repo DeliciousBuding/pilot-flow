@@ -3329,6 +3329,46 @@ def test_card_command_project_action_updates_card_as_failed_when_action_fails():
     ]
 
 
+def test_card_command_project_status_updates_origin_card_after_detail_sent():
+    with _project_registry_lock:
+        _project_registry.clear()
+    with _plan_lock:
+        _card_action_refs.clear()
+    _register_project(
+        "桥接详情项目", ["张三"], "2026-05-10", "进行中", [],
+        goal="验证详情反馈", deliverables=["验收记录"],
+    )
+    action_id = _create_card_action_ref(
+        "oc_bridge_detail",
+        "project_status",
+        {"title": "桥接详情项目"},
+    )
+    with _plan_lock:
+        _card_action_refs[action_id]["message_id"] = "om_bridge_detail_origin"
+
+    marked_cards = []
+
+    def capture_mark(message_id, title, content, template):
+        marked_cards.append((message_id, title, content, template))
+        return True
+
+    with (
+        patch("tools._send_interactive_card_via_feishu", return_value="om_bridge_detail_new"),
+        patch("tools._mark_card_message", side_effect=capture_mark),
+    ):
+        result = _handle_card_command(f'button {{"pilotflow_action_id":"{action_id}"}}')
+
+    assert result is None
+    assert marked_cards == [
+        (
+            "om_bridge_detail_origin",
+            "项目详情已发送",
+            "**桥接详情项目** 的详情卡片已发送到群聊。",
+            "blue",
+        )
+    ]
+
+
 def test_card_command_bridge_uses_opaque_action_id():
     with _project_registry_lock:
         _project_registry.clear()

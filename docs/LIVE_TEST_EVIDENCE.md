@@ -590,7 +590,7 @@
 | 优先排序 | 工具输出确认 `briefing_priority_ok=true`，说明风险和逾期项目排在正常项目之前 |
 | 指标汇总 | 工具输出确认 `briefing_counts_ok=true`，说明卡片展示总项目、风险、逾期、近期截止和已完成数量 |
 | 进展可读 | 工具输出确认 `briefing_progress_ok=true`，说明简报直接带最近进展，减少逐个点详情 |
-| 卡片动作 | 工具输出确认 `briefing_actions_ok=true`、`briefing_batch_reminder_ok=true`、`briefing_risk_followup_task_ok=true`、`briefing_filtered_button_label_ok=true`、`briefing_followup_card_feedback_ok=true`、`briefing_reminder_card_feedback_ok=true`、`card_action_failure_feedback_ok=true`，说明简报可一键查看风险/逾期项目、批量催办逾期项目，并能按当前筛选批量创建跟进待办；筛选简报的待办按钮会显示“创建风险待办/创建近期待办/创建逾期待办”，普通站会简报仍保持通用按钮；批量待办和批量催办点击成功后原卡片反馈会显示项目数量和筛选类型；项目按钮执行失败时原卡片会更新为红色失败反馈，不会假显示成功 |
+| 卡片动作 | 工具输出确认 `briefing_actions_ok=true`、`briefing_batch_reminder_ok=true`、`briefing_risk_followup_task_ok=true`、`briefing_filtered_button_label_ok=true`、`briefing_followup_card_feedback_ok=true`、`briefing_reminder_card_feedback_ok=true`、`project_status_card_feedback_ok=true`、`card_action_failure_feedback_ok=true`，说明简报可一键查看风险/逾期项目、批量催办逾期项目，并能按当前筛选批量创建跟进待办；筛选简报的待办按钮会显示“创建风险待办/创建近期待办/创建逾期待办”，普通站会简报仍保持通用按钮；批量待办、批量催办和查看状态点击成功后原卡片会显示明确反馈；项目按钮执行失败时原卡片会更新为红色失败反馈，不会假显示成功 |
 | 用户价值 | 站会或主管巡检时，一句“发一份站会简报”即可获得风险优先的项目总览，并能直接从卡片继续处理 |
 | 隐私处理 | 验证只输出布尔结果；不写入真实 chat_id、message_id、Feishu 资源 ID、文档链接、token 或本地绝对路径 |
 
@@ -603,7 +603,7 @@ uv run pytest -o addopts='' -q
 结果：
 
 ```text
-132 passed
+133 passed
 ```
 
 ## 当前证据边界
