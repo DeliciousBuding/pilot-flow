@@ -231,6 +231,7 @@ def _register_project(title: str, members: list, deadline: str, status: str, art
             "status": status,
             "created_at": time.time(),
             "artifacts": artifacts,
+            "updates": [],
             "app_token": app_token,
             "table_id": table_id,
             "record_id": record_id,
@@ -403,6 +404,12 @@ def _build_project_detail_card(chat_id: str, title: str, project: dict) -> tuple
             if sep and task_url.startswith(("http://", "https://")):
                 resource_lines.append(f"[任务：{task_name}]({task_url.strip()})")
     resource_text = f"\n**资源：** {' | '.join(resource_lines)}" if resource_lines else ""
+    recent_updates = [
+        str(item.get("value", "")).strip() if isinstance(item, dict) else str(item).strip()
+        for item in project.get("updates", [])[-3:]
+        if str(item.get("value", "") if isinstance(item, dict) else item).strip()
+    ]
+    update_text = f"\n**最近进展：** {'；'.join(recent_updates)}" if recent_updates else ""
     actions = [
         {
             "tag": "button",
@@ -434,6 +441,7 @@ def _build_project_detail_card(chat_id: str, title: str, project: dict) -> tuple
                     f"**成员：** {member_text}\n"
                     f"**交付物：** {deliverable_text}\n"
                     f"**截止：** {deadline_line}"
+                    f"{update_text}"
                     f"{resource_text}"
                 ),
             },
@@ -3176,6 +3184,10 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
                     registry_updated = True
                 elif action == "resolve_risk":
                     project["status"] = "进行中"
+                    registry_updated = True
+                elif action == "add_progress":
+                    project.setdefault("updates", []).append({"action": action_label, "value": value})
+                    project["updates"] = project["updates"][-5:]
                     registry_updated = True
 
             if action == "add_deliverable" and chat_id:

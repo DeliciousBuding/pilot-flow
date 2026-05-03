@@ -2481,6 +2481,44 @@ def test_project_detail_card_includes_registry_resource_links():
     assert "[任务：评审清单](https://example.invalid/task/task_123)" in body
 
 
+def test_project_detail_card_shows_recent_progress_updates():
+    with _project_registry_lock:
+        _project_registry.clear()
+    _register_project(
+        "进展详情项目", ["张三"], "2026-05-20", "进行中", [],
+        goal="验证详情进展", deliverables=["验收记录"],
+    )
+
+    with (
+        patch("tools._append_project_doc_update", return_value=True),
+        patch("tools._append_bitable_update_record", return_value=True),
+        patch("tools._hermes_send", return_value=True),
+    ):
+        result = json.loads(_handle_update_project(
+            {
+                "project_name": "进展详情项目",
+                "action": "add_progress",
+                "value": "完成原型评审，等待业务确认",
+            },
+            chat_id="oc_progress_detail_update",
+        ))
+
+    assert result["status"] == "project_updated"
+    captured = {}
+    action_value = json.dumps({"pilotflow_action": "project_status", "title": "进展详情项目"}, ensure_ascii=False)
+
+    def capture_card(chat_id, card):
+        captured["card"] = card
+        return "om_progress_detail"
+
+    with patch("tools._hermes_send_card", side_effect=capture_card):
+        detail_result = json.loads(_handle_card_action({"action_value": action_value}, chat_id="oc_progress_detail"))
+
+    assert detail_result["status"] == "project_status_sent"
+    body = captured["card"]["elements"][0]["content"]
+    assert "**最近进展：** 完成原型评审，等待业务确认" in body
+
+
 def test_due_project_detail_card_offers_reminder_button_without_chat_id_payload():
     with _project_registry_lock:
         _project_registry.clear()
