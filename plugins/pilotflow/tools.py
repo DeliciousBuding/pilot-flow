@@ -2975,10 +2975,10 @@ def _clean_member_update_value(value: str) -> str:
 PILOTFLOW_UPDATE_PROJECT_SCHEMA = {
     "name": "pilotflow_update_project",
     "description": (
-        "更新已有项目信息。当用户说「改截止时间」「加成员」「移除成员」「删除成员」「新增任务」「新增交付物」「记录进展」「项目有新进展」「项目有风险」「项目卡住了」「风险解除」「阻塞已解决」「改项目状态」「归档项目」「延期」「延期到」时调用。\n"
-        "支持八种操作：update_deadline（改截止时间）、add_member（加成员）、remove_member（移除成员）、add_deliverable（新增交付物/任务）、add_progress（记录进展）、add_risk（上报风险/阻塞）、resolve_risk（解除风险/阻塞）、update_status（改状态）。\n"
+        "更新已有项目信息。当用户说「改截止时间」「加成员」「移除成员」「删除成员」「新增任务」「新增交付物」「记录进展」「项目有新进展」「项目有风险」「项目卡住了」「风险解除」「阻塞已解决」「改项目状态」「归档项目」「延期」「延期到」「催办项目」「提醒负责人」「让负责人同步进展」时调用。\n"
+        "支持九种操作：update_deadline（改截止时间）、add_member（加成员）、remove_member（移除成员）、add_deliverable（新增交付物/任务）、add_progress（记录进展）、add_risk（上报风险/阻塞）、resolve_risk（解除风险/阻塞）、update_status（改状态）、send_reminder（发送项目催办）。\n"
         "归档项目时使用 action=update_status 且 value=已归档；归档后默认看板会隐藏该项目。\n"
-        "会更新内存注册表、脱敏本地状态；可定位状态表时同步多维表格，新增交付物时会尽量创建飞书任务。\n\n"
+        "会更新内存注册表、脱敏本地状态；可定位状态表时同步多维表格，新增交付物时会尽量创建飞书任务，催办时会发送群提醒并写入项目文档/状态表流水。\n\n"
         "【输出规则】只用中文回复更新结果，不要展示工具名称或英文内容。"
     ),
     "parameters": {
@@ -2987,10 +2987,10 @@ PILOTFLOW_UPDATE_PROJECT_SCHEMA = {
             "project_name": {"type": "string", "description": "项目名称。"},
             "action": {
                 "type": "string",
-                "enum": ["update_deadline", "add_member", "remove_member", "add_deliverable", "add_progress", "add_risk", "resolve_risk", "update_status"],
+                "enum": ["update_deadline", "add_member", "remove_member", "add_deliverable", "add_progress", "add_risk", "resolve_risk", "update_status", "send_reminder"],
                 "description": "操作类型。",
             },
-            "value": {"type": "string", "description": "新值（新截止时间、新成员名、要移除的成员名、新交付物/任务、新状态）。"},
+            "value": {"type": "string", "description": "新值（新截止时间、新成员名、要移除的成员名、新交付物/任务、新状态，或催办备注）。"},
         },
         "required": ["project_name", "action", "value"],
     },
@@ -3057,6 +3057,7 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
         "add_risk": "风险",
         "resolve_risk": "风险解除",
         "update_status": "状态",
+        "send_reminder": "催办",
     }
     action_label = action_labels.get(action, action)
     risk_level = _risk_level_from_text(value) if action == "add_risk" else ("低" if action == "resolve_risk" else "")
@@ -3071,6 +3072,7 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
     calendar_event_created = False
     calendar_attendees_added = False
     reminder_scheduled = False
+    reminder_sent = False
 
     # 1. Update in-memory registry
     if project:
@@ -3158,7 +3160,7 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
                 project["app_token"], project["table_id"], project["record_id"],
                 bitable_fields,
             )
-        if project.get("app_token") and project.get("table_id"):
+        if action != "send_reminder" and project.get("app_token") and project.get("table_id"):
             bitable_history_created = _append_bitable_update_record(
                 project["app_token"], project["table_id"], action_label, value, project,
             )
@@ -3172,9 +3174,16 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
             calendar_event_created = bool(cal_result)
             calendar_attendees_added = "已邀请" in str(cal_result or "")
             reminder_scheduled = _schedule_deadline_reminder(project_name, value, chat_id)
+        if action == "send_reminder" and chat_id:
+            reminder_sent = _hermes_send(chat_id, _build_project_reminder_text(chat_id, project_name, project))
+            doc_updated = _append_project_doc_update(project_name, project, action_label, value)
+            if project.get("app_token") and project.get("table_id"):
+                bitable_history_created = _append_bitable_update_record(
+                    project["app_token"], project["table_id"], action_label, value, project,
+                )
 
     # 3. Send notification via Hermes
-    if chat_id:
+    if chat_id and action != "send_reminder":
         member_at = _format_at(value, chat_id) if action in ("add_member", "remove_member") else value
         parts = [f"📝 项目更新: {project_name}", f"{action_label} → {member_at}"]
         if action == "add_deliverable" and assignee_override:
@@ -3228,6 +3237,7 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
         "calendar_event_created": calendar_event_created,
         "calendar_attendees_added": calendar_attendees_added,
         "reminder_scheduled": reminder_scheduled,
+        "reminder_sent": reminder_sent,
         "instructions": (
             f"用中文回复：已更新项目「{project_name}」的{action_label}为 {value}。"
             + ("飞书任务已创建。" if task_created else "")
@@ -3236,6 +3246,7 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
             + ("日历事件已更新。" if calendar_event_created else "")
             + ("日历参与人已邀请。" if calendar_attendees_added else "")
             + ("截止提醒已设置。" if reminder_scheduled else "")
+            + ("项目催办提醒已发送。" if reminder_sent else "")
             + ("状态表已同步。" if bitable_updated else "本地状态已更新。" if state_updated else "")
             + ("状态表记录已追加。" if bitable_history_created else "")
             + "不要显示工具名或英文。"

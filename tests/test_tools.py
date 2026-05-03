@@ -1129,6 +1129,53 @@ def test_project_reminder_card_action_records_doc_and_bitable_history():
     assert args[3] == "已发送催办提醒"
 
 
+def test_update_project_send_reminder_reuses_group_reminder_trace():
+    with _project_registry_lock:
+        _project_registry.clear()
+    deadline = (dt.date.today() + dt.timedelta(days=2)).isoformat()
+    _register_project(
+        "自然语言催办项目", ["张三"], deadline, "进行中", ["文档: https://example.invalid/doc"],
+        goal="验证自然语言催办", deliverables=["验收记录"],
+        app_token="app1", table_id="tbl1", record_id="rec1",
+    )
+    sent_messages = []
+
+    with (
+        patch("tools._hermes_send", side_effect=lambda chat_id, msg: sent_messages.append((chat_id, msg)) or True),
+        patch("tools._append_project_doc_update", return_value=True) as append_doc,
+        patch("tools._append_bitable_update_record", return_value=True) as append_history,
+    ):
+        result = json.loads(_handle_update_project(
+            {"project_name": "自然语言催办", "action": "send_reminder", "value": "请今天同步进展"},
+            chat_id="oc_update_reminder",
+        ))
+
+    assert result["status"] == "project_updated"
+    assert result["action"] == "send_reminder"
+    assert result["reminder_sent"] is True
+    assert result["doc_updated"] is True
+    assert result["bitable_history_created"] is True
+    assert sent_messages
+    chat_id, message = sent_messages[0]
+    assert chat_id == "oc_update_reminder"
+    assert "项目催办" in message
+    assert "自然语言催办项目" in message
+    assert "张三" in message
+    assert "pilotflow" not in message.lower()
+    append_doc.assert_called_once_with(
+        "自然语言催办项目",
+        _project_registry["自然语言催办项目"],
+        "催办",
+        "请今天同步进展",
+    )
+    append_history.assert_called_once()
+    args = append_history.call_args.args
+    assert args[0] == "app1"
+    assert args[1] == "tbl1"
+    assert args[2] == "催办"
+    assert args[3] == "请今天同步进展"
+
+
 def test_risk_project_dashboard_offers_resolve_risk_button():
     with _project_registry_lock:
         _project_registry.clear()
