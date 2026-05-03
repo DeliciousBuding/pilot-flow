@@ -25,6 +25,7 @@ Mention @PilotFlow in a Feishu group chat, get a confirmable project plan, and l
 | Live Feishu card | Verified: interactive send, button confirmation, source-card status update | WSL Hermes + Feishu test chat |
 | Live status dashboard | Verified Chinese text feedback + interactive dashboard card | [docs/LIVE_TEST_EVIDENCE.md](docs/LIVE_TEST_EVIDENCE.md) |
 | Live text-confirm creation | Verified plan card -> text confirmation -> project entry card | [docs/LIVE_TEST_EVIDENCE.md](docs/LIVE_TEST_EVIDENCE.md) |
+| Live text-cancel | Verified plan card -> cancel execution -> no project creation | [docs/LIVE_TEST_EVIDENCE.md](docs/LIVE_TEST_EVIDENCE.md) |
 | Live recording/artifacts | To be completed before submission | Success/cancel path recordings and live link samples |
 
 ---
