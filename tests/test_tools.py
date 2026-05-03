@@ -714,6 +714,36 @@ def test_update_project_adds_deliverable_and_creates_task():
         assert "任务: 评审清单" in project["artifacts"]
 
 
+def test_update_project_appends_update_to_project_doc():
+    with _project_registry_lock:
+        _project_registry.clear()
+    _register_project(
+        "文档更新项目", [], "2026-05-20", "进行中",
+        ["文档: https://example.invalid/docx/doc_token_123"],
+        goal="验证文档更新", deliverables=["验收记录"],
+    )
+
+    with (
+        patch("tools._create_task", return_value=None),
+        patch("tools._append_project_doc_update", return_value=True) as append_doc,
+        patch("tools._hermes_send", return_value=True) as send,
+    ):
+        result = json.loads(_handle_update_project(
+            {"project_name": "文档更新", "action": "add_deliverable", "value": "评审清单"},
+            chat_id="oc_doc_update",
+        ))
+
+    assert result["status"] == "project_updated"
+    assert result["doc_updated"] is True
+    append_doc.assert_called_once()
+    args = append_doc.call_args.args
+    assert args[0] == "文档更新项目"
+    assert args[2] == "交付物"
+    assert args[3] == "评审清单"
+    sent_text = send.call_args.args[1]
+    assert "项目文档已更新" in sent_text
+
+
 def test_update_project_adds_deliverable_to_sanitized_state_after_restart(tmp_path):
     state_path = tmp_path / "pilotflow-projects.json"
     with _project_registry_lock:

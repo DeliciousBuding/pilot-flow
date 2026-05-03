@@ -1097,6 +1097,64 @@ def _create_doc(title: str, markdown_content: str, chat_id: str) -> Optional[str
         return None
 
 
+def _doc_url_from_artifacts(artifacts: list) -> str:
+    """Extract the first Feishu docx URL from project artifacts."""
+    for item in artifacts or []:
+        text = str(item)
+        if text.startswith("文档: ") and "/docx/" in text:
+            return text.split("文档: ", 1)[1].strip()
+    return ""
+
+
+def _append_doc_update(doc_url: str, markdown_content: str) -> bool:
+    """Write an update block to an existing Feishu docx document."""
+    client = _get_client()
+    if not client or not doc_url:
+        return False
+    match = re.search(r"/docx/([^/?#]+)", doc_url)
+    if not match:
+        return False
+    doc_id = match.group(1)
+    try:
+        from lark_oapi.api.docx.v1 import CreateDocumentBlockChildrenRequest, CreateDocumentBlockChildrenRequestBody
+        children = _markdown_to_blocks(markdown_content)
+        if not children:
+            return False
+        body = CreateDocumentBlockChildrenRequestBody.builder().children(children).index(0).build()
+        req = (
+            CreateDocumentBlockChildrenRequest.builder()
+            .document_id(doc_id).block_id(doc_id).request_body(body).build()
+        )
+        resp = client.docx.v1.document_block_children.create(req)
+        if resp.success():
+            logger.info("doc update appended: %s", doc_id)
+            return True
+        logger.warning("append doc update failed: %s", resp.msg)
+        return False
+    except Exception as e:
+        logger.warning("append doc update error: %s", e)
+        return False
+
+
+def _append_project_doc_update(project_name: str, project: dict, action_label: str, value: str) -> bool:
+    """Append a concise project update record to the project document when available."""
+    doc_url = _doc_url_from_artifacts(project.get("artifacts", []))
+    if not doc_url:
+        return False
+    status = project.get("status", "进行中")
+    deadline = project.get("deadline") or "待确认"
+    deliverables = "、".join(project.get("deliverables", [])) or "待确认"
+    markdown = (
+        f"## 项目更新记录\n"
+        f"- 项目：{project_name}\n"
+        f"- 更新：{action_label} → {value}\n"
+        f"- 当前状态：{status}\n"
+        f"- 当前截止：{deadline}\n"
+        f"- 当前交付物：{deliverables}\n"
+    )
+    return _append_doc_update(doc_url, markdown)
+
+
 def _create_task(summary: str, description: str,
                  assignee_name: str = "", deadline: str = "",
                  chat_id: str = "") -> Optional[str]:
@@ -2334,6 +2392,7 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
     registry_updated = False
     state_updated = False
     task_created = False
+    doc_updated = False
 
     # 1. Update in-memory registry
     if project:
@@ -2378,6 +2437,8 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
                 project.get("deliverables", []), project.get("deadline", ""),
                 project.get("status", "进行中"), project.get("artifacts", []),
             )
+            if not state_project:
+                doc_updated = _append_project_doc_update(project_name, project, action_label, value)
 
         # 2. Update bitable record
         bitable_fields = {}
@@ -2406,6 +2467,8 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
                 parts.append(cd)
         if task_created:
             parts.append("✅ 飞书任务已创建")
+        if doc_updated:
+            parts.append("✅ 项目文档已更新")
         if bitable_updated:
             parts.append("✅ 状态表已同步")
         elif state_updated:
@@ -2424,9 +2487,11 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
         "state_updated": state_updated,
         "bitable_updated": bitable_updated,
         "task_created": task_created,
+        "doc_updated": doc_updated,
         "instructions": (
             f"用中文回复：已更新项目「{project_name}」的{action_label}为 {value}。"
             + ("飞书任务已创建。" if task_created else "")
+            + ("项目文档已更新。" if doc_updated else "")
             + ("状态表已同步。" if bitable_updated else "本地状态已更新。" if state_updated else "")
             + "不要显示工具名或英文。"
         ),
