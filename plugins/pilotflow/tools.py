@@ -751,6 +751,46 @@ def _handle_generate_plan(params: Dict[str, Any], **kwargs) -> str:
         with _plan_lock:
             _pending_plans[chat_id] = {"input": text, "template": template["description"] if template else None}
 
+    # Send confirmation card with interactive buttons (if we have enough info)
+    if chat_id and (plan["members"] or plan["deliverables"]):
+        member_text = ", ".join(plan["members"]) if plan["members"] else "待确认"
+        deliverable_text = ", ".join(plan["deliverables"]) if plan["deliverables"] else "待确认"
+        card = {
+            "config": {"wide_screen_mode": True},
+            "header": {
+                "title": {"content": "📋 执行计划", "tag": "plain_text"},
+                "template": "blue",
+            },
+            "elements": [
+                {
+                    "tag": "markdown",
+                    "content": (
+                        f"**成员：** {member_text}\n"
+                        f"**交付物：** {deliverable_text}\n"
+                        f"**截止时间：** {plan['deadline'] or '待确认'}"
+                    ),
+                },
+                {
+                    "tag": "action",
+                    "actions": [
+                        {
+                            "tag": "button",
+                            "text": {"tag": "plain_text", "content": "✅ 确认执行"},
+                            "type": "primary",
+                            "value": {"pilotflow_action": "confirm_project"},
+                        },
+                        {
+                            "tag": "button",
+                            "text": {"tag": "plain_text", "content": "❌ 取消"},
+                            "type": "default",
+                            "value": {"pilotflow_action": "cancel_project"},
+                        },
+                    ],
+                },
+            ],
+        }
+        _hermes_send_card(chat_id, card)
+
     template_hint = ""
     if template:
         template_hint = (
@@ -878,47 +918,6 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
     member_plain = _member_names_plain(members) if members else "TBD"
     # Use @mention format for docs and messages
     member_display = _format_members(members, chat_id) if members else "TBD"
-
-    # Send confirmation card with interactive buttons
-    deliverable_text = ", ".join(deliverables) if deliverables else "TBD"
-    member_text = ", ".join(members) if members else "TBD"
-    card = {
-        "config": {"wide_screen_mode": True},
-        "header": {
-            "title": {"content": "📋 执行计划", "tag": "plain_text"},
-            "template": "blue",
-        },
-        "elements": [
-            {
-                "tag": "markdown",
-                "content": (
-                    f"**项目：** {title}\n"
-                    f"**目标：** {goal}\n"
-                    f"**成员：** {member_text}\n"
-                    f"**交付物：** {deliverable_text}\n"
-                    f"**截止时间：** {deadline or 'TBD'}"
-                ),
-            },
-            {
-                "tag": "action",
-                "actions": [
-                    {
-                        "tag": "button",
-                        "text": {"tag": "plain_text", "content": "✅ 确认执行"},
-                        "type": "primary",
-                        "value": {"pilotflow_action": "confirm_project", "title": title},
-                    },
-                    {
-                        "tag": "button",
-                        "text": {"tag": "plain_text", "content": "❌ 取消"},
-                        "type": "default",
-                        "value": {"pilotflow_action": "cancel_project"},
-                    },
-                ],
-            },
-        ],
-    }
-    _hermes_send_card(chat_id, card)
 
     # 1. Create doc (lark_oapi) — with @mention in content
     doc_content = f"# {title}\n\n## 目标\n{goal}\n\n"
