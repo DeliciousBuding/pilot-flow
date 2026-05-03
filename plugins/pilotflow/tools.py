@@ -949,18 +949,33 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
             if task_name:
                 artifacts.append(f"任务: {task_name}")
 
-    # 4. Send entry message (via Hermes) — @mention members
-    entry_text = f"📌 项目入口: {title}\n🎯 目标: {goal}"
-    if members:
-        entry_text += f"\n👥 成员: {member_display}"
-    if deadline:
-        entry_text += f"\n⏰ 截止: {deadline}"
+    # 4. Send entry card (via Hermes) — interactive card with clickable links
+    link_lines = []
     if doc_url:
-        entry_text += f"\n📄 文档: {doc_url}"
+        link_lines.append(f"📄 [项目文档]({doc_url})")
     if bitable_url:
-        entry_text += f"\n📊 状态: {bitable_url}"
-    if _hermes_send(chat_id, entry_text):
-        artifacts.append("项目入口消息")
+        link_lines.append(f"📊 [状态表]({bitable_url})")
+    link_lines.append(f"⏰ 截止: {deadline or 'TBD'}")
+
+    entry_card = {
+        "config": {"wide_screen_mode": True},
+        "header": {
+            "title": {"content": f"📌 {title}", "tag": "plain_text"},
+            "template": "green",
+        },
+        "elements": [
+            {
+                "tag": "markdown",
+                "content": (
+                    f"**目标：** {goal}\n"
+                    f"**成员：** {member_display}\n"
+                    + "\n".join(link_lines)
+                ),
+            },
+        ],
+    }
+    if _hermes_send_card(chat_id, entry_card):
+        artifacts.append("项目入口卡片")
 
     # 5. Calendar event (best effort)
     cal_result = _create_calendar_event(title, goal, deadline)
