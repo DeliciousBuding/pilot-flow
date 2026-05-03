@@ -484,6 +484,55 @@ def test_query_status_dashboard_includes_project_action_buttons():
     assert all(ref["plan"]["title"] == "看板操作项目" for ref in refs)
 
 
+def test_query_status_filters_active_projects():
+    with _project_registry_lock:
+        _project_registry.clear()
+    _register_project(
+        "进行中筛选项目", [], "2026-05-20", "进行中", [],
+        goal="验证筛选", deliverables=["验收记录"],
+    )
+    _register_project(
+        "已完成筛选项目", [], "2026-05-20", "已完成", [],
+        goal="验证筛选", deliverables=["验收记录"],
+    )
+    captured = {}
+
+    def capture_card(chat_id, card):
+        captured["card"] = card
+        return True
+
+    with patch("tools._send_interactive_card_via_feishu", side_effect=capture_card):
+        result = _handle_query_status({"query": "还有哪些未完成项目"}, chat_id="oc_filter_active")
+
+    assert "项目看板已发送" in result
+    content = json.dumps(captured["card"], ensure_ascii=False)
+    assert "进行中筛选项目" in content
+    assert "已完成筛选项目" not in content
+
+
+def test_query_status_completed_filter_shows_empty_match_state():
+    with _project_registry_lock:
+        _project_registry.clear()
+    _register_project(
+        "未完成筛选项目", [], "2026-05-20", "进行中", [],
+        goal="验证空筛选", deliverables=["验收记录"],
+    )
+    captured = {}
+
+    def capture_card(chat_id, card):
+        captured["card"] = card
+        return True
+
+    with patch("tools._send_interactive_card_via_feishu", side_effect=capture_card):
+        result = _handle_query_status({"query": "看看已完成项目"}, chat_id="oc_filter_done")
+
+    assert "项目看板已发送" in result
+    content = json.dumps(captured["card"], ensure_ascii=False)
+    assert "未完成筛选项目" not in content
+    assert "暂无匹配项目" in content
+    assert "暂无项目记录" not in content
+
+
 def test_dashboard_card_action_marks_state_project_done_after_restart(tmp_path):
     state_path = tmp_path / "pilotflow-projects.json"
     with _project_registry_lock:

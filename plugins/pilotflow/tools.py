@@ -1213,6 +1213,37 @@ def _deadline_countdown(iso_date: str) -> str:
         return ""
 
 
+def _status_filter_from_query(query: str) -> str:
+    """Infer a dashboard status filter from the user's Chinese query."""
+    q = query or ""
+    if any(word in q for word in ("逾期", "过期", "超期")):
+        return "overdue"
+    if any(word in q for word in ("未完成", "没完成", "进行中", "待完成", "待办", "还剩")):
+        return "active"
+    if any(word in q for word in ("已完成", "完成的", "完成项目", "完结")):
+        return "completed"
+    return ""
+
+
+def _project_matches_status_filter(project: dict, status_filter: str) -> bool:
+    """Return whether a dashboard project matches the requested filter."""
+    if not status_filter:
+        return True
+    status = str(project.get("status", ""))
+    if status_filter == "completed":
+        return status == "已完成"
+    if status_filter == "active":
+        return status != "已完成"
+    if status_filter == "overdue":
+        import datetime as _dt
+        try:
+            deadline = _dt.date.fromisoformat(str(project.get("deadline", "")))
+            return deadline < _dt.date.today() and status != "已完成"
+        except (TypeError, ValueError):
+            return False
+    return True
+
+
 def _create_calendar_event(title: str, goal: str, deadline: str) -> Optional[str]:
     """Create a calendar event for the project deadline. Returns description on success."""
     client = _get_client()
@@ -2024,6 +2055,7 @@ def _handle_query_status(params: Dict[str, Any], **kwargs) -> str:
     """Query project status and send a dashboard card."""
     query = params.get("query", "")
     chat_id = _get_chat_id(kwargs)
+    status_filter = _status_filter_from_query(query)
 
     projects = []
 
@@ -2040,6 +2072,8 @@ def _handle_query_status(params: Dict[str, Any], **kwargs) -> str:
                 "name": title,
                 "source": f"成员: {member_str} | 截止: {deadline}{countdown} | {status}",
                 "actionable": True,
+                "status": status,
+                "deadline": deadline,
             })
 
     # 2. Secondary: try Feishu task API (requires user token, may fail)
@@ -2052,7 +2086,13 @@ def _handle_query_status(params: Dict[str, Any], **kwargs) -> str:
                 resp = client.task.v2.task.list(req)
                 if resp.success() and resp.data and resp.data.items:
                     for t in resp.data.items[:5]:
-                        projects.append({"name": t.summary or "无标题", "source": "任务", "actionable": False})
+                        projects.append({
+                            "name": t.summary or "无标题",
+                            "source": "任务",
+                            "actionable": False,
+                            "status": "进行中",
+                            "deadline": "",
+                        })
             except Exception as e:
                 logger.debug("task API fallback failed: %s", e)
 
@@ -2068,6 +2108,8 @@ def _handle_query_status(params: Dict[str, Any], **kwargs) -> str:
                 "name": item.get("title") or "历史项目",
                 "source": f"来源: 本地状态 | 交付物: {deliverables} | 截止: {deadline}{countdown} | {item.get('status', '进行中')}",
                 "actionable": True,
+                "status": item.get("status", "进行中"),
+                "deadline": deadline,
             })
             if len(projects) >= 5:
                 break
@@ -2083,13 +2125,22 @@ def _handle_query_status(params: Dict[str, Any], **kwargs) -> str:
                 "name": item.get("title") or "历史项目",
                 "source": f"来源: 历史记录 | 交付物: {deliverables} | 截止: {deadline}{countdown} | 进行中",
                 "actionable": False,
+                "status": "进行中",
+                "deadline": deadline,
             })
             if len(projects) >= 5:
                 break
 
     # Build dashboard card
+    had_projects_before_filter = bool(projects)
+    if status_filter:
+        projects = [p for p in projects if _project_matches_status_filter(p, status_filter)]
+
     if not projects:
-        projects.append({"name": "暂无项目记录", "source": "请先创建项目", "actionable": False})
+        if had_projects_before_filter and status_filter:
+            projects.append({"name": "暂无匹配项目", "source": "可以调整筛选条件", "actionable": False})
+        else:
+            projects.append({"name": "暂无项目记录", "source": "请先创建项目", "actionable": False})
 
     card_elements = []
     action_ids = []
