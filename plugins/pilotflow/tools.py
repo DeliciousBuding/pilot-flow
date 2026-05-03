@@ -805,17 +805,18 @@ def _handle_generate_plan(params: Dict[str, Any], **kwargs) -> str:
         "input": text,
         "template": template["description"] if template else None,
         "plan": plan,
+        "card_sent": bool(chat_id and (plan["members"] or plan["deliverables"])),
         "instructions": (
             "请从输入中提取项目信息，填入 plan 对象的各字段。\n"
             "- title: 项目标题\n- goal: 项目目标\n"
             "- members: 成员列表（中文名）\n"
             "- deliverables: 交付物列表\n- deadline: 截止时间（YYYY-MM-DD格式）\n\n"
-            "提取后向用户展示计划，问「确认执行？」。"
-            "用户确认后调用 pilotflow_create_project_space，传入 plan 中的所有字段。\n\n"
+            "【重要】确认卡片已自动发送到群聊，包含计划摘要和确认按钮。\n"
+            "你只需简短回复「已生成计划，请确认」即可，不要重复展示计划内容。\n"
+            "用户确认后（回复「确认」或点击按钮），调用 pilotflow_create_project_space。\n\n"
             "【输出规则 - 必须遵守】\n"
             "1. 绝对不要向用户展示工具名称或英文内容\n"
-            "2. 只回复中文，不要显示工具调用过程\n"
-            "3. 执行完成后回复结果摘要：已创建 + 产物链接"
+            "2. 只回复中文，不要显示工具调用过程"
             f"{template_hint}"
         ),
     })
