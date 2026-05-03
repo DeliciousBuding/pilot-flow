@@ -1115,6 +1115,26 @@ def _doc_url_from_artifacts(artifacts: list) -> str:
     return ""
 
 
+def _refresh_project_resource_permissions(project: dict, chat_id: str) -> bool:
+    """Refresh editable access for known project resources using the current chat members."""
+    if not chat_id:
+        return False
+    refreshed = False
+    doc_url = _doc_url_from_artifacts(project.get("artifacts", []))
+    doc_match = re.search(r"/docx/([^/?#]+)", doc_url or "")
+    if doc_match:
+        doc_token = doc_match.group(1)
+        _set_permission(doc_token, "docx")
+        _add_editors(doc_token, "docx", chat_id)
+        refreshed = True
+    app_token = project.get("app_token", "")
+    if app_token:
+        _set_permission(app_token, "bitable")
+        _add_editors(app_token, "bitable", chat_id)
+        refreshed = True
+    return refreshed
+
+
 def _append_doc_update(doc_url: str, markdown_content: str) -> bool:
     """Write an update block to an existing Feishu docx document."""
     client = _get_client()
@@ -2454,6 +2474,7 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
     state_updated = False
     task_created = False
     doc_updated = False
+    permission_refreshed = False
 
     # 1. Update in-memory registry
     if project:
@@ -2518,6 +2539,8 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
                 project["app_token"], project["table_id"], project["record_id"],
                 bitable_fields,
             )
+        if action == "add_member" and chat_id and not state_project:
+            permission_refreshed = _refresh_project_resource_permissions(project, chat_id)
 
     # 3. Send notification via Hermes
     if chat_id:
@@ -2532,6 +2555,8 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
             parts.append("✅ 飞书任务已创建")
         if doc_updated:
             parts.append("✅ 项目文档已更新")
+        if permission_refreshed:
+            parts.append("✅ 项目资源权限已刷新")
         if bitable_updated:
             parts.append("✅ 状态表已同步")
         elif state_updated:
@@ -2551,10 +2576,12 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
         "bitable_updated": bitable_updated,
         "task_created": task_created,
         "doc_updated": doc_updated,
+        "permission_refreshed": permission_refreshed,
         "instructions": (
             f"用中文回复：已更新项目「{project_name}」的{action_label}为 {value}。"
             + ("飞书任务已创建。" if task_created else "")
             + ("项目文档已更新。" if doc_updated else "")
+            + ("项目资源权限已刷新。" if permission_refreshed else "")
             + ("状态表已同步。" if bitable_updated else "本地状态已更新。" if state_updated else "")
             + "不要显示工具名或英文。"
         ),

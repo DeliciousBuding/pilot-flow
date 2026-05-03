@@ -891,6 +891,37 @@ def test_update_project_adds_deliverable_and_creates_task():
         assert "任务: 评审清单" in project["artifacts"]
 
 
+def test_update_project_add_member_refreshes_resource_permissions():
+    with _project_registry_lock:
+        _project_registry.clear()
+    _register_project(
+        "权限同步项目", ["张三"], "2026-05-20", "进行中",
+        ["文档: https://example.invalid/docx/doc_token_123"],
+        app_token="app1", table_id="tbl1", record_id="rec1",
+        goal="验证加成员刷新权限", deliverables=["验收记录"],
+    )
+
+    with (
+        patch("tools._set_permission") as set_permission,
+        patch("tools._add_editors") as add_editors,
+        patch("tools._update_bitable_record", return_value=True) as update_bitable,
+        patch("tools._hermes_send", return_value=True) as send,
+    ):
+        result = json.loads(_handle_update_project(
+            {"project_name": "权限同步", "action": "add_member", "value": "李四"},
+            chat_id="oc_permission_refresh",
+        ))
+
+    assert result["status"] == "project_updated"
+    assert result["permission_refreshed"] is True
+    set_permission.assert_any_call("doc_token_123", "docx")
+    set_permission.assert_any_call("app1", "bitable")
+    add_editors.assert_any_call("doc_token_123", "docx", "oc_permission_refresh")
+    add_editors.assert_any_call("app1", "bitable", "oc_permission_refresh")
+    update_bitable.assert_called_once_with("app1", "tbl1", "rec1", {"负责人": "张三, 李四"})
+    assert "资源权限已刷新" in send.call_args.args[1]
+
+
 def test_update_project_add_deliverable_syncs_bitable_deliverables():
     with _project_registry_lock:
         _project_registry.clear()
