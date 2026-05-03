@@ -2844,6 +2844,66 @@ def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
             "instructions": "已批量创建逾期项目待办。不要展示工具名或英文。",
         })
 
+    if pilotflow_action == "project_followup_task":
+        project_title = action_data.get("title") or action_data.get("project_name")
+        if not project_title:
+            return tool_error("无法识别项目，请在群里直接询问项目状态。")
+        with _project_registry_lock:
+            project = _project_registry.get(project_title)
+        if not project:
+            state_project = _find_project_state(project_title)
+            if not state_project:
+                return tool_error("没有找到这个项目，可能需要先在当前会话创建项目。")
+            project = {
+                "goal": state_project.get("goal", ""),
+                "members": [],
+                "deliverables": state_project.get("deliverables", []),
+                "deadline": state_project.get("deadline", ""),
+                "status": state_project.get("status", "进行中"),
+                "artifacts": [],
+                "updates": state_project.get("updates", []),
+                "app_token": "",
+                "table_id": "",
+                "record_id": "",
+            }
+            project_title = state_project.get("title", project_title)
+
+        members = list(project.get("members", []))
+        assignee = members[0] if members else ""
+        task_name = _create_task(
+            f"{project_title}跟进",
+            f"项目: {project_title}",
+            assignee,
+            project.get("deadline", ""),
+            chat_id,
+            members,
+        )
+        if not task_name:
+            return tool_error("待办创建失败，请检查飞书连接。")
+        created_entry = f"任务: {task_name}"
+        with _project_registry_lock:
+            if project_title in _project_registry:
+                _project_registry[project_title].setdefault("artifacts", []).append(created_entry)
+        _save_project_state(
+            project_title, project.get("goal", ""), members,
+            project.get("deliverables", []), project.get("deadline", ""), project.get("status", "进行中"),
+            list(project.get("artifacts", [])) + [created_entry],
+            updates=project.get("updates", []),
+        )
+        _append_project_doc_update(project_title, project, "任务", task_name)
+        if project.get("app_token") and project.get("table_id"):
+            _append_bitable_update_record(
+                project["app_token"], project["table_id"], "任务", task_name, project,
+            )
+        _hermes_send(chat_id, f"项目「{project_title}」的跟进待办“{task_name}”已创建。")
+        return tool_result({
+            "status": "project_followup_task_created",
+            "project": project_title,
+            "task_created": True,
+            "task_name": task_name,
+            "instructions": "已创建项目跟进待办。不要展示工具名或英文。",
+        })
+
     return tool_error(f"未知的卡片动作: {pilotflow_action}")
 
 
@@ -3182,9 +3242,12 @@ def _handle_query_status(params: Dict[str, Any], **kwargs) -> str:
             next_action_id = _create_card_action_ref(chat_id, next_action, {"title": p["name"]})
             action_ids.extend([status_action_id, next_action_id])
             reminder_action = None
+            followup_action = None
             if status_filter in ("overdue", "due_soon"):
                 reminder_action = _create_card_action_ref(chat_id, "send_project_reminder", {"title": p["name"]})
                 action_ids.append(reminder_action)
+                followup_action = _create_card_action_ref(chat_id, "project_followup_task", {"title": p["name"]})
+                action_ids.append(followup_action)
             actions = [
                 {
                     "tag": "button",
@@ -3205,6 +3268,13 @@ def _handle_query_status(params: Dict[str, Any], **kwargs) -> str:
                     "text": {"tag": "plain_text", "content": "发送提醒"},
                     "type": "primary",
                     "value": {"pilotflow_action_id": reminder_action},
+                })
+            if followup_action:
+                actions.append({
+                    "tag": "button",
+                    "text": {"tag": "plain_text", "content": "创建待办"},
+                    "type": "default",
+                    "value": {"pilotflow_action_id": followup_action},
                 })
             card_elements.append({
                 "tag": "action",

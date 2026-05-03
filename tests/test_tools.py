@@ -1305,6 +1305,10 @@ def test_query_status_filters_overdue_projects_with_red_dashboard():
     assert "逾期跟进项目" in content
     assert "未逾期项目" not in content
     assert "已完成逾期项目" not in content
+    actions = [element for element in captured["card"]["elements"] if element.get("tag") == "action"]
+    assert actions
+    button_texts = [button["text"]["content"] for button in actions[0]["actions"]]
+    assert "创建待办" in button_texts
 
 
 def test_query_status_filters_due_soon_projects_with_yellow_dashboard():
@@ -1365,13 +1369,13 @@ def test_deadline_dashboard_offers_reminder_button_without_chat_id_payload():
     actions = [element for element in captured["card"]["elements"] if element.get("tag") == "action"]
     assert actions
     button_text = [button["text"]["content"] for button in actions[0]["actions"]]
-    assert button_text == ["查看状态", "标记完成", "发送提醒"]
+    assert button_text == ["查看状态", "标记完成", "发送提醒", "创建待办"]
     reminder_value = actions[0]["actions"][2]["value"]
     assert "pilotflow_action_id" in reminder_value
     assert "pilotflow_chat_id" not in reminder_value
     with _plan_lock:
         refs = [ref for ref in _card_action_refs.values() if ref["chat_id"] == "oc_reminder_button"]
-    assert {ref["action"] for ref in refs} >= {"project_status", "mark_project_done", "send_project_reminder"}
+    assert {ref["action"] for ref in refs} >= {"project_status", "mark_project_done", "send_project_reminder", "project_followup_task"}
 
 
 def test_project_reminder_card_action_sends_chinese_group_reminder():
