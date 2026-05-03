@@ -2976,41 +2976,6 @@ def _handle_card_command(raw_args: str) -> str:
             "本次计划已取消，未创建任何项目产物。",
             "grey",
         )
-    elif action_id and pilotflow_action == "mark_project_done":
-        _mark_card_message(
-            message_id,
-            "项目已完成",
-            f"**{action_data.get('title', '项目')}** 已标记为完成。",
-            "green",
-        )
-    elif action_id and pilotflow_action == "reopen_project":
-        _mark_card_message(
-            message_id,
-            "项目已重新打开",
-            f"**{action_data.get('title', '项目')}** 已恢复为进行中。",
-            "blue",
-        )
-    elif action_id and pilotflow_action == "resolve_risk":
-        _mark_card_message(
-            message_id,
-            "风险已解除",
-            f"**{action_data.get('title', '项目')}** 已恢复为进行中。",
-            "green",
-        )
-    elif action_id and pilotflow_action == "send_project_reminder":
-        _mark_card_message(
-            message_id,
-            "已发送催办提醒",
-            f"**{action_data.get('title', '项目')}** 的催办提醒已发送到群聊。",
-            "yellow",
-        )
-    elif action_id and pilotflow_action == "create_followup_task":
-        _mark_card_message(
-            message_id,
-            "待办已创建",
-            f"**{action_data.get('title', '项目')}** 的跟进待办已创建。",
-            "green",
-        )
     elif action_id and pilotflow_action == "apply_history_suggestions":
         _mark_card_message(
             message_id,
@@ -3034,7 +2999,10 @@ def _handle_card_command(raw_args: str) -> str:
         return result
 
     if data.get("error"):
-        return str(data["error"])
+        error_text = str(data["error"])
+        if action_id and message_id:
+            _mark_card_message(message_id, "操作失败", error_text, "red")
+        return error_text
     if data.get("status") == "cancelled":
         if action_ref:
             _clear_pending_plan_if_matches(chat_id, action_ref.get("plan"))
@@ -3065,9 +3033,23 @@ def _handle_card_command(raw_args: str) -> str:
         )
         return None
     if data.get("status") in (
+        "project_marked_done", "project_reopened", "project_risk_resolved",
+        "project_reminder_sent", "project_followup_task_created",
+    ):
+        project_title = data.get("project") or action_data.get("title") or "项目"
+        feedback = {
+            "project_marked_done": ("项目已完成", f"**{project_title}** 已标记为完成。", "green"),
+            "project_reopened": ("项目已重新打开", f"**{project_title}** 已恢复为进行中。", "blue"),
+            "project_risk_resolved": ("风险已解除", f"**{project_title}** 已恢复为进行中。", "green"),
+            "project_reminder_sent": ("已发送催办提醒", f"**{project_title}** 的催办提醒已发送到群聊。", "yellow"),
+            "project_followup_task_created": ("待办已创建", f"**{project_title}** 的跟进待办已创建。", "green"),
+        }[data["status"]]
+        _mark_card_message(message_id, feedback[0], feedback[1], feedback[2])
+        return None
+    if data.get("status") in (
         "project_status_sent", "project_marked_done", "project_reopened", "project_risk_resolved",
         "project_reminder_sent", "dashboard_page_sent", "dashboard_filter_sent", "briefing_batch_reminder_sent",
-        "history_suggestions_applied", "project_followup_task_created",
+        "history_suggestions_applied",
     ):
         return None
     if data.get("display"):

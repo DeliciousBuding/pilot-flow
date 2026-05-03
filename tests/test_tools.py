@@ -3252,6 +3252,39 @@ def test_card_command_opaque_project_action_carries_project_title():
         assert _project_registry["入口按钮项目"]["status"] == "已完成"
 
 
+def test_card_command_project_action_updates_card_as_failed_when_action_fails():
+    with _project_registry_lock:
+        _project_registry.clear()
+    with _plan_lock:
+        _card_action_refs.clear()
+    action_id = _create_card_action_ref(
+        "oc_missing_project_action",
+        "mark_project_done",
+        {"title": "不存在的项目"},
+    )
+    with _plan_lock:
+        _card_action_refs[action_id]["message_id"] = "om_missing_project_action"
+
+    marked_cards = []
+
+    def capture_mark(message_id, title, content, template):
+        marked_cards.append((message_id, title, content, template))
+        return True
+
+    with patch("tools._mark_card_message", side_effect=capture_mark):
+        result = _handle_card_command(f'button {{"pilotflow_action_id":"{action_id}"}}')
+
+    assert "没有找到" in result
+    assert marked_cards == [
+        (
+            "om_missing_project_action",
+            "操作失败",
+            "没有找到这个项目，可能需要先在当前会话创建项目。",
+            "red",
+        )
+    ]
+
+
 def test_card_command_bridge_uses_opaque_action_id():
     with _project_registry_lock:
         _project_registry.clear()
