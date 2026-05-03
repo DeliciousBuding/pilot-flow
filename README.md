@@ -135,6 +135,7 @@ uv run hermes gateway
 | [产品规格](docs/PRODUCT_SPEC.md) | 用户承诺、功能分级 |
 | [架构设计](docs/ARCHITECTURE.md) | 组件、状态模型、工具路由 |
 | [个人进度](PERSONAL_PROGRESS.md) | 开发进度和验证结果 |
+| [贡献指南](CONTRIBUTING.md) | 开发环境、代码规范、提交 PR |
 
 ## 路线图
 

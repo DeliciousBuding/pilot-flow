@@ -131,6 +131,7 @@ uv run hermes gateway
 | [Product Spec](docs/PRODUCT_SPEC.md) | User commitments, feature tiers |
 | [Architecture Design](docs/ARCHITECTURE.md) | Components, state model, tool routing |
 | [Personal Progress](PERSONAL_PROGRESS.md) | Development progress and verification results |
+| [Contributing](CONTRIBUTING.md) | Dev setup, coding conventions, submitting PRs |
 
 ## Roadmap
 
