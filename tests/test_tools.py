@@ -596,6 +596,71 @@ def test_query_status_dashboard_includes_project_action_buttons():
     assert all(ref["plan"]["title"] == "看板操作项目" for ref in refs)
 
 
+def test_query_status_named_project_sends_detail_card_directly():
+    with _project_registry_lock:
+        _project_registry.clear()
+    with _plan_lock:
+        _card_action_refs.clear()
+    _register_project(
+        "定向详情项目", ["张三"], "2026-05-20", "进行中", [],
+        goal="验证定向查询", deliverables=["验收记录"],
+    )
+    captured = {}
+
+    def capture_card(chat_id, card):
+        captured["card"] = card
+        return "om_direct_detail"
+
+    with patch("tools._send_interactive_card_via_feishu", side_effect=capture_card):
+        result = _handle_query_status({"query": "定向详情项目进展如何"}, chat_id="oc_direct_detail")
+
+    assert "项目详情已发送" in result
+    card = captured["card"]
+    assert card["header"]["title"]["content"] == "📌 项目详情"
+    body = card["elements"][0]["content"]
+    assert "定向详情项目" in body
+    assert "验证定向查询" in body
+    assert "验收记录" in body
+    assert "项目看板" not in json.dumps(card, ensure_ascii=False)
+    with _plan_lock:
+        refs = [ref for ref in _card_action_refs.values() if ref["chat_id"] == "oc_direct_detail"]
+    assert {ref["action"] for ref in refs} == {"mark_project_done"}
+
+
+def test_query_status_named_state_project_sends_detail_card_after_restart(tmp_path):
+    state_path = tmp_path / "pilotflow-projects.json"
+    with _project_registry_lock:
+        _project_registry.clear()
+    with _plan_lock:
+        _card_action_refs.clear()
+    with patch.dict(os.environ, {"PILOTFLOW_STATE_PATH": str(state_path)}):
+        _save_project_state(
+            "重启定向项目",
+            "验证重启后定向查询",
+            [],
+            ["恢复记录"],
+            "2026-05-20",
+            "进行中",
+            [],
+        )
+        captured = {}
+
+        def capture_card(chat_id, card):
+            captured["card"] = card
+            return "om_state_direct_detail"
+
+        with patch("tools._send_interactive_card_via_feishu", side_effect=capture_card):
+            result = _handle_query_status({"query": "重启定向项目进展如何"}, chat_id="oc_state_direct_detail")
+
+    assert "项目详情已发送" in result
+    card = captured["card"]
+    assert card["header"]["title"]["content"] == "📌 项目详情"
+    body = card["elements"][0]["content"]
+    assert "重启定向项目" in body
+    assert "验证重启后定向查询" in body
+    assert "恢复记录" in body
+
+
 def test_query_status_filters_active_projects():
     with _project_registry_lock:
         _project_registry.clear()

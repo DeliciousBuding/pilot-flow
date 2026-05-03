@@ -1322,6 +1322,19 @@ def _project_matches_status_filter(project: dict, status_filter: str) -> bool:
     return True
 
 
+def _find_named_project_query_match(query: str, projects: list) -> Optional[dict]:
+    """Return an actionable project when the query explicitly contains its title."""
+    if not query:
+        return None
+    matches = [
+        p for p in projects
+        if p.get("actionable") and p.get("name") and p["name"] in query and p.get("detail_project")
+    ]
+    if len(matches) == 1:
+        return matches[0]
+    return None
+
+
 def _create_calendar_event(title: str, goal: str, deadline: str) -> Optional[str]:
     """Create a calendar event for the project deadline. Returns description on success."""
     client = _get_client()
@@ -2170,6 +2183,7 @@ def _handle_query_status(params: Dict[str, Any], **kwargs) -> str:
                 "actionable": True,
                 "status": status,
                 "deadline": deadline,
+                "detail_project": info.copy(),
             })
 
     # 2. Secondary: try Feishu task API (requires user token, may fail)
@@ -2206,6 +2220,14 @@ def _handle_query_status(params: Dict[str, Any], **kwargs) -> str:
                 "actionable": True,
                 "status": item.get("status", "进行中"),
                 "deadline": deadline,
+                "detail_project": {
+                    "goal": item.get("goal", ""),
+                    "members": [],
+                    "deliverables": item.get("deliverables", []),
+                    "deadline": item.get("deadline", ""),
+                    "status": item.get("status", "进行中"),
+                    "artifacts": [],
+                },
             })
             if len(projects) >= 5:
                 break
@@ -2226,6 +2248,20 @@ def _handle_query_status(params: Dict[str, Any], **kwargs) -> str:
             })
             if len(projects) >= 5:
                 break
+
+    named_match = _find_named_project_query_match(query, projects)
+    if named_match and chat_id:
+        card, action_ids = _build_project_detail_card(
+            chat_id,
+            named_match["name"],
+            named_match["detail_project"],
+        )
+        sent = _hermes_send_card(chat_id, card)
+        if isinstance(sent, str):
+            _attach_card_message_id(action_ids, sent)
+        if sent:
+            return tool_result(f"项目详情已发送：{named_match['name']}")
+        return tool_error(f"项目详情已生成：{named_match['name']}，但发送到群聊失败。请检查 Feishu 连接。")
 
     # Build dashboard card
     had_projects_before_filter = bool(projects)
