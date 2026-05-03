@@ -184,7 +184,7 @@ def _resolve_card_action_ref(action_id: str, *, consume: bool = False) -> Option
         if consume:
             _card_action_refs.pop(action_id, None)
             message_id = resolved.get("message_id")
-            if message_id:
+            if message_id and resolved.get("action") in ("confirm_project", "cancel_project"):
                 stale_ids = [
                     k for k, v in _card_action_refs.items()
                     if v.get("message_id") == message_id
@@ -1682,7 +1682,7 @@ def _latest_update_text(project: dict) -> str:
     return updates[-1]["value"] if updates else ""
 
 
-def _build_project_briefing_card(query: str, projects: list[dict]) -> tuple[dict, int]:
+def _build_project_briefing_card(query: str, projects: list[dict], chat_id: str = "") -> tuple[dict, int, list[str]]:
     active_projects = [p for p in projects if not _is_archived_status(p.get("status", ""))]
     total = len(active_projects)
     risk_count = sum(1 for p in active_projects if _project_matches_status_filter(p, "risk"))
@@ -1725,6 +1725,40 @@ def _build_project_briefing_card(query: str, projects: list[dict]) -> tuple[dict
                 },
             })
 
+    action_ids: list[str] = []
+    if chat_id and total:
+        risk_action = _create_card_action_ref(chat_id, "dashboard_filter", {"query": "看看风险项目", "filter": "risk"})
+        overdue_action = _create_card_action_ref(chat_id, "dashboard_filter", {"query": "看看逾期项目", "filter": "overdue"})
+        reminder_action = _create_card_action_ref(
+            chat_id,
+            "briefing_batch_reminder",
+            {"filter": "overdue", "value": "请今天同步进展"},
+        )
+        action_ids.extend([risk_action, overdue_action, reminder_action])
+        elements.append({
+            "tag": "action",
+            "actions": [
+                {
+                    "tag": "button",
+                    "text": {"tag": "plain_text", "content": "查看风险"},
+                    "type": "default",
+                    "value": {"pilotflow_action_id": risk_action},
+                },
+                {
+                    "tag": "button",
+                    "text": {"tag": "plain_text", "content": "查看逾期"},
+                    "type": "default",
+                    "value": {"pilotflow_action_id": overdue_action},
+                },
+                {
+                    "tag": "button",
+                    "text": {"tag": "plain_text", "content": "催办逾期"},
+                    "type": "primary",
+                    "value": {"pilotflow_action_id": reminder_action},
+                },
+            ],
+        })
+
     elements.extend([
         {"tag": "hr"},
         {
@@ -1739,7 +1773,7 @@ def _build_project_briefing_card(query: str, projects: list[dict]) -> tuple[dict
         "config": {"wide_screen_mode": True},
         "header": {"title": {"tag": "plain_text", "content": "项目简报"}, "template": template},
         "elements": elements,
-    }, total
+    }, total, action_ids
 
 
 def _find_named_project_query_match(query: str, projects: list) -> Optional[dict]:
@@ -2450,6 +2484,15 @@ def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
     except (json.JSONDecodeError, TypeError):
         return tool_error("无法解析卡片按钮值")
 
+    action_id = action_data.get("pilotflow_action_id", "")
+    if action_id:
+        action_ref = _resolve_card_action_ref(action_id, consume=True)
+        if not action_ref:
+            return tool_error("卡片操作已过期或已处理，请重新发起操作。")
+        chat_id = action_ref["chat_id"]
+        action_data["pilotflow_action"] = action_ref["action"]
+        action_data.update(action_ref.get("plan") or {})
+
     pilotflow_action = action_data.get("pilotflow_action", "")
 
     recovered_plan_override = kwargs.pop("_pilotflow_plan_override", None)
@@ -2615,6 +2658,34 @@ def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
             })
         return sent_result
 
+    if pilotflow_action == "dashboard_filter":
+        filter_query = action_data.get("query") or "项目进展"
+        sent_result = _handle_query_status({"query": filter_query}, chat_id=chat_id)
+        if isinstance(sent_result, str) and "项目看板已发送" in sent_result:
+            return tool_result({
+                "status": "dashboard_filter_sent",
+                "query": filter_query,
+                "instructions": "已发送筛选后的项目看板。不要展示工具名或英文。",
+            })
+        return sent_result
+
+    if pilotflow_action == "briefing_batch_reminder":
+        status_filter = action_data.get("filter") or "overdue"
+        value = action_data.get("value") or "请今天同步进展"
+        sent_result = _handle_update_project(
+            {"project_name": "逾期项目" if status_filter == "overdue" else status_filter, "action": "send_reminder", "value": value},
+            chat_id=chat_id,
+        )
+        try:
+            data = json.loads(sent_result)
+        except (TypeError, json.JSONDecodeError):
+            return sent_result
+        if data.get("status") == "project_reminders_sent":
+            data["status"] = "briefing_batch_reminder_sent"
+            data["instructions"] = "已发送简报批量催办。不要展示工具名或英文。"
+            return tool_result(data)
+        return sent_result
+
     return tool_error(f"未知的卡片动作: {pilotflow_action}")
 
 
@@ -2697,7 +2768,10 @@ def _handle_card_command(raw_args: str) -> str:
             "yellow",
         )
 
-    action_value = json.dumps(action_data, ensure_ascii=False)
+    resolved_action_data = dict(action_data)
+    if action_ref:
+        resolved_action_data.pop("pilotflow_action_id", None)
+    action_value = json.dumps(resolved_action_data, ensure_ascii=False)
     action_kwargs = {"chat_id": chat_id}
     if action_ref:
         action_kwargs["_pilotflow_gate_consumed"] = True
@@ -2727,7 +2801,10 @@ def _handle_card_command(raw_args: str) -> str:
         if action_ref:
             _clear_pending_plan_if_matches(chat_id, action_ref.get("plan"))
         return None
-    if data.get("status") in ("project_status_sent", "project_marked_done", "project_reopened", "project_risk_resolved", "project_reminder_sent", "dashboard_page_sent"):
+    if data.get("status") in (
+        "project_status_sent", "project_marked_done", "project_reopened", "project_risk_resolved",
+        "project_reminder_sent", "dashboard_page_sent", "dashboard_filter_sent", "briefing_batch_reminder_sent",
+    ):
         return None
     if data.get("display"):
         return "\n".join(str(item) for item in data["display"])
@@ -2878,8 +2955,10 @@ def _handle_query_status(params: Dict[str, Any], **kwargs) -> str:
             if any(member in set(_project_member_names(p)) for member in member_filters)
         ]
     if _is_briefing_query(query):
-        briefing_card, briefing_count = _build_project_briefing_card(query, projects)
+        briefing_card, briefing_count, briefing_action_ids = _build_project_briefing_card(query, projects, chat_id)
         sent = _hermes_send_card(chat_id, briefing_card) if chat_id else False
+        if isinstance(sent, str):
+            _attach_card_message_id(briefing_action_ids, sent)
         if sent:
             return tool_result(f"项目简报已发送，共 {briefing_count} 个项目")
         return tool_error(f"项目简报已生成，共 {briefing_count} 个项目，但发送到群聊失败。请检查 Feishu 连接。")
