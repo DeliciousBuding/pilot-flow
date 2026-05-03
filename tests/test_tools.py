@@ -1027,6 +1027,69 @@ def test_standup_briefing_overdue_button_can_create_batch_followup_tasks():
     append_history.assert_called_once()
 
 
+def test_standup_briefing_risk_button_can_create_batch_followup_tasks():
+    with _project_registry_lock:
+        _project_registry.clear()
+    with _plan_lock:
+        _card_action_refs.clear()
+    due_soon = (dt.date.today() + dt.timedelta(days=2)).isoformat()
+    future = (dt.date.today() + dt.timedelta(days=5)).isoformat()
+    _register_project(
+        "简报风险待办项目", ["张三"], due_soon, "有风险", [],
+        goal="验证简报风险待办", deliverables=["验收记录"],
+        app_token="app_followup_risk", table_id="tbl_followup_risk", record_id="rec_followup_risk",
+    )
+    _register_project(
+        "简报正常待办项目", ["李四"], future, "进行中", [],
+        goal="验证简报风险待办", deliverables=["验收记录"],
+        app_token="app_followup_normal", table_id="tbl_followup_normal", record_id="rec_followup_normal",
+    )
+    captured = {}
+
+    def capture_card(chat_id, card):
+        captured["card"] = card
+        return "om_briefing_risk_followup"
+
+    with patch("tools._send_interactive_card_via_feishu", side_effect=capture_card):
+        _handle_query_status({"query": "风险项目简报"}, chat_id="oc_briefing_risk_followup")
+
+    with _plan_lock:
+        followup_action_id = next(
+            action_id for action_id, ref in _card_action_refs.items()
+            if ref["chat_id"] == "oc_briefing_risk_followup" and ref["action"] == "briefing_batch_followup_task"
+        )
+
+    sent_messages = []
+    with (
+        patch("tools._create_task", return_value="简报风险待办项目跟进: https://example.invalid/task/task_654") as create_task,
+        patch("tools._hermes_send", side_effect=lambda chat_id, msg: sent_messages.append((chat_id, msg)) or True),
+        patch("tools._append_project_doc_update", return_value=True) as append_doc,
+        patch("tools._append_bitable_update_record", return_value=True) as append_history,
+    ):
+        result = json.loads(_handle_card_action(
+            {"action_value": json.dumps({"pilotflow_action_id": followup_action_id}, ensure_ascii=False)},
+            chat_id="ignored_chat",
+        ))
+
+    assert result["status"] == "briefing_batch_followup_task_created"
+    assert result["project_count"] == 1
+    assert result["projects"] == ["简报风险待办项目"]
+    create_task.assert_called_once_with(
+        "简报风险待办项目跟进",
+        "项目: 简报风险待办项目",
+        "张三",
+        due_soon,
+        "oc_briefing_risk_followup",
+        ["张三"],
+    )
+    assert sent_messages
+    assert sent_messages[0][0] == "oc_briefing_risk_followup"
+    assert "已为 1 个风险项目创建跟进待办" in sent_messages[0][1]
+    assert "简报风险待办项目" in sent_messages[0][1]
+    append_doc.assert_called_once()
+    append_history.assert_called_once()
+
+
 def test_query_status_dashboard_includes_project_action_buttons():
     with _project_registry_lock:
         _project_registry.clear()
