@@ -1767,6 +1767,7 @@ def _build_project_briefing_card(
     projects: list[dict],
     chat_id: str = "",
     status_filter: str = "",
+    member_filters: Optional[list[str]] = None,
 ) -> tuple[dict, int, list[str]]:
     active_projects = [p for p in projects if not _is_archived_status(p.get("status", ""))]
     total = len(active_projects)
@@ -1830,15 +1831,16 @@ def _build_project_briefing_card(
                 "due_soon": "创建近期待办",
                 "overdue": "创建逾期待办",
             }[status_filter]
+        action_scope = {"member_filters": list(member_filters or [])} if member_filters else {}
         reminder_action = _create_card_action_ref(
             chat_id,
             "briefing_batch_reminder",
-            {"filter": reminder_filter, "value": "请今天同步进展"},
+            {"filter": reminder_filter, "value": "请今天同步进展", **action_scope},
         )
         followup_action = _create_card_action_ref(
             chat_id,
             "briefing_batch_followup_task",
-            {"filter": followup_filter},
+            {"filter": followup_filter, **action_scope},
         )
         action_ids.extend([risk_action, overdue_action, reminder_action, followup_action])
         elements.append({
@@ -2800,11 +2802,14 @@ def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
     if pilotflow_action == "briefing_batch_reminder":
         status_filter = action_data.get("filter") or "overdue"
         value = action_data.get("value") or "请今天同步进展"
+        member_filters = [str(member).strip() for member in action_data.get("member_filters", []) if str(member).strip()]
         filter_query = {
             "overdue": "逾期项目",
             "due_soon": "近期截止项目",
             "risk": "风险项目",
         }.get(status_filter, status_filter)
+        if member_filters:
+            filter_query = f"{'、'.join(member_filters)}负责的{filter_query}"
         sent_result = _handle_update_project(
             {"project_name": filter_query, "action": "send_reminder", "value": value},
             chat_id=chat_id,
@@ -2821,6 +2826,7 @@ def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
 
     if pilotflow_action == "briefing_batch_followup_task":
         status_filter = action_data.get("filter") or "overdue"
+        member_filters = [str(member).strip() for member in action_data.get("member_filters", []) if str(member).strip()]
         if status_filter not in ("overdue", "due_soon", "risk"):
             return tool_error("仅支持风险、逾期或近期截止项目批量创建待办。")
         with _project_registry_lock:
@@ -2831,6 +2837,7 @@ def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
                     "status": info.get("status", "进行中"),
                     "deadline": info.get("deadline", ""),
                 }, status_filter)
+                and (not member_filters or any(member in set(_project_member_names({"detail_project": info})) for member in member_filters))
             ]
         created_projects: list[str] = []
         for project_name, project in candidate_projects:
@@ -2873,6 +2880,7 @@ def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
         return tool_result({
             "status": "briefing_batch_followup_task_created",
             "filter": status_filter,
+            "member_filters": member_filters,
             "project_count": len(created_projects),
             "projects": created_projects,
             "instructions": "已批量创建筛选项目待办。不要展示工具名或英文。",
@@ -3264,7 +3272,7 @@ def _handle_query_status(params: Dict[str, Any], **kwargs) -> str:
         ]
     if _is_briefing_query(query):
         briefing_card, briefing_count, briefing_action_ids = _build_project_briefing_card(
-            query, projects, chat_id, status_filter,
+            query, projects, chat_id, status_filter, member_filters,
         )
         sent = _hermes_send_card(chat_id, briefing_card) if chat_id else False
         if isinstance(sent, str):

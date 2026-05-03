@@ -1237,6 +1237,51 @@ def test_standup_briefing_risk_button_can_create_batch_followup_tasks():
     append_history.assert_called_once()
 
 
+def test_filtered_briefing_followup_can_filter_by_owner():
+    with _project_registry_lock:
+        _project_registry.clear()
+    with _plan_lock:
+        _card_action_refs.clear()
+    due_soon = (dt.date.today() + dt.timedelta(days=2)).isoformat()
+    _register_project(
+        "张三风险待办项目", ["张三"], due_soon, "有风险", [],
+        goal="验证负责人风险待办", deliverables=["验收记录"],
+    )
+    _register_project(
+        "李四风险待办项目", ["李四"], due_soon, "有风险", [],
+        goal="验证负责人风险待办", deliverables=["验收记录"],
+    )
+
+    with patch("tools._send_interactive_card_via_feishu", return_value="om_owner_risk_followup"):
+        _handle_query_status({"query": "张三负责的风险项目简报"}, chat_id="oc_owner_risk_followup")
+
+    with _plan_lock:
+        followup_action_id = next(
+            action_id for action_id, ref in _card_action_refs.items()
+            if ref["chat_id"] == "oc_owner_risk_followup" and ref["action"] == "briefing_batch_followup_task"
+        )
+
+    sent_messages = []
+    with (
+        patch("tools._create_task", return_value="张三风险待办项目跟进: https://example.invalid/task/task_owner") as create_task,
+        patch("tools._hermes_send", side_effect=lambda chat_id, msg: sent_messages.append((chat_id, msg)) or True),
+        patch("tools._append_project_doc_update", return_value=True),
+        patch("tools._append_bitable_update_record", return_value=False),
+    ):
+        result = json.loads(_handle_card_action(
+            {"action_value": json.dumps({"pilotflow_action_id": followup_action_id}, ensure_ascii=False)},
+            chat_id="ignored_chat",
+        ))
+
+    assert result["status"] == "briefing_batch_followup_task_created"
+    assert result["member_filters"] == ["张三"]
+    assert result["project_count"] == 1
+    assert result["projects"] == ["张三风险待办项目"]
+    create_task.assert_called_once()
+    assert "张三风险待办项目" in sent_messages[0][1]
+    assert "李四风险待办项目" not in sent_messages[0][1]
+
+
 def test_filtered_briefing_followup_button_names_current_filter():
     with _project_registry_lock:
         _project_registry.clear()
