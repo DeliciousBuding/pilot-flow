@@ -957,6 +957,50 @@ def test_standup_briefing_overdue_button_sends_batch_reminders():
     append_history.assert_called_once()
 
 
+def test_card_command_briefing_batch_reminder_updates_card_after_success():
+    with _project_registry_lock:
+        _project_registry.clear()
+    with _plan_lock:
+        _card_action_refs.clear()
+    overdue = (dt.date.today() - dt.timedelta(days=1)).isoformat()
+    _register_project(
+        "桥接逾期催办项目", ["张三"], overdue, "进行中", [],
+        goal="验证桥接批量催办", deliverables=["验收记录"],
+        app_token="app_bridge_reminder", table_id="tbl_bridge_reminder", record_id="rec_bridge_reminder",
+    )
+    action_id = _create_card_action_ref(
+        "oc_bridge_batch_reminder",
+        "briefing_batch_reminder",
+        {"filter": "overdue", "value": "请今天同步进展"},
+    )
+    with _plan_lock:
+        _card_action_refs[action_id]["message_id"] = "om_bridge_batch_reminder"
+
+    marked_cards = []
+
+    def capture_mark(message_id, title, content, template):
+        marked_cards.append((message_id, title, content, template))
+        return True
+
+    with (
+        patch("tools._hermes_send", return_value=True),
+        patch("tools._append_project_doc_update", return_value=True),
+        patch("tools._append_bitable_update_record", return_value=True),
+        patch("tools._mark_card_message", side_effect=capture_mark),
+    ):
+        result = _handle_card_command(f'button {{"pilotflow_action_id":"{action_id}"}}')
+
+    assert result is None
+    assert marked_cards == [
+        (
+            "om_bridge_batch_reminder",
+            "批量催办已发送",
+            "已向 1 个逾期项目发送催办提醒。",
+            "yellow",
+        )
+    ]
+
+
 def test_standup_briefing_overdue_button_can_create_batch_followup_tasks():
     with _project_registry_lock:
         _project_registry.clear()

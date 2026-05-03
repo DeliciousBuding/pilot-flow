@@ -3032,6 +3032,19 @@ def _handle_card_command(raw_args: str) -> str:
             "green",
         )
         return None
+    if data.get("status") == "briefing_batch_reminder_sent":
+        filter_label = {
+            "overdue": "逾期项目",
+            "due_soon": "近期截止项目",
+            "risk": "风险项目",
+        }.get(data.get("filter") or action_data.get("filter"), "匹配项目")
+        _mark_card_message(
+            message_id,
+            "批量催办已发送",
+            f"已向 {data.get('reminder_count', 0)} 个{filter_label}发送催办提醒。",
+            "yellow",
+        )
+        return None
     if data.get("status") in (
         "project_marked_done", "project_reopened", "project_risk_resolved",
         "project_reminder_sent", "project_followup_task_created",
@@ -3048,7 +3061,7 @@ def _handle_card_command(raw_args: str) -> str:
         return None
     if data.get("status") in (
         "project_status_sent", "project_marked_done", "project_reopened", "project_risk_resolved",
-        "project_reminder_sent", "dashboard_page_sent", "dashboard_filter_sent", "briefing_batch_reminder_sent",
+        "project_reminder_sent", "dashboard_page_sent", "dashboard_filter_sent",
         "history_suggestions_applied",
     ):
         return None
