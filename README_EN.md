@@ -2,9 +2,9 @@
 
 # ✈️ PilotFlow
 
-**Hermes Project Management Plugin for Feishu**
+**AI project operator for Feishu group chats, built on the Hermes runtime**
 
-Mention @PilotFlow in a Feishu group chat with a requirement, and it automatically creates Feishu docs, tasks, and project entry messages.
+Mention @PilotFlow in a Feishu group chat, get a confirmable project plan, and let it orchestrate Feishu docs, bitable, tasks, calendar, cards, permissions, mentions, and reminders.
 
 [中文版](README.md)
 
@@ -15,9 +15,15 @@ Mention @PilotFlow in a Feishu group chat with a requirement, and it automatical
 
 ---
 
-## Demo
+## Demo And Evidence
 
-See [docs/demo/README.md](docs/demo/README.md) for the full demo script covering 5 scenarios.
+| Asset | Status | Link |
+| --- | --- | --- |
+| Demo script | Prepared | [docs/demo/README.md](docs/demo/README.md) |
+| Contest submission pack | Prepared | [docs/CONTEST_SUBMISSION.md](docs/CONTEST_SUBMISSION.md) |
+| Local tests | 35 tests passing | `pytest -q` |
+| Live Feishu recording | Pending | To be added after live parity |
+| Live artifact samples | Pending | To be added after live parity |
 
 ---
 
@@ -25,7 +31,7 @@ See [docs/demo/README.md](docs/demo/README.md) for the full demo script covering
 
 **PilotFlow is an AI project operator living in your Feishu group chat.**
 
-Mention @PilotFlow with a requirement in plain language. It extracts goals, members, deliverables, and deadlines, then calls Feishu APIs to create real documents, tasks, and project entry messages. Fully LLM-driven, plug and play.
+Mention @PilotFlow with a requirement in plain language. It extracts goals, members, deliverables, and deadlines, sends a confirmation card, and creates real Feishu artifacts only after confirmation. It is not a raw Feishu API wrapper; it packages project kickoff, confirmation, execution, tracking, reminders, and review into an auditable workflow.
 
 ## Why PilotFlow
 
@@ -47,6 +53,15 @@ Mention @PilotFlow with a requirement in plain language. It extracts goals, memb
 | **Plug and Play** | Built on Hermes runtime — one-command install via `python setup.py --hermes-dir ...` |
 | **Project Pattern Memory** | Writes created project patterns to Hermes memory, preparing for history-based suggestions |
 
+## More Than A Feishu Tool Wrapper
+
+| Layer | Hermes Provides | PilotFlow Adds |
+| --- | --- | --- |
+| Runtime | LLM orchestration, tool registry, Feishu gateway, messaging, memory, cron | Project semantics, templates, confirmation gate, pending plans, risk checks, multi-turn status management |
+| Feishu surfaces | Message channel and card action routing | Docs, bitable, tasks, calendar, permissions, group-member resolution, @mentions, entry cards |
+| Workflow | Tool execution environment | Group request -> plan card -> human confirmation -> artifact orchestration -> dashboard -> deadline reminder |
+| Trust controls | Tool infrastructure | Per-chat confirmation gate, 10-minute TTL, cancel action, display summaries, graceful fallback |
+
 ## Architecture
 
 ```
@@ -56,7 +71,7 @@ Hermes Agent Runtime (LLM + Feishu Gateway + Tool Registry)
 
 - **Base**: Hermes provides Agent runtime, Feishu WebSocket gateway, LLM orchestration
 - **Plugin**: PilotFlow provides project management workflow and Feishu API tools (lark_oapi SDK)
-- **LLM**: gpt-5.5 via OpenAI-compatible API
+- **LLM**: OpenAI-compatible API. The default example uses `gpt-4.1`, and can be replaced through Hermes config.
 
 ## Quick Start
 
@@ -90,25 +105,17 @@ uv run hermes gateway
 | **@mention** | Resolve group member list, mention_user in docs, `<at>` tags in messages |
 | **Permission Management** | Auto-open link access + add group members as editors |
 
-## Verified Capabilities
+## Capability Evidence
 
-| Capability | Description |
-| --- | --- |
-| Feishu Doc Creation | Formatted markdown, @mention, auto permissions + editor access for group members |
-| Bitable | Auto-create project status ledger, write records, auto permissions + editor access |
-| Feishu Task Creation | Auto-creates tasks with assignee and deadline |
-| @mention | Resolves group members, mention_user in docs, `<at>` tags in messages |
-| Permission Management | Auto: link viewable + group members as editors |
-| Confirmation Gate | Code-level enforcement + interactive card buttons, must generate plan first |
-| Project Templates | Auto-detects keywords (defense/sprint/event/launch), suggests deliverables and timeline |
-| Multi-turn Management | Update deadline, add members, change status — syncs to bitable |
-| Project Dashboard | Query project status, send card to group chat |
-| Risk Detection | Auto-detect missing members, vague deadlines, unclear deliverables |
-| Calendar Integration | Auto-create deadline calendar event (UTC+8) |
-| Deadline Reminder | Auto-schedule reminder 1 day before deadline via Hermes cron |
-| Card Buttons | Confirm/cancel action tool is implemented; live Feishu button continuation still needs parity testing |
-| LLM-Driven | gpt-5.5 understands Chinese intent, selects tools automatically |
-| End-to-End Verified | Earlier live path was validated; v1.12 needs a real LLM + card button parity rerun |
+| Capability | Current Evidence | Notes |
+| --- | --- | --- |
+| Feishu docs/bitable/tasks/entry message | Earlier live group path was validated | v1.12 needs a fresh recording |
+| Confirmation gate | Local integration tests + per-chat TTL | Project creation is blocked before confirmation |
+| Card confirm/cancel | Local integration tests cover both actions | Real Feishu button continuation still needs live parity |
+| Hermes memory write | Local integration tests cover dispatch | Member names are not persisted by default |
+| Hermes cron reminder | Local integration tests cover dispatch | Schedules pre-deadline reminders |
+| Templates/risks/dashboard/updates | Unit + integration tests | Covers defense, sprint, event, and launch templates |
+| LLM-driven tool choice | Hermes tool descriptions + skill instructions | Real LLM behavior needs live parity rerun |
 
 ## Competitive Positioning
 
@@ -117,9 +124,9 @@ uv run hermes gateway
 | Positioning | Meeting notes / project space | Group chat project operator |
 | Entry Point | Meeting / workspace | Feishu group chat @mention |
 | Workflow | Meeting → todo / project flow | One sentence → docs + tasks + messages |
-| AI Capability | None | LLM understands intent, auto-executes |
-| Learning | None | Hermes memory write is implemented; memory read and automatic suggestions are next |
-| Extensibility | Fixed features | Hermes plugin ecosystem |
+| AI Workflow | Focused on meeting/project-space scenarios | Group-chat request, LLM tool choice, and executable project workflow |
+| Learning | Depends on built-in Feishu product behavior | Hermes memory write is implemented; memory read and automatic suggestions are next |
+| Extensibility | Mostly within Feishu product surfaces | Hermes plugins/skills/cron/memory plus Feishu OpenAPI orchestration |
 
 ## Documentation
 
@@ -128,6 +135,7 @@ uv run hermes gateway
 | [Installation Guide](INSTALL.md) | Setup steps |
 | [Product Spec](docs/PRODUCT_SPEC.md) | User commitments, feature tiers |
 | [Architecture Design](docs/ARCHITECTURE.md) | Components, state model, tool routing |
+| [Contest Submission Pack](docs/CONTEST_SUBMISSION.md) | Positioning, demo path, evidence matrix |
 | [Personal Progress](PERSONAL_PROGRESS.md) | Development progress and verification results |
 | [Contributing](CONTRIBUTING.md) | Dev setup, coding conventions, submitting PRs |
 

@@ -38,10 +38,10 @@ sys.modules["tools.registry"] = _mock_registry
 from tools import (
     _handle_generate_plan,
     _handle_create_project_space,
+    _handle_card_action,
     _handle_query_status,
     _handle_update_project,
     _handle_detect_risks,
-    _handle_send_summary,
     _check_plan_gate,
     _clear_plan_gate,
     _register_project,
@@ -132,6 +132,8 @@ def test_full_flow_create_project():
     memory_calls = [c for c in _call_log if c["name"] == "memory"]
     assert len(memory_calls) >= 1
     assert "答辩项目" in memory_calls[0]["args"]["content"]
+    assert "成员=1 人" in memory_calls[0]["args"]["content"]
+    assert "唐丁" not in memory_calls[0]["args"]["content"]
     print("  PASS  Step 7: Project saved to Hermes memory")
 
     # Step 8: Verify cron job was scheduled
@@ -144,6 +146,71 @@ def test_full_flow_create_project():
     msg_calls = [c for c in _call_log if c["name"] == "send_message"]
     assert len(msg_calls) >= 1
     print("  PASS  Step 9: Entry card sent via Hermes")
+
+
+def test_card_action_confirm_uses_pending_plan():
+    """Test card confirm recovers pending plan and creates the project."""
+    _clear_state()
+    chat_id = "oc_card_confirm"
+
+    _handle_generate_plan(
+        {
+            "input_text": "准备答辩项目",
+            "title": "卡片确认项目",
+            "goal": "验证卡片确认",
+            "members": ["唐丁"],
+            "deliverables": ["项目简报"],
+            "deadline": "2026-05-07",
+        },
+        chat_id=chat_id,
+    )
+    _call_log.clear()
+
+    result = json.loads(_handle_card_action(
+        {"action_value": json.dumps({"pilotflow_action": "confirm_project"})},
+        chat_id=chat_id,
+    ))
+
+    assert result["status"] == "project_space_created"
+    assert result["title"] == "卡片确认项目"
+    assert _check_plan_gate(chat_id) is False
+    with _project_registry_lock:
+        assert "卡片确认项目" in _project_registry
+    assert any(c["name"] == "memory" for c in _call_log)
+    assert any(c["name"] == "cronjob" for c in _call_log)
+    print("  PASS  Card confirm creates project from pending plan")
+
+
+def test_card_action_cancel_clears_pending_plan():
+    """Test card cancel clears the confirmation gate and does not create a project."""
+    _clear_state()
+    chat_id = "oc_card_cancel"
+
+    _handle_generate_plan(
+        {
+            "input_text": "准备取消项目",
+            "title": "取消项目",
+            "goal": "验证取消",
+            "members": ["唐丁"],
+            "deliverables": ["项目简报"],
+            "deadline": "2026-05-07",
+        },
+        chat_id=chat_id,
+    )
+    assert _check_plan_gate(chat_id) is True
+    _call_log.clear()
+
+    result = json.loads(_handle_card_action(
+        {"action_value": json.dumps({"pilotflow_action": "cancel_project"})},
+        chat_id=chat_id,
+    ))
+
+    assert result["status"] == "cancelled"
+    assert _check_plan_gate(chat_id) is False
+    with _project_registry_lock:
+        assert "取消项目" not in _project_registry
+    assert any(c["name"] == "send_message" for c in _call_log)
+    print("  PASS  Card cancel clears gate without creating project")
 
 
 # --- Integration Test: Query Status After Creation ---

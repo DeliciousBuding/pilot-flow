@@ -34,18 +34,27 @@ python PilotFlow/setup.py --hermes-dir .
 
 ## 第三步：配置环境变量
 
+Linux / macOS:
+
 ```bash
 mkdir -p ~/.hermes
 cp PilotFlow/.env.example ~/.hermes/.env
+```
+
+Windows PowerShell:
+
+```powershell
+New-Item -ItemType Directory -Force "$HOME\.hermes"
+Copy-Item .\PilotFlow\.env.example "$HOME\.hermes\.env"
 ```
 
 编辑 `~/.hermes/.env`：
 
 ```env
 # LLM 配置
-OPENAI_BASE_URL=https://api.vectorcontrol.tech/v1
+OPENAI_BASE_URL=https://api.openai.com/v1
 OPENAI_API_KEY=your-api-key-here
-OPENAI_MODEL=gpt-5.5
+OPENAI_MODEL=gpt-4.1
 
 # 飞书应用凭证
 FEISHU_APP_ID=cli_xxxxxxxxxxxxxxxx
@@ -54,20 +63,22 @@ FEISHU_GROUP_POLICY=open
 
 # PilotFlow 配置
 PILOTFLOW_TEST_CHAT_ID=oc_xxxxxxxxxxxxxxxx
+PILOTFLOW_MEMORY_ENABLED=true
+PILOTFLOW_MEMORY_INCLUDE_MEMBERS=false
 ```
 
 同时配置 Hermes 模型（`~/.hermes/config.yaml`）：
 
 ```yaml
 model:
-  default: gpt-5.5
-  provider: vectorcontrol
+  default: gpt-4.1
+  provider: openai
 
 providers:
-  vectorcontrol:
-    base_url: https://api.vectorcontrol.tech/v1
+  openai:
+    base_url: https://api.openai.com/v1
     key_env: OPENAI_API_KEY
-    model: gpt-5.5
+    model: gpt-4.1
 
 gateway:
   default_platform: feishu
@@ -85,6 +96,8 @@ gateway:
 | `FEISHU_APP_SECRET` | 同上，点击查看 |
 | `FEISHU_GROUP_POLICY` | 设为 `open` 允许所有群消息，或 `allowlist` 配合白名单 |
 | `PILOTFLOW_TEST_CHAT_ID` | 飞书群设置 → 群号 → 以 `oc_` 开头 |
+| `PILOTFLOW_MEMORY_ENABLED` | 默认 `true`，项目创建后写入 Hermes memory |
+| `PILOTFLOW_MEMORY_INCLUDE_MEMBERS` | 默认 `false`，共享环境不要持久化成员姓名 |
 
 ## 第四步：飞书应用配置
 
@@ -144,6 +157,14 @@ ModuleNotFoundError: No module named 'lark_oapi'
 
 确认 `OPENAI_BASE_URL` 和 `OPENAI_API_KEY` 正确：
 
+Linux / macOS:
+
 ```bash
 curl $OPENAI_BASE_URL/models -H "Authorization: Bearer $OPENAI_API_KEY"
+```
+
+Windows PowerShell:
+
+```powershell
+Invoke-RestMethod "$env:OPENAI_BASE_URL/models" -Headers @{ Authorization = "Bearer $env:OPENAI_API_KEY" }
 ```

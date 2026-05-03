@@ -17,6 +17,11 @@ import shutil
 import sys
 
 
+REQUIRED_ENV = ["OPENAI_API_KEY", "FEISHU_APP_ID", "FEISHU_APP_SECRET"]
+RECOMMENDED_CONFIG_MARKERS = ("provider:", "gateway:", "default_platform:", "feishu:")
+PLACEHOLDER_MARKERS = ("your-", "xxx", "xxxxx", "changeme", "example")
+
+
 def find_hermes_dir():
     """Try to find hermes-agent directory."""
     candidates = [
@@ -51,21 +56,39 @@ def copy_skills(src_dir, dst_dir):
     print(f"  Copied skills to {dst}")
 
 
-def check_env():
+def _parse_env(content):
+    """Parse simple KEY=VALUE lines from an env file."""
+    values = {}
+    for raw_line in content.splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        values[key.strip()] = value.strip().strip('"').strip("'")
+    return values
+
+
+def _is_configured(value):
+    if not value:
+        return False
+    lowered = value.lower()
+    return not any(marker in lowered for marker in PLACEHOLDER_MARKERS)
+
+
+def check_env(env_file=None):
     """Check for required environment variables."""
-    env_file = os.path.expanduser("~/.hermes/.env")
+    env_file = env_file or os.path.expanduser("~/.hermes/.env")
     if not os.path.exists(env_file):
         print(f"  WARNING: {env_file} not found")
         print("  Create it with: cp .env.example ~/.hermes/.env")
         print("  Then edit with your Feishu credentials")
         return False
 
-    required = ["OPENAI_API_KEY", "FEISHU_APP_ID", "FEISHU_APP_SECRET"]
     missing = []
     with open(env_file) as f:
-        content = f.read()
-        for var in required:
-            if var not in content or f"{var}=" not in content:
+        values = _parse_env(f.read())
+        for var in REQUIRED_ENV:
+            if not _is_configured(values.get(var, "")):
                 missing.append(var)
 
     if missing:
@@ -73,6 +96,25 @@ def check_env():
         return False
 
     print(f"  Environment OK ({env_file})")
+    return True
+
+
+def check_config(config_file=None):
+    """Check that Hermes config has the required model and Feishu gateway sections."""
+    config_file = config_file or os.path.expanduser("~/.hermes/config.yaml")
+    if not os.path.exists(config_file):
+        print(f"  WARNING: {config_file} not found")
+        print("  Create it from INSTALL.md before starting the gateway")
+        return False
+
+    with open(config_file) as f:
+        content = f.read()
+    missing = [marker for marker in RECOMMENDED_CONFIG_MARKERS if marker not in content]
+    if missing:
+        print(f"  WARNING: {config_file} may be incomplete; missing: {', '.join(missing)}")
+        return False
+
+    print(f"  Hermes config OK ({config_file})")
     return True
 
 
@@ -127,7 +169,10 @@ def main():
     print("3. Checking environment...")
     env_ok = check_env()
 
-    print("4. Validating installation...")
+    print("4. Checking Hermes config...")
+    config_ok = check_config()
+
+    print("5. Validating installation...")
     install_ok = validate_install(hermes_dir)
 
     print()
@@ -136,6 +181,9 @@ def main():
         if not env_ok:
             print("WARNING: Environment variables need configuration")
             print("Edit ~/.hermes/.env with your Feishu credentials")
+        elif not config_ok:
+            print("WARNING: Hermes config needs review")
+            print("Edit ~/.hermes/config.yaml using INSTALL.md")
         else:
             print("Run: uv run hermes gateway")
     else:

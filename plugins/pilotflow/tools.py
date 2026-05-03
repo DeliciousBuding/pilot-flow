@@ -23,6 +23,8 @@ logger = logging.getLogger(__name__)
 # Feishu app credentials — read from env
 APP_ID = os.environ.get("FEISHU_APP_ID", "")
 APP_SECRET = os.environ.get("FEISHU_APP_SECRET", "")
+MEMORY_ENABLED = os.environ.get("PILOTFLOW_MEMORY_ENABLED", "true").lower() not in ("0", "false", "no")
+MEMORY_INCLUDE_MEMBERS = os.environ.get("PILOTFLOW_MEMORY_INCLUDE_MEMBERS", "false").lower() in ("1", "true", "yes")
 
 # Lazy-loaded lark client (only for doc/task/bitable — NOT for messaging)
 _client = None
@@ -175,8 +177,13 @@ def _hermes_send_card(chat_id: str, card_json: dict) -> bool:
 
 def _save_to_hermes_memory(title: str, goal: str, members: list, deliverables: list, deadline: str):
     """Save project creation pattern to Hermes memory for future suggestions."""
+    if not MEMORY_ENABLED:
+        return
     try:
-        member_str = "、".join(members) if members else "无"
+        if MEMORY_INCLUDE_MEMBERS:
+            member_str = "、".join(members) if members else "无"
+        else:
+            member_str = f"{len(members)} 人" if members else "无"
         deliverable_str = "、".join(deliverables) if deliverables else "无"
         content = (
             f"【项目创建】{title}：目标={goal}，成员={member_str}，"
@@ -1167,50 +1174,6 @@ def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
         }, **kwargs)
 
     return tool_error(f"未知的卡片动作: {pilotflow_action}")
-
-
-# ---------------------------------------------------------------------------
-# Tool: pilotflow_send_summary
-# ---------------------------------------------------------------------------
-
-PILOTFLOW_SEND_SUMMARY_SCHEMA = {
-    "name": "pilotflow_send_summary",
-    "description": (
-        "向飞书群发送项目执行总结消息。包含已创建的产物列表和项目状态。\n"
-        "通常在 pilotflow_create_project_space 完成后自动调用，向群聊发送一条汇总消息。\n"
-        "如果 create_project_space 已返回 display 列表，你可以直接展示，不必再调用此工具。\n\n"
-        "【输出规则】只用中文回复，不要展示工具名称或英文内容。"
-    ),
-    "parameters": {
-        "type": "object",
-        "properties": {
-            "title": {"type": "string", "description": "项目标题。"},
-            "artifacts": {"type": "array", "items": {"type": "string"}, "description": "已创建的产物列表。"},
-            "status": {"type": "string", "description": "项目状态，默认 completed。"},
-        },
-        "required": ["title", "artifacts"],
-    },
-}
-
-
-def _handle_send_summary(params: Dict[str, Any], **kwargs) -> str:
-    """Send a delivery summary via Hermes."""
-    title = params.get("title", "")
-    artifacts = params.get("artifacts", [])
-    status = params.get("status", "completed")
-
-    chat_id = _get_chat_id(kwargs)
-    if not chat_id:
-        return tool_error("无法获取群聊 ID")
-
-    summary = f"✅ {title} — 执行完成\n\n已创建产物:\n"
-    for a in artifacts:
-        summary += f"  • {a}\n"
-    summary += f"\n状态: {status}"
-
-    if not _hermes_send(chat_id, summary):
-        return tool_error("发送总结失败")
-    return tool_result(f"已发送项目总结到群聊: {title}")
 
 
 # ---------------------------------------------------------------------------

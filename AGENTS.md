@@ -47,15 +47,15 @@ PilotFlow/
 - Direct tool test: set `PILOTFLOW_TEST_CHAT_ID` env var
 - End-to-end: @PilotFlow in Feishu group chat
 
-## Current Status (2026-05-03)
-
-- Version: `plugin.yaml` 1.12.0
-- Tests: 25 local tests passing
-- Runtime install: `<hermes-agent>/plugins/pilotflow/tools.py` should match the repo copy after `python setup.py --hermes-dir <hermes-agent-path>`
-- Must verify next: real LLM + Feishu group live parity for confirm/cancel card buttons
-
 ## Dependencies
 
 - hermes-agent (runtime)
 - lark-oapi (Feishu SDK)
-- gpt-5.5 via vectorcontrol API
+- OpenAI-compatible chat completion provider configured through Hermes
+
+## Verification Checklist
+
+- Run `pytest -q` before committing.
+- Run `python setup.py --hermes-dir <hermes-agent-path>` after plugin changes.
+- In the Hermes runtime, import `plugins.pilotflow` and verify six registered tools.
+- For release claims, separate local test evidence from real Feishu live evidence.

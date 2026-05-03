@@ -35,7 +35,7 @@ PilotFlow 是飞书群聊中的 AI 项目运行官。它将群聊中的项目讨
 | 多轮管理 | 改截止时间、加成员、改状态 — 同步更新多维表格 |
 | 项目看板 | 查询项目状态，发送看板卡片到群聊 |
 | 项目模板 | 自动识别答辩/sprint/活动/上线模板，建议交付物和工期 |
-| Hermes Memory 写入 | 项目创建时自动保存模式，供后续历史读取使用 |
+| Hermes Memory 写入 | 项目创建时自动保存模式，供后续历史读取使用；默认不保存成员姓名 |
 | 卡片回调工具 | 已实现确认/取消按钮处理；真实飞书 live 续跑待复测 |
 
 ### P1 — 深度融合（下一轮）
@@ -80,5 +80,6 @@ PilotFlow 发送交付总结
 - 依赖 lark-oapi SDK（Doc/Task/Bitable 操作）
 - 消息发送通过 Hermes registry.dispatch
 - 项目模式通过 Hermes memory 写入；历史读取尚未作为稳定功能发布
+- 共享环境默认 `PILOTFLOW_MEMORY_INCLUDE_MEMBERS=false`，避免把成员姓名持久化到 memory
 - 截止提醒通过 Hermes cronjob 调度
 - 需要飞书应用权限（im, docx, bitable, task, drive, calendar）

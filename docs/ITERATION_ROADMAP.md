@@ -91,7 +91,7 @@ Hermes 已经为我们准备好的能力, 我们能复用的全部要复用:
 4. 修复在真实环境中暴露的所有 bug
 
 **验证标准**:
-- 真实群里 @PilotFlow 能完整跑通: 提取 -> 卡片确认 -> 创建 5 个产物
+- 真实群里 @PilotFlow 能完整跑通: 提取 -> 卡片确认 -> 创建核心项目产物
 - 点击「✅ 确认执行」按钮能触发 create_project_space (不需要文字回复)
 - 点击「❌ 取消」按钮能清掉 plan gate 和 pending plan
 
@@ -164,7 +164,7 @@ Hermes 已经为我们准备好的能力, 我们能复用的全部要复用:
 明确不在本阶段做的事 (留给 Phase 4+):
 
 - ❌ 移动端飞书小程序 (飞书原生体验已够)
-- ❌ 自定义 LLM provider (vectorcontrol 够用)
+- ❌ 自定义 LLM provider (复用 Hermes 的 OpenAI-compatible provider 配置)
 - ❌ 多租户 / SaaS 化 (单 app 单租户足以演示)
 - ❌ Worker Tab / Chat Tab (PR 体验复杂, 优先级低)
 - ❌ 事件订阅复杂规则 (Hermes 默认 group_policy=open 即可)

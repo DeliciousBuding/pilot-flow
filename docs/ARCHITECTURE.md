@@ -34,7 +34,7 @@
 
 | 组件 | 职责 |
 | --- | --- |
-| LLM 调度 | 调用 gpt-5.5，解析用户意图，选择工具 |
+| LLM 调度 | 调用 Hermes 配置的 OpenAI-compatible 模型，解析用户意图，选择工具 |
 | 飞书网关 | WebSocket 连接、@mention 解析、消息收发 |
 | 工具注册表 | 插件注册工具、工具发现、handler 调度 |
 
