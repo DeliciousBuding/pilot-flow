@@ -2288,10 +2288,18 @@ def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
             reminder_sent = _hermes_send(chat_id, _build_project_reminder_text(chat_id, project_title, project))
             if not reminder_sent:
                 return tool_error("项目催办提醒发送失败，请检查 Feishu 连接。")
+            doc_updated = _append_project_doc_update(project_title, project, "催办", "已发送催办提醒")
+            bitable_history_created = False
+            if project.get("app_token") and project.get("table_id"):
+                bitable_history_created = _append_bitable_update_record(
+                    project["app_token"], project["table_id"], "催办", "已发送催办提醒", project,
+                )
             return tool_result({
                 "status": "project_reminder_sent",
                 "project": project_title,
                 "reminder_sent": True,
+                "doc_updated": doc_updated,
+                "bitable_history_created": bitable_history_created,
                 "instructions": "已发送项目催办提醒。不要展示工具名或英文。",
             })
 

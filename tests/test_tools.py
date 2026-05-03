@@ -1038,6 +1038,41 @@ def test_project_reminder_card_action_sends_chinese_group_reminder():
     assert "pilotflow" not in message.lower()
 
 
+def test_project_reminder_card_action_records_doc_and_bitable_history():
+    with _project_registry_lock:
+        _project_registry.clear()
+    deadline = (dt.date.today() - dt.timedelta(days=1)).isoformat()
+    _register_project(
+        "催办留痕项目", ["张三"], deadline, "进行中", ["文档: https://example.invalid/doc"],
+        goal="验证催办留痕", deliverables=["验收记录"],
+        app_token="app1", table_id="tbl1", record_id="rec1",
+    )
+    action_value = json.dumps({"pilotflow_action": "send_project_reminder", "title": "催办留痕项目"}, ensure_ascii=False)
+
+    with (
+        patch("tools._hermes_send", return_value=True),
+        patch("tools._append_project_doc_update", return_value=True) as append_doc,
+        patch("tools._append_bitable_update_record", return_value=True) as append_history,
+    ):
+        result = json.loads(_handle_card_action({"action_value": action_value}, chat_id="oc_reminder_trace"))
+
+    assert result["status"] == "project_reminder_sent"
+    assert result["doc_updated"] is True
+    assert result["bitable_history_created"] is True
+    append_doc.assert_called_once_with(
+        "催办留痕项目",
+        _project_registry["催办留痕项目"],
+        "催办",
+        "已发送催办提醒",
+    )
+    append_history.assert_called_once()
+    args = append_history.call_args.args
+    assert args[0] == "app1"
+    assert args[1] == "tbl1"
+    assert args[2] == "催办"
+    assert args[3] == "已发送催办提醒"
+
+
 def test_risk_project_dashboard_offers_resolve_risk_button():
     with _project_registry_lock:
         _project_registry.clear()
