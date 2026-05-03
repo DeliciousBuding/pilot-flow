@@ -2857,6 +2857,7 @@ def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
         _hermes_send(chat_id, f"已为 {len(created_projects)} 个{filter_label}创建跟进待办：{', '.join(created_projects)}。")
         return tool_result({
             "status": "briefing_batch_followup_task_created",
+            "filter": status_filter,
             "project_count": len(created_projects),
             "projects": created_projects,
             "instructions": "已批量创建筛选项目待办。不要展示工具名或英文。",
@@ -3017,14 +3018,6 @@ def _handle_card_command(raw_args: str) -> str:
             "已将历史建议补入计划，请继续确认执行。",
             "blue",
         )
-    elif action_id and pilotflow_action == "briefing_batch_followup_task":
-        _mark_card_message(
-            message_id,
-            "批量待办已创建",
-            "已为逾期项目创建跟进待办。",
-            "green",
-        )
-
     resolved_action_data = dict(action_data)
     if action_ref:
         resolved_action_data.pop("pilotflow_action_id", None)
@@ -3058,10 +3051,23 @@ def _handle_card_command(raw_args: str) -> str:
         if action_ref:
             _clear_pending_plan_if_matches(chat_id, action_ref.get("plan"))
         return None
+    if data.get("status") == "briefing_batch_followup_task_created":
+        filter_label = {
+            "overdue": "逾期项目",
+            "due_soon": "近期截止项目",
+            "risk": "风险项目",
+        }.get(data.get("filter") or action_data.get("filter"), "匹配项目")
+        _mark_card_message(
+            message_id,
+            "批量待办已创建",
+            f"已为 {data.get('project_count', 0)} 个{filter_label}创建跟进待办。",
+            "green",
+        )
+        return None
     if data.get("status") in (
         "project_status_sent", "project_marked_done", "project_reopened", "project_risk_resolved",
         "project_reminder_sent", "dashboard_page_sent", "dashboard_filter_sent", "briefing_batch_reminder_sent",
-        "history_suggestions_applied", "project_followup_task_created", "briefing_batch_followup_task_created",
+        "history_suggestions_applied", "project_followup_task_created",
     ):
         return None
     if data.get("display"):

@@ -1119,6 +1119,51 @@ def test_filtered_briefing_followup_button_names_current_filter():
     assert "批量创建待办" not in button_texts
 
 
+def test_card_command_briefing_batch_followup_updates_card_after_success_with_filter_label():
+    with _project_registry_lock:
+        _project_registry.clear()
+    with _plan_lock:
+        _card_action_refs.clear()
+    due_soon = (dt.date.today() + dt.timedelta(days=2)).isoformat()
+    _register_project(
+        "桥接风险待办项目", ["张三"], due_soon, "有风险", [],
+        goal="验证桥接风险待办", deliverables=["验收记录"],
+        app_token="app_bridge_risk", table_id="tbl_bridge_risk", record_id="rec_bridge_risk",
+    )
+    action_id = _create_card_action_ref(
+        "oc_bridge_risk_followup",
+        "briefing_batch_followup_task",
+        {"filter": "risk"},
+    )
+    with _plan_lock:
+        _card_action_refs[action_id]["message_id"] = "om_bridge_risk_followup"
+
+    marked_cards = []
+
+    def capture_mark(message_id, title, content, template):
+        marked_cards.append((message_id, title, content, template))
+        return True
+
+    with (
+        patch("tools._create_task", return_value="桥接风险待办项目跟进: https://example.invalid/task/task_987"),
+        patch("tools._hermes_send", return_value=True),
+        patch("tools._append_project_doc_update", return_value=True),
+        patch("tools._append_bitable_update_record", return_value=True),
+        patch("tools._mark_card_message", side_effect=capture_mark),
+    ):
+        result = _handle_card_command(f'button {{"pilotflow_action_id":"{action_id}"}}')
+
+    assert result is None
+    assert marked_cards == [
+        (
+            "om_bridge_risk_followup",
+            "批量待办已创建",
+            "已为 1 个风险项目创建跟进待办。",
+            "green",
+        )
+    ]
+
+
 def test_query_status_dashboard_includes_project_action_buttons():
     with _project_registry_lock:
         _project_registry.clear()
