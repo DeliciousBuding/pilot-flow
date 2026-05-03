@@ -1453,6 +1453,17 @@ def _dashboard_page_from_query(query: str) -> int:
     return 1
 
 
+def _dashboard_query_for_page(query: str, page: int) -> str:
+    """Build a Chinese dashboard query that preserves filters and targets a page."""
+    base = (query or "项目进展").strip()
+    target = max(1, int(page))
+    if re.search(r"第\s*\d+\s*页", base):
+        return re.sub(r"第\s*\d+\s*页", f"第{target}页", base, count=1)
+    if "下一页" in base:
+        return base.replace("下一页", f"第{target}页", 1)
+    return f"{base} 第{target}页"
+
+
 def _is_archived_status(status: str) -> bool:
     return str(status).strip() in ("已归档", "归档", "archived")
 
@@ -2247,6 +2258,17 @@ def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
             "instructions": instruction,
         })
 
+    if pilotflow_action == "dashboard_page":
+        page_query = action_data.get("query") or _dashboard_query_for_page("项目进展", action_data.get("page", 1))
+        sent_result = _handle_query_status({"query": page_query}, chat_id=chat_id)
+        if isinstance(sent_result, str) and "项目看板已发送" in sent_result:
+            return tool_result({
+                "status": "dashboard_page_sent",
+                "query": page_query,
+                "instructions": "已发送项目看板分页。不要展示工具名或英文。",
+            })
+        return sent_result
+
     return tool_error(f"未知的卡片动作: {pilotflow_action}")
 
 
@@ -2345,7 +2367,7 @@ def _handle_card_command(raw_args: str) -> str:
         if action_ref:
             _clear_pending_plan_if_matches(chat_id, action_ref.get("plan"))
         return None
-    if data.get("status") in ("project_status_sent", "project_marked_done", "project_reopened"):
+    if data.get("status") in ("project_status_sent", "project_marked_done", "project_reopened", "dashboard_page_sent"):
         return None
     if data.get("display"):
         return "\n".join(str(item) for item in data["display"])
@@ -2531,6 +2553,34 @@ def _handle_query_status(params: Dict[str, Any], **kwargs) -> str:
                         "value": {"pilotflow_action_id": next_action_id},
                     },
                 ],
+            })
+
+    if chat_id and total_pages > 1:
+        nav_actions = []
+        if page > 1:
+            prev_query = _dashboard_query_for_page(query, page - 1)
+            prev_action_id = _create_card_action_ref(chat_id, "dashboard_page", {"query": prev_query, "page": page - 1})
+            action_ids.append(prev_action_id)
+            nav_actions.append({
+                "tag": "button",
+                "text": {"tag": "plain_text", "content": "上一页"},
+                "type": "default",
+                "value": {"pilotflow_action_id": prev_action_id},
+            })
+        if page < total_pages:
+            next_query = _dashboard_query_for_page(query, page + 1)
+            next_action_id = _create_card_action_ref(chat_id, "dashboard_page", {"query": next_query, "page": page + 1})
+            action_ids.append(next_action_id)
+            nav_actions.append({
+                "tag": "button",
+                "text": {"tag": "plain_text", "content": "下一页"},
+                "type": "primary",
+                "value": {"pilotflow_action_id": next_action_id},
+            })
+        if nav_actions:
+            card_elements.append({
+                "tag": "action",
+                "actions": nav_actions,
             })
 
     card = {

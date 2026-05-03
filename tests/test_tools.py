@@ -886,6 +886,8 @@ def test_query_status_hides_archived_projects_by_default_and_shows_when_requeste
 def test_query_status_paginates_large_dashboards():
     with _project_registry_lock:
         _project_registry.clear()
+    with _plan_lock:
+        _card_action_refs.clear()
     for i in range(1, 13):
         _register_project(
             f"分页项目{i:02d}", [], "2026-05-20", "进行中", [],
@@ -914,6 +916,48 @@ def test_query_status_paginates_large_dashboards():
     assert "分页项目11" in second_content
     assert "分页项目12" in second_content
     assert "第 2/2 页" in second_content
+
+
+def test_dashboard_pagination_button_sends_next_page_card():
+    with _project_registry_lock:
+        _project_registry.clear()
+    with _plan_lock:
+        _card_action_refs.clear()
+    for i in range(1, 13):
+        _register_project(
+            f"按钮分页项目{i:02d}", [], "2026-05-20", "进行中", [],
+            goal="验证按钮分页", deliverables=["验收记录"],
+        )
+    captured_cards = []
+
+    def capture_card(chat_id, card):
+        captured_cards.append(card)
+        return f"mid-{len(captured_cards)}"
+
+    with patch("tools._send_interactive_card_via_feishu", side_effect=capture_card):
+        result = _handle_query_status({"query": "项目进展"}, chat_id="oc_page_button")
+        first_card = captured_cards[0]
+        next_button = next(
+            action
+            for element in first_card["elements"]
+            if element.get("tag") == "action"
+            for action in element["actions"]
+            if action["text"]["content"] == "下一页"
+        )
+        command_result = _handle_card_command(
+            "button " + json.dumps(next_button["value"], ensure_ascii=False)
+        )
+
+    assert "项目看板已发送" in result
+    assert command_result is None
+    assert len(captured_cards) == 2
+    second_content = json.dumps(captured_cards[1], ensure_ascii=False)
+    assert "按钮分页项目01" not in second_content
+    assert "按钮分页项目11" in second_content
+    assert "按钮分页项目12" in second_content
+    assert "上一页" in second_content
+    assert "第 2/2 页" in second_content
+    assert "pilotflow_chat_id" not in json.dumps(first_card, ensure_ascii=False)
 
 
 def test_query_status_completed_filter_shows_empty_match_state():
