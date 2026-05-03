@@ -1532,6 +1532,45 @@ def test_update_project_add_member_refreshes_resource_permissions():
     assert "资源权限已刷新" in send.call_args.args[1]
 
 
+def test_update_project_add_member_cleans_feishu_mention_value():
+    with _project_registry_lock:
+        _project_registry.clear()
+    _register_project(
+        "提及加成员项目", ["张三"], "2026-05-20", "进行中",
+        ["文档: https://example.invalid/docx/doc_token_123"],
+        app_token="app1", table_id="tbl1", record_id="rec1",
+        goal="验证提及加成员", deliverables=["验收记录"],
+    )
+    mention_value = '<at user_id="ou_new_member">王五</at>'
+
+    with (
+        patch("tools._refresh_project_resource_permissions", return_value=True) as refresh_permissions,
+        patch("tools._update_bitable_record", return_value=True) as update_bitable,
+        patch("tools._append_bitable_update_record", return_value=True) as append_history,
+        patch("tools._format_at", side_effect=lambda name, chat_id: f"@{name}"),
+        patch("tools._hermes_send", return_value=True) as send,
+    ):
+        result = json.loads(_handle_update_project(
+            {"project_name": "提及加成员", "action": "add_member", "value": mention_value},
+            chat_id="oc_mention_add_member",
+        ))
+
+    assert result["status"] == "project_updated"
+    assert result["value"] == "王五"
+    assert result["permission_refreshed"] is True
+    with _project_registry_lock:
+        members = _project_registry["提及加成员项目"]["members"]
+    assert members == ["张三", "王五"]
+    update_bitable.assert_called_once_with("app1", "tbl1", "rec1", {"负责人": "张三, 王五"})
+    append_history.assert_called_once()
+    assert append_history.call_args.args[2] == "成员"
+    assert append_history.call_args.args[3] == "王五"
+    refresh_permissions.assert_called_once()
+    sent_text = send.call_args.args[1]
+    assert "<at user_id" not in sent_text
+    assert "成员 → @王五" in sent_text
+
+
 def test_update_project_deadline_refreshes_calendar_and_reminder():
     with _project_registry_lock:
         _project_registry.clear()

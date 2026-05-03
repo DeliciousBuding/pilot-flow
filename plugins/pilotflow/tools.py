@@ -2853,6 +2853,15 @@ def _parse_deliverable_assignment(value: str, members: list[str]) -> tuple[str, 
     return text, ""
 
 
+def _clean_member_update_value(value: str) -> str:
+    """Convert a Feishu @mention used as an add_member value into a plain name."""
+    text = str(value or "").strip()
+    at_match = _AT_PATTERN.fullmatch(text)
+    if at_match:
+        return at_match.group(2).strip()
+    return text
+
+
 PILOTFLOW_UPDATE_PROJECT_SCHEMA = {
     "name": "pilotflow_update_project",
     "description": (
@@ -2889,6 +2898,8 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
         return tool_error("请指定项目名称")
     if not action or not value:
         return tool_error("请指定操作类型和新值")
+    if action == "add_member":
+        value = _clean_member_update_value(value)
 
     # Look up project in registry (fuzzy match: project_name is substring of registry key)
     with _project_registry_lock:
