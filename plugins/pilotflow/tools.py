@@ -1815,6 +1815,13 @@ def _build_project_briefing_card(
         risk_action = _create_card_action_ref(chat_id, "dashboard_filter", {"query": "看看风险项目", "filter": "risk"})
         overdue_action = _create_card_action_ref(chat_id, "dashboard_filter", {"query": "看看逾期项目", "filter": "overdue"})
         followup_filter = status_filter if status_filter in ("risk", "overdue", "due_soon") else "overdue"
+        followup_button_text = "批量创建待办"
+        if status_filter in ("risk", "overdue", "due_soon"):
+            followup_button_text = {
+                "risk": "创建风险待办",
+                "due_soon": "创建近期待办",
+                "overdue": "创建逾期待办",
+            }[status_filter]
         reminder_action = _create_card_action_ref(
             chat_id,
             "briefing_batch_reminder",
@@ -1849,7 +1856,7 @@ def _build_project_briefing_card(
                 },
                 {
                     "tag": "button",
-                    "text": {"tag": "plain_text", "content": "批量创建待办"},
+                    "text": {"tag": "plain_text", "content": followup_button_text},
                     "type": "default",
                     "value": {"pilotflow_action_id": followup_action},
                 },

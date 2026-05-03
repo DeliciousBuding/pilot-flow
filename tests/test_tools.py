@@ -1090,6 +1090,35 @@ def test_standup_briefing_risk_button_can_create_batch_followup_tasks():
     append_history.assert_called_once()
 
 
+def test_filtered_briefing_followup_button_names_current_filter():
+    with _project_registry_lock:
+        _project_registry.clear()
+    with _plan_lock:
+        _card_action_refs.clear()
+    due_soon = (dt.date.today() + dt.timedelta(days=2)).isoformat()
+    _register_project(
+        "简报近期待办项目", ["张三"], due_soon, "进行中", [],
+        goal="验证近期截止待办", deliverables=["验收记录"],
+    )
+    captured = {}
+
+    def capture_card(chat_id, card):
+        captured["card"] = card
+        return "om_briefing_due_soon_followup"
+
+    with patch("tools._send_interactive_card_via_feishu", side_effect=capture_card):
+        _handle_query_status({"query": "近期截止项目简报"}, chat_id="oc_briefing_due_soon_followup")
+
+    button_texts = [
+        button["text"]["content"]
+        for element in captured["card"]["elements"]
+        if element.get("tag") == "action"
+        for button in element["actions"]
+    ]
+    assert "创建近期待办" in button_texts
+    assert "批量创建待办" not in button_texts
+
+
 def test_query_status_dashboard_includes_project_action_buttons():
     with _project_registry_lock:
         _project_registry.clear()
