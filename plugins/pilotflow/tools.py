@@ -1028,6 +1028,17 @@ def _format_members(members: List[str], chat_id: str) -> str:
     return ", ".join(_format_at(m, chat_id) for m in members)
 
 
+def _find_unresolved_members(members: List[str], chat_id: str) -> List[str]:
+    """Return member names that could not be resolved to Feishu open_id."""
+    unresolved = []
+    if not members or not chat_id:
+        return unresolved
+    for name in members:
+        if not _resolve_member(name, chat_id):
+            unresolved.append(name)
+    return unresolved
+
+
 def _member_names_plain(members: List[str]) -> str:
     """Format member names as plain text (for bitable, no @mention markup)."""
     return ", ".join(members)
@@ -1851,6 +1862,12 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
     risks = params.get("risks", [])
 
     artifacts = []
+    unresolved_members = _find_unresolved_members(members, chat_id)
+    unresolved_text = "、".join(unresolved_members)
+    member_warning = (
+        f"⚠️ 成员解析提醒：{unresolved_text} 未能 @，请确认这些成员已在群内。"
+        if unresolved_members else ""
+    )
     # Use plain names for bitable (no @mention markup)
     member_plain = _member_names_plain(members) if members else "待确认"
     # Use @mention format for docs and messages
@@ -1860,6 +1877,8 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
     doc_content = f"# {title}\n\n## 目标\n{goal}\n\n"
     if members:
         doc_content += f"## 成员\n{member_display}\n\n"
+    if member_warning:
+        doc_content += f"## 成员解析提醒\n{member_warning}\n\n"
     if deliverables:
         doc_content += "## 交付物\n" + "\n".join(f"- {d}" for d in deliverables) + "\n\n"
     if deadline:
@@ -1912,6 +1931,7 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
                 "content": (
                     f"**目标：** {goal}\n"
                     f"**成员：** {member_display}\n"
+                    + (f"{member_warning}\n" if member_warning else "")
                     + "\n".join(link_lines)
                 ),
             },
@@ -1988,6 +2008,8 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
         display_items.append(f"📊 状态表: {bitable_url}")
     if members:
         display_items.append(f"👥 成员: {', '.join(members)}")
+    if member_warning:
+        display_items.append(member_warning)
     if deliverables:
         display_items.append(f"📋 任务: {', '.join(deliverables)}")
     if deadline:
@@ -2003,9 +2025,11 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
         "title": title,
         "artifacts": artifacts,
         "display": display_items,
+        "unresolved_members": unresolved_members,
         "instructions": (
             "用中文回复结果摘要（不要显示工具名或英文）。\n"
             "直接使用 display 列表逐行展示，或自行组织语言。"
+            + (f"\n成员解析提醒：{unresolved_text} 未能 @，请提示用户确认这些成员已在群内。" if unresolved_members else "")
         ),
         "message": f"已创建 {len(artifacts)} 个产物: {', '.join(artifacts)}",
     })

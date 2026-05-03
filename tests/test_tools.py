@@ -571,6 +571,46 @@ def test_create_project_requires_separate_text_confirmation_after_plan():
         assert "迁移验证项目" not in _project_registry
 
 
+def test_create_project_reports_unresolved_members():
+    with _project_registry_lock:
+        _project_registry.clear()
+
+    def fake_resolve(name, chat_id):
+        return "ou_zhangsan" if name == "张三" else None
+
+    with (
+        patch("tools._resolve_member", side_effect=fake_resolve),
+        patch("tools._create_doc", return_value="https://example.invalid/doc"),
+        patch("tools._create_bitable", return_value={
+            "url": "https://example.invalid/base",
+            "app_token": "app1",
+            "table_id": "tbl1",
+            "record_id": "rec1",
+        }),
+        patch("tools._create_task", return_value="任务已创建"),
+        patch("tools._hermes_send_card", return_value=True),
+        patch("tools._create_calendar_event", return_value=None),
+        patch("tools._schedule_deadline_reminder", return_value=False),
+        patch("tools._save_to_hermes_memory", return_value=True),
+    ):
+        result = json.loads(_handle_create_project_space(
+            {
+                "title": "成员解析项目",
+                "goal": "验证成员解析失败反馈",
+                "members": ["张三", "外部同学"],
+                "deliverables": ["验证记录"],
+                "deadline": "2026-06-01",
+            },
+            chat_id="oc_unresolved_member",
+            _pilotflow_gate_consumed=True,
+        ))
+
+    assert result["status"] == "project_space_created"
+    assert result["unresolved_members"] == ["外部同学"]
+    assert any("外部同学" in item and "未能 @" in item for item in result["display"])
+    assert "成员解析提醒" in result["instructions"]
+
+
 def test_history_suggestions_do_not_silently_mutate_plan():
     with _project_registry_lock:
         _project_registry.clear()
