@@ -1339,7 +1339,7 @@ def _create_bitable(
         url = app_resp.data.app.url
         logger.info("bitable created: %s", url)
 
-        for fname in ["类型", "负责人", "截止时间", "状态", "风险等级", "交付物"]:
+        for fname in ["类型", "负责人", "截止时间", "状态", "风险等级", "交付物", "更新内容"]:
             field = AppTableField.builder().field_name(fname).type(1).build()
             field_resp = client.bitable.v1.app_table_field.create(
                 CreateAppTableFieldRequest.builder().app_token(app_token).table_id(table_id).request_body(field).build()
@@ -1351,6 +1351,7 @@ def _create_bitable(
         record = AppTableRecord.builder().fields({
             "类型": "project", "负责人": owner or "待确认", "截止时间": deadline or "待确认",
             "状态": "进行中", "风险等级": "高" if risks else "低", "交付物": deliverable_text,
+            "更新内容": "创建项目",
         }).build()
         rec_resp = client.bitable.v1.app_table_record.create(
             CreateAppTableRecordRequest.builder().app_token(app_token).table_id(table_id).request_body(record).build()
@@ -2441,6 +2442,37 @@ def _handle_query_status(params: Dict[str, Any], **kwargs) -> str:
 # Bitable update helper
 # ---------------------------------------------------------------------------
 
+def _append_bitable_update_record(app_token: str, table_id: str, action_label: str, value: str, project: dict) -> bool:
+    """Append an update history row to the project Bitable when possible."""
+    client = _get_client()
+    if not client or not app_token or not table_id:
+        return False
+    try:
+        from lark_oapi.api.bitable.v1 import CreateAppTableRecordRequest, AppTableRecord
+
+        fields = {
+            "类型": "update",
+            "负责人": ", ".join(project.get("members", [])) or "待确认",
+            "截止时间": project.get("deadline") or "待确认",
+            "状态": project.get("status", "进行中"),
+            "风险等级": "低",
+            "交付物": ", ".join(project.get("deliverables", [])) or "待确认",
+            "更新内容": f"{action_label} → {value}",
+        }
+        record = AppTableRecord.builder().fields(fields).build()
+        resp = client.bitable.v1.app_table_record.create(
+            CreateAppTableRecordRequest.builder().app_token(app_token).table_id(table_id).request_body(record).build()
+        )
+        if resp.success():
+            logger.info("bitable update history appended: %s", action_label)
+            return True
+        logger.warning("append bitable update history failed: %s", resp.msg)
+        return False
+    except Exception as e:
+        logger.warning("append bitable update history error: %s", e)
+        return False
+
+
 def _update_bitable_record(app_token: str, table_id: str, record_id: str, fields: dict) -> bool:
     """Update a bitable record with new field values."""
     client = _get_client()
@@ -2545,6 +2577,7 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
     action_label = action_labels.get(action, action)
 
     bitable_updated = False
+    bitable_history_created = False
     registry_updated = False
     state_updated = False
     task_created = False
@@ -2614,6 +2647,10 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
                 project["app_token"], project["table_id"], project["record_id"],
                 bitable_fields,
             )
+        if project.get("app_token") and project.get("table_id"):
+            bitable_history_created = _append_bitable_update_record(
+                project["app_token"], project["table_id"], action_label, value, project,
+            )
         if action == "add_member" and chat_id and not state_project:
             permission_refreshed = _refresh_project_resource_permissions(project, chat_id)
 
@@ -2634,6 +2671,8 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
             parts.append("✅ 项目资源权限已刷新")
         if bitable_updated:
             parts.append("✅ 状态表已同步")
+        if bitable_history_created:
+            parts.append("✅ 状态表记录已追加")
         elif state_updated:
             parts.append("✅ 本地状态已更新")
         elif project and not bitable_updated:
@@ -2649,6 +2688,7 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
         "registry_updated": registry_updated,
         "state_updated": state_updated,
         "bitable_updated": bitable_updated,
+        "bitable_history_created": bitable_history_created,
         "task_created": task_created,
         "doc_updated": doc_updated,
         "permission_refreshed": permission_refreshed,
@@ -2658,6 +2698,7 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
             + ("项目文档已更新。" if doc_updated else "")
             + ("项目资源权限已刷新。" if permission_refreshed else "")
             + ("状态表已同步。" if bitable_updated else "本地状态已更新。" if state_updated else "")
+            + ("状态表记录已追加。" if bitable_history_created else "")
             + "不要显示工具名或英文。"
         ),
     })

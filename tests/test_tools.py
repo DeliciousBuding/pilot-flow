@@ -51,6 +51,7 @@ from tools import (
     _parse_memory_project_entry,
     _history_suggestions_for_plan,
     _create_bitable,
+    _append_bitable_update_record,
     _create_card_action_ref,
     _handle_card_action,
     _handle_card_command,
@@ -251,7 +252,30 @@ def test_create_bitable_includes_deliverables_field_and_initial_value(monkeypatc
 
     assert meta["app_token"] == "app_token_test"
     assert "交付物" in fake_client.field_names
+    assert "更新内容" in fake_client.field_names
     assert fake_client.records[0]["交付物"] == "验收记录, 评审清单"
+
+
+def test_append_bitable_update_record_writes_change_log(monkeypatch):
+    _install_fake_bitable_sdk(monkeypatch)
+    fake_client = _FakeBitableClient()
+    project = {
+        "members": ["张三"],
+        "deadline": "2026-05-20",
+        "status": "已完成",
+        "deliverables": ["验收记录"],
+    }
+
+    with patch("tools._get_client", return_value=fake_client):
+        created = _append_bitable_update_record("app1", "tbl1", "状态", "已完成", project)
+
+    assert created is True
+    record = fake_client.records[0]
+    assert record["类型"] == "update"
+    assert record["负责人"] == "张三"
+    assert record["状态"] == "已完成"
+    assert record["交付物"] == "验收记录"
+    assert "状态 → 已完成" in record["更新内容"]
 
 
 def test_register_project_stores_reusable_project_pattern():
@@ -971,6 +995,36 @@ def test_update_project_add_deliverable_syncs_bitable_deliverables():
         "app1", "tbl1", "rec1", {"交付物": "验收记录, 评审清单"},
     )
     assert "状态表已同步" in send.call_args.args[1]
+
+
+def test_update_project_appends_bitable_update_history():
+    with _project_registry_lock:
+        _project_registry.clear()
+    _register_project(
+        "流水记录项目", ["张三"], "2026-05-20", "进行中", [],
+        app_token="app1", table_id="tbl1", record_id="rec1",
+        goal="验证多维表格流水", deliverables=["验收记录"],
+    )
+
+    with (
+        patch("tools._update_bitable_record", return_value=True),
+        patch("tools._append_bitable_update_record", return_value=True) as append_record,
+        patch("tools._hermes_send", return_value=True) as send,
+    ):
+        result = json.loads(_handle_update_project(
+            {"project_name": "流水记录", "action": "update_status", "value": "已完成"},
+            chat_id="oc_bitable_history",
+        ))
+
+    assert result["status"] == "project_updated"
+    assert result["bitable_history_created"] is True
+    append_record.assert_called_once()
+    args = append_record.call_args.args
+    assert args[0] == "app1"
+    assert args[1] == "tbl1"
+    assert args[2] == "状态"
+    assert args[3] == "已完成"
+    assert "状态表记录已追加" in send.call_args.args[1]
 
 
 def test_update_project_appends_update_to_project_doc():
