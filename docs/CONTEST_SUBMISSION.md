@@ -4,11 +4,27 @@
 
 PilotFlow 是飞书群里的 AI 项目运行官。它面向团队在群聊中发起项目、筹备答辩、推进活动和管理交付的场景，把自然语言需求转成可确认的计划，并在确认后编排飞书文档、多维表格、任务、日历、群卡片、权限和提醒。
 
+## 一、个人信息
+
+| 姓名 | 项目中负责的工作简述 | 个人基本信息介绍 | 实习信息 |
+| --- | --- | --- | --- |
+| 唐丁 | PilotFlow 产品设计、Hermes 插件实现、飞书 API 集成、测试体系、文档和演示材料 | 湖南大学，计算机科学与技术，本科，2028 届（2024 级） | 北京/上海/深圳，2026 年 7 月到岗，可实习 6 个月以上 |
+
+## 二、项目结果展示
+
 ## 评委视角三句话
 
 1. 痛点：群聊讨论容易散，任务、负责人、截止时间和风险很难自动沉淀。
 2. 方案：PilotFlow 用 Hermes 做 Agent 底座，用飞书 OpenAPI 创建真实协作产物，把群聊入口变成项目启动流程。
 3. 可信：所有写入前先发计划卡片确认，确认后才执行，过程有状态、可追踪、可取消、可降级。
+
+## Demo 展示
+
+当前仓库已完成本地测试和演示脚本整理，真实飞书 v1.12 live parity 与录屏待补。演示脚本入口：
+
+- GitHub README: https://github.com/DeliciousBuding/PilotFlow
+- Demo script: https://github.com/DeliciousBuding/PilotFlow/blob/main/docs/demo/README.md
+- Architecture: https://github.com/DeliciousBuding/PilotFlow/blob/main/docs/ARCHITECTURE.md
 
 ## Hermes 与 PilotFlow 的边界
 
