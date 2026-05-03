@@ -143,6 +143,7 @@ uv run hermes gateway
 | [Architecture Design](docs/ARCHITECTURE.md) | Components, state model, tool routing |
 | [Contest Submission Pack](docs/CONTEST_SUBMISSION.md) | Positioning, demo path, evidence matrix |
 | [Live Test Evidence](docs/LIVE_TEST_EVIDENCE.md) | Sanitized real Feishu test evidence |
+| [Delivery Audit](docs/DELIVERY_AUDIT.md) | Requirement-to-evidence checklist and remaining gaps |
 | [Personal Progress](PERSONAL_PROGRESS.md) | Development progress and verification results |
 | [Contributing](CONTRIBUTING.md) | Dev setup, coding conventions, submitting PRs |
 
