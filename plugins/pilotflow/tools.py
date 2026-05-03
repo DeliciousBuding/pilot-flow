@@ -350,9 +350,15 @@ def _build_project_detail_card(chat_id: str, title: str, project: dict) -> tuple
     deadline = project.get("deadline") or "待确认"
     countdown = _deadline_countdown(deadline)
     deadline_line = deadline + (f"（{countdown}）" if countdown else "")
-    next_action = "reopen_project" if project.get("status") == "已完成" else "mark_project_done"
-    next_text = "重新打开" if next_action == "reopen_project" else "标记完成"
-    next_type = "default" if next_action == "reopen_project" else "primary"
+    status = project.get("status", "进行中")
+    if status == "有风险":
+        next_action = "resolve_risk"
+        next_text = "解除风险"
+        next_type = "primary"
+    else:
+        next_action = "reopen_project" if status == "已完成" else "mark_project_done"
+        next_text = "重新打开" if next_action == "reopen_project" else "标记完成"
+        next_type = "default" if next_action == "reopen_project" else "primary"
     next_action_id = _create_card_action_ref(chat_id, next_action, {"title": title})
     resource_lines = []
     for item in project.get("artifacts", []):
@@ -2182,7 +2188,7 @@ def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
             "risks": recovered_plan.get("risks", []),
         }, **kwargs)
 
-    if pilotflow_action in ("project_status", "mark_project_done", "reopen_project"):
+    if pilotflow_action in ("project_status", "mark_project_done", "reopen_project", "resolve_risk"):
         project_title = action_data.get("title") or action_data.get("project_name")
         if not project_title:
             return tool_error("无法识别项目，请在群里直接询问项目状态。")
@@ -2194,6 +2200,8 @@ def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
             if project and pilotflow_action == "mark_project_done":
                 project["status"] = "已完成"
             elif project and pilotflow_action == "reopen_project":
+                project["status"] = "进行中"
+            elif project and pilotflow_action == "resolve_risk":
                 project["status"] = "进行中"
 
         if not project:
@@ -2229,16 +2237,21 @@ def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
 
         target_status = "已完成" if pilotflow_action == "mark_project_done" else "进行中"
         if project.get("app_token") and project.get("table_id") and project.get("record_id"):
+            bitable_fields = {"状态": target_status}
+            if pilotflow_action == "resolve_risk":
+                bitable_fields["风险等级"] = "低"
             bitable_updated = _update_bitable_record(
                 project["app_token"], project["table_id"], project["record_id"],
-                {"状态": target_status},
+                bitable_fields,
             )
         _save_project_state(
             project_title, project.get("goal", ""), project.get("members", []),
             project.get("deliverables", []), project.get("deadline", ""), target_status,
             project.get("artifacts", []),
         )
-        doc_updated = _append_project_doc_update(project_title, project, "状态", target_status)
+        doc_label = "风险解除" if pilotflow_action == "resolve_risk" else "状态"
+        doc_value = "风险已解除" if pilotflow_action == "resolve_risk" else target_status
+        doc_updated = _append_project_doc_update(project_title, project, doc_label, doc_value)
 
         suffix_parts = []
         if bitable_updated:
@@ -2250,10 +2263,14 @@ def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
             _hermes_send(chat_id, f"项目「{project_title}」已标记为完成{suffix}")
             result_status = "project_marked_done"
             instruction = "回复用户：已标记完成。不要展示工具名或英文。"
-        else:
+        elif pilotflow_action == "reopen_project":
             _hermes_send(chat_id, f"项目「{project_title}」已重新打开，状态改为进行中{suffix}")
             result_status = "project_reopened"
             instruction = "回复用户：已重新打开项目。不要展示工具名或英文。"
+        else:
+            _hermes_send(chat_id, f"项目「{project_title}」风险已解除，状态恢复为进行中{suffix}")
+            result_status = "project_risk_resolved"
+            instruction = "回复用户：风险已解除。不要展示工具名或英文。"
         return tool_result({
             "status": result_status,
             "project": project_title,
@@ -2340,6 +2357,13 @@ def _handle_card_command(raw_args: str) -> str:
             f"**{action_data.get('title', '项目')}** 已恢复为进行中。",
             "blue",
         )
+    elif action_id and pilotflow_action == "resolve_risk":
+        _mark_card_message(
+            message_id,
+            "风险已解除",
+            f"**{action_data.get('title', '项目')}** 已恢复为进行中。",
+            "green",
+        )
 
     action_value = json.dumps(action_data, ensure_ascii=False)
     action_kwargs = {"chat_id": chat_id}
@@ -2371,7 +2395,7 @@ def _handle_card_command(raw_args: str) -> str:
         if action_ref:
             _clear_pending_plan_if_matches(chat_id, action_ref.get("plan"))
         return None
-    if data.get("status") in ("project_status_sent", "project_marked_done", "project_reopened", "dashboard_page_sent"):
+    if data.get("status") in ("project_status_sent", "project_marked_done", "project_reopened", "project_risk_resolved", "dashboard_page_sent"):
         return None
     if data.get("display"):
         return "\n".join(str(item) for item in data["display"])
@@ -2536,9 +2560,14 @@ def _handle_query_status(params: Dict[str, Any], **kwargs) -> str:
         })
         if chat_id and p.get("actionable"):
             status_action_id = _create_card_action_ref(chat_id, "project_status", {"title": p["name"]})
-            next_action = "reopen_project" if p.get("status") == "已完成" or _is_archived_status(p.get("status", "")) else "mark_project_done"
-            next_text = "重新打开" if next_action == "reopen_project" else "标记完成"
-            next_type = "default" if next_action == "reopen_project" else "primary"
+            if p.get("status") == "有风险":
+                next_action = "resolve_risk"
+                next_text = "解除风险"
+                next_type = "primary"
+            else:
+                next_action = "reopen_project" if p.get("status") == "已完成" or _is_archived_status(p.get("status", "")) else "mark_project_done"
+                next_text = "重新打开" if next_action == "reopen_project" else "标记完成"
+                next_type = "default" if next_action == "reopen_project" else "primary"
             next_action_id = _create_card_action_ref(chat_id, next_action, {"title": p["name"]})
             action_ids.extend([status_action_id, next_action_id])
             card_elements.append({

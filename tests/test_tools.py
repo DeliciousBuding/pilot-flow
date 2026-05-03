@@ -910,6 +910,36 @@ def test_query_status_filters_risk_projects():
     assert "第 1/1 页" in content
 
 
+def test_risk_project_dashboard_offers_resolve_risk_button():
+    with _project_registry_lock:
+        _project_registry.clear()
+    with _plan_lock:
+        _card_action_refs.clear()
+    _register_project(
+        "卡片风险项目", [], "2026-05-20", "有风险", [],
+        goal="验证风险按钮", deliverables=["验收记录"],
+    )
+    captured = {}
+
+    def capture_card(chat_id, card):
+        captured["card"] = card
+        return True
+
+    with patch("tools._send_interactive_card_via_feishu", side_effect=capture_card):
+        result = _handle_query_status({"query": "看看风险项目"}, chat_id="oc_risk_button")
+
+    assert "项目看板已发送" in result
+    actions = [
+        element for element in captured["card"]["elements"]
+        if element.get("tag") == "action"
+    ]
+    assert actions
+    assert actions[0]["actions"][1]["text"]["content"] == "解除风险"
+    with _plan_lock:
+        refs = [ref for ref in _card_action_refs.values() if ref["chat_id"] == "oc_risk_button"]
+    assert {ref["action"] for ref in refs} >= {"project_status", "resolve_risk"}
+
+
 def test_query_status_paginates_large_dashboards():
     with _project_registry_lock:
         _project_registry.clear()
@@ -1526,6 +1556,48 @@ def test_update_project_resolves_risk_and_marks_project_active():
     assert "风险解除 → 支付接口联调已恢复" in sent_text
     assert "状态已恢复为进行中" in sent_text
     assert "状态表已同步" in sent_text
+
+
+def test_card_action_resolves_risk_project():
+    with _project_registry_lock:
+        _project_registry.clear()
+    _register_project(
+        "卡片解除风险项目", ["张三"], "2026-05-20", "有风险", ["文档: https://example.invalid/doc"],
+        goal="验证卡片解除风险", deliverables=["验收记录"],
+        app_token="app1", table_id="tbl1", record_id="rec1",
+    )
+
+    with (
+        patch("tools._update_bitable_record", return_value=True) as update_bitable,
+        patch("tools._append_project_doc_update", return_value=True) as append_doc,
+        patch("tools._hermes_send", return_value=True) as send,
+        patch("tools._save_project_state", return_value=True) as save_state,
+    ):
+        result = json.loads(_handle_card_action(
+            {
+                "action_value": json.dumps(
+                    {"pilotflow_action": "resolve_risk", "title": "卡片解除风险项目"},
+                    ensure_ascii=False,
+                )
+            },
+            chat_id="oc_card_resolve_risk",
+        ))
+
+    assert result["status"] == "project_risk_resolved"
+    assert _project_registry["卡片解除风险项目"]["status"] == "进行中"
+    assert result["bitable_updated"] is True
+    assert result["doc_updated"] is True
+    update_bitable.assert_called_once_with(
+        "app1", "tbl1", "rec1", {"状态": "进行中", "风险等级": "低"},
+    )
+    append_doc.assert_called_once_with(
+        "卡片解除风险项目",
+        _project_registry["卡片解除风险项目"],
+        "风险解除",
+        "风险已解除",
+    )
+    save_state.assert_called_once()
+    assert "风险已解除" in send.call_args.args[1]
 
 
 def test_update_project_appends_update_to_project_doc():
