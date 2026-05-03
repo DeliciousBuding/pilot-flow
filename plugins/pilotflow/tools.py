@@ -1967,6 +1967,7 @@ def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
             return tool_error("无法识别项目，请在群里直接询问项目状态。")
 
         bitable_updated = False
+        doc_updated = False
         with _project_registry_lock:
             project = _project_registry.get(project_title)
             if project and pilotflow_action == "mark_project_done":
@@ -2016,8 +2017,14 @@ def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
             project.get("deliverables", []), project.get("deadline", ""), target_status,
             project.get("artifacts", []),
         )
+        doc_updated = _append_project_doc_update(project_title, project, "状态", target_status)
 
-        suffix = "，状态表已同步。" if bitable_updated else "。"
+        suffix_parts = []
+        if bitable_updated:
+            suffix_parts.append("状态表已同步")
+        if doc_updated:
+            suffix_parts.append("项目文档已更新")
+        suffix = "，" + "，".join(suffix_parts) + "。" if suffix_parts else "。"
         if pilotflow_action == "mark_project_done":
             _hermes_send(chat_id, f"项目「{project_title}」已标记为完成{suffix}")
             result_status = "project_marked_done"
@@ -2030,6 +2037,7 @@ def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
             "status": result_status,
             "project": project_title,
             "bitable_updated": bitable_updated,
+            "doc_updated": doc_updated,
             "instructions": instruction,
         })
 

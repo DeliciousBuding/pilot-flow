@@ -1108,6 +1108,58 @@ def test_project_entry_card_action_syncs_bitable_status():
     update_bitable.assert_called_once_with("app1", "tbl1", "rec1", {"状态": "已完成"})
 
 
+def test_project_entry_card_action_appends_completion_to_project_doc():
+    with _project_registry_lock:
+        _project_registry.clear()
+    _register_project(
+        "文档完成项目", [], "2026-05-10", "进行中",
+        ["文档: https://example.invalid/docx/doc_token_123"],
+        goal="验证卡片完成写文档", deliverables=["验收记录"],
+    )
+    action_value = json.dumps({"pilotflow_action": "mark_project_done", "title": "文档完成项目"}, ensure_ascii=False)
+
+    with (
+        patch("tools._append_project_doc_update", return_value=True) as append_doc,
+        patch("tools._hermes_send", return_value=True) as send,
+    ):
+        result = json.loads(_handle_card_action({"action_value": action_value}, chat_id="oc_card_doc_done"))
+
+    assert result["status"] == "project_marked_done"
+    assert result["doc_updated"] is True
+    append_doc.assert_called_once()
+    args = append_doc.call_args.args
+    assert args[0] == "文档完成项目"
+    assert args[2] == "状态"
+    assert args[3] == "已完成"
+    assert "项目文档已更新" in send.call_args.args[1]
+
+
+def test_project_entry_card_action_appends_reopen_to_project_doc():
+    with _project_registry_lock:
+        _project_registry.clear()
+    _register_project(
+        "文档重开项目", [], "2026-05-10", "已完成",
+        ["文档: https://example.invalid/docx/doc_token_456"],
+        goal="验证卡片重开写文档", deliverables=["验收记录"],
+    )
+    action_value = json.dumps({"pilotflow_action": "reopen_project", "title": "文档重开项目"}, ensure_ascii=False)
+
+    with (
+        patch("tools._append_project_doc_update", return_value=True) as append_doc,
+        patch("tools._hermes_send", return_value=True) as send,
+    ):
+        result = json.loads(_handle_card_action({"action_value": action_value}, chat_id="oc_card_doc_reopen"))
+
+    assert result["status"] == "project_reopened"
+    assert result["doc_updated"] is True
+    append_doc.assert_called_once()
+    args = append_doc.call_args.args
+    assert args[0] == "文档重开项目"
+    assert args[2] == "状态"
+    assert args[3] == "进行中"
+    assert "项目文档已更新" in send.call_args.args[1]
+
+
 def test_card_command_opaque_project_action_carries_project_title():
     with _project_registry_lock:
         _project_registry.clear()
