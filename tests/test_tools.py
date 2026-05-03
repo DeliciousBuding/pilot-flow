@@ -1814,6 +1814,40 @@ def test_completed_project_detail_card_offers_reopen_button():
     assert {ref["action"] for ref in refs} == {"reopen_project"}
 
 
+def test_project_detail_card_uses_status_colored_header():
+    cases = [
+        ("进行中", "blue", "标记完成"),
+        ("有风险", "red", "解除风险"),
+        ("已完成", "green", "重新打开"),
+        ("已归档", "grey", "重新打开"),
+    ]
+
+    for status, expected_template, expected_button in cases:
+        with _project_registry_lock:
+            _project_registry.clear()
+        with _plan_lock:
+            _card_action_refs.clear()
+        title = f"详情颜色项目-{status}"
+        _register_project(
+            title, [], "2026-05-20", status, [],
+            goal="验证详情颜色", deliverables=["验收记录"],
+        )
+        captured = {}
+        action_value = json.dumps({"pilotflow_action": "project_status", "title": title}, ensure_ascii=False)
+
+        def capture_card(chat_id, card):
+            captured["card"] = card
+            return "om_detail_color"
+
+        with patch("tools._hermes_send_card", side_effect=capture_card):
+            result = json.loads(_handle_card_action({"action_value": action_value}, chat_id=f"oc_detail_color_{status}"))
+
+        assert result["status"] == "project_status_sent"
+        assert captured["card"]["header"]["template"] == expected_template
+        actions = [element for element in captured["card"]["elements"] if element.get("tag") == "action"]
+        assert actions[0]["actions"][0]["text"]["content"] == expected_button
+
+
 def test_project_entry_card_action_marks_project_done():
     with _project_registry_lock:
         _project_registry.clear()

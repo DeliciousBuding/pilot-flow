@@ -343,6 +343,17 @@ def _build_action_feedback_card(title: str, content: str, template: str) -> dict
     }
 
 
+def _project_detail_header_template(status: str) -> str:
+    status = str(status).strip()
+    if status == "有风险":
+        return "red"
+    if status == "已完成":
+        return "green"
+    if _is_archived_status(status):
+        return "grey"
+    return "blue"
+
+
 def _build_project_detail_card(chat_id: str, title: str, project: dict) -> tuple[dict, list[str]]:
     """Build an actionable project detail card for Feishu."""
     member_text = "、".join(project.get("members", [])) or "待确认"
@@ -356,7 +367,7 @@ def _build_project_detail_card(chat_id: str, title: str, project: dict) -> tuple
         next_text = "解除风险"
         next_type = "primary"
     else:
-        next_action = "reopen_project" if status == "已完成" else "mark_project_done"
+        next_action = "reopen_project" if status == "已完成" or _is_archived_status(status) else "mark_project_done"
         next_text = "重新打开" if next_action == "reopen_project" else "标记完成"
         next_type = "default" if next_action == "reopen_project" else "primary"
     next_action_id = _create_card_action_ref(chat_id, next_action, {"title": title})
@@ -372,7 +383,7 @@ def _build_project_detail_card(chat_id: str, title: str, project: dict) -> tuple
         "config": {"wide_screen_mode": True},
         "header": {
             "title": {"tag": "plain_text", "content": "📌 项目详情"},
-            "template": "blue",
+            "template": _project_detail_header_template(status),
         },
         "elements": [
             {
