@@ -51,7 +51,7 @@ PilotFlow/
 
 - Version: `plugin.yaml` 1.12.0
 - Tests: 25 local tests passing
-- Runtime install: `D:\Code\LarkProject\hermes-agent\plugins\pilotflow\tools.py` matches the repo copy
+- Runtime install: `<hermes-agent>/plugins/pilotflow/tools.py` should match the repo copy after `python setup.py --hermes-dir <hermes-agent-path>`
 - Must verify next: real LLM + Feishu group live parity for confirm/cancel card buttons
 
 ## Dependencies
