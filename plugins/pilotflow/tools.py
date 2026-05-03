@@ -2351,7 +2351,7 @@ def _handle_generate_plan(params: Dict[str, Any], **kwargs) -> str:
             "【用户确认路径】\n"
             "- 路径A: 用户点击卡片 ✅ 按钮 → PilotFlow 的 /card 插件命令会自动续跑\n"
             "- 路径B: 用户文字回复「确认」「可以」「好的」「行」「ok」\n"
-            "  → 调用 pilotflow_create_project_space（使用本次提取的 plan 字段，并把用户最新回复原文填入 confirmation_text）\n"
+            "  → 直接调用 pilotflow_create_project_space；若只剩用户最新回复，就把原文填入 input_text，若已有结构化确认字段也可继续传 confirmation_text。\n"
             "- 路径C: 用户点击 ❌ 或文字回复「取消」\n"
             "  → 调用 pilotflow_handle_card_action（action=cancel_project）\n\n"
             "【输出规则 - 必须遵守】\n"
@@ -2436,6 +2436,10 @@ PILOTFLOW_CREATE_PROJECT_SPACE_SCHEMA = {
     "parameters": {
         "type": "object",
         "properties": {
+            "input_text": {
+                "type": "string",
+                "description": "用户最新的原始确认文本，可用于识别是否真的在确认执行。",
+            },
             "title": {"type": "string", "description": "项目标题（必填），如「答辩项目」。"},
             "goal": {"type": "string", "description": "项目目标（必填），一句话描述项目要达成什么。"},
             "members": {
@@ -2452,10 +2456,10 @@ PILOTFLOW_CREATE_PROJECT_SPACE_SCHEMA = {
             "risks": {"type": "array", "items": {"type": "string"}, "description": "已知风险，如[\"时间紧张\"]。"},
             "confirmation_text": {
                 "type": "string",
-                "description": "用户最新的独立确认回复。只有用户明确回复确认执行时填写，例如「确认」「确认执行」「可以」「好的」「行」「ok」。",
+                "description": "用户最新的独立确认回复。也可改用 input_text 传入同样的确认语义，例如「确认」「确认执行」「可以」「好的」「行」「ok」。",
             },
         },
-        "required": ["title", "goal", "members", "deliverables", "confirmation_text"],
+        "required": ["title", "goal", "members", "deliverables"],
     },
 }
 
@@ -2468,7 +2472,7 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
 
     skip_gate = bool(kwargs.get("_pilotflow_gate_consumed"))
     if not skip_gate:
-        confirmation_text = params.get("confirmation_text", "")
+        confirmation_text = params.get("confirmation_text") or params.get("input_text") or ""
         if not _is_execution_confirmation(confirmation_text):
             return tool_error("请等待用户明确回复「确认执行」或点击卡片确认按钮后再创建项目。")
         if not _consume_plan_gate(chat_id):

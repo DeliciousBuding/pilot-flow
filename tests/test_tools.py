@@ -790,6 +790,95 @@ def test_create_project_requires_separate_text_confirmation_after_plan():
         assert "迁移验证项目" not in _project_registry
 
 
+def test_create_project_accepts_raw_confirmation_text_fallback():
+    chat_id = "oc_same_turn_fallback"
+    with _project_registry_lock:
+        _project_registry.clear()
+    with _plan_lock:
+        _pending_plans.clear()
+        _card_action_refs.clear()
+
+    with patch("tools._hermes_send_card", return_value="om_plan"):
+        _handle_generate_plan(
+            {
+                "input_text": "帮我准备迁移验证项目，先给我确认卡片",
+                "title": "迁移验证项目",
+                "goal": "验证迁移流程",
+                "members": [],
+                "deliverables": ["迁移验证记录"],
+                "deadline": "2026-05-10",
+            },
+            chat_id=chat_id,
+        )
+
+    with (
+        patch("tools._create_doc", return_value="https://example.invalid/doc"),
+        patch("tools._create_bitable", return_value={
+            "url": "https://example.invalid/base",
+            "app_token": "app1",
+            "table_id": "tbl1",
+            "record_id": "rec1",
+        }),
+        patch("tools._create_task", return_value="任务已创建"),
+        patch("tools._hermes_send_card", return_value=True),
+        patch("tools._create_calendar_event", return_value=None),
+        patch("tools._schedule_deadline_reminder", return_value=False),
+        patch("tools._save_to_hermes_memory", return_value=True),
+    ):
+        result = json.loads(_handle_create_project_space(
+            {
+                "input_text": "确认执行",
+                "title": "迁移验证项目",
+                "goal": "验证迁移流程",
+                "members": [],
+                "deliverables": ["迁移验证记录"],
+                "deadline": "2026-05-10",
+            },
+            chat_id=chat_id,
+        ))
+
+    assert result["status"] == "project_space_created"
+    with _project_registry_lock:
+        assert "迁移验证项目" in _project_registry
+
+
+def test_create_project_rejects_non_confirming_input_text():
+    chat_id = "oc_same_turn_reject"
+    with _project_registry_lock:
+        _project_registry.clear()
+    with _plan_lock:
+        _pending_plans.clear()
+        _card_action_refs.clear()
+
+    with patch("tools._hermes_send_card", return_value="om_plan"):
+        _handle_generate_plan(
+            {
+                "input_text": "帮我准备迁移验证项目，先给我确认卡片",
+                "title": "迁移验证项目",
+                "goal": "验证迁移流程",
+                "members": [],
+                "deliverables": ["迁移验证记录"],
+                "deadline": "2026-05-10",
+            },
+            chat_id=chat_id,
+        )
+
+    result = json.loads(_handle_create_project_space(
+        {
+            "input_text": "给我确认卡片",
+            "title": "迁移验证项目",
+            "goal": "验证迁移流程",
+            "members": [],
+            "deliverables": ["迁移验证记录"],
+            "deadline": "2026-05-10",
+        },
+        chat_id=chat_id,
+    ))
+
+    assert "error" in result
+    assert "确认执行" in result["error"]
+
+
 def test_create_project_reports_unresolved_members():
     with _project_registry_lock:
         _project_registry.clear()
