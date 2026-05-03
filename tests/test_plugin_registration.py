@@ -28,7 +28,7 @@ class FakeContext:
         self.commands.append(kwargs)
 
 
-def test_register_exposes_exactly_six_tools():
+def test_register_exposes_expected_tools():
     ctx = FakeContext()
 
     pilotflow.register(ctx)
@@ -41,6 +41,7 @@ def test_register_exposes_exactly_six_tools():
         "pilotflow_handle_card_action",
         "pilotflow_query_status",
         "pilotflow_update_project",
+        "pilotflow_health_check",
     ]
     assert all(call["toolset"] == "pilotflow" for call in ctx.calls)
     assert all(call["schema"]["name"] == call["name"] for call in ctx.calls)

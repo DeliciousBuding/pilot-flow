@@ -13,6 +13,7 @@ from plugins.pilotflow.tools import (
     PILOTFLOW_HANDLE_CARD_ACTION_SCHEMA,
     PILOTFLOW_QUERY_STATUS_SCHEMA,
     PILOTFLOW_UPDATE_PROJECT_SCHEMA,
+    PILOTFLOW_HEALTH_CHECK_SCHEMA,
     _handle_generate_plan,
     _handle_detect_risks,
     _handle_create_project_space,
@@ -20,6 +21,7 @@ from plugins.pilotflow.tools import (
     _handle_card_command,
     _handle_query_status,
     _handle_update_project,
+    _handle_health_check,
     _check_available,
 )
 
@@ -45,6 +47,14 @@ def register(ctx) -> None:
             check_fn=_check_available,
             emoji=emoji,
         )
+    ctx.register_tool(
+        name="pilotflow_health_check",
+        toolset="pilotflow",
+        schema=PILOTFLOW_HEALTH_CHECK_SCHEMA,
+        handler=_handle_health_check,
+        check_fn=lambda: True,
+        emoji="🩺",
+    )
 
     # Hermes routes Feishu card clicks as `/card button {...}`. Registering
     # this bridge keeps PilotFlow plug-in-only; no Hermes core patch required.

@@ -861,6 +861,81 @@ def _check_available() -> bool:
     return _client_ready
 
 
+PILOTFLOW_HEALTH_CHECK_SCHEMA = {
+    "name": "pilotflow_health_check",
+    "description": (
+        "检查 PilotFlow 在当前 Hermes/Feishu 环境中的运行健康状态。\n"
+        "当用户说「检查配置」「为什么不能发卡片」「PilotFlow 状态」「诊断一下」时调用。\n"
+        "只返回脱敏中文状态，不展示 app id、secret、chat_id、token、本地绝对路径或 message_id。"
+    ),
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "include_details": {
+                "type": "boolean",
+                "description": "是否返回更完整的检查项；默认 true。",
+            },
+        },
+        "required": [],
+    },
+}
+
+
+def _lark_sdk_status() -> str:
+    try:
+        import lark_oapi  # noqa: F401
+        return "已安装"
+    except ImportError:
+        return "未安装"
+
+
+def _state_path_status() -> str:
+    if os.environ.get("PILOTFLOW_STATE_PATH"):
+        return "已配置"
+    if os.environ.get("HERMES_HOME"):
+        return "跟随 HERMES_HOME"
+    return "默认位置"
+
+
+def _handle_health_check(params: Dict[str, Any], **kwargs) -> str:
+    """Return a sanitized runtime health report for PilotFlow."""
+    chat_id = _get_chat_id(kwargs)
+    lark_sdk = _lark_sdk_status()
+    client = _get_client()
+    checks = {
+        "feishu_credentials": "已配置" if APP_ID and APP_SECRET else "缺失",
+        "lark_oapi": lark_sdk,
+        "feishu_client": "可用" if client else "不可用",
+        "chat_context": "已检测" if chat_id else "缺失",
+        "state_path": _state_path_status(),
+        "memory_write": "开启" if MEMORY_ENABLED else "关闭",
+        "memory_read": "开启" if MEMORY_READ_ENABLED else "关闭",
+        "card_bridge": "已注册",
+    }
+    blocking = [
+        name for name in ("feishu_credentials", "lark_oapi", "feishu_client")
+        if checks[name] in ("缺失", "未安装", "不可用")
+    ]
+    status = "ok" if not blocking and chat_id else "warning"
+    suggestions = []
+    if checks["feishu_credentials"] == "缺失":
+        suggestions.append("请在 Hermes 环境中配置 Feishu 应用凭据。")
+    if checks["lark_oapi"] == "未安装":
+        suggestions.append("请安装 Feishu SDK 依赖后重启 Hermes。")
+    if checks["chat_context"] == "缺失":
+        suggestions.append("请从飞书群聊触发，或提供当前会话 chat 上下文。")
+    if not suggestions:
+        suggestions.append("核心配置可用，可以继续创建或更新项目。")
+
+    return tool_result({
+        "status": status,
+        "checks": checks,
+        "summary": "PilotFlow 运行检查完成",
+        "suggestions": suggestions,
+        "instructions": "用中文回复健康检查结果；不要展示任何密钥、ID、token、URL 或本地绝对路径。",
+    })
+
+
 # ---------------------------------------------------------------------------
 # Chat ID resolution (from kwargs, session context, or env)
 # ---------------------------------------------------------------------------

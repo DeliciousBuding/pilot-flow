@@ -58,6 +58,7 @@ from tools import (
     _handle_create_project_space,
     _handle_query_status,
     _handle_update_project,
+    _handle_health_check,
     _pending_plans,
     _card_action_refs,
     _plan_lock,
@@ -277,6 +278,29 @@ def test_register_project_eviction():
     _register_project("新项目", [], "", "进行中", [])
     assert len(_project_registry) == 50
     assert "新项目" in _project_registry
+
+
+def test_health_check_returns_sanitized_runtime_status():
+    with (
+        patch("tools.APP_ID", "sentinel_app_id_should_not_leak"),
+        patch("tools.APP_SECRET", "sentinel_secret_should_not_leak"),
+        patch("tools._get_client", return_value=object()),
+        patch("tools._get_chat_id", return_value="oc_sentinel_chat_should_not_leak"),
+        patch("tools._lark_sdk_status", return_value="已安装"),
+        patch.dict(os.environ, {"PILOTFLOW_STATE_PATH": "sentinel_state_path_should_not_leak"}),
+    ):
+        raw = _handle_health_check({"include_details": True}, chat_id="oc_sentinel_chat_should_not_leak")
+
+    result = json.loads(raw)
+    assert result["status"] == "ok"
+    assert result["checks"]["feishu_credentials"] == "已配置"
+    assert result["checks"]["feishu_client"] == "可用"
+    assert result["checks"]["chat_context"] == "已检测"
+    assert result["checks"]["state_path"] == "已配置"
+    assert "sentinel_app_id_should_not_leak" not in raw
+    assert "sentinel_secret_should_not_leak" not in raw
+    assert "oc_sentinel_chat_should_not_leak" not in raw
+    assert "sentinel_state_path_should_not_leak" not in raw
 
 
 # --- Plan gate ---
