@@ -42,7 +42,7 @@ PilotFlow/
 
 ## Testing
 
-- Local tests: `pytest -q` in `PilotFlow/` (47 passing as of 2026-05-03)
+- Local tests: `uv run pytest -o addopts='' -q` in `PilotFlow/` (115 passing as of 2026-05-04)
 - Gateway test: `uv run hermes gateway` in hermes-agent directory
 - Direct tool test: set `PILOTFLOW_TEST_CHAT_ID` env var
 - End-to-end: @PilotFlow in Feishu group chat

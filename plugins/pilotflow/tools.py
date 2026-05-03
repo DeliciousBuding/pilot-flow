@@ -354,6 +354,20 @@ def _project_detail_header_template(status: str) -> str:
     return "blue"
 
 
+def _project_needs_reminder_action(project: dict) -> bool:
+    """Return true when a live project is overdue or due within 7 days."""
+    status = project.get("status", "进行中")
+    if status == "已完成" or _is_archived_status(status):
+        return False
+    import datetime as _dt
+    try:
+        deadline = _dt.date.fromisoformat(str(project.get("deadline", "")))
+    except (TypeError, ValueError):
+        return False
+    today = _dt.date.today()
+    return deadline <= today + _dt.timedelta(days=7)
+
+
 def _build_project_detail_card(chat_id: str, title: str, project: dict) -> tuple[dict, list[str]]:
     """Build an actionable project detail card for Feishu."""
     member_text = "、".join(project.get("members", [])) or "待确认"
@@ -371,6 +385,11 @@ def _build_project_detail_card(chat_id: str, title: str, project: dict) -> tuple
         next_text = "重新打开" if next_action == "reopen_project" else "标记完成"
         next_type = "default" if next_action == "reopen_project" else "primary"
     next_action_id = _create_card_action_ref(chat_id, next_action, {"title": title})
+    action_ids = [next_action_id]
+    reminder_action_id = None
+    if _project_needs_reminder_action(project):
+        reminder_action_id = _create_card_action_ref(chat_id, "send_project_reminder", {"title": title})
+        action_ids.append(reminder_action_id)
     resource_lines = []
     for item in project.get("artifacts", []):
         text = str(item)
@@ -384,6 +403,21 @@ def _build_project_detail_card(chat_id: str, title: str, project: dict) -> tuple
             if sep and task_url.startswith(("http://", "https://")):
                 resource_lines.append(f"[任务：{task_name}]({task_url.strip()})")
     resource_text = f"\n**资源：** {' | '.join(resource_lines)}" if resource_lines else ""
+    actions = [
+        {
+            "tag": "button",
+            "text": {"tag": "plain_text", "content": next_text},
+            "type": next_type,
+            "value": {"pilotflow_action_id": next_action_id},
+        },
+    ]
+    if reminder_action_id:
+        actions.append({
+            "tag": "button",
+            "text": {"tag": "plain_text", "content": "发送提醒"},
+            "type": "primary",
+            "value": {"pilotflow_action_id": reminder_action_id},
+        })
     card = {
         "config": {"wide_screen_mode": True},
         "header": {
@@ -405,18 +439,11 @@ def _build_project_detail_card(chat_id: str, title: str, project: dict) -> tuple
             },
             {
                 "tag": "action",
-                "actions": [
-                    {
-                        "tag": "button",
-                        "text": {"tag": "plain_text", "content": next_text},
-                        "type": next_type,
-                        "value": {"pilotflow_action_id": next_action_id},
-                    },
-                ],
+                "actions": actions,
             },
         ],
     }
-    return card, [next_action_id]
+    return card, action_ids
 
 
 def _build_project_reminder_text(chat_id: str, title: str, project: dict) -> str:

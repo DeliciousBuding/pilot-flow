@@ -2348,6 +2348,39 @@ def test_project_detail_card_includes_registry_resource_links():
     assert "[任务：评审清单](https://example.invalid/task/task_123)" in body
 
 
+def test_due_project_detail_card_offers_reminder_button_without_chat_id_payload():
+    with _project_registry_lock:
+        _project_registry.clear()
+    with _plan_lock:
+        _card_action_refs.clear()
+    due_soon = (dt.date.today() + dt.timedelta(days=2)).isoformat()
+    _register_project(
+        "详情催办项目", ["张三"], due_soon, "进行中", [],
+        goal="验证详情催办", deliverables=["验收记录"],
+    )
+    captured = {}
+    action_value = json.dumps({"pilotflow_action": "project_status", "title": "详情催办项目"}, ensure_ascii=False)
+
+    def capture_card(chat_id, card):
+        captured["card"] = card
+        return "om_detail_reminder"
+
+    with patch("tools._hermes_send_card", side_effect=capture_card):
+        result = json.loads(_handle_card_action({"action_value": action_value}, chat_id="oc_detail_reminder"))
+
+    assert result["status"] == "project_status_sent"
+    actions = [element for element in captured["card"]["elements"] if element.get("tag") == "action"]
+    assert actions
+    button_text = [button["text"]["content"] for button in actions[0]["actions"]]
+    assert button_text == ["标记完成", "发送提醒"]
+    reminder_value = actions[0]["actions"][1]["value"]
+    assert "pilotflow_action_id" in reminder_value
+    assert "pilotflow_chat_id" not in reminder_value
+    with _plan_lock:
+        refs = [ref for ref in _card_action_refs.values() if ref["chat_id"] == "oc_detail_reminder"]
+    assert {ref["action"] for ref in refs} == {"mark_project_done", "send_project_reminder"}
+
+
 def test_completed_project_detail_card_offers_reopen_button():
     with _project_registry_lock:
         _project_registry.clear()
