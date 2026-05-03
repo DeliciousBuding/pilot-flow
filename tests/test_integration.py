@@ -70,7 +70,7 @@ def test_full_flow_create_project():
 
     # Step 1: User @PilotFlow with a project request
     result1 = _handle_generate_plan(
-        {"input_text": "帮我准备答辩项目空间，成员唐丁，交付物是项目简报和任务清单，5月7日截止"},
+        {"input_text": "帮我准备答辩项目空间，成员示例成员A，交付物是项目简报和任务清单，5月7日截止"},
         chat_id=chat_id,
     )
     plan = json.loads(result1)
@@ -101,7 +101,7 @@ def test_full_flow_create_project():
         {
             "title": "答辩项目",
             "goal": "准备答辩",
-            "members": ["唐丁"],
+            "members": ["示例成员A"],
             "deliverables": ["项目简报", "任务清单"],
             "deadline": "2026-05-07",
         },
@@ -123,7 +123,7 @@ def test_full_flow_create_project():
     with _project_registry_lock:
         assert "答辩项目" in _project_registry
         proj = _project_registry["答辩项目"]
-        assert proj["members"] == ["唐丁"]
+        assert proj["members"] == ["示例成员A"]
         assert proj["deadline"] == "2026-05-07"
         assert proj["status"] == "进行中"
     print("  PASS  Step 6: Project registered in memory")
@@ -133,7 +133,7 @@ def test_full_flow_create_project():
     assert len(memory_calls) >= 1
     assert "答辩项目" in memory_calls[0]["args"]["content"]
     assert "成员=1 人" in memory_calls[0]["args"]["content"]
-    assert "唐丁" not in memory_calls[0]["args"]["content"]
+    assert "示例成员A" not in memory_calls[0]["args"]["content"]
     print("  PASS  Step 7: Project saved to Hermes memory")
 
     # Step 8: Verify cron job was scheduled
@@ -158,7 +158,7 @@ def test_card_action_confirm_uses_pending_plan():
             "input_text": "准备答辩项目",
             "title": "卡片确认项目",
             "goal": "验证卡片确认",
-            "members": ["唐丁"],
+            "members": ["示例成员A"],
             "deliverables": ["项目简报"],
             "deadline": "2026-05-07",
         },
@@ -191,7 +191,7 @@ def test_card_action_cancel_clears_pending_plan():
             "input_text": "准备取消项目",
             "title": "取消项目",
             "goal": "验证取消",
-            "members": ["唐丁"],
+            "members": ["示例成员A"],
             "deliverables": ["项目简报"],
             "deadline": "2026-05-07",
         },
@@ -225,11 +225,8 @@ def test_query_status_after_creation():
 
     # Query status
     result = _handle_query_status({"query": "项目进展"}, chat_id="oc_query")
-    assert "看板项目" in result
-    assert "张三" in result
-    assert "李四" in result
-    assert "剩余" in result
-    assert "天" in result
+    assert "项目看板已发送" in result
+    assert "1 个项目" in result
     print("  PASS  Query status shows project with countdown")
 
 

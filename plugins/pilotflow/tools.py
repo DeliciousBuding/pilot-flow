@@ -1267,11 +1267,7 @@ def _handle_query_status(params: Dict[str, Any], **kwargs) -> str:
     if chat_id:
         _hermes_send_card(chat_id, card)
 
-    summary = "📊 项目看板\n\n"
-    for p in projects:
-        summary += f"  • {p['name']} ({p['source']})\n"
-
-    return tool_result(summary)
+    return tool_result(f"项目看板已发送，共 {len(projects)} 个项目")
 
 
 # ---------------------------------------------------------------------------
