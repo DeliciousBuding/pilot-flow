@@ -81,9 +81,10 @@ PilotFlow 提供 6 个工具：
 
 ## 场景三：更新项目
 
-当用户说「改截止时间」「加成员」「改状态」时：
+当用户说「改截止时间」「加成员」「新增任务」「新增交付物」「加一个交付物」「改状态」时：
 - 调用 pilotflow_update_project
-- 支持：update_deadline、add_member、update_status
+- 支持：update_deadline、add_member、add_deliverable、update_status
+- 用户说新增任务、补一个任务、加交付物时，使用 `add_deliverable`，value 填新增任务/交付物标题
 
 ## 场景四：项目模板
 

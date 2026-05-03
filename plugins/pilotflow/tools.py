@@ -2184,9 +2184,9 @@ def _update_bitable_record(app_token: str, table_id: str, record_id: str, fields
 PILOTFLOW_UPDATE_PROJECT_SCHEMA = {
     "name": "pilotflow_update_project",
     "description": (
-        "更新已有项目信息。当用户说「改截止时间」「加成员」「改项目状态」「延期」「延期到」时调用。\n"
-        "支持三种操作：update_deadline（改截止时间）、add_member（加成员）、update_status（改状态）。\n"
-        "会同时更新内存注册表和多维表格记录，并向群聊发送更新通知。\n\n"
+        "更新已有项目信息。当用户说「改截止时间」「加成员」「新增任务」「新增交付物」「改项目状态」「延期」「延期到」时调用。\n"
+        "支持四种操作：update_deadline（改截止时间）、add_member（加成员）、add_deliverable（新增交付物/任务）、update_status（改状态）。\n"
+        "会更新内存注册表、脱敏本地状态；可定位状态表时同步多维表格，新增交付物时会尽量创建飞书任务。\n\n"
         "【输出规则】只用中文回复更新结果，不要展示工具名称或英文内容。"
     ),
     "parameters": {
@@ -2195,10 +2195,10 @@ PILOTFLOW_UPDATE_PROJECT_SCHEMA = {
             "project_name": {"type": "string", "description": "项目名称。"},
             "action": {
                 "type": "string",
-                "enum": ["update_deadline", "add_member", "update_status"],
+                "enum": ["update_deadline", "add_member", "add_deliverable", "update_status"],
                 "description": "操作类型。",
             },
-            "value": {"type": "string", "description": "新值（新截止时间、新成员名、新状态）。"},
+            "value": {"type": "string", "description": "新值（新截止时间、新成员名、新交付物/任务、新状态）。"},
         },
         "required": ["project_name", "action", "value"],
     },
@@ -2250,6 +2250,7 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
     action_labels = {
         "update_deadline": "截止时间",
         "add_member": "成员",
+        "add_deliverable": "交付物",
         "update_status": "状态",
     }
     action_label = action_labels.get(action, action)
@@ -2257,12 +2258,16 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
     bitable_updated = False
     registry_updated = False
     state_updated = False
+    task_created = False
 
     # 1. Update in-memory registry
     if project:
         if state_project:
             if action == "update_deadline":
                 project["deadline"] = value
+            elif action == "add_deliverable":
+                if value not in project["deliverables"]:
+                    project["deliverables"].append(value)
             elif action == "update_status":
                 project["status"] = value
         else:
@@ -2274,11 +2279,25 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
                     if value not in project["members"]:
                         project["members"].append(value)
                     registry_updated = True
+                elif action == "add_deliverable":
+                    if value not in project["deliverables"]:
+                        project["deliverables"].append(value)
+                    registry_updated = True
                 elif action == "update_status":
                     project["status"] = value
                     registry_updated = True
 
-        if action in ("update_deadline", "update_status"):
+            if action == "add_deliverable" and chat_id:
+                assignee = project.get("members", [""])[0] if project.get("members") else ""
+                task_name = _create_task(
+                    value, f"项目: {project_name}", assignee,
+                    project.get("deadline", ""), chat_id,
+                )
+                if task_name:
+                    project.setdefault("artifacts", []).append(f"任务: {task_name}")
+                    task_created = True
+
+        if action in ("update_deadline", "add_deliverable", "update_status"):
             state_updated = _save_project_state(
                 project_name, project.get("goal", ""), project.get("members", []),
                 project.get("deliverables", []), project.get("deadline", ""),
@@ -2310,6 +2329,8 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
             cd = _deadline_countdown(value)
             if cd:
                 parts.append(cd)
+        if task_created:
+            parts.append("✅ 飞书任务已创建")
         if bitable_updated:
             parts.append("✅ 状态表已同步")
         elif state_updated:
@@ -2327,8 +2348,10 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
         "registry_updated": registry_updated,
         "state_updated": state_updated,
         "bitable_updated": bitable_updated,
+        "task_created": task_created,
         "instructions": (
             f"用中文回复：已更新项目「{project_name}」的{action_label}为 {value}。"
+            + ("飞书任务已创建。" if task_created else "")
             + ("状态表已同步。" if bitable_updated else "本地状态已更新。" if state_updated else "")
             + "不要显示工具名或英文。"
         ),

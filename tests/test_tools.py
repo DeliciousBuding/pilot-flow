@@ -575,6 +575,62 @@ def test_update_project_status_uses_sanitized_state_after_restart(tmp_path):
     assert projects[0]["status"] == "暂停"
 
 
+def test_update_project_adds_deliverable_and_creates_task():
+    with _project_registry_lock:
+        _project_registry.clear()
+    _register_project(
+        "交付物项目", ["张三"], "2026-05-20", "进行中", [],
+        goal="验证新增交付物", deliverables=["验收记录"],
+    )
+
+    with (
+        patch("tools._create_task", return_value="评审清单") as create_task,
+        patch("tools._hermes_send", return_value=True),
+    ):
+        result = json.loads(_handle_update_project(
+            {"project_name": "交付物", "action": "add_deliverable", "value": "评审清单"},
+            chat_id="oc_deliverable",
+        ))
+
+    assert result["status"] == "project_updated"
+    assert result["action"] == "add_deliverable"
+    assert result["registry_updated"] is True
+    assert result["task_created"] is True
+    create_task.assert_called_once_with("评审清单", "项目: 交付物项目", "张三", "2026-05-20", "oc_deliverable")
+    with _project_registry_lock:
+        project = _project_registry["交付物项目"]
+        assert project["deliverables"] == ["验收记录", "评审清单"]
+        assert "任务: 评审清单" in project["artifacts"]
+
+
+def test_update_project_adds_deliverable_to_sanitized_state_after_restart(tmp_path):
+    state_path = tmp_path / "pilotflow-projects.json"
+    with _project_registry_lock:
+        _project_registry.clear()
+
+    with patch.dict(os.environ, {"PILOTFLOW_STATE_PATH": str(state_path)}):
+        assert _save_project_state(
+            "重启交付物项目",
+            "验证重启后新增交付物",
+            [],
+            ["验收记录"],
+            "2026-05-20",
+            "进行中",
+        )
+        with patch("tools._hermes_send", return_value=True):
+            result = json.loads(_handle_update_project(
+                {"project_name": "重启交付物", "action": "add_deliverable", "value": "评审清单"},
+                chat_id="oc_state_deliverable",
+            ))
+        projects = _load_project_state()
+
+    assert result["status"] == "project_updated"
+    assert result["project"] == "重启交付物项目"
+    assert result["state_updated"] is True
+    assert result["task_created"] is False
+    assert projects[0]["deliverables"] == ["验收记录", "评审清单"]
+
+
 def test_project_status_action_sends_interactive_detail_card():
     with _project_registry_lock:
         _project_registry.clear()
