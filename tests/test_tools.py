@@ -1655,7 +1655,7 @@ def test_update_project_deadline_refreshes_calendar_and_reminder():
     )
 
     with (
-        patch("tools._create_calendar_event", return_value="日历事件: 2026-05-30") as calendar,
+        patch("tools._create_calendar_event", return_value="日历事件: 2026-05-30；已邀请 1 位成员") as calendar,
         patch("tools._schedule_deadline_reminder", return_value=True) as reminder,
         patch("tools._hermes_send", return_value=True) as send,
     ):
@@ -1666,11 +1666,13 @@ def test_update_project_deadline_refreshes_calendar_and_reminder():
 
     assert result["status"] == "project_updated"
     assert result["calendar_event_created"] is True
+    assert result["calendar_attendees_added"] is True
     assert result["reminder_scheduled"] is True
-    calendar.assert_called_once_with("截止联动项目", "验证截止联动", "2026-05-30")
+    calendar.assert_called_once_with("截止联动项目", "验证截止联动", "2026-05-30", ["张三"], "oc_deadline_refresh")
     reminder.assert_called_once_with("截止联动项目", "2026-05-30", "oc_deadline_refresh")
     sent_text = send.call_args.args[1]
     assert "日历事件已更新" in sent_text
+    assert "日历参与人已邀请" in sent_text
     assert "截止提醒已设置" in sent_text
 
 
@@ -1748,6 +1750,95 @@ def test_create_calendar_event_resolves_primary_calendar_id():
     assert created["calendar_id"] == "cal_primary"
     assert created["summary"] == "📌 截止: 真实日历项目"
     assert created["start_timestamp"]
+
+
+def test_create_calendar_event_invites_resolved_project_members():
+    import types
+
+    class _Builder:
+        def __init__(self, cls):
+            self.cls = cls
+            self.values = {}
+
+        def __getattr__(self, name):
+            def setter(value):
+                self.values[name] = value
+                return self
+            return setter
+
+        def build(self):
+            return self.cls(**self.values)
+
+    class _Model:
+        def __init__(self, **kwargs):
+            self.__dict__.update(kwargs)
+
+        @classmethod
+        def builder(cls):
+            return _Builder(cls)
+
+    class _Response:
+        def __init__(self, data=None):
+            self.data = data
+            self.msg = "success"
+
+        def success(self):
+            return True
+
+    attendee_requests = []
+
+    class _CalendarEventApi:
+        def create(self, request):
+            event = types.SimpleNamespace(event_id="evt_deadline")
+            return _Response(types.SimpleNamespace(event=event))
+
+    class _CalendarEventAttendeeApi:
+        def create(self, request):
+            attendee_requests.append(request)
+            return _Response()
+
+    fake_v4 = types.ModuleType("lark_oapi.api.calendar.v4")
+    fake_v4.CreateCalendarEventRequest = type("CreateCalendarEventRequest", (_Model,), {})
+    fake_v4.CalendarEvent = type("CalendarEvent", (_Model,), {})
+    fake_v4.TimeInfo = type("TimeInfo", (_Model,), {})
+    fake_v4.CreateCalendarEventAttendeeRequest = type("CreateCalendarEventAttendeeRequest", (_Model,), {})
+    fake_v4.CreateCalendarEventAttendeeRequestBody = type("CreateCalendarEventAttendeeRequestBody", (_Model,), {})
+    fake_v4.CalendarEventAttendee = type("CalendarEventAttendee", (_Model,), {})
+
+    client = types.SimpleNamespace(
+        calendar=types.SimpleNamespace(v4=types.SimpleNamespace(
+            calendar_event=_CalendarEventApi(),
+            calendar_event_attendee=_CalendarEventAttendeeApi(),
+        )),
+    )
+
+    with (
+        patch.dict(sys.modules, {
+            "lark_oapi": types.ModuleType("lark_oapi"),
+            "lark_oapi.api": types.ModuleType("lark_oapi.api"),
+            "lark_oapi.api.calendar": types.ModuleType("lark_oapi.api.calendar"),
+            "lark_oapi.api.calendar.v4": fake_v4,
+        }),
+        patch.dict(os.environ, {"PILOTFLOW_FEISHU_CALENDAR_ID": "cal_test"}),
+        patch("tools._get_client", return_value=client),
+        patch("tools._resolve_member", side_effect=lambda name, chat_id: {"张三": "ou_zhang", "李四": "ou_li"}.get(name)),
+    ):
+        result = _create_calendar_event(
+            "邀请成员项目", "验证日历邀请", "2026-06-01",
+            ["张三", "李四", "未入群"], "oc_calendar_attendees",
+        )
+
+    assert result == "日历事件: 2026-06-01；已邀请 2 位成员"
+    assert len(attendee_requests) == 1
+    request = attendee_requests[0]
+    assert request.calendar_id == "cal_test"
+    assert request.event_id == "evt_deadline"
+    assert request.user_id_type == "open_id"
+    assert request.request_body.need_notification is True
+    assert [(item.type, item.user_id) for item in request.request_body.attendees] == [
+        ("user", "ou_zhang"),
+        ("user", "ou_li"),
+    ]
 
 
 def test_update_project_add_deliverable_syncs_bitable_deliverables():

@@ -1612,7 +1612,67 @@ def _resolve_calendar_id(client: Any) -> str:
     return "primary"
 
 
-def _create_calendar_event(title: str, goal: str, deadline: str) -> Optional[str]:
+def _add_calendar_event_attendees(
+    client: Any,
+    calendar_id: str,
+    event_id: str,
+    members: Optional[list[str]],
+    chat_id: str,
+) -> int:
+    """Invite resolved project members to a Feishu calendar event."""
+    if not client or not calendar_id or not event_id or not members or not chat_id:
+        return 0
+    try:
+        from lark_oapi.api.calendar.v4 import (
+            CalendarEventAttendee,
+            CreateCalendarEventAttendeeRequest,
+            CreateCalendarEventAttendeeRequestBody,
+        )
+
+        open_ids = []
+        for name in members:
+            open_id = _resolve_member(name, chat_id)
+            if open_id and open_id not in open_ids:
+                open_ids.append(open_id)
+        if not open_ids:
+            return 0
+
+        attendees = [
+            CalendarEventAttendee.builder().type("user").user_id(open_id).build()
+            for open_id in open_ids
+        ]
+        body = (
+            CreateCalendarEventAttendeeRequestBody.builder()
+            .attendees(attendees)
+            .need_notification(True)
+            .build()
+        )
+        req = (
+            CreateCalendarEventAttendeeRequest.builder()
+            .calendar_id(calendar_id)
+            .event_id(event_id)
+            .user_id_type("open_id")
+            .request_body(body)
+            .build()
+        )
+        resp = client.calendar.v4.calendar_event_attendee.create(req)
+        if resp.success():
+            logger.info("calendar attendees added: %s", len(attendees))
+            return len(attendees)
+        logger.warning("add calendar attendees failed: %s", getattr(resp, "msg", "unknown error"))
+        return 0
+    except Exception as e:
+        logger.warning("add calendar attendees error: %s", e)
+        return 0
+
+
+def _create_calendar_event(
+    title: str,
+    goal: str,
+    deadline: str,
+    members: Optional[list[str]] = None,
+    chat_id: str = "",
+) -> Optional[str]:
     """Create a calendar event for the project deadline. Returns description on success."""
     client = _get_client()
     if not client or not deadline:
@@ -1634,16 +1694,20 @@ def _create_calendar_event(title: str, goal: str, deadline: str) -> Optional[str
             .summary(f"📌 截止: {title}").description(goal)
             .start_time(start_time).end_time(end_time).build()
         )
+        calendar_id = _resolve_calendar_id(client)
         req = (
             CreateCalendarEventRequest.builder()
-            .calendar_id(_resolve_calendar_id(client))
+            .calendar_id(calendar_id)
             .request_body(event)
             .build()
         )
         resp = client.calendar.v4.calendar_event.create(req)
         if resp.success():
             logger.info("calendar event created for %s", deadline)
-            return f"日历事件: {deadline}"
+            event_id = getattr(getattr(resp.data, "event", None), "event_id", "") if getattr(resp, "data", None) else ""
+            attendee_count = _add_calendar_event_attendees(client, calendar_id, event_id, members, chat_id)
+            attendee_suffix = f"；已邀请 {attendee_count} 位成员" if attendee_count else ""
+            return f"日历事件: {deadline}{attendee_suffix}"
         else:
             logger.warning("create calendar event failed: %s", resp.msg)
             return None
@@ -2959,6 +3023,7 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
     doc_updated = False
     permission_refreshed = False
     calendar_event_created = False
+    calendar_attendees_added = False
     reminder_scheduled = False
 
     # 1. Update in-memory registry
@@ -3054,8 +3119,12 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
         if action == "add_member" and chat_id and not state_project:
             permission_refreshed = _refresh_project_resource_permissions(project, chat_id)
         if action == "update_deadline" and chat_id:
-            cal_result = _create_calendar_event(project_name, project.get("goal", ""), value)
+            cal_result = _create_calendar_event(
+                project_name, project.get("goal", ""), value,
+                project.get("members", []), chat_id,
+            )
             calendar_event_created = bool(cal_result)
+            calendar_attendees_added = "已邀请" in str(cal_result or "")
             reminder_scheduled = _schedule_deadline_reminder(project_name, value, chat_id)
 
     # 3. Send notification via Hermes
@@ -3081,6 +3150,8 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
             parts.append("✅ 项目资源权限已刷新")
         if calendar_event_created:
             parts.append("✅ 日历事件已更新")
+        if calendar_attendees_added:
+            parts.append("✅ 日历参与人已邀请")
         if reminder_scheduled:
             parts.append("✅ 截止提醒已设置")
         if bitable_updated:
@@ -3109,6 +3180,7 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
         "doc_updated": doc_updated,
         "permission_refreshed": permission_refreshed,
         "calendar_event_created": calendar_event_created,
+        "calendar_attendees_added": calendar_attendees_added,
         "reminder_scheduled": reminder_scheduled,
         "instructions": (
             f"用中文回复：已更新项目「{project_name}」的{action_label}为 {value}。"
@@ -3116,6 +3188,7 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
             + ("项目文档已更新。" if doc_updated else "")
             + ("项目资源权限已刷新。" if permission_refreshed else "")
             + ("日历事件已更新。" if calendar_event_created else "")
+            + ("日历参与人已邀请。" if calendar_attendees_added else "")
             + ("截止提醒已设置。" if reminder_scheduled else "")
             + ("状态表已同步。" if bitable_updated else "本地状态已更新。" if state_updated else "")
             + ("状态表记录已追加。" if bitable_history_created else "")
