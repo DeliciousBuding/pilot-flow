@@ -1,6 +1,6 @@
 # PilotFlow 自驱迭代路线图
 
-> 版本: v1.11+ (2026-05-03)
+> 版本: v1.12 (2026-05-03)
 > 目的: 规划下一阶段的产品增量, 围绕「深度融合 Hermes 生态 + 飞书原生能力」, 不造轮子, 强差异化
 
 ---
@@ -12,14 +12,15 @@
 - **架构边界清晰**: 消息/记忆/定时走 Hermes (`registry.dispatch`), 文档/表格/任务走 lark_oapi SDK 直连
 - **确认门控有效**: `_plan_generated` 全局变量按 chat_id 隔离, TTL 10 分钟
 - **测试覆盖**: 25/25 通过 (19 单元 + 6 集成 mock gateway)
+- **卡片 action 工具已实现**: `pilotflow_handle_card_action` 已接入 pending plan 确认/取消
 - **代码质量**: 工具描述强引导 LLM, 输出规则在工具返回值里
 
 ### 已经识别但还没做的事
 
 | 缺口 | 影响 | 紧迫度 |
 | --- | --- | --- |
-| WSL+tmux 真实端到端验证 | 工具描述改了没在真实 LLM 上验证 | P0 |
-| 卡片按钮回调 handler | 按钮点了没反应 = 产品断点 | P0 |
+| WSL+tmux 真实端到端验证 | v1.12 改动尚未在真实 LLM + 飞书群复测 | P0 |
+| 卡片按钮 live parity | handler 已写，真实按钮点击续跑尚未复测 | P0 |
 | Memory 双向读取 | 「越用越聪明」是口号不是功能 | P1 |
 | Session Context 利用不足 | 浪费了 user_name / chat_name 信息 | P1 |
 | 任务订阅者 / 日历邀请 | 飞书生态深度未挖透 | P2 |
@@ -46,9 +47,7 @@ Hermes 已经为我们准备好的能力, 我们能复用的全部要复用:
 | `FeishuAdapter._on_card_action_trigger` | ❌ 未接 | **关键!** Hermes 已把按钮路由成 `/card button {value}` 合成消息, 我们只需让 LLM 识别这个格式 |
 | `tools/registry.py 的 30s TTL 缓存` | ✅ 隐式利用 | 维持 |
 
-**重大发现**: 卡片按钮回调不需要我们自己写 handler! Hermes 的 `_handle_card_action_event` 已经把按钮点击路由成 `/card button {"pilotflow_action": "confirm_project"}` 这样的合成 COMMAND 消息走 LLM 流程。我们只需:
-1. 在 `_handle_generate_plan` 返回的 instructions 里告诉 LLM「如果收到 `/card button {pilotflow_action: confirm_project}` 就调用 create_project_space」
-2. 或者写一个轻量级的 `pilotflow_handle_card_action` 工具专门处理这种合成消息
+**当前实现**: Hermes 的 `_handle_card_action_event` 会把按钮点击路由成 `/card button {"pilotflow_action": "confirm_project"}` 这样的合成 COMMAND 消息。PilotFlow 已新增 `pilotflow_handle_card_action` 工具，从 `_pending_plans` 恢复参数并执行确认/取消。下一步是 live parity 验证真实按钮点击能稳定进入该工具。
 
 ### 2.2 飞书生态融合 (lark_oapi 还没挖透的部分)
 
@@ -81,14 +80,14 @@ Hermes 已经为我们准备好的能力, 我们能复用的全部要复用:
 
 ## 三、迭代轮次规划
 
-### Round 12: 真实验证 + 卡片回调 (P0 必做)
+### Round 12: 真实验证 + 卡片按钮 live parity (P0 必做)
 
 **目标**: 把上一轮欠的债还清 + 关闭最大产品断点
 
 **任务清单**:
 1. WSL+tmux 启动 gateway, 在真实测试群发消息全链路验证
 2. 验证卡片按钮回调 (Hermes 已自动路由, 验证 LLM 能接住合成消息)
-3. 添加 `pilotflow_handle_card_action` 工具 (专门处理 `/card button {...}` 格式)
+3. 验证 `pilotflow_handle_card_action` 能从 pending plan 创建项目或取消项目
 4. 修复在真实环境中暴露的所有 bug
 
 **验证标准**:
@@ -119,13 +118,13 @@ Hermes 已经为我们准备好的能力, 我们能复用的全部要复用:
 1. 任务创建: 用 `task_collaborator.create` 把所有成员加为关注者
 2. 日历事件: `attendee.create` 邀请所有成员
 3. 文档创建后: 用 Hermes 自带的 `feishu_drive_add_comment` 写一条「@所有人, 请补充内容」的引导评论
-4. 看板查询: 用 `feishu_drive_list_comments` 拉取每个项目文档的评论数, 显示「最近活跃度」
+4. 看板查询: 用 `feishu_drive_list_comments` 拉取每个项目文档的评论数, 显示「文档活跃度」
 
 **验证标准**:
 - 创建任务后, 群成员全员收到「关注的任务」通知
 - 创建日历事件后, 群成员全员收到日历邀请
 - 文档刚创建就有一条引导评论
-- 看板显示「文档评论数 / 最近评论时间」
+- 看板显示「文档评论数 / 最后评论时间」
 
 ### Round 15: UX 收尾 + 项目生命周期 (P2)
 

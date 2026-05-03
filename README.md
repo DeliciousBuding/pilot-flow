@@ -44,8 +44,8 @@
 | **AI 干真活** | lark_oapi SDK 直连飞书 API，创建真实文档、任务 |
 | **成员 @提及** | 文档和消息中自动 @提及项目成员 |
 | **文档自动开权限** | 创建的文档自动开放链接访问，无需手动设置 |
-| **即插即用** | 基于 Hermes 运行时，`cp -r` 即可安装 |
-| **越用越聪明** | Hermes memory 集成，记住项目模式和常用成员，下次自动建议 |
+| **即插即用** | 基于 Hermes 运行时，`python setup.py --hermes-dir ...` 一键安装 |
+| **可沉淀项目模式** | 创建项目时写入 Hermes memory，为后续历史模式读取和智能建议打基础 |
 
 ## 飞书生态深度融合
 
@@ -110,8 +110,9 @@ uv run hermes gateway
 | 风险检测 | 自动识别缺失成员、模糊截止时间等风险 |
 | 日历集成 | 自动创建截止时间日历事件（UTC+8） |
 | 截止提醒 | 通过 Hermes cron 自动设置截止前 1 天提醒 |
+| 卡片按钮 | 已实现确认/取消 action 工具；真实飞书按钮续跑需在 live parity 中复测 |
 | LLM 驱动 | gpt-5.5 理解中文意图，自动选择工具 |
-| 端到端验证 | 飞书群 @PilotFlow → LLM → 5 个飞书产物，~30 秒 |
+| 端到端验证 | 早期 live 路径已跑通；v1.12 需要复测真实 LLM + 卡片按钮续跑 |
 
 ## 竞品定位
 
@@ -121,7 +122,7 @@ uv run hermes gateway
 | 入口 | 会议/工作台 | 飞书群聊 @mention |
 | 工作流 | 会议→待办/项目流程 | 一句话→文档+任务+消息 |
 | AI 能力 | 无 | LLM 理解意图，自动执行 |
-| 学习能力 | 无 | Hermes memory 集成，越用越聪明 |
+| 学习能力 | 无 | Hermes memory 写入已实现，历史读取和自动建议在下一轮推进 |
 | 可扩展性 | 固定功能 | Hermes 插件生态 |
 
 ## 文档
@@ -142,7 +143,8 @@ uv run hermes gateway
 | Phase 2 | LLM 驱动的意图理解和计划生成 | ✅ 已完成 |
 | Phase 3 | lark_oapi SDK 直连 + @mention + 格式化文档 + 权限自动开放 | ✅ 已完成 |
 | Phase 4 | 确认门控 + 风险检测 + 多轮管理 + 项目看板 | ✅ 已完成 |
-| Phase 5 | Hermes memory 集成 + 智能模板 + 日历集成 | ✅ 已完成 |
+| Phase 5 | Hermes memory 写入 + 智能模板 + 日历集成 | ✅ 已完成 |
+| Phase 6 | Hermes memory 读取 + 真实卡片按钮 live parity + 录屏材料 | 进行中 |
 
 ## 致谢
 

@@ -9,7 +9,7 @@ PilotFlow 是飞书群聊中的 AI 项目运行官。详见 [README.md](README.m
 ## 开发环境
 
 1. 安装 Hermes Agent：[INSTALL.md](INSTALL.md)
-2. 安装 PilotFlow 插件：`cp -r plugins/pilotflow hermes-agent/plugins/` + `cp -r skills/pilotflow hermes-agent/skills/`
+2. 安装 PilotFlow 插件：`python setup.py --hermes-dir <hermes-agent-path>`
 3. 配置 `.env` 和 `config.yaml`：详见 [INSTALL.md](INSTALL.md)
 4. 启动：`uv run hermes gateway`
 
@@ -17,7 +17,7 @@ PilotFlow 是飞书群聊中的 AI 项目运行官。详见 [README.md](README.m
 
 ```
 plugins/pilotflow/
-├── tools.py          # 核心工具（6个飞书工具 + 辅助函数）
+├── tools.py          # 核心工具（6个注册工具 + 辅助函数）
 ├── __init__.py       # 插件注册
 └── plugin.yaml       # 插件元数据
 

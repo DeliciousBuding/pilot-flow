@@ -1045,7 +1045,7 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
         record_id=bitable_meta.get("record_id", "") if bitable_meta else "",
     )
 
-    # Save project pattern to Hermes memory (越用越聪明)
+    # Save project pattern to Hermes memory for later history-based suggestions.
     _save_to_hermes_memory(title, goal, members, deliverables, deadline)
 
     # Schedule deadline reminder via Hermes cron (if deadline is set)

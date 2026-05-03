@@ -26,7 +26,7 @@ PilotFlow 提供 6 个工具：
 1. **pilotflow_generate_plan** — 从自然语言提取项目信息，生成计划
 2. **pilotflow_detect_risks** — 检测项目计划中的风险
 3. **pilotflow_create_project_space** — 一键创建项目空间（文档+表格+任务+消息）
-4. **pilotflow_send_summary** — 发送执行总结
+4. **pilotflow_handle_card_action** — 处理确认卡片按钮（确认/取消）
 5. **pilotflow_query_status** — 查询项目状态，发送看板卡片
 6. **pilotflow_update_project** — 更新项目（改截止时间、加成员、改状态）
 

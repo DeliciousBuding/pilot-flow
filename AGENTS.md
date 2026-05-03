@@ -25,23 +25,34 @@ PilotFlow/
 ## Key Technical Decisions
 
 - **Messaging**: via `registry.dispatch("send_message")` (reuses Hermes channels)
-- **Doc/Task/Bitable**: via lark_oapi SDK (Hermes doesn't have native Feishu doc tools)
+- **Memory**: project creation writes patterns via `registry.dispatch("memory")`; reading/scanning history is next work
+- **Cron**: deadline reminders are scheduled via `registry.dispatch("cronjob")`
+- **Doc/Task/Bitable/Calendar**: via lark_oapi SDK (Hermes doesn't have native write tools for these surfaces)
 - **Permissions**: auto-open link access + add group members as editors after creation
 - **@mention**: resolve group member names to open_id via `im.chat.members.get`
 - **Confirmation gate**: per-chat_id with TTL, prevents execution without user confirmation
+- **Card actions**: Hermes routes Feishu button clicks as `/card button {...}`; `pilotflow_handle_card_action` confirms/cancels using pending plan state
 
 ## Conventions
 
 - All user-facing text in Chinese
 - Tool names are English (`pilotflow_*`) — required by OpenAI API schema validation
 - No English or tool names shown to users
-- Plugin is "即插即用" — `cp -r` to install into Hermes
+- Plugin is installed with `python setup.py --hermes-dir <hermes-agent-path>`; manual copy is fallback only
 
 ## Testing
 
+- Local tests: `pytest -q` in `PilotFlow/`
 - Gateway test: `uv run hermes gateway` in hermes-agent directory
 - Direct tool test: set `PILOTFLOW_TEST_CHAT_ID` env var
 - End-to-end: @PilotFlow in Feishu group chat
+
+## Current Status (2026-05-03)
+
+- Version: `plugin.yaml` 1.12.0
+- Tests: 25 local tests passing
+- Runtime install: `D:\Code\LarkProject\hermes-agent\plugins\pilotflow\tools.py` matches the repo copy
+- Must verify next: real LLM + Feishu group live parity for confirm/cancel card buttons
 
 ## Dependencies
 

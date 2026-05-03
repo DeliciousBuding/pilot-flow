@@ -44,8 +44,8 @@ Mention @PilotFlow with a requirement in plain language. It extracts goals, memb
 | **AI Does Real Work** | lark_oapi SDK connects directly to Feishu API |
 | **@mention Support** | Auto-resolves group member names to @mentions in docs and messages |
 | **Auto Permissions** | Created docs automatically open link access |
-| **Plug and Play** | Built on Hermes runtime — `cp -r` to install |
-| **Gets Smarter** | Hermes memory integration — remembers project patterns and common members for next time |
+| **Plug and Play** | Built on Hermes runtime — one-command install via `python setup.py --hermes-dir ...` |
+| **Project Pattern Memory** | Writes created project patterns to Hermes memory, preparing for history-based suggestions |
 
 ## Architecture
 
@@ -106,8 +106,9 @@ uv run hermes gateway
 | Risk Detection | Auto-detect missing members, vague deadlines, unclear deliverables |
 | Calendar Integration | Auto-create deadline calendar event (UTC+8) |
 | Deadline Reminder | Auto-schedule reminder 1 day before deadline via Hermes cron |
+| Card Buttons | Confirm/cancel action tool is implemented; live Feishu button continuation still needs parity testing |
 | LLM-Driven | gpt-5.5 understands Chinese intent, selects tools automatically |
-| End-to-End Verified | Feishu group @PilotFlow → LLM → 5 Feishu artifacts, ~30 seconds |
+| End-to-End Verified | Earlier live path was validated; v1.12 needs a real LLM + card button parity rerun |
 
 ## Competitive Positioning
 
@@ -117,7 +118,7 @@ uv run hermes gateway
 | Entry Point | Meeting / workspace | Feishu group chat @mention |
 | Workflow | Meeting → todo / project flow | One sentence → docs + tasks + messages |
 | AI Capability | None | LLM understands intent, auto-executes |
-| Learning | None | Hermes memory integration, gets smarter with use |
+| Learning | None | Hermes memory write is implemented; memory read and automatic suggestions are next |
 | Extensibility | Fixed features | Hermes plugin ecosystem |
 
 ## Documentation
@@ -138,7 +139,8 @@ uv run hermes gateway
 | Phase 2 | LLM-driven intent understanding and plan generation | ✅ Done |
 | Phase 3 | lark_oapi SDK + @mention + formatted docs + auto permissions | ✅ Done |
 | Phase 4 | Confirmation gate + risk detection + multi-turn management + project dashboard | ✅ Done |
-| Phase 5 | Hermes memory integration + smart templates + calendar integration | ✅ Done |
+| Phase 5 | Hermes memory write + smart templates + calendar integration | ✅ Done |
+| Phase 6 | Hermes memory read + live card-button parity + demo recordings | In progress |
 
 ## Acknowledgments
 
