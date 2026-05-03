@@ -414,6 +414,22 @@ def _build_project_detail_card(chat_id: str, title: str, project: dict) -> tuple
     return card, [next_action_id]
 
 
+def _build_project_reminder_text(chat_id: str, title: str, project: dict) -> str:
+    deadline = project.get("deadline") or "待确认"
+    countdown = _deadline_countdown(deadline)
+    deadline_text = deadline + (f"（{countdown}）" if countdown else "")
+    members = project.get("members", [])
+    owner_text = _format_members(members, chat_id) if members else "相关负责人"
+    status = project.get("status", "进行中")
+    return (
+        f"项目催办：请关注项目「{title}」。\n"
+        f"负责人：{owner_text}\n"
+        f"截止：{deadline_text}\n"
+        f"当前状态：{status}\n"
+        "请在群里同步最新进展；如已完成，请点击项目卡片标记完成。"
+    )
+
+
 def _update_interactive_card_via_feishu(message_id: str, card_json: dict) -> bool:
     """Update an existing Feishu interactive card message."""
     client = _get_client()
@@ -2221,7 +2237,7 @@ def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
             "risks": recovered_plan.get("risks", []),
         }, **kwargs)
 
-    if pilotflow_action in ("project_status", "mark_project_done", "reopen_project", "resolve_risk"):
+    if pilotflow_action in ("project_status", "mark_project_done", "reopen_project", "resolve_risk", "send_project_reminder"):
         project_title = action_data.get("title") or action_data.get("project_name")
         if not project_title:
             return tool_error("无法识别项目，请在群里直接询问项目状态。")
@@ -2266,6 +2282,17 @@ def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
                 "project": project_title,
                 "card_sent": True,
                 "instructions": "已发送项目状态。不要展示工具名或英文。",
+            })
+
+        if pilotflow_action == "send_project_reminder":
+            reminder_sent = _hermes_send(chat_id, _build_project_reminder_text(chat_id, project_title, project))
+            if not reminder_sent:
+                return tool_error("项目催办提醒发送失败，请检查 Feishu 连接。")
+            return tool_result({
+                "status": "project_reminder_sent",
+                "project": project_title,
+                "reminder_sent": True,
+                "instructions": "已发送项目催办提醒。不要展示工具名或英文。",
             })
 
         target_status = "已完成" if pilotflow_action == "mark_project_done" else "进行中"
@@ -2397,6 +2424,13 @@ def _handle_card_command(raw_args: str) -> str:
             f"**{action_data.get('title', '项目')}** 已恢复为进行中。",
             "green",
         )
+    elif action_id and pilotflow_action == "send_project_reminder":
+        _mark_card_message(
+            message_id,
+            "已发送催办提醒",
+            f"**{action_data.get('title', '项目')}** 的催办提醒已发送到群聊。",
+            "yellow",
+        )
 
     action_value = json.dumps(action_data, ensure_ascii=False)
     action_kwargs = {"chat_id": chat_id}
@@ -2428,7 +2462,7 @@ def _handle_card_command(raw_args: str) -> str:
         if action_ref:
             _clear_pending_plan_if_matches(chat_id, action_ref.get("plan"))
         return None
-    if data.get("status") in ("project_status_sent", "project_marked_done", "project_reopened", "project_risk_resolved", "dashboard_page_sent"):
+    if data.get("status") in ("project_status_sent", "project_marked_done", "project_reopened", "project_risk_resolved", "project_reminder_sent", "dashboard_page_sent"):
         return None
     if data.get("display"):
         return "\n".join(str(item) for item in data["display"])
@@ -2604,22 +2638,34 @@ def _handle_query_status(params: Dict[str, Any], **kwargs) -> str:
                 next_type = "default" if next_action == "reopen_project" else "primary"
             next_action_id = _create_card_action_ref(chat_id, next_action, {"title": p["name"]})
             action_ids.extend([status_action_id, next_action_id])
+            reminder_action = None
+            if status_filter in ("overdue", "due_soon"):
+                reminder_action = _create_card_action_ref(chat_id, "send_project_reminder", {"title": p["name"]})
+                action_ids.append(reminder_action)
+            actions = [
+                {
+                    "tag": "button",
+                    "text": {"tag": "plain_text", "content": "查看状态"},
+                    "type": "default",
+                    "value": {"pilotflow_action_id": status_action_id},
+                },
+                {
+                    "tag": "button",
+                    "text": {"tag": "plain_text", "content": next_text},
+                    "type": next_type,
+                    "value": {"pilotflow_action_id": next_action_id},
+                },
+            ]
+            if reminder_action:
+                actions.append({
+                    "tag": "button",
+                    "text": {"tag": "plain_text", "content": "发送提醒"},
+                    "type": "primary",
+                    "value": {"pilotflow_action_id": reminder_action},
+                })
             card_elements.append({
                 "tag": "action",
-                "actions": [
-                    {
-                        "tag": "button",
-                        "text": {"tag": "plain_text", "content": "查看状态"},
-                        "type": "default",
-                        "value": {"pilotflow_action_id": status_action_id},
-                    },
-                    {
-                        "tag": "button",
-                        "text": {"tag": "plain_text", "content": next_text},
-                        "type": next_type,
-                        "value": {"pilotflow_action_id": next_action_id},
-                    },
-                ],
+                "actions": actions,
             })
 
     if chat_id and total_pages > 1:

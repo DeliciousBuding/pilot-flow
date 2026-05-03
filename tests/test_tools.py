@@ -980,6 +980,64 @@ def test_query_status_filters_due_soon_projects_with_yellow_dashboard():
     assert "已经逾期项目" not in content
 
 
+def test_deadline_dashboard_offers_reminder_button_without_chat_id_payload():
+    with _project_registry_lock:
+        _project_registry.clear()
+    with _plan_lock:
+        _card_action_refs.clear()
+    overdue = (dt.date.today() - dt.timedelta(days=2)).isoformat()
+    _register_project(
+        "催办按钮项目", ["张三"], overdue, "进行中", [],
+        goal="验证催办按钮", deliverables=["验收记录"],
+    )
+    captured = {}
+
+    def capture_card(chat_id, card):
+        captured["card"] = card
+        return True
+
+    with patch("tools._send_interactive_card_via_feishu", side_effect=capture_card):
+        result = _handle_query_status({"query": "看看逾期项目"}, chat_id="oc_reminder_button")
+
+    assert "项目看板已发送" in result
+    actions = [element for element in captured["card"]["elements"] if element.get("tag") == "action"]
+    assert actions
+    button_text = [button["text"]["content"] for button in actions[0]["actions"]]
+    assert button_text == ["查看状态", "标记完成", "发送提醒"]
+    reminder_value = actions[0]["actions"][2]["value"]
+    assert "pilotflow_action_id" in reminder_value
+    assert "pilotflow_chat_id" not in reminder_value
+    with _plan_lock:
+        refs = [ref for ref in _card_action_refs.values() if ref["chat_id"] == "oc_reminder_button"]
+    assert {ref["action"] for ref in refs} >= {"project_status", "mark_project_done", "send_project_reminder"}
+
+
+def test_project_reminder_card_action_sends_chinese_group_reminder():
+    with _project_registry_lock:
+        _project_registry.clear()
+    deadline = (dt.date.today() - dt.timedelta(days=1)).isoformat()
+    _register_project(
+        "卡片催办项目", ["张三"], deadline, "进行中", [],
+        goal="验证卡片催办", deliverables=["验收记录"],
+    )
+    sent_messages = []
+    action_value = json.dumps({"pilotflow_action": "send_project_reminder", "title": "卡片催办项目"}, ensure_ascii=False)
+
+    with patch("tools._hermes_send", side_effect=lambda chat_id, msg: sent_messages.append((chat_id, msg)) or True):
+        result = json.loads(_handle_card_action({"action_value": action_value}, chat_id="oc_reminder_action"))
+
+    assert result["status"] == "project_reminder_sent"
+    assert result["project"] == "卡片催办项目"
+    assert sent_messages
+    chat_id, message = sent_messages[0]
+    assert chat_id == "oc_reminder_action"
+    assert "项目催办" in message
+    assert "卡片催办项目" in message
+    assert deadline in message
+    assert "张三" in message
+    assert "pilotflow" not in message.lower()
+
+
 def test_risk_project_dashboard_offers_resolve_risk_button():
     with _project_registry_lock:
         _project_registry.clear()
