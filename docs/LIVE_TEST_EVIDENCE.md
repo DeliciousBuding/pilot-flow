@@ -56,6 +56,20 @@
 | 入口卡片 | Bot 发送 `迁移验收项目` 入口互动卡片，包含 `查看状态` / `标记完成` 按钮 |
 | 隐私处理 | 真实 chat_id、open_id、message_id、文档链接和状态表链接不写入公开仓库 |
 
+## 2026-05-03 入口卡片完成状态同步场景
+
+| 项目 | 证据 |
+| --- | --- |
+| 运行环境 | WSL 中 Hermes gateway 已重启，PilotFlow 已通过 `setup.py --hermes-dir <hermes-agent-path>` 同步到 runtime |
+| 验证方式 | 在 WSL runtime 内直接调用 PilotFlow 工具链，使用真实 Feishu SDK 创建项目空间，再调用 `mark_project_done` 卡片动作 |
+| 创建结果 | 工具返回 `project_space_created`，并在 Feishu 群里出现项目入口互动卡片 |
+| 状态表 metadata | 创建后项目 registry 中存在 `app_token`、`table_id`、`record_id`，证明可定位状态表记录 |
+| 完成动作 | `mark_project_done` 返回 `project_marked_done` |
+| 状态表同步 | 工具返回 `bitable_updated=True`，registry 状态变为 `已完成` |
+| 群卡片确认 | 最近消息中出现 `按钮同步状态表验证` 项目入口卡片，包含文档、状态表、截止时间和 `查看状态` / `标记完成` 按钮 |
+| 边界说明 | 直接工具脚本脱离 gateway 时 `send_message` registry 不可用，但飞书文档、状态表、卡片和状态表更新均走真实 API |
+| 隐私处理 | 真实 chat_id、open_id、message_id、文档链接、状态表链接和 token 不写入公开仓库 |
+
 ## 本地回归
 
 ```bash
@@ -65,11 +79,11 @@ uv run pytest -o addopts='' -q
 结果：
 
 ```text
-57 passed
+58 passed
 ```
 
 ## 当前证据边界
 
 - 已有真实证据：Feishu 网关可接收群消息，PilotFlow 可发中文文本反馈、互动看板卡片、执行计划卡片、确认完成卡片、项目入口卡片和取消反馈。
-- 已有历史现场验证：确认按钮可触发项目创建，原确认卡片可更新为已创建状态；`确认卡片` 请求不会再被当作执行确认。
+- 已有历史现场验证：确认按钮可触发项目创建，原确认卡片可更新为已创建状态；`确认卡片` 请求不会再被当作执行确认；入口卡片完成动作可同步状态表。
 - 提交材料仍需补齐：成功创建路径录屏、取消路径录屏、真实文档/多维表格/任务/日历链接清单。该清单应进入私有提交材料或飞书在线文档，不建议直接提交到公开仓库。

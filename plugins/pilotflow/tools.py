@@ -1719,6 +1719,7 @@ def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
         if not project_title:
             return tool_error("无法识别项目，请在群里直接询问项目状态。")
 
+        bitable_updated = False
         with _project_registry_lock:
             project = _project_registry.get(project_title)
             if project and pilotflow_action == "mark_project_done":
@@ -1741,10 +1742,18 @@ def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
                 "instructions": "已发送项目状态。不要展示工具名或英文。",
             })
 
-        _hermes_send(chat_id, f"项目「{project_title}」已标记为完成。")
+        if project.get("app_token") and project.get("table_id") and project.get("record_id"):
+            bitable_updated = _update_bitable_record(
+                project["app_token"], project["table_id"], project["record_id"],
+                {"状态": "已完成"},
+            )
+
+        suffix = "，状态表已同步。" if bitable_updated else "。"
+        _hermes_send(chat_id, f"项目「{project_title}」已标记为完成{suffix}")
         return tool_result({
             "status": "project_marked_done",
             "project": project_title,
+            "bitable_updated": bitable_updated,
             "instructions": "回复用户：已标记完成。不要展示工具名或英文。",
         })
 

@@ -404,6 +404,27 @@ def test_project_entry_card_action_marks_project_done():
         assert _project_registry["动作项目"]["status"] == "已完成"
 
 
+def test_project_entry_card_action_syncs_bitable_status():
+    with _project_registry_lock:
+        _project_registry.clear()
+    _register_project(
+        "表格同步项目", ["张三"], "2026-05-10", "进行中", [],
+        app_token="app1", table_id="tbl1", record_id="rec1",
+        goal="验证入口卡片同步状态表", deliverables=["验收记录"],
+    )
+    action_value = json.dumps({"pilotflow_action": "mark_project_done", "title": "表格同步项目"}, ensure_ascii=False)
+
+    with (
+        patch("tools._hermes_send", return_value=True),
+        patch("tools._update_bitable_record", return_value=True) as update_bitable,
+    ):
+        result = json.loads(_handle_card_action({"action_value": action_value}, chat_id="oc_action_bitable"))
+
+    assert result["status"] == "project_marked_done"
+    assert result["bitable_updated"] is True
+    update_bitable.assert_called_once_with("app1", "tbl1", "rec1", {"状态": "已完成"})
+
+
 def test_card_command_opaque_project_action_carries_project_title():
     with _project_registry_lock:
         _project_registry.clear()
