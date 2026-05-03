@@ -3011,6 +3011,55 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
     if action in ("add_member", "remove_member"):
         value = _clean_member_update_value(value)
 
+    def send_reminder_for_project(title: str, info: dict) -> dict:
+        sent = _hermes_send(chat_id, _build_project_reminder_text(chat_id, title, info)) if chat_id else False
+        doc_trace = _append_project_doc_update(title, info, "催办", value)
+        bitable_trace = False
+        if info.get("app_token") and info.get("table_id"):
+            bitable_trace = _append_bitable_update_record(
+                info["app_token"], info["table_id"], "催办", value, info,
+            )
+        return {"sent": sent, "doc_trace": doc_trace, "bitable_trace": bitable_trace}
+
+    if action == "send_reminder":
+        batch_filter = _status_filter_from_query(project_name)
+        if batch_filter in ("overdue", "due_soon", "risk"):
+            with _project_registry_lock:
+                candidates = [
+                    (title, info)
+                    for title, info in _project_registry.items()
+                    if _project_matches_status_filter({
+                        "status": info.get("status", "进行中"),
+                        "deadline": info.get("deadline", ""),
+                    }, batch_filter)
+                ]
+            sent_count = 0
+            doc_count = 0
+            bitable_count = 0
+            sent_projects = []
+            for title, info in candidates:
+                trace = send_reminder_for_project(title, info)
+                if trace["sent"]:
+                    sent_count += 1
+                    sent_projects.append(title)
+                if trace["doc_trace"]:
+                    doc_count += 1
+                if trace["bitable_trace"]:
+                    bitable_count += 1
+            return tool_result({
+                "status": "project_reminders_sent",
+                "filter": batch_filter,
+                "reminder_count": sent_count,
+                "projects": sent_projects,
+                "doc_trace_count": doc_count,
+                "bitable_trace_count": bitable_count,
+                "instructions": (
+                    f"用中文回复：已发送 {sent_count} 个项目催办提醒。"
+                    + ("没有匹配项目时请提示用户当前无需催办。" if sent_count == 0 else "")
+                    + "不要显示工具名或英文。"
+                ),
+            })
+
     # Look up project in registry (fuzzy match: project_name is substring of registry key)
     with _project_registry_lock:
         project = _project_registry.get(project_name)
@@ -3175,12 +3224,10 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
             calendar_attendees_added = "已邀请" in str(cal_result or "")
             reminder_scheduled = _schedule_deadline_reminder(project_name, value, chat_id)
         if action == "send_reminder" and chat_id:
-            reminder_sent = _hermes_send(chat_id, _build_project_reminder_text(chat_id, project_name, project))
-            doc_updated = _append_project_doc_update(project_name, project, action_label, value)
-            if project.get("app_token") and project.get("table_id"):
-                bitable_history_created = _append_bitable_update_record(
-                    project["app_token"], project["table_id"], action_label, value, project,
-                )
+            trace = send_reminder_for_project(project_name, project)
+            reminder_sent = trace["sent"]
+            doc_updated = trace["doc_trace"]
+            bitable_history_created = trace["bitable_trace"]
 
     # 3. Send notification via Hermes
     if chat_id and action != "send_reminder":
