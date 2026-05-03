@@ -3408,6 +3408,7 @@ def test_project_detail_card_can_create_followup_task_from_action():
     _register_project(
         "待办详情项目", ["张三", "李四"], "2026-05-20", "进行中", [],
         goal="验证详情卡待办", deliverables=["验收记录"],
+        app_token="app_followup_detail", table_id="tbl_followup_detail", record_id="rec_followup_detail",
     )
     captured = {}
     action_value = json.dumps({"pilotflow_action": "project_status", "title": "待办详情项目"}, ensure_ascii=False)
@@ -3435,6 +3436,8 @@ def test_project_detail_card_can_create_followup_task_from_action():
     with (
         patch("tools._create_task", return_value="待办详情项目跟进: https://example.invalid/task/task_123") as create_task,
         patch("tools._hermes_send", side_effect=lambda chat_id, msg: sent_messages.append((chat_id, msg)) or True),
+        patch("tools._append_project_doc_update", return_value=True) as append_doc,
+        patch("tools._append_bitable_update_record", return_value=True) as append_history,
     ):
         task_result = json.loads(_handle_card_action(
             {"action_value": json.dumps({"pilotflow_action_id": task_action_id}, ensure_ascii=False)},
@@ -3442,6 +3445,8 @@ def test_project_detail_card_can_create_followup_task_from_action():
         ))
 
     assert task_result["status"] == "project_followup_task_created"
+    assert task_result["doc_updated"] is True
+    assert task_result["bitable_history_created"] is True
     create_task.assert_called_once_with(
         "待办详情项目跟进",
         "项目: 待办详情项目",
@@ -3450,6 +3455,8 @@ def test_project_detail_card_can_create_followup_task_from_action():
         "oc_followup_detail",
         ["张三", "李四"],
     )
+    append_doc.assert_called_once()
+    append_history.assert_called_once()
     assert sent_messages
     assert sent_messages[0][0] == "oc_followup_detail"
     assert "待办详情项目跟进" in sent_messages[0][1]
