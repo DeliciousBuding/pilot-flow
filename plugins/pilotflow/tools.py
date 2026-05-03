@@ -1433,6 +1433,8 @@ def _status_filter_from_query(query: str) -> str:
         return "all"
     if any(word in q for word in ("归档", "已归档")):
         return "archived"
+    if any(word in q for word in ("风险", "阻塞", "卡住")):
+        return "risk"
     if any(word in q for word in ("逾期", "过期", "超期")):
         return "overdue"
     if any(word in q for word in ("未完成", "没完成", "进行中", "待完成", "待办", "还剩")):
@@ -1481,6 +1483,8 @@ def _project_matches_status_filter(project: dict, status_filter: str) -> bool:
         return status == "已完成"
     if status_filter == "active":
         return status != "已完成" and not _is_archived_status(status)
+    if status_filter == "risk":
+        return status in ("有风险", "风险", "blocked")
     if status_filter == "overdue":
         import datetime as _dt
         try:

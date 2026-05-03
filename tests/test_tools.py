@@ -883,6 +883,33 @@ def test_query_status_hides_archived_projects_by_default_and_shows_when_requeste
     assert "已归档生命周期项目" in archived_content
 
 
+def test_query_status_filters_risk_projects():
+    with _project_registry_lock:
+        _project_registry.clear()
+    _register_project(
+        "正常推进项目", [], "2026-05-20", "进行中", [],
+        goal="验证风险筛选", deliverables=["验收记录"],
+    )
+    _register_project(
+        "接口阻塞项目", [], "2026-05-20", "有风险", [],
+        goal="验证风险筛选", deliverables=["验收记录"],
+    )
+    captured = {}
+
+    def capture_card(chat_id, card):
+        captured["card"] = card
+        return True
+
+    with patch("tools._send_interactive_card_via_feishu", side_effect=capture_card):
+        result = _handle_query_status({"query": "看看风险项目"}, chat_id="oc_risk_filter")
+
+    assert "项目看板已发送" in result
+    content = json.dumps(captured["card"], ensure_ascii=False)
+    assert "接口阻塞项目" in content
+    assert "正常推进项目" not in content
+    assert "第 1/1 页" in content
+
+
 def test_query_status_paginates_large_dashboards():
     with _project_registry_lock:
         _project_registry.clear()
