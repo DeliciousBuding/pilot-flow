@@ -137,25 +137,26 @@ def _register_project(title: str, members: list, deadline: str, status: str, art
 # Hermes integration: messaging via registry.dispatch
 # ---------------------------------------------------------------------------
 
-def _hermes_send(chat_id: str, text: str) -> bool:
-    """Send a message via Hermes's send_message tool.
+def _hermes_ok(result: str) -> bool:
+    """Check if a registry.dispatch result indicates success."""
+    try:
+        data = json.loads(result)
+        return not (isinstance(data, dict) and "error" in data)
+    except (json.JSONDecodeError, TypeError):
+        return isinstance(result, str) and bool(result)
 
-    registry.dispatch returns JSON: {"error": "..."} on failure, or the
-    handler's raw return string on success.
-    """
+
+def _hermes_send(chat_id: str, text: str) -> bool:
+    """Send a message via Hermes's send_message tool."""
     result = registry.dispatch("send_message", {
         "action": "send",
         "target": f"feishu:{chat_id}",
         "message": text,
     })
-    try:
-        data = json.loads(result)
-        if isinstance(data, dict) and "error" in data:
-            logger.warning("hermes send error: %s", data["error"])
-            return False
-        return True
-    except (json.JSONDecodeError, TypeError):
-        return isinstance(result, str) and bool(result)
+    ok = _hermes_ok(result)
+    if not ok:
+        logger.warning("hermes send error: %s", result)
+    return ok
 
 
 def _hermes_send_card(chat_id: str, card_json: dict) -> bool:
@@ -166,14 +167,10 @@ def _hermes_send_card(chat_id: str, card_json: dict) -> bool:
         "message": json.dumps(card_json, ensure_ascii=False),
         "msg_type": "interactive",
     })
-    try:
-        data = json.loads(result)
-        if isinstance(data, dict) and "error" in data:
-            logger.warning("hermes send card error: %s", data["error"])
-            return False
-        return True
-    except (json.JSONDecodeError, TypeError):
-        return isinstance(result, str) and bool(result)
+    ok = _hermes_ok(result)
+    if not ok:
+        logger.warning("hermes send card error: %s", result)
+    return ok
 
 
 def _save_to_hermes_memory(title: str, goal: str, members: list, deliverables: list, deadline: str):
@@ -676,15 +673,21 @@ def _create_calendar_event(title: str, goal: str, deadline: str) -> Optional[str
 PILOTFLOW_GENERATE_PLAN_SCHEMA = {
     "name": "pilotflow_generate_plan",
     "description": (
-        "【创建项目的第一步 — 必须首先调用】当用户在群里 @机器人 并提到项目、答辩、任务、计划、"
-        "创建、准备等关键词时，必须先调用此工具。此工具会：\n"
-        "1. 设置确认门控（允许后续调用 create_project_space）\n"
+        "【创建项目的第一步 — 必须首先调用】\n"
+        "当用户在群里 @机器人 并提到项目、答辩、任务、计划、创建、准备等关键词时，必须先调用此工具。\n\n"
+        "此工具会：\n"
+        "1. 设置确认门控（允许后续调用 pilotflow_create_project_space）\n"
         "2. 检测项目模板（答辩/sprint/活动/上线）并提供建议\n"
-        "3. 返回结构化指令，指导你从用户消息中提取：项目标题、目标、成员、交付物、截止时间\n\n"
+        "3. 自动发送确认卡片到群聊，包含计划摘要和确认/取消按钮\n"
+        "4. 返回结构化指令，指导你从用户消息中提取：项目标题、目标、成员、交付物、截止时间\n\n"
         "调用后，你必须：\n"
         "- 向用户展示提取到的项目信息（中文）\n"
         "- 询问「确认执行？」\n"
-        "- 等用户明确回复「确认」「可以」「好的」「行」「ok」后，才能调用 pilotflow_create_project_space"
+        "- 等用户明确回复「确认」「可以」「好的」「行」「ok」后，才能调用 pilotflow_create_project_space\n\n"
+        "【输出规则 - 必须遵守】\n"
+        "- 绝对不要向用户展示工具名称、英文内容或 JSON\n"
+        "- 只用中文回复，不要显示工具调用过程\n"
+        "- 不要说「正在调用xxx工具」"
     ),
     "parameters": {
         "type": "object",
@@ -751,10 +754,11 @@ def _handle_generate_plan(params: Dict[str, Any], **kwargs) -> str:
         with _plan_lock:
             _pending_plans[chat_id] = {"input": text, "template": template["description"] if template else None}
 
-    # Send confirmation card with interactive buttons (if we have enough info)
-    if chat_id and (plan["members"] or plan["deliverables"]):
+    # Send confirmation card with interactive buttons (always send if we have chat_id)
+    if chat_id:
         member_text = ", ".join(plan["members"]) if plan["members"] else "待确认"
         deliverable_text = ", ".join(plan["deliverables"]) if plan["deliverables"] else "待确认"
+        deadline_text = plan["deadline"] or "待确认"
         card = {
             "config": {"wide_screen_mode": True},
             "header": {
@@ -767,7 +771,7 @@ def _handle_generate_plan(params: Dict[str, Any], **kwargs) -> str:
                     "content": (
                         f"**成员：** {member_text}\n"
                         f"**交付物：** {deliverable_text}\n"
-                        f"**截止时间：** {plan['deadline'] or '待确认'}"
+                        f"**截止时间：** {deadline_text}"
                     ),
                 },
                 {
@@ -805,18 +809,19 @@ def _handle_generate_plan(params: Dict[str, Any], **kwargs) -> str:
         "input": text,
         "template": template["description"] if template else None,
         "plan": plan,
-        "card_sent": bool(chat_id and (plan["members"] or plan["deliverables"])),
+        "card_sent": bool(chat_id),
         "instructions": (
             "请从输入中提取项目信息，填入 plan 对象的各字段。\n"
             "- title: 项目标题\n- goal: 项目目标\n"
             "- members: 成员列表（中文名）\n"
             "- deliverables: 交付物列表\n- deadline: 截止时间（YYYY-MM-DD格式）\n\n"
             "【重要】确认卡片已自动发送到群聊，包含计划摘要和确认按钮。\n"
-            "你只需简短回复「已生成计划，请确认」即可，不要重复展示计划内容。\n"
+            "你只需简短回复「已生成计划，请确认」或展示提取到的信息即可。\n"
             "用户确认后（回复「确认」或点击按钮），调用 pilotflow_create_project_space。\n\n"
             "【输出规则 - 必须遵守】\n"
             "1. 绝对不要向用户展示工具名称或英文内容\n"
-            "2. 只回复中文，不要显示工具调用过程"
+            "2. 只回复中文，不要显示工具调用过程\n"
+            "3. 不要说「正在调用xxx工具」"
             f"{template_hint}"
         ),
     })
@@ -829,8 +834,10 @@ def _handle_generate_plan(params: Dict[str, Any], **kwargs) -> str:
 PILOTFLOW_DETECT_RISKS_SCHEMA = {
     "name": "pilotflow_detect_risks",
     "description": (
-        "检测项目计划中的潜在风险。检查：成员是否为空、交付物是否为空、截止时间是否明确。"
-        "返回风险列表和处理建议。在展示计划给用户时可以调用此工具进行风险预检。"
+        "检测项目计划中的潜在风险。检查：成员是否为空、交付物是否为空、截止时间是否明确。\n"
+        "返回风险列表和处理建议。\n"
+        "在展示计划给用户时可以调用此工具进行风险预检，也可独立使用。\n\n"
+        "【输出规则】只用中文回复风险信息，不要展示工具名称或英文内容。"
     ),
     "parameters": {
         "type": "object",
@@ -873,14 +880,19 @@ def _handle_detect_risks(params: Dict[str, Any], **kwargs) -> str:
 PILOTFLOW_CREATE_PROJECT_SPACE_SCHEMA = {
     "name": "pilotflow_create_project_space",
     "description": (
-        "【必须在用户确认后调用】一键创建飞书项目空间，包含以下产物：\n"
+        "【必须在用户确认后调用 — 禁止跳过确认步骤】\n"
+        "一键创建飞书项目空间，包含以下产物：\n"
         "1. 飞书文档（格式化 markdown + @提及成员 + 自动开链接权限 + 给成员加编辑权）\n"
         "2. 多维表格（项目状态台账 + 记录 + 自动开权限）\n"
         "3. 飞书任务（每个交付物一个任务）\n"
         "4. 群入口消息（@成员 + 文档/表格/截止时间链接）\n"
         "5. 日历事件（截止时间提醒）\n\n"
-        "前置条件：必须先调用 pilotflow_generate_plan 并等用户回复「确认」。"
-        "如果用户没确认就调用，会返回错误。"
+        "前置条件：必须先调用 pilotflow_generate_plan 并等用户回复「确认」。\n"
+        "如果用户没确认就调用，会返回错误。\n\n"
+        "【输出规则 - 必须遵守】\n"
+        "- 用中文回复结果摘要，直接使用返回的 display 列表逐行展示\n"
+        "- 绝对不要向用户展示工具名称、英文内容或 JSON\n"
+        "- 不要说「正在调用xxx工具」或显示技术细节"
     ),
     "parameters": {
         "type": "object",
@@ -1045,8 +1057,10 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
 PILOTFLOW_SEND_SUMMARY_SCHEMA = {
     "name": "pilotflow_send_summary",
     "description": (
-        "向飞书群发送项目执行总结消息。包含已创建的产物列表和项目状态。"
-        "通常在 pilotflow_create_project_space 之后调用，发送一条汇总消息到群聊。"
+        "向飞书群发送项目执行总结消息。包含已创建的产物列表和项目状态。\n"
+        "通常在 pilotflow_create_project_space 完成后自动调用，向群聊发送一条汇总消息。\n"
+        "如果 create_project_space 已返回 display 列表，你可以直接展示，不必再调用此工具。\n\n"
+        "【输出规则】只用中文回复，不要展示工具名称或英文内容。"
     ),
     "parameters": {
         "type": "object",
@@ -1087,8 +1101,10 @@ def _handle_send_summary(params: Dict[str, Any], **kwargs) -> str:
 PILOTFLOW_QUERY_STATUS_SCHEMA = {
     "name": "pilotflow_query_status",
     "description": (
-        "查询项目状态并向群聊发送看板卡片。当用户问「项目进展如何」「有哪些项目」「项目状态」时调用。"
-        "会查询本会话中创建过的项目，构建项目看板卡片发送到群聊。"
+        "查询项目状态并向群聊发送看板卡片。\n"
+        "当用户问「项目进展如何」「有哪些项目」「项目状态」「看看进展」时调用。\n"
+        "会查询本会话中创建过的项目，构建项目看板互动卡片发送到群聊。\n\n"
+        "【输出规则】只用中文回复看板信息，不要展示工具名称或英文内容。"
     ),
     "parameters": {
         "type": "object",
@@ -1212,9 +1228,10 @@ def _update_bitable_record(app_token: str, table_id: str, record_id: str, fields
 PILOTFLOW_UPDATE_PROJECT_SCHEMA = {
     "name": "pilotflow_update_project",
     "description": (
-        "发送项目更新通知到群聊。当用户说「改截止时间」「加成员」「改项目状态」时调用。"
-        "会向群聊发送一条更新通知消息，@提及相关成员。"
-        "支持三种操作：update_deadline（改截止时间）、add_member（加成员）、update_status（改状态）。"
+        "更新已有项目信息。当用户说「改截止时间」「加成员」「改项目状态」「延期」「延期到」时调用。\n"
+        "支持三种操作：update_deadline（改截止时间）、add_member（加成员）、update_status（改状态）。\n"
+        "会同时更新内存注册表和多维表格记录，并向群聊发送更新通知。\n\n"
+        "【输出规则】只用中文回复更新结果，不要展示工具名称或英文内容。"
     ),
     "parameters": {
         "type": "object",
