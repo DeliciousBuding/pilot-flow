@@ -114,6 +114,7 @@ def test_full_flow_create_project():
                 "members": ["示例成员A"],
                 "deliverables": ["项目简报", "任务清单"],
                 "deadline": "2026-05-07",
+                "confirmation_text": "确认执行",
             },
             chat_id=chat_id,
         )

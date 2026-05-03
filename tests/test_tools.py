@@ -52,6 +52,7 @@ from tools import (
     _handle_card_action,
     _handle_card_command,
     _handle_generate_plan,
+    _handle_create_project_space,
     _pending_plans,
     _card_action_refs,
     _plan_lock,
@@ -280,6 +281,44 @@ def test_generate_plan_does_not_show_placeholder_members():
     card_text = captured_cards[0]["elements"][0]["content"]
     assert "示例成员A" not in card_text
     assert "**成员：** 待确认" in card_text
+
+
+def test_create_project_requires_separate_text_confirmation_after_plan():
+    chat_id = "oc_same_turn_guard"
+    with _project_registry_lock:
+        _project_registry.clear()
+    with _plan_lock:
+        _pending_plans.clear()
+        _card_action_refs.clear()
+
+    with patch("tools._hermes_send_card", return_value="om_plan"):
+        _handle_generate_plan(
+            {
+                "input_text": "帮我准备迁移验证项目，先给我确认卡片",
+                "title": "迁移验证项目",
+                "goal": "验证迁移流程",
+                "members": [],
+                "deliverables": ["迁移验证记录"],
+                "deadline": "2026-05-10",
+            },
+            chat_id=chat_id,
+        )
+
+    result = json.loads(_handle_create_project_space(
+        {
+            "title": "迁移验证项目",
+            "goal": "验证迁移流程",
+            "members": [],
+            "deliverables": ["迁移验证记录"],
+            "deadline": "2026-05-10",
+        },
+        chat_id=chat_id,
+    ))
+
+    assert "error" in result
+    assert "确认执行" in result["error"]
+    with _project_registry_lock:
+        assert "迁移验证项目" not in _project_registry
 
 
 def test_history_suggestions_do_not_silently_mutate_plan():

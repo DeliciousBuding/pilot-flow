@@ -525,6 +525,30 @@ def _clean_plan_list(values: Any) -> list[str]:
     return cleaned
 
 
+def _is_execution_confirmation(text: str) -> bool:
+    """Return True only for explicit execution confirmations, not card requests."""
+    normalized = (text or "").strip().lower()
+    if not normalized:
+        return False
+    if any(blocked in normalized for blocked in ("确认卡片", "确认计划", "确认按钮")):
+        return False
+    return normalized in {
+        "确认",
+        "确认执行",
+        "可以",
+        "可以执行",
+        "好的",
+        "好",
+        "行",
+        "执行",
+        "执行吧",
+        "开始执行",
+        "ok",
+        "okay",
+        "yes",
+    }
+
+
 def _score_history_project(query: str, project: dict, plan: Optional[dict] = None) -> int:
     """Score how closely a history project matches the current request."""
     haystack = " ".join([
@@ -1316,7 +1340,7 @@ def _handle_generate_plan(params: Dict[str, Any], **kwargs) -> str:
             "【用户确认路径】\n"
             "- 路径A: 用户点击卡片 ✅ 按钮 → PilotFlow 的 /card 插件命令会自动续跑\n"
             "- 路径B: 用户文字回复「确认」「可以」「好的」「行」「ok」\n"
-            "  → 调用 pilotflow_create_project_space（使用本次提取的 plan 字段）\n"
+            "  → 调用 pilotflow_create_project_space（使用本次提取的 plan 字段，并把用户最新回复原文填入 confirmation_text）\n"
             "- 路径C: 用户点击 ❌ 或文字回复「取消」\n"
             "  → 调用 pilotflow_handle_card_action（action=cancel_project）\n\n"
             "【输出规则 - 必须遵守】\n"
@@ -1391,6 +1415,8 @@ PILOTFLOW_CREATE_PROJECT_SPACE_SCHEMA = {
         "5. 日历事件（截止时间提醒）\n\n"
         "前置条件：必须先调用 pilotflow_generate_plan 并等用户回复「确认」。\n"
         "如果用户没确认就调用，会返回错误。\n\n"
+        "文本确认路径必须传入用户最新回复 confirmation_text，且只能是「确认」「确认执行」「可以」「好的」「行」「ok」等明确执行语义。\n"
+        "用户说「确认卡片」「给我确认卡片」只表示要看卡片，不是确认执行。\n\n"
         "【输出规则 - 必须遵守】\n"
         "- 用中文回复结果摘要，直接使用返回的 display 列表逐行展示\n"
         "- 绝对不要向用户展示工具名称、英文内容或 JSON\n"
@@ -1413,8 +1439,12 @@ PILOTFLOW_CREATE_PROJECT_SPACE_SCHEMA = {
             },
             "deadline": {"type": "string", "description": "截止时间，格式 YYYY-MM-DD，如「2026-05-10」。"},
             "risks": {"type": "array", "items": {"type": "string"}, "description": "已知风险，如[\"时间紧张\"]。"},
+            "confirmation_text": {
+                "type": "string",
+                "description": "用户最新的独立确认回复。只有用户明确回复确认执行时填写，例如「确认」「确认执行」「可以」「好的」「行」「ok」。",
+            },
         },
-        "required": ["title", "goal", "members", "deliverables"],
+        "required": ["title", "goal", "members", "deliverables", "confirmation_text"],
     },
 }
 
@@ -1426,8 +1456,12 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
         return tool_error("无法获取群聊 ID，请确认 PILOTFLOW_TEST_CHAT_ID 已配置。")
 
     skip_gate = bool(kwargs.get("_pilotflow_gate_consumed"))
-    if not skip_gate and not _consume_plan_gate(chat_id):
-        return tool_error("请先调用 pilotflow_generate_plan 生成计划，展示给用户确认后再调用此工具。")
+    if not skip_gate:
+        confirmation_text = params.get("confirmation_text", "")
+        if not _is_execution_confirmation(confirmation_text):
+            return tool_error("请等待用户明确回复「确认执行」或点击卡片确认按钮后再创建项目。")
+        if not _consume_plan_gate(chat_id):
+            return tool_error("请先调用 pilotflow_generate_plan 生成计划，展示给用户确认后再调用此工具。")
 
     title = params.get("title", "项目")
     goal = params.get("goal", "")
