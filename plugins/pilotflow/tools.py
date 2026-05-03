@@ -2942,9 +2942,10 @@ def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
             list(project.get("artifacts", [])) + [created_entry],
             updates=project.get("updates", []),
         )
-        _append_project_doc_update(project_title, project, "任务", task_name)
+        doc_updated = _append_project_doc_update(project_title, project, "任务", task_name)
+        bitable_history_created = False
         if project.get("app_token") and project.get("table_id"):
-            _append_bitable_update_record(
+            bitable_history_created = _append_bitable_update_record(
                 project["app_token"], project["table_id"], "任务", task_name, project,
             )
         _hermes_send(chat_id, f"项目「{project_title}」的跟进待办“{task_name}”已创建。")
@@ -2953,6 +2954,8 @@ def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
             "project": project_title,
             "task_created": True,
             "task_name": task_name,
+            "doc_updated": doc_updated,
+            "bitable_history_created": bitable_history_created,
             "instructions": "已创建项目跟进待办。不要展示工具名或英文。",
         })
 

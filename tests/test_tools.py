@@ -3462,6 +3462,56 @@ def test_project_detail_card_can_create_followup_task_from_action():
     assert "待办详情项目跟进" in sent_messages[0][1]
 
 
+def test_dashboard_followup_task_reports_doc_and_bitable_traces():
+    with _project_registry_lock:
+        _project_registry.clear()
+    with _plan_lock:
+        _card_action_refs.clear()
+    overdue = (dt.date.today() - dt.timedelta(days=1)).isoformat()
+    _register_project(
+        "看板待办留痕项目", ["张三"], overdue, "进行中", [],
+        goal="验证看板待办留痕", deliverables=["验收记录"],
+        app_token="app_dashboard_followup", table_id="tbl_dashboard_followup", record_id="rec_dashboard_followup",
+    )
+
+    with patch("tools._send_interactive_card_via_feishu", return_value="om_dashboard_followup"):
+        _handle_query_status({"query": "逾期项目"}, chat_id="oc_dashboard_followup")
+
+    with _plan_lock:
+        task_action_id = next(
+            action_id for action_id, ref in _card_action_refs.items()
+            if ref["chat_id"] == "oc_dashboard_followup" and ref["action"] == "project_followup_task"
+        )
+
+    sent_messages = []
+    with (
+        patch("tools._create_task", return_value="看板待办留痕项目跟进: https://example.invalid/task/task_dashboard") as create_task,
+        patch("tools._hermes_send", side_effect=lambda chat_id, msg: sent_messages.append((chat_id, msg)) or True),
+        patch("tools._append_project_doc_update", return_value=True) as append_doc,
+        patch("tools._append_bitable_update_record", return_value=True) as append_history,
+    ):
+        result = json.loads(_handle_card_action(
+            {"action_value": json.dumps({"pilotflow_action_id": task_action_id}, ensure_ascii=False)},
+            chat_id="ignored_chat",
+        ))
+
+    assert result["status"] == "project_followup_task_created"
+    assert result["doc_updated"] is True
+    assert result["bitable_history_created"] is True
+    create_task.assert_called_once_with(
+        "看板待办留痕项目跟进",
+        "项目: 看板待办留痕项目",
+        "张三",
+        overdue,
+        "oc_dashboard_followup",
+        ["张三"],
+    )
+    append_doc.assert_called_once()
+    append_history.assert_called_once()
+    assert sent_messages
+    assert sent_messages[0][0] == "oc_dashboard_followup"
+
+
 def test_due_project_detail_card_offers_reminder_button_without_chat_id_payload():
     with _project_registry_lock:
         _project_registry.clear()
