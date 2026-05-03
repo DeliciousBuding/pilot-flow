@@ -24,6 +24,7 @@
 | 本地测试 | 47 个测试通过 | `uv run pytest -o addopts='' -q` |
 | 真实飞书卡片 | 已验证发送、按钮确认、原卡片状态更新 | WSL Hermes + 飞书测试群 |
 | 真实状态看板 | 已验证中文文本反馈 + interactive 看板卡片 | [docs/LIVE_TEST_EVIDENCE.md](docs/LIVE_TEST_EVIDENCE.md) |
+| 真实文字确认创建 | 已验证计划卡片 → 文字确认 → 项目入口卡片 | [docs/LIVE_TEST_EVIDENCE.md](docs/LIVE_TEST_EVIDENCE.md) |
 | 真实录屏/产物样例 | 提交前补齐 | 成功/取消路径录屏与真实链接样例 |
 
 ---

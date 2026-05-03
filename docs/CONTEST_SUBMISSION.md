@@ -54,6 +54,7 @@ PilotFlow 是飞书群里的 AI 项目运行官。它面向团队在群聊中发
 | 安装脚本 | 测试覆盖复制插件、复制 skill、环境变量、config 校验和 Feishu 显示降噪 |
 | 真实飞书卡片 | 已验证发送为 `interactive` 卡片，点击后原卡片状态可更新 |
 | 真实状态看板 | 2026-05-03 通过 lark-cli 发送状态查询，Bot 返回中文文本反馈和 `interactive` 看板卡片；见 [LIVE_TEST_EVIDENCE.md](LIVE_TEST_EVIDENCE.md) |
+| 真实文字确认创建 | 2026-05-03 通过 lark-cli 跑通创建需求 → 计划卡片 → 文字确认 → 已确认并创建卡片 → 项目入口卡片；见 [LIVE_TEST_EVIDENCE.md](LIVE_TEST_EVIDENCE.md) |
 | 真实飞书产物 | 2026-05-03 在真实群点击确认后创建文档、状态表和项目入口卡片 |
 | 录屏 | 提交前补齐 |
 
