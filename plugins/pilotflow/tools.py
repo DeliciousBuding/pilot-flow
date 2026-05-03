@@ -176,18 +176,18 @@ def _hermes_send_card(chat_id: str, card_json: dict) -> bool:
 def _save_to_hermes_memory(title: str, goal: str, members: list, deliverables: list, deadline: str):
     """Save project creation pattern to Hermes memory for future suggestions."""
     try:
-        member_str = ", ".join(members) if members else "none"
-        deliverable_str = ", ".join(deliverables) if deliverables else "none"
+        member_str = "、".join(members) if members else "无"
+        deliverable_str = "、".join(deliverables) if deliverables else "无"
         content = (
-            f"[Project Created] {title}: goal={goal}, members=[{member_str}], "
-            f"deliverables=[{deliverable_str}], deadline={deadline or 'none'}"
+            f"【项目创建】{title}：目标={goal}，成员={member_str}，"
+            f"交付物={deliverable_str}，截止={deadline or '未设'}"
         )
         registry.dispatch("memory", {
             "action": "add",
             "target": "memory",
             "content": content,
         })
-        logger.info("saved project pattern to hermes memory: %s", title)
+        logger.info("已保存项目模式到 Hermes memory: %s", title)
     except Exception as e:
         logger.debug("memory save skipped: %s", e)
 
@@ -679,11 +679,14 @@ PILOTFLOW_GENERATE_PLAN_SCHEMA = {
         "1. 设置确认门控（允许后续调用 pilotflow_create_project_space）\n"
         "2. 检测项目模板（答辩/sprint/活动/上线）并提供建议\n"
         "3. 自动发送确认卡片到群聊，包含计划摘要和确认/取消按钮\n"
-        "4. 返回结构化指令，指导你从用户消息中提取：项目标题、目标、成员、交付物、截止时间\n\n"
+        "4. 把你提取的字段存入 pending plan，用户点击确认按钮即可一键创建（无需重新提取）\n\n"
+        "调用时你必须从用户消息中提取并传入：title、goal、members、deliverables、deadline。\n"
+        "提取不全也要传，能提多少传多少，剩余字段留空字符串或空数组。\n"
+        "模板会补全缺失的 deliverables 和 deadline 默认值。\n\n"
         "调用后，你必须：\n"
-        "- 向用户展示提取到的项目信息（中文）\n"
-        "- 询问「确认执行？」\n"
-        "- 等用户明确回复「确认」「可以」「好的」「行」「ok」后，才能调用 pilotflow_create_project_space\n\n"
+        "- 简短回复「已生成计划，请在卡片上确认」（卡片已自动发送）\n"
+        "- 等用户确认（点击按钮 / 回复「确认」「可以」「好的」「行」「ok」）\n"
+        "- 用户确认后调用 pilotflow_create_project_space 或 pilotflow_handle_card_action\n\n"
         "【输出规则 - 必须遵守】\n"
         "- 绝对不要向用户展示工具名称、英文内容或 JSON\n"
         "- 只用中文回复，不要显示工具调用过程\n"
@@ -693,6 +696,11 @@ PILOTFLOW_GENERATE_PLAN_SCHEMA = {
         "type": "object",
         "properties": {
             "input_text": {"type": "string", "description": "用户的原始输入文本，包含项目描述。"},
+            "title": {"type": "string", "description": "项目标题（从用户消息提取，可为空字符串）。"},
+            "goal": {"type": "string", "description": "项目目标（从用户消息提取，可为空字符串）。"},
+            "members": {"type": "array", "items": {"type": "string"}, "description": "成员列表（中文名，可为空数组）。"},
+            "deliverables": {"type": "array", "items": {"type": "string"}, "description": "交付物列表（可为空数组，会被模板补全）。"},
+            "deadline": {"type": "string", "description": "截止时间 YYYY-MM-DD（可为空字符串，会被模板补全）。"},
         },
         "required": ["input_text"],
     },
@@ -727,7 +735,7 @@ _TEMPLATES = {
 def _detect_template(text: str) -> Optional[dict]:
     """Detect project template from user input."""
     for keyword, template in _TEMPLATES.items():
-        if keyword in text.lower():
+        if keyword in text:
             return template
     return None
 
@@ -741,18 +749,41 @@ def _handle_generate_plan(params: Dict[str, Any], **kwargs) -> str:
     text = params.get("input_text", "")
     template = _detect_template(text)
 
-    # Build pre-populated plan scaffold from template
+    # Build plan from LLM-extracted fields + template defaults
     import datetime
-    plan = {"title": "", "goal": "", "members": [], "deliverables": [], "deadline": "", "risks": []}
+    plan = {
+        "title": params.get("title", "") or "",
+        "goal": params.get("goal", "") or "",
+        "members": list(params.get("members") or []),
+        "deliverables": list(params.get("deliverables") or []),
+        "deadline": params.get("deadline", "") or "",
+        "risks": [],
+    }
+    # Template fills in gaps
     if template:
-        plan["deliverables"] = list(template["deliverables"])
-        suggested = datetime.date.today() + datetime.timedelta(days=template["suggested_deadline_days"])
-        plan["deadline"] = suggested.strftime("%Y-%m-%d")
+        if not plan["deliverables"]:
+            plan["deliverables"] = list(template["deliverables"])
+        if not plan["deadline"]:
+            suggested = datetime.date.today() + datetime.timedelta(days=template["suggested_deadline_days"])
+            plan["deadline"] = suggested.strftime("%Y-%m-%d")
 
-    # Store pending plan for validation in create_project_space
+    # Title fallback: use chat name + date if extraction failed
+    if not plan["title"]:
+        try:
+            from gateway.session_context import get_session_env
+            chat_name = get_session_env("HERMES_SESSION_CHAT_NAME", "") or "项目"
+            plan["title"] = f"{chat_name} - {datetime.date.today().isoformat()}"
+        except Exception:
+            plan["title"] = f"项目 - {datetime.date.today().isoformat()}"
+
+    # Store full pending plan for card-button-driven creation
     if chat_id:
         with _plan_lock:
-            _pending_plans[chat_id] = {"input": text, "template": template["description"] if template else None}
+            _pending_plans[chat_id] = {
+                "input": text,
+                "template": template["description"] if template else None,
+                "plan": dict(plan),
+            }
 
     # Send confirmation card with interactive buttons (always send if we have chat_id)
     if chat_id:
@@ -811,13 +842,17 @@ def _handle_generate_plan(params: Dict[str, Any], **kwargs) -> str:
         "plan": plan,
         "card_sent": bool(chat_id),
         "instructions": (
-            "请从输入中提取项目信息，填入 plan 对象的各字段。\n"
-            "- title: 项目标题\n- goal: 项目目标\n"
-            "- members: 成员列表（中文名）\n"
-            "- deliverables: 交付物列表\n- deadline: 截止时间（YYYY-MM-DD格式）\n\n"
-            "【重要】确认卡片已自动发送到群聊，包含计划摘要和确认按钮。\n"
-            "你只需简短回复「已生成计划，请确认」或展示提取到的信息即可。\n"
-            "用户确认后（回复「确认」或点击按钮），调用 pilotflow_create_project_space。\n\n"
+            "✅ 已提取并存储项目信息（pending plan）。\n"
+            "✅ 确认卡片已自动发送到群聊（包含计划摘要、✅确认/❌取消按钮）。\n\n"
+            "【你的下一步】\n"
+            "简短回复「已生成计划，请在卡片上确认」即可，不要重复展示完整计划内容（卡片里已有）。\n\n"
+            "【用户确认路径】\n"
+            "- 路径A: 用户点击卡片 ✅ 按钮 → 你会收到 /card button {pilotflow_action:\"confirm_project\"}\n"
+            "  → 直接调用 pilotflow_handle_card_action，无需重新提取参数\n"
+            "- 路径B: 用户文字回复「确认」「可以」「好的」「行」「ok」\n"
+            "  → 调用 pilotflow_create_project_space（使用本次提取的 plan 字段）\n"
+            "- 路径C: 用户点击 ❌ 或回复「取消」\n"
+            "  → 调用 pilotflow_handle_card_action（action=cancel_project）\n\n"
             "【输出规则 - 必须遵守】\n"
             "1. 绝对不要向用户展示工具名称或英文内容\n"
             "2. 只回复中文，不要显示工具调用过程\n"
@@ -953,14 +988,18 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
     if bitable_url:
         artifacts.append(f"多维表格: {bitable_url}")
 
-    # 3. Create tasks (lark_oapi)
     # 3. Create tasks (lark_oapi) — with assignee + deadline
     if deliverables:
-        for i, d in enumerate(deliverables[:3]):
+        created_tasks = 0
+        max_tasks = 10
+        for i, d in enumerate(deliverables[:max_tasks]):
             assignee = members[i % len(members)] if members else ""
             task_name = _create_task(d, f"项目: {title}", assignee, deadline, chat_id)
             if task_name:
                 artifacts.append(f"任务: {task_name}")
+                created_tasks += 1
+        if len(deliverables) > max_tasks:
+            logger.warning("deliverables capped: %d -> %d tasks created", len(deliverables), created_tasks)
 
     # 4. Send entry card (via Hermes) — interactive card with clickable links
     link_lines = []
@@ -1048,6 +1087,86 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
         ),
         "message": f"已创建 {len(artifacts)} 个产物: {', '.join(artifacts)}",
     })
+
+
+# ---------------------------------------------------------------------------
+# Tool: pilotflow_handle_card_action
+# ---------------------------------------------------------------------------
+
+PILOTFLOW_HANDLE_CARD_ACTION_SCHEMA = {
+    "name": "pilotflow_handle_card_action",
+    "description": (
+        "【处理卡片按钮点击 — 用户点击确认卡片按钮时调用】\n"
+        "当用户点击卡片上的 ✅确认执行 或 ❌取消 按钮时，Hermes 会将点击路由为合成命令\n"
+        "/card button {\"pilotflow_action\": \"confirm_project\"}\n\n"
+        "此工具会：\n"
+        "- confirm_project: 从 _pending_plans 恢复已提取的项目信息，自动调用创建流程\n"
+        "- cancel_project: 清除确认门控和 pending plan，通知用户已取消\n\n"
+        "收到 /card button 格式的消息时必须调用此工具，不需要重新提取项目参数。\n\n"
+        "【输出规则】只用中文回复结果，不要展示工具名称或英文内容。"
+    ),
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "action_value": {
+                "type": "string",
+                "description": (
+                    "卡片按钮的值，JSON 字符串，如 '{\"pilotflow_action\":\"confirm_project\"}'。"
+                    "从 /card button {...} 合成消息中提取。"
+                ),
+            },
+        },
+        "required": ["action_value"],
+    },
+}
+
+
+def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
+    """Handle card button clicks routed as synthetic /card button commands."""
+    chat_id = _get_chat_id(kwargs)
+    if not chat_id:
+        return tool_error("无法获取群聊 ID")
+
+    action_value_str = params.get("action_value", "{}")
+    try:
+        action_data = json.loads(action_value_str)
+    except (json.JSONDecodeError, TypeError):
+        return tool_error("无法解析卡片按钮值")
+
+    pilotflow_action = action_data.get("pilotflow_action", "")
+
+    if pilotflow_action == "cancel_project":
+        _clear_plan_gate(chat_id)
+        with _plan_lock:
+            _pending_plans.pop(chat_id, None)
+        _hermes_send(chat_id, "已取消本次项目创建。")
+        return tool_result({
+            "status": "cancelled",
+            "instructions": "回复用户：已取消。不要展示工具名或英文。",
+        })
+
+    if pilotflow_action == "confirm_project":
+        if not _check_plan_gate(chat_id):
+            return tool_error("确认超时，请重新发起项目创建。")
+
+        # Recover plan from pending storage
+        with _plan_lock:
+            pending = _pending_plans.get(chat_id, {})
+        recovered_plan = pending.get("plan", {})
+        if not recovered_plan.get("title"):
+            return tool_error("无法恢复项目信息，请重新用 pilotflow_generate_plan 生成计划。")
+
+        # Feed recovered plan into create_project_space
+        return _handle_create_project_space({
+            "title": recovered_plan.get("title", ""),
+            "goal": recovered_plan.get("goal", ""),
+            "members": recovered_plan.get("members", []),
+            "deliverables": recovered_plan.get("deliverables", []),
+            "deadline": recovered_plan.get("deadline", ""),
+            "risks": recovered_plan.get("risks", []),
+        }, **kwargs)
+
+    return tool_error(f"未知的卡片动作: {pilotflow_action}")
 
 
 # ---------------------------------------------------------------------------
