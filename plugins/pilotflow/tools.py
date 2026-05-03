@@ -958,6 +958,15 @@ def _get_chat_id(kwargs: dict) -> str:
     return os.environ.get("PILOTFLOW_TEST_CHAT_ID", "")
 
 
+def _get_session_value(name: str, default: str = "") -> str:
+    """Read Hermes gateway session context without depending on local env paths."""
+    try:
+        from gateway.session_context import get_session_env
+        return get_session_env(name, default) or default
+    except Exception:
+        return default
+
+
 # ---------------------------------------------------------------------------
 # @mention helpers
 # ---------------------------------------------------------------------------
@@ -1585,6 +1594,12 @@ def _handle_generate_plan(params: Dict[str, Any], **kwargs) -> str:
 
     text = params.get("input_text", "")
     template = _detect_template(text)
+    session_chat_name = _get_session_value("HERMES_SESSION_CHAT_NAME", "")
+    session_user_name = _get_session_value("HERMES_SESSION_USER_NAME", "")
+    session_context_used = {
+        "chat_name": False,
+        "initiator": False,
+    }
 
     # Build plan from LLM-extracted fields + template defaults
     import datetime
@@ -1596,6 +1611,10 @@ def _handle_generate_plan(params: Dict[str, Any], **kwargs) -> str:
         "deadline": params.get("deadline", "") or "",
         "risks": [],
     }
+    if not plan["members"] and session_user_name:
+        plan["members"] = [session_user_name]
+        session_context_used["initiator"] = True
+
     # History is context for the Agent/user, not a silent overwrite. Templates
     # may fill generic defaults; history is shown explicitly as suggestions.
     history_suggestions, history_suggested_fields = _history_suggestions_for_plan(plan, text)
@@ -1610,12 +1629,9 @@ def _handle_generate_plan(params: Dict[str, Any], **kwargs) -> str:
 
     # Title fallback: use chat name + date if extraction failed
     if not plan["title"]:
-        try:
-            from gateway.session_context import get_session_env
-            chat_name = get_session_env("HERMES_SESSION_CHAT_NAME", "") or "项目"
-            plan["title"] = f"{chat_name} - {datetime.date.today().isoformat()}"
-        except Exception:
-            plan["title"] = f"项目 - {datetime.date.today().isoformat()}"
+        chat_name = session_chat_name or "项目"
+        plan["title"] = f"{chat_name} - {datetime.date.today().isoformat()}"
+        session_context_used["chat_name"] = bool(session_chat_name)
 
     # Store full pending plan for card-button-driven creation
     if chat_id:
@@ -1694,6 +1710,7 @@ def _handle_generate_plan(params: Dict[str, Any], **kwargs) -> str:
         "plan": plan,
         "history_suggestions": history_suggestions,
         "history_suggested_fields": history_suggested_fields,
+        "session_context_used": session_context_used,
         "card_sent": bool(chat_id),
         "instructions": (
             "✅ 已提取并存储项目信息（pending plan）。\n"

@@ -476,6 +476,63 @@ def test_generate_plan_does_not_show_placeholder_members():
     assert "**成员：** 待确认" in card_text
 
 
+def test_generate_plan_uses_session_chat_and_initiator_context():
+    import datetime
+    import types
+
+    captured_cards = []
+
+    def fake_send(chat_id, card):
+        captured_cards.append(card)
+        return "om_context"
+
+    def fake_get_session_env(name, default=""):
+        values = {
+            "HERMES_SESSION_CHAT_NAME": "增长小组",
+            "HERMES_SESSION_USER_NAME": "王小明",
+        }
+        return values.get(name, default)
+
+    fake_session_context = types.ModuleType("gateway.session_context")
+    fake_session_context.get_session_env = fake_get_session_env
+    fake_gateway = types.ModuleType("gateway")
+    fake_gateway.session_context = fake_session_context
+
+    with _plan_lock:
+        _pending_plans.clear()
+        _card_action_refs.clear()
+
+    with (
+        patch.dict(sys.modules, {
+            "gateway": fake_gateway,
+            "gateway.session_context": fake_session_context,
+        }),
+        patch("tools._hermes_send_card", side_effect=fake_send),
+    ):
+        result = json.loads(_handle_generate_plan(
+            {
+                "input_text": "帮我创建本周增长实验项目",
+                "title": "",
+                "goal": "推进本周增长实验",
+                "members": [],
+                "deliverables": ["实验方案"],
+                "deadline": "",
+            },
+            chat_id="oc_session_context",
+        ))
+
+    today = datetime.date.today().isoformat()
+    assert result["plan"]["title"] == f"增长小组 - {today}"
+    assert result["plan"]["members"] == ["王小明"]
+    assert result["session_context_used"] == {
+        "chat_name": True,
+        "initiator": True,
+    }
+    assert _pending_plans["oc_session_context"]["plan"]["members"] == ["王小明"]
+    card_text = captured_cards[0]["elements"][0]["content"]
+    assert "**成员：** 王小明" in card_text
+
+
 def test_create_project_requires_separate_text_confirmation_after_plan():
     chat_id = "oc_same_turn_guard"
     with _project_registry_lock:
