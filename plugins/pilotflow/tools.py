@@ -2672,11 +2672,21 @@ def _update_bitable_record(app_token: str, table_id: str, record_id: str, fields
 # Tool: pilotflow_update_project
 # ---------------------------------------------------------------------------
 
+def _risk_level_from_text(text: str) -> str:
+    """Infer a simple Feishu status-table risk level from Chinese risk text."""
+    value = text or ""
+    if any(word in value for word in ("高", "严重", "阻塞", "卡住", "无法", "延期")):
+        return "高"
+    if any(word in value for word in ("低", "轻微", "可控")):
+        return "低"
+    return "中"
+
+
 PILOTFLOW_UPDATE_PROJECT_SCHEMA = {
     "name": "pilotflow_update_project",
     "description": (
-        "更新已有项目信息。当用户说「改截止时间」「加成员」「新增任务」「新增交付物」「记录进展」「项目有新进展」「改项目状态」「归档项目」「延期」「延期到」时调用。\n"
-        "支持五种操作：update_deadline（改截止时间）、add_member（加成员）、add_deliverable（新增交付物/任务）、add_progress（记录进展）、update_status（改状态）。\n"
+        "更新已有项目信息。当用户说「改截止时间」「加成员」「新增任务」「新增交付物」「记录进展」「项目有新进展」「项目有风险」「项目卡住了」「改项目状态」「归档项目」「延期」「延期到」时调用。\n"
+        "支持六种操作：update_deadline（改截止时间）、add_member（加成员）、add_deliverable（新增交付物/任务）、add_progress（记录进展）、add_risk（上报风险/阻塞）、update_status（改状态）。\n"
         "归档项目时使用 action=update_status 且 value=已归档；归档后默认看板会隐藏该项目。\n"
         "会更新内存注册表、脱敏本地状态；可定位状态表时同步多维表格，新增交付物时会尽量创建飞书任务。\n\n"
         "【输出规则】只用中文回复更新结果，不要展示工具名称或英文内容。"
@@ -2687,7 +2697,7 @@ PILOTFLOW_UPDATE_PROJECT_SCHEMA = {
             "project_name": {"type": "string", "description": "项目名称。"},
             "action": {
                 "type": "string",
-                "enum": ["update_deadline", "add_member", "add_deliverable", "add_progress", "update_status"],
+                "enum": ["update_deadline", "add_member", "add_deliverable", "add_progress", "add_risk", "update_status"],
                 "description": "操作类型。",
             },
             "value": {"type": "string", "description": "新值（新截止时间、新成员名、新交付物/任务、新状态）。"},
@@ -2744,9 +2754,11 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
         "add_member": "成员",
         "add_deliverable": "交付物",
         "add_progress": "进展",
+        "add_risk": "风险",
         "update_status": "状态",
     }
     action_label = action_labels.get(action, action)
+    risk_level = _risk_level_from_text(value) if action == "add_risk" else ""
 
     bitable_updated = False
     bitable_history_created = False
@@ -2768,6 +2780,8 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
                     project["deliverables"].append(value)
             elif action == "update_status":
                 project["status"] = value
+            elif action == "add_risk":
+                project["status"] = "有风险"
         else:
             with _project_registry_lock:
                 if action == "update_deadline":
@@ -2784,6 +2798,9 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
                 elif action == "update_status":
                     project["status"] = value
                     registry_updated = True
+                elif action == "add_risk":
+                    project["status"] = "有风险"
+                    registry_updated = True
 
             if action == "add_deliverable" and chat_id:
                 assignee = project.get("members", [""])[0] if project.get("members") else ""
@@ -2795,7 +2812,7 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
                     project.setdefault("artifacts", []).append(f"任务: {task_name}")
                     task_created = True
 
-        if action in ("update_deadline", "add_deliverable", "add_progress", "update_status"):
+        if action in ("update_deadline", "add_deliverable", "add_progress", "add_risk", "update_status"):
             state_updated = _save_project_state(
                 project_name, project.get("goal", ""), project.get("members", []),
                 project.get("deliverables", []), project.get("deadline", ""),
@@ -2813,6 +2830,9 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
             bitable_fields["负责人"] = current
         elif action == "add_deliverable":
             bitable_fields["交付物"] = ", ".join(project.get("deliverables", [])) or "待确认"
+        elif action == "add_risk":
+            bitable_fields["状态"] = "有风险"
+            bitable_fields["风险等级"] = risk_level
         elif action == "update_status":
             bitable_fields["状态"] = value
 
@@ -2841,6 +2861,8 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
             cd = _deadline_countdown(value)
             if cd:
                 parts.append(cd)
+        if action == "add_risk":
+            parts.append("✅ 状态已切换为有风险")
         if task_created:
             parts.append("✅ 飞书任务已创建")
         if doc_updated:
@@ -2867,6 +2889,7 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
         "project": project_name,
         "action": action,
         "value": value,
+        "risk_level": risk_level,
         "registry_updated": registry_updated,
         "state_updated": state_updated,
         "bitable_updated": bitable_updated,

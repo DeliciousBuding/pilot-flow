@@ -1400,6 +1400,57 @@ def test_update_project_adds_progress_log_to_doc_and_bitable():
     assert "状态表记录已追加" in sent_messages[0]
 
 
+def test_update_project_adds_risk_and_marks_project_at_risk():
+    with _project_registry_lock:
+        _project_registry.clear()
+    _register_project(
+        "风险上报项目", ["张三"], "2026-05-20", "进行中", ["文档: https://example.invalid/doc"],
+        goal="验证风险上报", deliverables=["验收记录"],
+        app_token="app1", table_id="tbl1", record_id="rec1",
+    )
+
+    with (
+        patch("tools._append_project_doc_update", return_value=True) as append_doc,
+        patch("tools._append_bitable_update_record", return_value=True) as append_history,
+        patch("tools._update_bitable_record", return_value=True) as update_bitable,
+        patch("tools._hermes_send", return_value=True) as send,
+        patch("tools._save_project_state", return_value=True) as save_state,
+    ):
+        result = json.loads(_handle_update_project(
+            {
+                "project_name": "风险上报项目",
+                "action": "add_risk",
+                "value": "支付接口联调阻塞，高风险",
+            },
+            chat_id="oc_risk_report",
+        ))
+
+    assert result["status"] == "project_updated"
+    assert result["action"] == "add_risk"
+    assert result["value"] == "支付接口联调阻塞，高风险"
+    assert result["risk_level"] == "高"
+    assert result["doc_updated"] is True
+    assert result["bitable_updated"] is True
+    assert result["bitable_history_created"] is True
+    assert result["state_updated"] is True
+    assert _project_registry["风险上报项目"]["status"] == "有风险"
+    update_bitable.assert_called_once_with(
+        "app1", "tbl1", "rec1", {"状态": "有风险", "风险等级": "高"},
+    )
+    append_doc.assert_called_once_with(
+        "风险上报项目",
+        _project_registry["风险上报项目"],
+        "风险",
+        "支付接口联调阻塞，高风险",
+    )
+    append_history.assert_called_once()
+    save_state.assert_called_once()
+    sent_text = send.call_args.args[1]
+    assert "风险 → 支付接口联调阻塞，高风险" in sent_text
+    assert "状态已切换为有风险" in sent_text
+    assert "状态表已同步" in sent_text
+
+
 def test_update_project_appends_update_to_project_doc():
     with _project_registry_lock:
         _project_registry.clear()
