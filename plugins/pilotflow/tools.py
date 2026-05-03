@@ -1431,6 +1431,28 @@ def _find_named_project_query_match(query: str, projects: list) -> Optional[dict
     return None
 
 
+def _resolve_calendar_id(client: Any) -> str:
+    """Resolve the writable Feishu calendar id without tenant-specific hardcoding."""
+    configured = os.getenv("PILOTFLOW_FEISHU_CALENDAR_ID", "").strip()
+    if configured:
+        return configured
+    try:
+        from lark_oapi.api.calendar.v4 import PrimaryCalendarRequest
+
+        req = PrimaryCalendarRequest.builder().build()
+        resp = client.calendar.v4.calendar.primary(req)
+        if resp.success():
+            calendars = getattr(resp.data, "calendars", None) or []
+            for item in calendars:
+                calendar = getattr(item, "calendar", None)
+                calendar_id = getattr(calendar, "calendar_id", "")
+                if calendar_id:
+                    return calendar_id
+    except Exception as e:
+        logger.warning("resolve primary calendar failed: %s", e)
+    return "primary"
+
+
 def _create_calendar_event(title: str, goal: str, deadline: str) -> Optional[str]:
     """Create a calendar event for the project deadline. Returns description on success."""
     client = _get_client()
@@ -1439,21 +1461,26 @@ def _create_calendar_event(title: str, goal: str, deadline: str) -> Optional[str
     try:
         import datetime
         from lark_oapi.api.calendar.v4 import (
-            CreateCalendarEventRequest, CalendarEvent, EventTime,
+            CreateCalendarEventRequest, CalendarEvent, TimeInfo,
         )
         # Parse deadline as UTC+8 (China Standard Time) 9:00 AM
         dt = datetime.datetime.strptime(deadline, "%Y-%m-%d")
         dt = dt.replace(hour=9, tzinfo=datetime.timezone(datetime.timedelta(hours=8)))
         ts_start = str(int(dt.timestamp()))
         ts_end = str(int((dt + datetime.timedelta(hours=1)).timestamp()))
-        start_time = EventTime.builder().time_stamp(ts_start).build()
-        end_time = EventTime.builder().time_stamp(ts_end).build()
+        start_time = TimeInfo.builder().timestamp(ts_start).build()
+        end_time = TimeInfo.builder().timestamp(ts_end).build()
         event = (
             CalendarEvent.builder()
             .summary(f"📌 截止: {title}").description(goal)
             .start_time(start_time).end_time(end_time).build()
         )
-        req = CreateCalendarEventRequest.builder().calendar_id("primary").request_body(event).build()
+        req = (
+            CreateCalendarEventRequest.builder()
+            .calendar_id(_resolve_calendar_id(client))
+            .request_body(event)
+            .build()
+        )
         resp = client.calendar.v4.calendar_event.create(req)
         if resp.success():
             logger.info("calendar event created for %s", deadline)
@@ -2583,6 +2610,8 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
     task_created = False
     doc_updated = False
     permission_refreshed = False
+    calendar_event_created = False
+    reminder_scheduled = False
 
     # 1. Update in-memory registry
     if project:
@@ -2653,6 +2682,10 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
             )
         if action == "add_member" and chat_id and not state_project:
             permission_refreshed = _refresh_project_resource_permissions(project, chat_id)
+        if action == "update_deadline" and chat_id:
+            cal_result = _create_calendar_event(project_name, project.get("goal", ""), value)
+            calendar_event_created = bool(cal_result)
+            reminder_scheduled = _schedule_deadline_reminder(project_name, value, chat_id)
 
     # 3. Send notification via Hermes
     if chat_id:
@@ -2669,6 +2702,10 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
             parts.append("✅ 项目文档已更新")
         if permission_refreshed:
             parts.append("✅ 项目资源权限已刷新")
+        if calendar_event_created:
+            parts.append("✅ 日历事件已更新")
+        if reminder_scheduled:
+            parts.append("✅ 截止提醒已设置")
         if bitable_updated:
             parts.append("✅ 状态表已同步")
         if bitable_history_created:
@@ -2692,11 +2729,15 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
         "task_created": task_created,
         "doc_updated": doc_updated,
         "permission_refreshed": permission_refreshed,
+        "calendar_event_created": calendar_event_created,
+        "reminder_scheduled": reminder_scheduled,
         "instructions": (
             f"用中文回复：已更新项目「{project_name}」的{action_label}为 {value}。"
             + ("飞书任务已创建。" if task_created else "")
             + ("项目文档已更新。" if doc_updated else "")
             + ("项目资源权限已刷新。" if permission_refreshed else "")
+            + ("日历事件已更新。" if calendar_event_created else "")
+            + ("截止提醒已设置。" if reminder_scheduled else "")
             + ("状态表已同步。" if bitable_updated else "本地状态已更新。" if state_updated else "")
             + ("状态表记录已追加。" if bitable_history_created else "")
             + "不要显示工具名或英文。"

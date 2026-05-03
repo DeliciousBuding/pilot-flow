@@ -52,6 +52,7 @@ from tools import (
     _history_suggestions_for_plan,
     _create_bitable,
     _append_bitable_update_record,
+    _create_calendar_event,
     _create_card_action_ref,
     _handle_card_action,
     _handle_card_command,
@@ -968,6 +969,110 @@ def test_update_project_add_member_refreshes_resource_permissions():
     add_editors.assert_any_call("app1", "bitable", "oc_permission_refresh")
     update_bitable.assert_called_once_with("app1", "tbl1", "rec1", {"负责人": "张三, 李四"})
     assert "资源权限已刷新" in send.call_args.args[1]
+
+
+def test_update_project_deadline_refreshes_calendar_and_reminder():
+    with _project_registry_lock:
+        _project_registry.clear()
+    _register_project(
+        "截止联动项目", ["张三"], "2026-05-20", "进行中", [],
+        goal="验证截止联动", deliverables=["验收记录"],
+    )
+
+    with (
+        patch("tools._create_calendar_event", return_value="日历事件: 2026-05-30") as calendar,
+        patch("tools._schedule_deadline_reminder", return_value=True) as reminder,
+        patch("tools._hermes_send", return_value=True) as send,
+    ):
+        result = json.loads(_handle_update_project(
+            {"project_name": "截止联动", "action": "update_deadline", "value": "2026-05-30"},
+            chat_id="oc_deadline_refresh",
+        ))
+
+    assert result["status"] == "project_updated"
+    assert result["calendar_event_created"] is True
+    assert result["reminder_scheduled"] is True
+    calendar.assert_called_once_with("截止联动项目", "验证截止联动", "2026-05-30")
+    reminder.assert_called_once_with("截止联动项目", "2026-05-30", "oc_deadline_refresh")
+    sent_text = send.call_args.args[1]
+    assert "日历事件已更新" in sent_text
+    assert "截止提醒已设置" in sent_text
+
+
+def test_create_calendar_event_resolves_primary_calendar_id():
+    import types
+
+    class _Builder:
+        def __init__(self, cls):
+            self.cls = cls
+            self.values = {}
+
+        def __getattr__(self, name):
+            def setter(value):
+                self.values[name] = value
+                return self
+            return setter
+
+        def build(self):
+            return self.cls(**self.values)
+
+    class _Model:
+        def __init__(self, **kwargs):
+            self.__dict__.update(kwargs)
+
+        @classmethod
+        def builder(cls):
+            return _Builder(cls)
+
+    class _Response:
+        def __init__(self, data=None):
+            self.data = data
+            self.msg = "success"
+
+        def success(self):
+            return True
+
+    created = {}
+
+    class _CalendarApi:
+        def primary(self, request):
+            calendar = types.SimpleNamespace(calendar_id="cal_primary")
+            user_calendar = types.SimpleNamespace(calendar=calendar)
+            return _Response(types.SimpleNamespace(calendars=[user_calendar]))
+
+    class _CalendarEventApi:
+        def create(self, request):
+            created["calendar_id"] = request.calendar_id
+            created["summary"] = request.request_body.summary
+            created["start_timestamp"] = request.request_body.start_time.timestamp
+            return _Response()
+
+    fake_v4 = types.ModuleType("lark_oapi.api.calendar.v4")
+    fake_v4.PrimaryCalendarRequest = type("PrimaryCalendarRequest", (_Model,), {})
+    fake_v4.CreateCalendarEventRequest = type("CreateCalendarEventRequest", (_Model,), {})
+    fake_v4.CalendarEvent = type("CalendarEvent", (_Model,), {})
+    fake_v4.TimeInfo = type("TimeInfo", (_Model,), {})
+
+    with (
+        patch.dict(sys.modules, {
+            "lark_oapi": types.ModuleType("lark_oapi"),
+            "lark_oapi.api": types.ModuleType("lark_oapi.api"),
+            "lark_oapi.api.calendar": types.ModuleType("lark_oapi.api.calendar"),
+            "lark_oapi.api.calendar.v4": fake_v4,
+        }),
+        patch("tools._get_client", return_value=types.SimpleNamespace(
+            calendar=types.SimpleNamespace(v4=types.SimpleNamespace(
+                calendar=_CalendarApi(),
+                calendar_event=_CalendarEventApi(),
+            )),
+        )),
+    ):
+        result = _create_calendar_event("真实日历项目", "验证 primary 解析", "2026-06-01")
+
+    assert result == "日历事件: 2026-06-01"
+    assert created["calendar_id"] == "cal_primary"
+    assert created["summary"] == "📌 截止: 真实日历项目"
+    assert created["start_timestamp"]
 
 
 def test_update_project_add_deliverable_syncs_bitable_deliverables():
