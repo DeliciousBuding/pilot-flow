@@ -8,6 +8,7 @@ import os
 import sys
 import time
 import threading
+import datetime as dt
 from unittest.mock import patch
 
 # Add plugin path
@@ -908,6 +909,75 @@ def test_query_status_filters_risk_projects():
     assert "接口阻塞项目" in content
     assert "正常推进项目" not in content
     assert "第 1/1 页" in content
+
+
+def test_query_status_filters_overdue_projects_with_red_dashboard():
+    with _project_registry_lock:
+        _project_registry.clear()
+    overdue = (dt.date.today() - dt.timedelta(days=2)).isoformat()
+    future = (dt.date.today() + dt.timedelta(days=5)).isoformat()
+    _register_project(
+        "逾期跟进项目", [], overdue, "进行中", [],
+        goal="验证逾期筛选", deliverables=["验收记录"],
+    )
+    _register_project(
+        "未逾期项目", [], future, "进行中", [],
+        goal="验证逾期筛选", deliverables=["验收记录"],
+    )
+    _register_project(
+        "已完成逾期项目", [], overdue, "已完成", [],
+        goal="验证逾期筛选", deliverables=["验收记录"],
+    )
+    captured = {}
+
+    def capture_card(chat_id, card):
+        captured["card"] = card
+        return True
+
+    with patch("tools._send_interactive_card_via_feishu", side_effect=capture_card):
+        result = _handle_query_status({"query": "看看逾期项目"}, chat_id="oc_overdue_filter")
+
+    assert "项目看板已发送" in result
+    assert captured["card"]["header"]["template"] == "red"
+    content = json.dumps(captured["card"], ensure_ascii=False)
+    assert "逾期跟进项目" in content
+    assert "未逾期项目" not in content
+    assert "已完成逾期项目" not in content
+
+
+def test_query_status_filters_due_soon_projects_with_yellow_dashboard():
+    with _project_registry_lock:
+        _project_registry.clear()
+    due_soon = (dt.date.today() + dt.timedelta(days=3)).isoformat()
+    later = (dt.date.today() + dt.timedelta(days=12)).isoformat()
+    overdue = (dt.date.today() - dt.timedelta(days=1)).isoformat()
+    _register_project(
+        "快到期项目", [], due_soon, "进行中", [],
+        goal="验证到期筛选", deliverables=["验收记录"],
+    )
+    _register_project(
+        "稍后到期项目", [], later, "进行中", [],
+        goal="验证到期筛选", deliverables=["验收记录"],
+    )
+    _register_project(
+        "已经逾期项目", [], overdue, "进行中", [],
+        goal="验证到期筛选", deliverables=["验收记录"],
+    )
+    captured = {}
+
+    def capture_card(chat_id, card):
+        captured["card"] = card
+        return True
+
+    with patch("tools._send_interactive_card_via_feishu", side_effect=capture_card):
+        result = _handle_query_status({"query": "看看近期截止"}, chat_id="oc_due_soon_filter")
+
+    assert "项目看板已发送" in result
+    assert captured["card"]["header"]["template"] == "yellow"
+    content = json.dumps(captured["card"], ensure_ascii=False)
+    assert "快到期项目" in content
+    assert "稍后到期项目" not in content
+    assert "已经逾期项目" not in content
 
 
 def test_risk_project_dashboard_offers_resolve_risk_button():

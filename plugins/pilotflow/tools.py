@@ -1454,6 +1454,8 @@ def _status_filter_from_query(query: str) -> str:
         return "risk"
     if any(word in q for word in ("逾期", "过期", "超期")):
         return "overdue"
+    if any(word in q for word in ("快到期", "即将到期", "快截止", "近期截止", "本周到期", "本周截止", "七天内", "7天内", "三天内", "3天内")):
+        return "due_soon"
     if any(word in q for word in ("未完成", "没完成", "进行中", "待完成", "待办", "还剩")):
         return "active"
     if any(word in q for word in ("已完成", "完成的", "完成项目", "完结")):
@@ -1487,6 +1489,18 @@ def _is_archived_status(status: str) -> bool:
     return str(status).strip() in ("已归档", "归档", "archived")
 
 
+def _dashboard_header_template(status_filter: str) -> str:
+    if status_filter in ("risk", "overdue"):
+        return "red"
+    if status_filter == "due_soon":
+        return "yellow"
+    if status_filter == "archived":
+        return "grey"
+    if status_filter == "all":
+        return "blue"
+    return "green"
+
+
 def _project_matches_status_filter(project: dict, status_filter: str) -> bool:
     """Return whether a dashboard project matches the requested filter."""
     status = str(project.get("status", ""))
@@ -1507,6 +1521,14 @@ def _project_matches_status_filter(project: dict, status_filter: str) -> bool:
         try:
             deadline = _dt.date.fromisoformat(str(project.get("deadline", "")))
             return deadline < _dt.date.today() and status != "已完成" and not _is_archived_status(status)
+        except (TypeError, ValueError):
+            return False
+    if status_filter == "due_soon":
+        import datetime as _dt
+        try:
+            deadline = _dt.date.fromisoformat(str(project.get("deadline", "")))
+            today = _dt.date.today()
+            return today <= deadline <= today + _dt.timedelta(days=7) and status != "已完成" and not _is_archived_status(status)
         except (TypeError, ValueError):
             return False
     return True
@@ -2423,7 +2445,8 @@ PILOTFLOW_QUERY_STATUS_SCHEMA = {
         "查询项目状态并向群聊发送看板卡片。\n"
         "当用户问「项目进展如何」「有哪些项目」「项目状态」「看看进展」时调用。\n"
         "会查询本会话中创建过的项目，构建项目看板互动卡片发送到群聊。\n"
-        "默认隐藏已归档项目；用户说「显示所有项目」或「看看归档项目」时才显示归档项目。\n\n"
+        "默认隐藏已归档项目；用户说「显示所有项目」或「看看归档项目」时才显示归档项目。\n"
+        "用户问「逾期项目」「快到期」「近期截止」「本周截止」时，发送对应催办看板。\n\n"
         "项目超过一页时，用户说「第2页」或「下一页」继续查看后续项目。\n\n"
         "【输出规则】只用中文回复看板信息，不要展示工具名称或英文内容。"
     ),
@@ -2631,7 +2654,7 @@ def _handle_query_status(params: Dict[str, Any], **kwargs) -> str:
         "config": {"wide_screen_mode": True},
         "header": {
             "title": {"tag": "plain_text", "content": "📊 项目看板"},
-            "template": "green",
+            "template": _dashboard_header_template(status_filter),
         },
         "elements": card_elements + [
             {"tag": "hr"},
