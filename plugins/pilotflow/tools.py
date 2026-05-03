@@ -378,6 +378,11 @@ def _build_project_detail_card(chat_id: str, title: str, project: dict) -> tuple
             resource_lines.append(f"[项目文档]({text.split('文档: ', 1)[1].strip()})")
         elif text.startswith("多维表格: "):
             resource_lines.append(f"[状态表]({text.split('多维表格: ', 1)[1].strip()})")
+        elif text.startswith("任务: "):
+            task_info = text.split("任务: ", 1)[1].strip()
+            task_name, sep, task_url = task_info.partition(": ")
+            if sep and task_url.startswith(("http://", "https://")):
+                resource_lines.append(f"[任务：{task_name}]({task_url.strip()})")
     resource_text = f"\n**资源：** {' | '.join(resource_lines)}" if resource_lines else ""
     card = {
         "config": {"wide_screen_mode": True},

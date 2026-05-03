@@ -2327,6 +2327,7 @@ def test_project_detail_card_includes_registry_resource_links():
         [
             "文档: https://example.invalid/docx/doc_token_123",
             "多维表格: https://example.invalid/base/app_token_123",
+            "任务: 评审清单: https://example.invalid/task/task_123",
         ],
         goal="验证资源链接", deliverables=["验收记录"],
     )
@@ -2344,6 +2345,7 @@ def test_project_detail_card_includes_registry_resource_links():
     body = captured["card"]["elements"][0]["content"]
     assert "[项目文档](https://example.invalid/docx/doc_token_123)" in body
     assert "[状态表](https://example.invalid/base/app_token_123)" in body
+    assert "[任务：评审清单](https://example.invalid/task/task_123)" in body
 
 
 def test_completed_project_detail_card_offers_reopen_button():
