@@ -3076,9 +3076,26 @@ def _handle_card_command(raw_args: str) -> str:
             "blue",
         )
         return None
+    if data.get("status") == "dashboard_filter_sent":
+        filter_label = {
+            "risk": "风险项目",
+            "overdue": "逾期项目",
+            "due_soon": "近期截止项目",
+            "completed": "已完成项目",
+            "active": "未完成项目",
+            "archived": "归档项目",
+            "all": "全部项目",
+        }.get(action_data.get("filter"), "筛选后的项目")
+        _mark_card_message(
+            message_id,
+            "看板筛选已发送",
+            f"{filter_label}看板已发送到群聊。",
+            "blue",
+        )
+        return None
     if data.get("status") in (
         "project_marked_done", "project_reopened", "project_risk_resolved",
-        "project_reminder_sent", "dashboard_filter_sent",
+        "project_reminder_sent",
         "history_suggestions_applied",
     ):
         return None
