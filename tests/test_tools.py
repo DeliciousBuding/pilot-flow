@@ -40,6 +40,7 @@ from tools import (
     _clear_plan_gate,
     _evict_caches,
     _PLAN_GATE_TTL,
+    _deadline_countdown,
 )
 
 
@@ -158,6 +159,57 @@ def test_plan_gate_per_chat():
 
 def test_evict_caches_runs_without_error():
     _evict_caches()  # should not raise
+
+
+# --- Integration tests ---
+
+def test_full_flow_generate_plan_and_gate():
+    """Test: generate_plan sets gate, create_project_space checks it."""
+    with _project_registry_lock:
+        _project_registry.clear()
+    chat_id = "test_flow_chat"
+    # Gate should be off initially
+    assert _check_plan_gate(chat_id) is False
+    # After generate_plan, gate should be on
+    _set_plan_gate(chat_id)
+    assert _check_plan_gate(chat_id) is True
+    # After clear, gate should be off
+    _clear_plan_gate(chat_id)
+    assert _check_plan_gate(chat_id) is False
+
+
+def test_full_flow_update_project():
+    """Test: register project, update deadline, verify registry change."""
+    with _project_registry_lock:
+        _project_registry.clear()
+    _register_project("测试项目", ["张三"], "2026-05-10", "进行中", ["文档: url"])
+    with _project_registry_lock:
+        proj = _project_registry["测试项目"]
+        assert proj["deadline"] == "2026-05-10"
+        proj["deadline"] = "2026-05-15"
+    with _project_registry_lock:
+        assert _project_registry["测试项目"]["deadline"] == "2026-05-15"
+
+
+def test_full_flow_query_status_with_countdown():
+    """Test: register project, query status shows countdown."""
+    with _project_registry_lock:
+        _project_registry.clear()
+    import datetime
+    future = (datetime.date.today() + datetime.timedelta(days=5)).isoformat()
+    _register_project("看板项目", ["李四"], future, "进行中", [])
+    cd = _deadline_countdown(future)
+    assert "剩余" in cd
+    assert "天" in cd
+
+
+def test_full_flow_template_detection():
+    """Test: all 4 templates detected correctly."""
+    assert _detect_template("帮我准备答辩") is not None
+    assert _detect_template("开始新的sprint") is not None
+    assert _detect_template("策划一个活动") is not None
+    assert _detect_template("准备上线") is not None
+    assert _detect_template("今天天气怎么样") is None
 
 
 # --- Run all tests ---
