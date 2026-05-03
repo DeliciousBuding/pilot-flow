@@ -575,6 +575,46 @@ def test_update_project_status_uses_sanitized_state_after_restart(tmp_path):
     assert projects[0]["status"] == "暂停"
 
 
+def test_project_status_action_sends_interactive_detail_card():
+    with _project_registry_lock:
+        _project_registry.clear()
+    with _plan_lock:
+        _card_action_refs.clear()
+    _register_project(
+        "详情卡项目", ["张三"], "2026-05-20", "进行中", [],
+        goal="验证详情卡", deliverables=["验收记录"],
+    )
+    captured = {}
+    action_value = json.dumps({"pilotflow_action": "project_status", "title": "详情卡项目"}, ensure_ascii=False)
+
+    def capture_card(chat_id, card):
+        captured["chat_id"] = chat_id
+        captured["card"] = card
+        return "om_detail_card"
+
+    with (
+        patch("tools._hermes_send", return_value=True) as send_text,
+        patch("tools._hermes_send_card", side_effect=capture_card),
+    ):
+        result = json.loads(_handle_card_action({"action_value": action_value}, chat_id="oc_detail"))
+
+    assert result["status"] == "project_status_sent"
+    send_text.assert_not_called()
+    assert captured["chat_id"] == "oc_detail"
+    card = captured["card"]
+    assert card["header"]["title"]["content"] == "📌 项目详情"
+    body = card["elements"][0]["content"]
+    assert "详情卡项目" in body
+    assert "验证详情卡" in body
+    assert "验收记录" in body
+    assert "2026-05-20" in body
+    actions = [element for element in card["elements"] if element.get("tag") == "action"]
+    assert actions
+    assert actions[0]["actions"][0]["text"]["content"] == "标记完成"
+    assert "pilotflow_action_id" in actions[0]["actions"][0]["value"]
+    assert "pilotflow_chat_id" not in actions[0]["actions"][0]["value"]
+
+
 def test_project_entry_card_action_marks_project_done():
     with _project_registry_lock:
         _project_registry.clear()

@@ -324,6 +324,48 @@ def _build_action_feedback_card(title: str, content: str, template: str) -> dict
     }
 
 
+def _build_project_detail_card(chat_id: str, title: str, project: dict) -> tuple[dict, list[str]]:
+    """Build an actionable project detail card for Feishu."""
+    member_text = "、".join(project.get("members", [])) or "待确认"
+    deliverable_text = "、".join(project.get("deliverables", [])) or "待确认"
+    deadline = project.get("deadline") or "待确认"
+    countdown = _deadline_countdown(deadline)
+    deadline_line = deadline + (f"（{countdown}）" if countdown else "")
+    done_action_id = _create_card_action_ref(chat_id, "mark_project_done", {"title": title})
+    card = {
+        "config": {"wide_screen_mode": True},
+        "header": {
+            "title": {"tag": "plain_text", "content": "📌 项目详情"},
+            "template": "blue",
+        },
+        "elements": [
+            {
+                "tag": "markdown",
+                "content": (
+                    f"**项目：** {title}\n"
+                    f"**目标：** {project.get('goal') or '待确认'}\n"
+                    f"**状态：** {project.get('status', '进行中')}\n"
+                    f"**成员：** {member_text}\n"
+                    f"**交付物：** {deliverable_text}\n"
+                    f"**截止：** {deadline_line}"
+                ),
+            },
+            {
+                "tag": "action",
+                "actions": [
+                    {
+                        "tag": "button",
+                        "text": {"tag": "plain_text", "content": "标记完成"},
+                        "type": "primary",
+                        "value": {"pilotflow_action_id": done_action_id},
+                    },
+                ],
+            },
+        ],
+    }
+    return card, [done_action_id]
+
+
 def _update_interactive_card_via_feishu(message_id: str, card_json: dict) -> bool:
     """Update an existing Feishu interactive card message."""
     client = _get_client()
@@ -1825,16 +1867,16 @@ def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
             project_title = state_project.get("title", project_title)
 
         if pilotflow_action == "project_status":
-            member_text = "、".join(project.get("members", [])) or "待确认"
-            deliverable_text = "、".join(project.get("deliverables", [])) or "待确认"
-            _hermes_send(
-                chat_id,
-                f"项目「{project_title}」当前状态：{project.get('status', '进行中')}。"
-                f"成员：{member_text}；交付物：{deliverable_text}；截止：{project.get('deadline') or '待确认'}。"
-            )
+            detail_card, action_ids = _build_project_detail_card(chat_id, project_title, project)
+            sent_detail_message_id = _hermes_send_card(chat_id, detail_card)
+            if isinstance(sent_detail_message_id, str):
+                _attach_card_message_id(action_ids, sent_detail_message_id)
+            if not sent_detail_message_id:
+                return tool_error("项目详情卡发送失败，请检查 Feishu 连接。")
             return tool_result({
                 "status": "project_status_sent",
                 "project": project_title,
+                "card_sent": True,
                 "instructions": "已发送项目状态。不要展示工具名或英文。",
             })
 
