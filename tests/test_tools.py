@@ -1478,6 +1478,56 @@ def test_update_project_adds_risk_and_marks_project_at_risk():
     assert "状态表已同步" in sent_text
 
 
+def test_update_project_resolves_risk_and_marks_project_active():
+    with _project_registry_lock:
+        _project_registry.clear()
+    _register_project(
+        "风险解除项目", ["张三"], "2026-05-20", "有风险", ["文档: https://example.invalid/doc"],
+        goal="验证风险解除", deliverables=["验收记录"],
+        app_token="app1", table_id="tbl1", record_id="rec1",
+    )
+
+    with (
+        patch("tools._append_project_doc_update", return_value=True) as append_doc,
+        patch("tools._append_bitable_update_record", return_value=True) as append_history,
+        patch("tools._update_bitable_record", return_value=True) as update_bitable,
+        patch("tools._hermes_send", return_value=True) as send,
+        patch("tools._save_project_state", return_value=True) as save_state,
+    ):
+        result = json.loads(_handle_update_project(
+            {
+                "project_name": "风险解除项目",
+                "action": "resolve_risk",
+                "value": "支付接口联调已恢复",
+            },
+            chat_id="oc_risk_resolved",
+        ))
+
+    assert result["status"] == "project_updated"
+    assert result["action"] == "resolve_risk"
+    assert result["risk_level"] == "低"
+    assert _project_registry["风险解除项目"]["status"] == "进行中"
+    assert result["doc_updated"] is True
+    assert result["bitable_updated"] is True
+    assert result["bitable_history_created"] is True
+    assert result["state_updated"] is True
+    update_bitable.assert_called_once_with(
+        "app1", "tbl1", "rec1", {"状态": "进行中", "风险等级": "低"},
+    )
+    append_doc.assert_called_once_with(
+        "风险解除项目",
+        _project_registry["风险解除项目"],
+        "风险解除",
+        "支付接口联调已恢复",
+    )
+    append_history.assert_called_once()
+    save_state.assert_called_once()
+    sent_text = send.call_args.args[1]
+    assert "风险解除 → 支付接口联调已恢复" in sent_text
+    assert "状态已恢复为进行中" in sent_text
+    assert "状态表已同步" in sent_text
+
+
 def test_update_project_appends_update_to_project_doc():
     with _project_registry_lock:
         _project_registry.clear()
