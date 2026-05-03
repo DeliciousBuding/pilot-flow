@@ -57,6 +57,25 @@ _project_registry: Dict[str, dict] = {}  # title -> {members, deadline, status, 
 _project_registry_lock = threading.Lock()
 _PROJECT_REGISTRY_MAX = 50
 
+
+def _env_positive_int(name: str, default: int) -> int:
+    """Read a positive integer env var without making plugin import fragile."""
+    raw = os.getenv(name, "").strip()
+    if not raw:
+        return default
+    try:
+        value = int(raw)
+    except ValueError:
+        logger.warning("Ignoring invalid integer env var %s=%r", name, raw)
+        return default
+    if value < 1:
+        logger.warning("Ignoring non-positive integer env var %s=%r", name, raw)
+        return default
+    return value
+
+
+_DASHBOARD_PAGE_SIZE = _env_positive_int("PILOTFLOW_DASHBOARD_PAGE_SIZE", 10)
+
 # Pending plans (populated by generate_plan, validated by create_project_space)
 _pending_plans: Dict[str, dict] = {}  # chat_id -> plan params
 _card_action_refs: Dict[str, dict] = {}  # action_id -> {chat_id, action, message_id, timestamp}
@@ -1423,6 +1442,17 @@ def _status_filter_from_query(query: str) -> str:
     return ""
 
 
+def _dashboard_page_from_query(query: str) -> int:
+    """Infer dashboard page from Chinese query text."""
+    q = query or ""
+    match = re.search(r"第\s*(\d+)\s*页", q)
+    if match:
+        return max(1, int(match.group(1)))
+    if "下一页" in q:
+        return 2
+    return 1
+
+
 def _is_archived_status(status: str) -> bool:
     return str(status).strip() in ("已归档", "归档", "archived")
 
@@ -2333,6 +2363,7 @@ PILOTFLOW_QUERY_STATUS_SCHEMA = {
         "当用户问「项目进展如何」「有哪些项目」「项目状态」「看看进展」时调用。\n"
         "会查询本会话中创建过的项目，构建项目看板互动卡片发送到群聊。\n"
         "默认隐藏已归档项目；用户说「显示所有项目」或「看看归档项目」时才显示归档项目。\n\n"
+        "项目超过一页时，用户说「第2页」或「下一页」继续查看后续项目。\n\n"
         "【输出规则】只用中文回复看板信息，不要展示工具名称或英文内容。"
     ),
     "parameters": {
@@ -2451,12 +2482,21 @@ def _handle_query_status(params: Dict[str, Any], **kwargs) -> str:
     # Build dashboard card
     had_projects_before_filter = bool(projects)
     projects = [p for p in projects if _project_matches_status_filter(p, status_filter)]
+    total_projects = len(projects)
+    page = 1
+    total_pages = 1
 
     if not projects:
         if had_projects_before_filter and status_filter:
             projects.append({"name": "暂无匹配项目", "source": "可以调整筛选条件", "actionable": False})
         else:
             projects.append({"name": "暂无项目记录", "source": "请先创建项目", "actionable": False})
+    else:
+        page_size = max(1, _DASHBOARD_PAGE_SIZE)
+        total_pages = max(1, (total_projects + page_size - 1) // page_size)
+        page = min(_dashboard_page_from_query(query), total_pages)
+        start = (page - 1) * page_size
+        projects = projects[start:start + page_size]
 
     card_elements = []
     action_ids = []
@@ -2504,7 +2544,7 @@ def _handle_query_status(params: Dict[str, Any], **kwargs) -> str:
             {
                 "tag": "note",
                 "elements": [
-                    {"tag": "plain_text", "content": f"查询: {query} | 共 {len(projects)} 个项目"},
+                    {"tag": "plain_text", "content": f"查询: {query} | 第 {page}/{total_pages} 页 | 共 {total_projects if total_projects else len(projects)} 个项目"},
                 ],
             },
         ],
@@ -2514,8 +2554,8 @@ def _handle_query_status(params: Dict[str, Any], **kwargs) -> str:
     if isinstance(sent, str):
         _attach_card_message_id(action_ids, sent)
     if sent:
-        return tool_result(f"项目看板已发送，共 {len(projects)} 个项目")
-    return tool_error(f"项目看板已生成，共 {len(projects)} 个项目，但发送到群聊失败。请检查 Feishu 连接。")
+        return tool_result(f"项目看板已发送，共 {total_projects if total_projects else len(projects)} 个项目，第 {page}/{total_pages} 页")
+    return tool_error(f"项目看板已生成，共 {total_projects if total_projects else len(projects)} 个项目，但发送到群聊失败。请检查 Feishu 连接。")
 
 
 # ---------------------------------------------------------------------------

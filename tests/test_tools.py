@@ -56,6 +56,7 @@ from tools import (
     _create_card_action_ref,
     _handle_card_action,
     _handle_card_command,
+    _env_positive_int,
     _handle_generate_plan,
     _handle_create_project_space,
     _handle_query_status,
@@ -65,6 +66,17 @@ from tools import (
     _card_action_refs,
     _plan_lock,
 )
+
+
+def test_env_positive_int_falls_back_for_invalid_values(monkeypatch):
+    monkeypatch.setenv("PILOTFLOW_BAD_INT", "abc")
+    assert _env_positive_int("PILOTFLOW_BAD_INT", 10) == 10
+
+    monkeypatch.setenv("PILOTFLOW_BAD_INT", "0")
+    assert _env_positive_int("PILOTFLOW_BAD_INT", 10) == 10
+
+    monkeypatch.setenv("PILOTFLOW_BAD_INT", "3")
+    assert _env_positive_int("PILOTFLOW_BAD_INT", 10) == 3
 
 
 def _install_fake_bitable_sdk(monkeypatch):
@@ -869,6 +881,39 @@ def test_query_status_hides_archived_projects_by_default_and_shows_when_requeste
     archived_content = json.dumps(captured_cards[2], ensure_ascii=False)
     assert "进行中生命周期项目" not in archived_content
     assert "已归档生命周期项目" in archived_content
+
+
+def test_query_status_paginates_large_dashboards():
+    with _project_registry_lock:
+        _project_registry.clear()
+    for i in range(1, 13):
+        _register_project(
+            f"分页项目{i:02d}", [], "2026-05-20", "进行中", [],
+            goal="验证分页", deliverables=["验收记录"],
+        )
+    captured_cards = []
+
+    def capture_card(chat_id, card):
+        captured_cards.append(card)
+        return True
+
+    with patch("tools._send_interactive_card_via_feishu", side_effect=capture_card):
+        first_result = _handle_query_status({"query": "项目进展"}, chat_id="oc_page_1")
+        second_result = _handle_query_status({"query": "项目进展第2页"}, chat_id="oc_page_2")
+
+    assert "项目看板已发送" in first_result
+    first_content = json.dumps(captured_cards[0], ensure_ascii=False)
+    assert "分页项目01" in first_content
+    assert "分页项目10" in first_content
+    assert "分页项目11" not in first_content
+    assert "第 1/2 页" in first_content
+
+    assert "项目看板已发送" in second_result
+    second_content = json.dumps(captured_cards[1], ensure_ascii=False)
+    assert "分页项目01" not in second_content
+    assert "分页项目11" in second_content
+    assert "分页项目12" in second_content
+    assert "第 2/2 页" in second_content
 
 
 def test_query_status_completed_filter_shows_empty_match_state():
