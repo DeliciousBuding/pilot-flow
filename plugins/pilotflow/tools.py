@@ -331,7 +331,10 @@ def _build_project_detail_card(chat_id: str, title: str, project: dict) -> tuple
     deadline = project.get("deadline") or "待确认"
     countdown = _deadline_countdown(deadline)
     deadline_line = deadline + (f"（{countdown}）" if countdown else "")
-    done_action_id = _create_card_action_ref(chat_id, "mark_project_done", {"title": title})
+    next_action = "reopen_project" if project.get("status") == "已完成" else "mark_project_done"
+    next_text = "重新打开" if next_action == "reopen_project" else "标记完成"
+    next_type = "default" if next_action == "reopen_project" else "primary"
+    next_action_id = _create_card_action_ref(chat_id, next_action, {"title": title})
     card = {
         "config": {"wide_screen_mode": True},
         "header": {
@@ -355,15 +358,15 @@ def _build_project_detail_card(chat_id: str, title: str, project: dict) -> tuple
                 "actions": [
                     {
                         "tag": "button",
-                        "text": {"tag": "plain_text", "content": "标记完成"},
-                        "type": "primary",
-                        "value": {"pilotflow_action_id": done_action_id},
+                        "text": {"tag": "plain_text", "content": next_text},
+                        "type": next_type,
+                        "value": {"pilotflow_action_id": next_action_id},
                     },
                 ],
             },
         ],
     }
-    return card, [done_action_id]
+    return card, [next_action_id]
 
 
 def _update_interactive_card_via_feishu(message_id: str, card_json: dict) -> bool:
@@ -1795,6 +1798,7 @@ PILOTFLOW_HANDLE_CARD_ACTION_SCHEMA = {
         "- cancel_project: 清除确认门控和 pending plan，通知用户已取消\n"
         "- project_status: 从入口卡片查看单个项目状态\n"
         "- mark_project_done: 从入口卡片把项目标记为完成\n\n"
+        "- reopen_project: 从入口卡片把已完成项目重新打开\n\n"
         "收到 /card button 格式的消息时必须调用此工具，不需要重新提取项目参数。\n\n"
         "【输出规则】只用中文回复结果，不要展示工具名称或英文内容。"
     ),
@@ -1869,7 +1873,7 @@ def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
             "risks": recovered_plan.get("risks", []),
         }, **kwargs)
 
-    if pilotflow_action in ("project_status", "mark_project_done"):
+    if pilotflow_action in ("project_status", "mark_project_done", "reopen_project"):
         project_title = action_data.get("title") or action_data.get("project_name")
         if not project_title:
             return tool_error("无法识别项目，请在群里直接询问项目状态。")
@@ -1879,6 +1883,8 @@ def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
             project = _project_registry.get(project_title)
             if project and pilotflow_action == "mark_project_done":
                 project["status"] = "已完成"
+            elif project and pilotflow_action == "reopen_project":
+                project["status"] = "进行中"
 
         if not project:
             state_project = _find_project_state(project_title)
@@ -1911,24 +1917,32 @@ def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
                 "instructions": "已发送项目状态。不要展示工具名或英文。",
             })
 
+        target_status = "已完成" if pilotflow_action == "mark_project_done" else "进行中"
         if project.get("app_token") and project.get("table_id") and project.get("record_id"):
             bitable_updated = _update_bitable_record(
                 project["app_token"], project["table_id"], project["record_id"],
-                {"状态": "已完成"},
+                {"状态": target_status},
             )
         _save_project_state(
             project_title, project.get("goal", ""), project.get("members", []),
-            project.get("deliverables", []), project.get("deadline", ""), "已完成",
+            project.get("deliverables", []), project.get("deadline", ""), target_status,
             project.get("artifacts", []),
         )
 
         suffix = "，状态表已同步。" if bitable_updated else "。"
-        _hermes_send(chat_id, f"项目「{project_title}」已标记为完成{suffix}")
+        if pilotflow_action == "mark_project_done":
+            _hermes_send(chat_id, f"项目「{project_title}」已标记为完成{suffix}")
+            result_status = "project_marked_done"
+            instruction = "回复用户：已标记完成。不要展示工具名或英文。"
+        else:
+            _hermes_send(chat_id, f"项目「{project_title}」已重新打开，状态改为进行中{suffix}")
+            result_status = "project_reopened"
+            instruction = "回复用户：已重新打开项目。不要展示工具名或英文。"
         return tool_result({
-            "status": "project_marked_done",
+            "status": result_status,
             "project": project_title,
             "bitable_updated": bitable_updated,
-            "instructions": "回复用户：已标记完成。不要展示工具名或英文。",
+            "instructions": instruction,
         })
 
     return tool_error(f"未知的卡片动作: {pilotflow_action}")
@@ -1991,6 +2005,13 @@ def _handle_card_command(raw_args: str) -> str:
             f"**{action_data.get('title', '项目')}** 已标记为完成。",
             "green",
         )
+    elif action_id and pilotflow_action == "reopen_project":
+        _mark_card_message(
+            message_id,
+            "项目已重新打开",
+            f"**{action_data.get('title', '项目')}** 已恢复为进行中。",
+            "blue",
+        )
 
     action_value = json.dumps(action_data, ensure_ascii=False)
     action_kwargs = {"chat_id": chat_id}
@@ -2022,7 +2043,7 @@ def _handle_card_command(raw_args: str) -> str:
         if action_ref:
             _clear_pending_plan_if_matches(chat_id, action_ref.get("plan"))
         return None
-    if data.get("status") in ("project_status_sent", "project_marked_done"):
+    if data.get("status") in ("project_status_sent", "project_marked_done", "project_reopened"):
         return None
     if data.get("display"):
         return "\n".join(str(item) for item in data["display"])
@@ -2154,8 +2175,11 @@ def _handle_query_status(params: Dict[str, Any], **kwargs) -> str:
         })
         if chat_id and p.get("actionable"):
             status_action_id = _create_card_action_ref(chat_id, "project_status", {"title": p["name"]})
-            done_action_id = _create_card_action_ref(chat_id, "mark_project_done", {"title": p["name"]})
-            action_ids.extend([status_action_id, done_action_id])
+            next_action = "reopen_project" if p.get("status") == "已完成" else "mark_project_done"
+            next_text = "重新打开" if next_action == "reopen_project" else "标记完成"
+            next_type = "default" if next_action == "reopen_project" else "primary"
+            next_action_id = _create_card_action_ref(chat_id, next_action, {"title": p["name"]})
+            action_ids.extend([status_action_id, next_action_id])
             card_elements.append({
                 "tag": "action",
                 "actions": [
@@ -2167,9 +2191,9 @@ def _handle_query_status(params: Dict[str, Any], **kwargs) -> str:
                     },
                     {
                         "tag": "button",
-                        "text": {"tag": "plain_text", "content": "标记完成"},
-                        "type": "primary",
-                        "value": {"pilotflow_action_id": done_action_id},
+                        "text": {"tag": "plain_text", "content": next_text},
+                        "type": next_type,
+                        "value": {"pilotflow_action_id": next_action_id},
                     },
                 ],
             })

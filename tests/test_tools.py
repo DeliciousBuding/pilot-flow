@@ -533,6 +533,36 @@ def test_query_status_completed_filter_shows_empty_match_state():
     assert "暂无项目记录" not in content
 
 
+def test_completed_project_dashboard_offers_reopen_button():
+    with _project_registry_lock:
+        _project_registry.clear()
+    with _plan_lock:
+        _card_action_refs.clear()
+    _register_project(
+        "完成可重开项目", [], "2026-05-20", "已完成", [],
+        goal="验证重开按钮", deliverables=["验收记录"],
+    )
+    captured = {}
+
+    def capture_card(chat_id, card):
+        captured["card"] = card
+        return True
+
+    with patch("tools._send_interactive_card_via_feishu", side_effect=capture_card):
+        result = _handle_query_status({"query": "看看已完成项目"}, chat_id="oc_reopen_dashboard")
+
+    assert "项目看板已发送" in result
+    actions = [
+        element for element in captured["card"]["elements"]
+        if element.get("tag") == "action"
+    ]
+    assert actions
+    assert actions[0]["actions"][1]["text"]["content"] == "重新打开"
+    with _plan_lock:
+        refs = [ref for ref in _card_action_refs.values() if ref["chat_id"] == "oc_reopen_dashboard"]
+    assert {ref["action"] for ref in refs} >= {"project_status", "reopen_project"}
+
+
 def test_dashboard_card_action_marks_state_project_done_after_restart(tmp_path):
     state_path = tmp_path / "pilotflow-projects.json"
     with _project_registry_lock:
@@ -565,6 +595,38 @@ def test_dashboard_card_action_marks_state_project_done_after_restart(tmp_path):
     assert result["bitable_updated"] is False
     assert projects[0]["title"] == "重启看板项目"
     assert projects[0]["status"] == "已完成"
+
+
+def test_card_action_reopens_state_project_after_restart(tmp_path):
+    state_path = tmp_path / "pilotflow-projects.json"
+    with _project_registry_lock:
+        _project_registry.clear()
+
+    with patch.dict(os.environ, {"PILOTFLOW_STATE_PATH": str(state_path)}):
+        assert _save_project_state(
+            "重启重开项目",
+            "验证重启后重开",
+            [],
+            ["验收记录"],
+            "2026-05-20",
+            "已完成",
+        )
+        with patch("tools._hermes_send", return_value=True):
+            result = json.loads(_handle_card_action(
+                {
+                    "action_value": json.dumps(
+                        {"pilotflow_action": "reopen_project", "title": "重启重开项目"},
+                        ensure_ascii=False,
+                    )
+                },
+                chat_id="oc_reopen_state",
+            ))
+        projects = _load_project_state()
+
+    assert result["status"] == "project_reopened"
+    assert result["bitable_updated"] is False
+    assert projects[0]["title"] == "重启重开项目"
+    assert projects[0]["status"] == "进行中"
 
 
 def test_update_project_updates_sanitized_state_after_restart(tmp_path):
@@ -718,6 +780,33 @@ def test_project_status_action_sends_interactive_detail_card():
     assert actions[0]["actions"][0]["text"]["content"] == "标记完成"
     assert "pilotflow_action_id" in actions[0]["actions"][0]["value"]
     assert "pilotflow_chat_id" not in actions[0]["actions"][0]["value"]
+
+
+def test_completed_project_detail_card_offers_reopen_button():
+    with _project_registry_lock:
+        _project_registry.clear()
+    with _plan_lock:
+        _card_action_refs.clear()
+    _register_project(
+        "详情重开项目", [], "2026-05-20", "已完成", [],
+        goal="验证详情重开", deliverables=["验收记录"],
+    )
+    captured = {}
+    action_value = json.dumps({"pilotflow_action": "project_status", "title": "详情重开项目"}, ensure_ascii=False)
+
+    def capture_card(chat_id, card):
+        captured["card"] = card
+        return "om_detail_reopen"
+
+    with patch("tools._hermes_send_card", side_effect=capture_card):
+        result = json.loads(_handle_card_action({"action_value": action_value}, chat_id="oc_detail_reopen"))
+
+    assert result["status"] == "project_status_sent"
+    actions = [element for element in captured["card"]["elements"] if element.get("tag") == "action"]
+    assert actions[0]["actions"][0]["text"]["content"] == "重新打开"
+    with _plan_lock:
+        refs = [ref for ref in _card_action_refs.values() if ref["chat_id"] == "oc_detail_reopen"]
+    assert {ref["action"] for ref in refs} == {"reopen_project"}
 
 
 def test_project_entry_card_action_marks_project_done():
