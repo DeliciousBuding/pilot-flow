@@ -1215,7 +1215,14 @@ def _create_task(summary: str, description: str,
         return None
 
 
-def _create_bitable(title: str, owner: str, deadline: str, risks: list, chat_id: str) -> Optional[dict]:
+def _create_bitable(
+    title: str,
+    owner: str,
+    deadline: str,
+    risks: list,
+    chat_id: str,
+    deliverables: Optional[list] = None,
+) -> Optional[dict]:
     """Create a Feishu Bitable with project status record. Returns metadata dict or None."""
     client = _get_client()
     if not client:
@@ -1237,7 +1244,7 @@ def _create_bitable(title: str, owner: str, deadline: str, risks: list, chat_id:
         url = app_resp.data.app.url
         logger.info("bitable created: %s", url)
 
-        for fname in ["类型", "负责人", "截止时间", "状态", "风险等级"]:
+        for fname in ["类型", "负责人", "截止时间", "状态", "风险等级", "交付物"]:
             field = AppTableField.builder().field_name(fname).type(1).build()
             field_resp = client.bitable.v1.app_table_field.create(
                 CreateAppTableFieldRequest.builder().app_token(app_token).table_id(table_id).request_body(field).build()
@@ -1245,9 +1252,10 @@ def _create_bitable(title: str, owner: str, deadline: str, risks: list, chat_id:
             if not field_resp.success():
                 logger.warning("create bitable field '%s' failed: %s", fname, field_resp.msg)
 
+        deliverable_text = ", ".join(deliverables or []) or "待确认"
         record = AppTableRecord.builder().fields({
             "类型": "project", "负责人": owner or "待确认", "截止时间": deadline or "待确认",
-            "状态": "进行中", "风险等级": "高" if risks else "低",
+            "状态": "进行中", "风险等级": "高" if risks else "低", "交付物": deliverable_text,
         }).build()
         rec_resp = client.bitable.v1.app_table_record.create(
             CreateAppTableRecordRequest.builder().app_token(app_token).table_id(table_id).request_body(record).build()
@@ -1711,7 +1719,7 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
         artifacts.append(f"文档: {doc_url}")
 
     # 2. Create bitable (lark_oapi) — plain names for data fields
-    bitable_meta = _create_bitable(title, member_plain, deadline, risks, chat_id)
+    bitable_meta = _create_bitable(title, member_plain, deadline, risks, chat_id, deliverables)
     bitable_url = bitable_meta["url"] if bitable_meta else None
     if bitable_url:
         artifacts.append(f"多维表格: {bitable_url}")
@@ -2456,6 +2464,8 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
         elif action == "add_member":
             current = ", ".join(project.get("members", []))
             bitable_fields["负责人"] = current
+        elif action == "add_deliverable":
+            bitable_fields["交付物"] = ", ".join(project.get("deliverables", [])) or "待确认"
         elif action == "update_status":
             bitable_fields["状态"] = value
 

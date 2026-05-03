@@ -50,6 +50,7 @@ from tools import (
     _clean_plan_list,
     _parse_memory_project_entry,
     _history_suggestions_for_plan,
+    _create_bitable,
     _create_card_action_ref,
     _handle_card_action,
     _handle_card_command,
@@ -61,6 +62,94 @@ from tools import (
     _card_action_refs,
     _plan_lock,
 )
+
+
+def _install_fake_bitable_sdk(monkeypatch):
+    """Install the minimal lark_oapi bitable surface used by _create_bitable."""
+    class _Builder:
+        def __init__(self, cls):
+            self.cls = cls
+            self.values = {}
+
+        def __getattr__(self, name):
+            def setter(value):
+                self.values[name] = value
+                return self
+            return setter
+
+        def build(self):
+            return self.cls(**self.values)
+
+    class _Model:
+        def __init__(self, **kwargs):
+            self.__dict__.update(kwargs)
+
+        @classmethod
+        def builder(cls):
+            return _Builder(cls)
+
+    fake_v1 = types.ModuleType("lark_oapi.api.bitable.v1")
+    for name in [
+        "CreateAppRequest",
+        "App",
+        "CreateAppTableRecordRequest",
+        "AppTableRecord",
+        "CreateAppTableFieldRequest",
+        "AppTableField",
+    ]:
+        setattr(fake_v1, name, type(name, (_Model,), {}))
+
+    modules = {
+        "lark_oapi": types.ModuleType("lark_oapi"),
+        "lark_oapi.api": types.ModuleType("lark_oapi.api"),
+        "lark_oapi.api.bitable": types.ModuleType("lark_oapi.api.bitable"),
+        "lark_oapi.api.bitable.v1": fake_v1,
+    }
+    monkeypatch.setitem(sys.modules, "lark_oapi", modules["lark_oapi"])
+    monkeypatch.setitem(sys.modules, "lark_oapi.api", modules["lark_oapi.api"])
+    monkeypatch.setitem(sys.modules, "lark_oapi.api.bitable", modules["lark_oapi.api.bitable"])
+    monkeypatch.setitem(sys.modules, "lark_oapi.api.bitable.v1", fake_v1)
+
+
+class _FakeBitableResponse:
+    def __init__(self, data=None, msg=""):
+        self.data = data
+        self.msg = msg
+
+    def success(self):
+        return True
+
+
+class _FakeBitableClient:
+    def __init__(self):
+        self.field_names = []
+        self.records = []
+        self.bitable = types.SimpleNamespace(
+            v1=types.SimpleNamespace(
+                app=types.SimpleNamespace(create=self._create_app),
+                app_table_field=types.SimpleNamespace(create=self._create_field),
+                app_table_record=types.SimpleNamespace(create=self._create_record),
+            )
+        )
+
+    def _create_app(self, _request):
+        data = types.SimpleNamespace(
+            app=types.SimpleNamespace(
+                app_token="app_token_test",
+                default_table_id="tbl_test",
+                url="https://example.invalid/base/app_token_test",
+            )
+        )
+        return _FakeBitableResponse(data=data)
+
+    def _create_field(self, request):
+        self.field_names.append(request.request_body.field_name)
+        return _FakeBitableResponse()
+
+    def _create_record(self, request):
+        self.records.append(request.request_body.fields)
+        data = types.SimpleNamespace(record=types.SimpleNamespace(record_id="rec_test"))
+        return _FakeBitableResponse(data=data)
 
 
 # --- Template detection ---
@@ -139,6 +228,29 @@ def test_register_project_with_bitable_metadata():
         assert proj["app_token"] == "abc"
         assert proj["table_id"] == "tbl"
         assert proj["record_id"] == "rec1"
+
+
+def test_create_bitable_includes_deliverables_field_and_initial_value(monkeypatch):
+    _install_fake_bitable_sdk(monkeypatch)
+    fake_client = _FakeBitableClient()
+
+    with (
+        patch("tools._get_client", return_value=fake_client),
+        patch("tools._set_permission", return_value=True),
+        patch("tools._add_editors", return_value=True),
+    ):
+        meta = _create_bitable(
+            "交付物同步项目",
+            "张三",
+            "2026-05-20",
+            [],
+            "oc_bitable_create",
+            deliverables=["验收记录", "评审清单"],
+        )
+
+    assert meta["app_token"] == "app_token_test"
+    assert "交付物" in fake_client.field_names
+    assert fake_client.records[0]["交付物"] == "验收记录, 评审清单"
 
 
 def test_register_project_stores_reusable_project_pattern():
@@ -712,6 +824,33 @@ def test_update_project_adds_deliverable_and_creates_task():
         project = _project_registry["交付物项目"]
         assert project["deliverables"] == ["验收记录", "评审清单"]
         assert "任务: 评审清单" in project["artifacts"]
+
+
+def test_update_project_add_deliverable_syncs_bitable_deliverables():
+    with _project_registry_lock:
+        _project_registry.clear()
+    _register_project(
+        "交付物表格项目", ["张三"], "2026-05-20", "进行中", [],
+        app_token="app1", table_id="tbl1", record_id="rec1",
+        goal="验证新增交付物同步状态表", deliverables=["验收记录"],
+    )
+
+    with (
+        patch("tools._create_task", return_value=None),
+        patch("tools._update_bitable_record", return_value=True) as update_bitable,
+        patch("tools._hermes_send", return_value=True) as send,
+    ):
+        result = json.loads(_handle_update_project(
+            {"project_name": "交付物表格", "action": "add_deliverable", "value": "评审清单"},
+            chat_id="oc_deliverable_bitable",
+        ))
+
+    assert result["status"] == "project_updated"
+    assert result["bitable_updated"] is True
+    update_bitable.assert_called_once_with(
+        "app1", "tbl1", "rec1", {"交付物": "验收记录, 评审清单"},
+    )
+    assert "状态表已同步" in send.call_args.args[1]
 
 
 def test_update_project_appends_update_to_project_doc():
