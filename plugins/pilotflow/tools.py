@@ -195,6 +195,40 @@ def _save_to_hermes_memory(title: str, goal: str, members: list, deliverables: l
         logger.debug("memory save skipped: %s", e)
 
 
+def _schedule_deadline_reminder(title: str, deadline: str, chat_id: str) -> bool:
+    """Schedule a deadline reminder via Hermes cron job."""
+    try:
+        import datetime as _dt
+        dl = _dt.date.fromisoformat(deadline)
+        days_left = (dl - _dt.date.today()).days
+        if days_left <= 0:
+            return False  # Already overdue, no reminder needed
+
+        # Schedule reminder for 1 day before deadline
+        reminder_date = dl - _dt.timedelta(days=1)
+        if reminder_date <= _dt.date.today():
+            # If deadline is tomorrow or today, remind in 1 hour
+            schedule = "1h"
+        else:
+            # Schedule at 9:00 AM on the reminder date
+            schedule = f"{reminder_date.isoformat()}T09:00:00"
+
+        result = registry.dispatch("cronjob", {
+            "action": "create",
+            "name": f"截止提醒: {title}",
+            "schedule": schedule,
+            "prompt": f"项目「{title}」明天截止（{deadline}），请发送提醒到群聊。",
+            "repeat": 1,
+            "deliver": f"feishu:{chat_id}",
+            "skills": ["pilotflow"],
+        })
+        logger.info("deadline reminder scheduled: %s at %s", title, schedule)
+        return True
+    except Exception as e:
+        logger.debug("deadline reminder skipped: %s", e)
+        return False
+
+
 # ---------------------------------------------------------------------------
 # lark_oapi client (for doc/task/bitable — Hermes doesn't have these)
 # ---------------------------------------------------------------------------
@@ -907,6 +941,12 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
     # Save project pattern to Hermes memory (越用越聪明)
     _save_to_hermes_memory(title, goal, members, deliverables, deadline)
 
+    # Schedule deadline reminder via Hermes cron (if deadline is set)
+    if deadline:
+        reminder_job = _schedule_deadline_reminder(title, deadline, chat_id)
+        if reminder_job:
+            artifacts.append("截止提醒已设置")
+
     # Clean up pending plan
     with _plan_lock:
         _pending_plans.pop(chat_id, None)
@@ -925,6 +965,8 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
         display_items.append(f"⏰ 截止: {deadline}")
     if cal_result:
         display_items.append("📅 日历提醒已创建")
+    if deadline:
+        display_items.append("🔔 截止提醒已设置")
     display_items.append("💬 已通知群成员")
 
     return tool_result({
