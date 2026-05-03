@@ -16,6 +16,14 @@
 
 ---
 
+## 演示
+
+> 录制演示视频后替换此处
+
+详细演示脚本见 [docs/demo/README.md](docs/demo/README.md)
+
+---
+
 ## 一句话介绍
 
 **PilotFlow 是飞书群里的 AI 项目运行官。**

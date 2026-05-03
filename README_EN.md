@@ -16,6 +16,14 @@ Mention @PilotFlow in a Feishu group chat with a requirement, and it automatical
 
 ---
 
+## Demo
+
+> Replace with demo video recording
+
+See [docs/demo/README.md](docs/demo/README.md) for detailed demo script.
+
+---
+
 ## One-liner
 
 **PilotFlow is an AI project operator living in your Feishu group chat.**
