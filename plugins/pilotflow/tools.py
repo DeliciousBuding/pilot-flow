@@ -1814,6 +1814,14 @@ def _build_project_briefing_card(
     if chat_id and total:
         risk_action = _create_card_action_ref(chat_id, "dashboard_filter", {"query": "看看风险项目", "filter": "risk"})
         overdue_action = _create_card_action_ref(chat_id, "dashboard_filter", {"query": "看看逾期项目", "filter": "overdue"})
+        reminder_filter = status_filter if status_filter in ("risk", "overdue", "due_soon") else "overdue"
+        reminder_button_text = "催办逾期"
+        if status_filter in ("risk", "overdue", "due_soon"):
+            reminder_button_text = {
+                "risk": "催办风险",
+                "due_soon": "催办近期",
+                "overdue": "催办逾期",
+            }[status_filter]
         followup_filter = status_filter if status_filter in ("risk", "overdue", "due_soon") else "overdue"
         followup_button_text = "批量创建待办"
         if status_filter in ("risk", "overdue", "due_soon"):
@@ -1825,7 +1833,7 @@ def _build_project_briefing_card(
         reminder_action = _create_card_action_ref(
             chat_id,
             "briefing_batch_reminder",
-            {"filter": "overdue", "value": "请今天同步进展"},
+            {"filter": reminder_filter, "value": "请今天同步进展"},
         )
         followup_action = _create_card_action_ref(
             chat_id,
@@ -1850,7 +1858,7 @@ def _build_project_briefing_card(
                 },
                 {
                     "tag": "button",
-                    "text": {"tag": "plain_text", "content": "催办逾期"},
+                    "text": {"tag": "plain_text", "content": reminder_button_text},
                     "type": "primary",
                     "value": {"pilotflow_action_id": reminder_action},
                 },
@@ -2792,8 +2800,13 @@ def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
     if pilotflow_action == "briefing_batch_reminder":
         status_filter = action_data.get("filter") or "overdue"
         value = action_data.get("value") or "请今天同步进展"
+        filter_query = {
+            "overdue": "逾期项目",
+            "due_soon": "近期截止项目",
+            "risk": "风险项目",
+        }.get(status_filter, status_filter)
         sent_result = _handle_update_project(
-            {"project_name": "逾期项目" if status_filter == "overdue" else status_filter, "action": "send_reminder", "value": value},
+            {"project_name": filter_query, "action": "send_reminder", "value": value},
             chat_id=chat_id,
         )
         try:

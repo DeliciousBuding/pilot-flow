@@ -1046,6 +1046,64 @@ def test_card_command_briefing_batch_reminder_updates_card_after_success():
     ]
 
 
+def test_filtered_briefing_reminder_button_uses_current_filter():
+    with _project_registry_lock:
+        _project_registry.clear()
+    with _plan_lock:
+        _card_action_refs.clear()
+    due_soon = (dt.date.today() + dt.timedelta(days=2)).isoformat()
+    _register_project(
+        "简报风险催办项目", ["张三"], due_soon, "有风险", [],
+        goal="验证风险筛选催办", deliverables=["验收记录"],
+    )
+    _register_project(
+        "简报普通催办项目", ["李四"], due_soon, "进行中", [],
+        goal="验证风险筛选催办", deliverables=["验收记录"],
+    )
+    captured = {}
+
+    def capture_card(chat_id, card):
+        captured["card"] = card
+        return "om_briefing_risk_reminder"
+
+    with patch("tools._send_interactive_card_via_feishu", side_effect=capture_card):
+        _handle_query_status({"query": "风险项目简报"}, chat_id="oc_briefing_risk_reminder")
+
+    button_texts = [
+        button["text"]["content"]
+        for element in captured["card"]["elements"]
+        if element.get("tag") == "action"
+        for button in element["actions"]
+    ]
+    assert "催办风险" in button_texts
+    assert "催办逾期" not in button_texts
+
+    with _plan_lock:
+        reminder_id = next(
+            action_id for action_id, ref in _card_action_refs.items()
+            if ref["chat_id"] == "oc_briefing_risk_reminder" and ref["action"] == "briefing_batch_reminder"
+        )
+
+    sent_messages = []
+    with (
+        patch("tools._hermes_send", side_effect=lambda chat_id, msg: sent_messages.append((chat_id, msg)) or True),
+        patch("tools._append_project_doc_update", return_value=True),
+        patch("tools._append_bitable_update_record", return_value=False),
+    ):
+        result = json.loads(_handle_card_action(
+            {"action_value": json.dumps({"pilotflow_action_id": reminder_id}, ensure_ascii=False)},
+            chat_id="ignored_chat",
+        ))
+
+    assert result["status"] == "briefing_batch_reminder_sent"
+    assert result["filter"] == "risk"
+    assert result["reminder_count"] == 1
+    assert result["projects"] == ["简报风险催办项目"]
+    assert len(sent_messages) == 1
+    assert "简报风险催办项目" in sent_messages[0][1]
+    assert "简报普通催办项目" not in sent_messages[0][1]
+
+
 def test_standup_briefing_overdue_button_can_create_batch_followup_tasks():
     with _project_registry_lock:
         _project_registry.clear()
