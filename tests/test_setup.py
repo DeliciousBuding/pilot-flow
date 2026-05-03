@@ -42,6 +42,78 @@ def test_check_env_rejects_missing_and_placeholder_values(tmp_path):
     assert setup.check_env(str(env_file)) is False
 
 
+def test_load_lark_cli_profiles_hides_secret_values(tmp_path):
+    config_file = tmp_path / "config.json"
+    config_file.write_text(
+        """
+{
+  "apps": [
+    {
+      "name": "pilotflow-contest",
+      "appId": "cli_testvalue",
+      "appSecret": {
+        "source": "keychain",
+        "value": "do-not-print-this"
+      }
+    },
+    {
+      "name": "missing-app-id",
+      "appSecret": {
+        "source": "env"
+      }
+    }
+  ]
+}
+""",
+        encoding="utf-8",
+    )
+
+    assert setup._load_lark_cli_profiles(str(config_file)) == [
+        {
+            "name": "pilotflow-contest",
+            "app_id": "cli_testvalue",
+            "secret_source": "keychain",
+        }
+    ]
+
+
+def test_check_env_explains_matching_lark_cli_secret_boundary(tmp_path, capsys):
+    env_file = tmp_path / ".env"
+    env_file.write_text(
+        "\n".join(
+            [
+                "OPENAI_API_KEY=sk-test",
+                "FEISHU_APP_ID=cli_testvalue",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    config_file = tmp_path / "config.json"
+    config_file.write_text(
+        """
+{
+  "apps": [
+    {
+      "name": "pilotflow-contest",
+      "appId": "cli_testvalue",
+      "appSecret": {
+        "source": "keychain",
+        "value": "do-not-print-this"
+      }
+    }
+  ]
+}
+""",
+        encoding="utf-8",
+    )
+
+    assert setup.check_env(str(env_file), lark_cli_config_file=str(config_file)) is False
+    output = capsys.readouterr().out
+    assert "pilotflow-contest" in output
+    assert "Hermes gateway does not read lark-cli keychain secrets automatically" in output
+    assert "do-not-print-this" not in output
+
+
 def test_check_env_accepts_configured_values(tmp_path):
     env_file = tmp_path / ".env"
     env_file.write_text(

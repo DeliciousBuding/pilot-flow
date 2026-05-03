@@ -12,6 +12,7 @@ This script:
 """
 
 import argparse
+import json
 import os
 import shutil
 import sys
@@ -90,7 +91,42 @@ def _backup_file(path):
     return backup_path
 
 
-def check_env(env_file=None):
+def _load_lark_cli_profiles(config_file=None):
+    """Load lark-cli profile metadata without exposing stored secrets."""
+    config_file = config_file or os.path.expanduser("~/.lark-cli/config.json")
+    if not os.path.exists(config_file):
+        return []
+    try:
+        with open(config_file, encoding="utf-8") as f:
+            config = json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return []
+    profiles = []
+    for app in config.get("apps", []):
+        app_id = app.get("appId") or ""
+        if not app_id:
+            continue
+        profiles.append(
+            {
+                "name": app.get("name") or app_id,
+                "app_id": app_id,
+                "secret_source": (app.get("appSecret") or {}).get("source") or "unknown",
+            }
+        )
+    return profiles
+
+
+def _matching_lark_cli_profile(app_id, config_file=None):
+    """Return the lark-cli profile matching a Feishu app id, if present."""
+    if not app_id:
+        return None
+    for profile in _load_lark_cli_profiles(config_file):
+        if profile.get("app_id") == app_id:
+            return profile
+    return None
+
+
+def check_env(env_file=None, lark_cli_config_file=None):
     """Check for required environment variables."""
     env_file = env_file or os.path.expanduser("~/.hermes/.env")
     if not os.path.exists(env_file):
@@ -108,6 +144,15 @@ def check_env(env_file=None):
 
     if missing:
         print(f"  WARNING: Missing in {env_file}: {', '.join(missing)}")
+        profile = _matching_lark_cli_profile(values.get("FEISHU_APP_ID", ""), lark_cli_config_file)
+        if profile and "FEISHU_APP_SECRET" in missing:
+            print(
+                "  NOTE: lark-cli profile "
+                f"'{profile['name']}' has the same FEISHU_APP_ID "
+                f"(secret source: {profile['secret_source']})."
+            )
+            print("  Hermes gateway does not read lark-cli keychain secrets automatically.")
+            print("  Copy the matching app secret into ~/.hermes/.env as FEISHU_APP_SECRET before live E2E.")
         return False
 
     print(f"  Environment OK ({env_file})")
