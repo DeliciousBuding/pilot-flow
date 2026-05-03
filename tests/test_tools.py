@@ -1221,6 +1221,34 @@ def test_update_project_adds_deliverable_and_creates_task():
         assert "任务: 评审清单" in project["artifacts"]
 
 
+def test_update_project_add_deliverable_assigns_named_member():
+    with _project_registry_lock:
+        _project_registry.clear()
+    _register_project(
+        "指定负责人交付物项目", ["张三", "李四"], "2026-05-20", "进行中", [],
+        goal="验证指定负责人", deliverables=["验收记录"],
+    )
+
+    with (
+        patch("tools._create_task", return_value="完成接口联调") as create_task,
+        patch("tools._hermes_send", return_value=True) as send,
+    ):
+        result = json.loads(_handle_update_project(
+            {"project_name": "指定负责人", "action": "add_deliverable", "value": "李四：完成接口联调"},
+            chat_id="oc_named_assignee",
+        ))
+
+    assert result["status"] == "project_updated"
+    assert result["value"] == "完成接口联调"
+    assert result["assignee"] == "李四"
+    create_task.assert_called_once_with("完成接口联调", "项目: 指定负责人交付物项目", "李四", "2026-05-20", "oc_named_assignee")
+    with _project_registry_lock:
+        project = _project_registry["指定负责人交付物项目"]
+        assert project["deliverables"] == ["验收记录", "完成接口联调"]
+        assert "李四：完成接口联调" not in project["deliverables"]
+    assert "交付物 → 完成接口联调" in send.call_args.args[1]
+
+
 def test_update_project_add_member_refreshes_resource_permissions():
     with _project_registry_lock:
         _project_registry.clear()

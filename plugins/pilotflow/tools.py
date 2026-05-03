@@ -2715,6 +2715,19 @@ def _risk_level_from_text(text: str) -> str:
     return "中"
 
 
+def _parse_deliverable_assignment(value: str, members: list[str]) -> tuple[str, str]:
+    """Parse 'member: deliverable' only when the prefix is a known project member."""
+    text = str(value or "").strip()
+    match = re.match(r"^\s*([^:：]+)\s*[:：]\s*(.+)$", text)
+    if not match:
+        return text, ""
+    assignee = match.group(1).strip()
+    deliverable = match.group(2).strip()
+    if assignee and deliverable and assignee in set(members or []):
+        return deliverable, assignee
+    return text, ""
+
+
 PILOTFLOW_UPDATE_PROJECT_SCHEMA = {
     "name": "pilotflow_update_project",
     "description": (
@@ -2782,6 +2795,10 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
             "record_id": "",
         }
 
+    assignee_override = ""
+    if action == "add_deliverable":
+        value, assignee_override = _parse_deliverable_assignment(value, project.get("members", []))
+
     action_labels = {
         "update_deadline": "截止时间",
         "add_member": "成员",
@@ -2842,7 +2859,7 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
                     registry_updated = True
 
             if action == "add_deliverable" and chat_id:
-                assignee = project.get("members", [""])[0] if project.get("members") else ""
+                assignee = assignee_override or (project.get("members", [""])[0] if project.get("members") else "")
                 task_name = _create_task(
                     value, f"项目: {project_name}", assignee,
                     project.get("deadline", ""), chat_id,
@@ -2933,6 +2950,7 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
         "project": project_name,
         "action": action,
         "value": value,
+        "assignee": assignee_override,
         "risk_level": risk_level,
         "registry_updated": registry_updated,
         "state_updated": state_updated,
