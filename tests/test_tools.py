@@ -1020,7 +1020,7 @@ def test_query_status_named_project_sends_detail_card_directly():
     assert "项目看板" not in json.dumps(card, ensure_ascii=False)
     with _plan_lock:
         refs = [ref for ref in _card_action_refs.values() if ref["chat_id"] == "oc_direct_detail"]
-    assert {ref["action"] for ref in refs} == {"mark_project_done"}
+    assert {ref["action"] for ref in refs} == {"mark_project_done", "create_followup_task"}
 
 
 def test_query_status_named_state_project_sends_detail_card_after_restart(tmp_path):
@@ -2785,6 +2785,61 @@ def test_project_detail_card_shows_recent_progress_updates():
     assert "**最近进展：** 完成原型评审，等待业务确认" in body
 
 
+def test_project_detail_card_can_create_followup_task_from_action():
+    with _project_registry_lock:
+        _project_registry.clear()
+    with _plan_lock:
+        _card_action_refs.clear()
+    _register_project(
+        "待办详情项目", ["张三", "李四"], "2026-05-20", "进行中", [],
+        goal="验证详情卡待办", deliverables=["验收记录"],
+    )
+    captured = {}
+    action_value = json.dumps({"pilotflow_action": "project_status", "title": "待办详情项目"}, ensure_ascii=False)
+
+    def capture_card(chat_id, card):
+        captured["card"] = card
+        return "om_followup_detail"
+
+    with patch("tools._hermes_send_card", side_effect=capture_card):
+        result = json.loads(_handle_card_action({"action_value": action_value}, chat_id="oc_followup_detail"))
+
+    assert result["status"] == "project_status_sent"
+    actions = [element for element in captured["card"]["elements"] if element.get("tag") == "action"]
+    assert actions
+    button_texts = [button["text"]["content"] for button in actions[0]["actions"]]
+    assert "创建待办" in button_texts
+
+    with _plan_lock:
+        task_action_id = next(
+            action_id for action_id, ref in _card_action_refs.items()
+            if ref["chat_id"] == "oc_followup_detail" and ref["action"] == "create_followup_task"
+        )
+
+    sent_messages = []
+    with (
+        patch("tools._create_task", return_value="待办详情项目跟进: https://example.invalid/task/task_123") as create_task,
+        patch("tools._hermes_send", side_effect=lambda chat_id, msg: sent_messages.append((chat_id, msg)) or True),
+    ):
+        task_result = json.loads(_handle_card_action(
+            {"action_value": json.dumps({"pilotflow_action_id": task_action_id}, ensure_ascii=False)},
+            chat_id="ignored_chat",
+        ))
+
+    assert task_result["status"] == "project_followup_task_created"
+    create_task.assert_called_once_with(
+        "待办详情项目跟进",
+        "项目: 待办详情项目",
+        "张三",
+        "2026-05-20",
+        "oc_followup_detail",
+        ["张三", "李四"],
+    )
+    assert sent_messages
+    assert sent_messages[0][0] == "oc_followup_detail"
+    assert "待办详情项目跟进" in sent_messages[0][1]
+
+
 def test_due_project_detail_card_offers_reminder_button_without_chat_id_payload():
     with _project_registry_lock:
         _project_registry.clear()
@@ -2809,13 +2864,13 @@ def test_due_project_detail_card_offers_reminder_button_without_chat_id_payload(
     actions = [element for element in captured["card"]["elements"] if element.get("tag") == "action"]
     assert actions
     button_text = [button["text"]["content"] for button in actions[0]["actions"]]
-    assert button_text == ["标记完成", "发送提醒"]
+    assert button_text == ["标记完成", "发送提醒", "创建待办"]
     reminder_value = actions[0]["actions"][1]["value"]
     assert "pilotflow_action_id" in reminder_value
     assert "pilotflow_chat_id" not in reminder_value
     with _plan_lock:
         refs = [ref for ref in _card_action_refs.values() if ref["chat_id"] == "oc_detail_reminder"]
-    assert {ref["action"] for ref in refs} == {"mark_project_done", "send_project_reminder"}
+    assert {ref["action"] for ref in refs} == {"mark_project_done", "send_project_reminder", "create_followup_task"}
 
 
 def test_completed_project_detail_card_offers_reopen_button():
@@ -2842,7 +2897,7 @@ def test_completed_project_detail_card_offers_reopen_button():
     assert actions[0]["actions"][0]["text"]["content"] == "重新打开"
     with _plan_lock:
         refs = [ref for ref in _card_action_refs.values() if ref["chat_id"] == "oc_detail_reopen"]
-    assert {ref["action"] for ref in refs} == {"reopen_project"}
+    assert {ref["action"] for ref in refs} == {"reopen_project", "create_followup_task"}
 
 
 def test_project_detail_card_uses_status_colored_header():

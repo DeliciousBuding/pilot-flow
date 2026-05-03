@@ -603,7 +603,7 @@ uv run pytest -o addopts='' -q
 结果：
 
 ```text
-125 passed
+126 passed
 ```
 
 ## 当前证据边界

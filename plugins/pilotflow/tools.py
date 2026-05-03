@@ -391,6 +391,8 @@ def _build_project_detail_card(chat_id: str, title: str, project: dict) -> tuple
     if _project_needs_reminder_action(project):
         reminder_action_id = _create_card_action_ref(chat_id, "send_project_reminder", {"title": title})
         action_ids.append(reminder_action_id)
+    followup_action_id = _create_card_action_ref(chat_id, "create_followup_task", {"title": title})
+    action_ids.append(followup_action_id)
     resource_lines = []
     for item in project.get("artifacts", []):
         text = str(item)
@@ -425,6 +427,12 @@ def _build_project_detail_card(chat_id: str, title: str, project: dict) -> tuple
             "type": "primary",
             "value": {"pilotflow_action_id": reminder_action_id},
         })
+    actions.append({
+        "tag": "button",
+        "text": {"tag": "plain_text", "content": "创建待办"},
+        "type": "default",
+        "value": {"pilotflow_action_id": followup_action_id},
+    })
     card = {
         "config": {"wide_screen_mode": True},
         "header": {
@@ -2589,7 +2597,7 @@ def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
             "instructions": "已应用历史建议并重新发送确认卡片。不要展示工具名或英文。",
         })
 
-    if pilotflow_action in ("project_status", "mark_project_done", "reopen_project", "resolve_risk", "send_project_reminder"):
+    if pilotflow_action in ("project_status", "mark_project_done", "reopen_project", "resolve_risk", "send_project_reminder", "create_followup_task"):
         project_title = action_data.get("title") or action_data.get("project_name")
         if not project_title:
             return tool_error("无法识别项目，请在群里直接询问项目状态。")
@@ -2622,6 +2630,39 @@ def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
                 "record_id": "",
             }
             project_title = state_project.get("title", project_title)
+
+        if pilotflow_action == "create_followup_task":
+            members = list(project.get("members", []))
+            assignee = members[0] if members else ""
+            task_name = _create_task(
+                f"{project_title}跟进",
+                f"项目: {project_title}",
+                assignee,
+                project.get("deadline", ""),
+                chat_id,
+                members,
+            )
+            if not task_name:
+                return tool_error("待办创建失败，请检查飞书连接。")
+            created_task_entry = f"任务: {task_name}"
+            with _project_registry_lock:
+                if project_title in _project_registry:
+                    _project_registry[project_title].setdefault("artifacts", []).append(created_task_entry)
+            _save_project_state(
+                project_title, project.get("goal", ""), members,
+                project.get("deliverables", []), project.get("deadline", ""), project.get("status", "进行中"),
+                list(project.get("artifacts", [])) + [created_task_entry],
+                updates=project.get("updates", []),
+            )
+            _append_project_doc_update(project_title, project, "任务", task_name)
+            _hermes_send(chat_id, f"项目「{project_title}」的跟进待办“{task_name}”已创建。")
+            return tool_result({
+                "status": "project_followup_task_created",
+                "project": project_title,
+                "task_created": True,
+                "task_name": task_name,
+                "instructions": "已创建项目跟进待办。不要展示工具名或英文。",
+            })
 
         if pilotflow_action == "project_status":
             detail_card, action_ids = _build_project_detail_card(chat_id, project_title, project)
@@ -2820,6 +2861,13 @@ def _handle_card_command(raw_args: str) -> str:
             f"**{action_data.get('title', '项目')}** 的催办提醒已发送到群聊。",
             "yellow",
         )
+    elif action_id and pilotflow_action == "create_followup_task":
+        _mark_card_message(
+            message_id,
+            "待办已创建",
+            f"**{action_data.get('title', '项目')}** 的跟进待办已创建。",
+            "green",
+        )
     elif action_id and pilotflow_action == "apply_history_suggestions":
         _mark_card_message(
             message_id,
@@ -2864,7 +2912,7 @@ def _handle_card_command(raw_args: str) -> str:
     if data.get("status") in (
         "project_status_sent", "project_marked_done", "project_reopened", "project_risk_resolved",
         "project_reminder_sent", "dashboard_page_sent", "dashboard_filter_sent", "briefing_batch_reminder_sent",
-        "history_suggestions_applied",
+        "history_suggestions_applied", "project_followup_task_created",
     ):
         return None
     if data.get("display"):
