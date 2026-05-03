@@ -1410,6 +1410,10 @@ def _deadline_countdown(iso_date: str) -> str:
 def _status_filter_from_query(query: str) -> str:
     """Infer a dashboard status filter from the user's Chinese query."""
     q = query or ""
+    if any(word in q for word in ("所有项目", "全部项目", "显示所有", "全部")):
+        return "all"
+    if any(word in q for word in ("归档", "已归档")):
+        return "archived"
     if any(word in q for word in ("逾期", "过期", "超期")):
         return "overdue"
     if any(word in q for word in ("未完成", "没完成", "进行中", "待完成", "待办", "还剩")):
@@ -1419,20 +1423,28 @@ def _status_filter_from_query(query: str) -> str:
     return ""
 
 
+def _is_archived_status(status: str) -> bool:
+    return str(status).strip() in ("已归档", "归档", "archived")
+
+
 def _project_matches_status_filter(project: dict, status_filter: str) -> bool:
     """Return whether a dashboard project matches the requested filter."""
-    if not status_filter:
-        return True
     status = str(project.get("status", ""))
+    if status_filter == "all":
+        return True
+    if status_filter == "archived":
+        return _is_archived_status(status)
+    if not status_filter:
+        return not _is_archived_status(status)
     if status_filter == "completed":
         return status == "已完成"
     if status_filter == "active":
-        return status != "已完成"
+        return status != "已完成" and not _is_archived_status(status)
     if status_filter == "overdue":
         import datetime as _dt
         try:
             deadline = _dt.date.fromisoformat(str(project.get("deadline", "")))
-            return deadline < _dt.date.today() and status != "已完成"
+            return deadline < _dt.date.today() and status != "已完成" and not _is_archived_status(status)
         except (TypeError, ValueError):
             return False
     return True
@@ -2319,7 +2331,8 @@ PILOTFLOW_QUERY_STATUS_SCHEMA = {
     "description": (
         "查询项目状态并向群聊发送看板卡片。\n"
         "当用户问「项目进展如何」「有哪些项目」「项目状态」「看看进展」时调用。\n"
-        "会查询本会话中创建过的项目，构建项目看板互动卡片发送到群聊。\n\n"
+        "会查询本会话中创建过的项目，构建项目看板互动卡片发送到群聊。\n"
+        "默认隐藏已归档项目；用户说「显示所有项目」或「看看归档项目」时才显示归档项目。\n\n"
         "【输出规则】只用中文回复看板信息，不要展示工具名称或英文内容。"
     ),
     "parameters": {
@@ -2437,8 +2450,7 @@ def _handle_query_status(params: Dict[str, Any], **kwargs) -> str:
 
     # Build dashboard card
     had_projects_before_filter = bool(projects)
-    if status_filter:
-        projects = [p for p in projects if _project_matches_status_filter(p, status_filter)]
+    projects = [p for p in projects if _project_matches_status_filter(p, status_filter)]
 
     if not projects:
         if had_projects_before_filter and status_filter:
@@ -2458,7 +2470,7 @@ def _handle_query_status(params: Dict[str, Any], **kwargs) -> str:
         })
         if chat_id and p.get("actionable"):
             status_action_id = _create_card_action_ref(chat_id, "project_status", {"title": p["name"]})
-            next_action = "reopen_project" if p.get("status") == "已完成" else "mark_project_done"
+            next_action = "reopen_project" if p.get("status") == "已完成" or _is_archived_status(p.get("status", "")) else "mark_project_done"
             next_text = "重新打开" if next_action == "reopen_project" else "标记完成"
             next_type = "default" if next_action == "reopen_project" else "primary"
             next_action_id = _create_card_action_ref(chat_id, next_action, {"title": p["name"]})
@@ -2573,8 +2585,9 @@ def _update_bitable_record(app_token: str, table_id: str, record_id: str, fields
 PILOTFLOW_UPDATE_PROJECT_SCHEMA = {
     "name": "pilotflow_update_project",
     "description": (
-        "更新已有项目信息。当用户说「改截止时间」「加成员」「新增任务」「新增交付物」「改项目状态」「延期」「延期到」时调用。\n"
+        "更新已有项目信息。当用户说「改截止时间」「加成员」「新增任务」「新增交付物」「改项目状态」「归档项目」「延期」「延期到」时调用。\n"
         "支持四种操作：update_deadline（改截止时间）、add_member（加成员）、add_deliverable（新增交付物/任务）、update_status（改状态）。\n"
+        "归档项目时使用 action=update_status 且 value=已归档；归档后默认看板会隐藏该项目。\n"
         "会更新内存注册表、脱敏本地状态；可定位状态表时同步多维表格，新增交付物时会尽量创建飞书任务。\n\n"
         "【输出规则】只用中文回复更新结果，不要展示工具名称或英文内容。"
     ),

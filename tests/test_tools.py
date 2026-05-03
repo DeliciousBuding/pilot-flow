@@ -833,6 +833,44 @@ def test_query_status_filters_active_projects():
     assert "已完成筛选项目" not in content
 
 
+def test_query_status_hides_archived_projects_by_default_and_shows_when_requested():
+    with _project_registry_lock:
+        _project_registry.clear()
+    _register_project(
+        "进行中生命周期项目", [], "2026-05-20", "进行中", [],
+        goal="验证归档隐藏", deliverables=["验收记录"],
+    )
+    _register_project(
+        "已归档生命周期项目", [], "2026-05-20", "已归档", [],
+        goal="验证归档隐藏", deliverables=["验收记录"],
+    )
+    captured_cards = []
+
+    def capture_card(chat_id, card):
+        captured_cards.append(card)
+        return True
+
+    with patch("tools._send_interactive_card_via_feishu", side_effect=capture_card):
+        default_result = _handle_query_status({"query": "项目进展"}, chat_id="oc_archive_default")
+        all_result = _handle_query_status({"query": "显示所有项目"}, chat_id="oc_archive_all")
+        archived_result = _handle_query_status({"query": "看看归档项目"}, chat_id="oc_archive_only")
+
+    assert "项目看板已发送" in default_result
+    default_content = json.dumps(captured_cards[0], ensure_ascii=False)
+    assert "进行中生命周期项目" in default_content
+    assert "已归档生命周期项目" not in default_content
+
+    assert "项目看板已发送" in all_result
+    all_content = json.dumps(captured_cards[1], ensure_ascii=False)
+    assert "进行中生命周期项目" in all_content
+    assert "已归档生命周期项目" in all_content
+
+    assert "项目看板已发送" in archived_result
+    archived_content = json.dumps(captured_cards[2], ensure_ascii=False)
+    assert "进行中生命周期项目" not in archived_content
+    assert "已归档生命周期项目" in archived_content
+
+
 def test_query_status_completed_filter_shows_empty_match_state():
     with _project_registry_lock:
         _project_registry.clear()
