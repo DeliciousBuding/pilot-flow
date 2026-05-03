@@ -2722,6 +2722,9 @@ def _parse_deliverable_assignment(value: str, members: list[str]) -> tuple[str, 
     if not match:
         return text, ""
     assignee = match.group(1).strip()
+    at_match = _AT_PATTERN.fullmatch(assignee)
+    if at_match:
+        assignee = at_match.group(2).strip()
     deliverable = match.group(2).strip()
     if assignee and deliverable and assignee in set(members or []):
         return deliverable, assignee

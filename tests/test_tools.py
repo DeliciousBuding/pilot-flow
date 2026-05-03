@@ -1250,6 +1250,39 @@ def test_update_project_add_deliverable_assigns_named_member():
     assert "负责人 → 李四" in send.call_args.args[1]
 
 
+def test_update_project_add_deliverable_assigns_feishu_mentioned_member():
+    with _project_registry_lock:
+        _project_registry.clear()
+    _register_project(
+        "飞书提及交付物项目", ["李四"], "2026-05-20", "进行中", [],
+        goal="验证飞书提及负责人", deliverables=["验收记录"],
+    )
+
+    with (
+        patch("tools._create_task", return_value="完成接口联调") as create_task,
+        patch("tools._hermes_send", return_value=True) as send,
+    ):
+        result = json.loads(_handle_update_project(
+            {
+                "project_name": "飞书提及",
+                "action": "add_deliverable",
+                "value": '<at user_id="ou_test">李四</at>：完成接口联调',
+            },
+            chat_id="oc_mentioned_assignee",
+        ))
+
+    assert result["status"] == "project_updated"
+    assert result["value"] == "完成接口联调"
+    assert result["assignee"] == "李四"
+    create_task.assert_called_once_with("完成接口联调", "项目: 飞书提及交付物项目", "李四", "2026-05-20", "oc_mentioned_assignee")
+    with _project_registry_lock:
+        project = _project_registry["飞书提及交付物项目"]
+        assert project["deliverables"] == ["验收记录", "完成接口联调"]
+    sent_text = send.call_args.args[1]
+    assert "<at user_id" not in sent_text
+    assert "负责人 → 李四" in sent_text
+
+
 def test_update_project_add_member_refreshes_resource_permissions():
     with _project_registry_lock:
         _project_registry.clear()
