@@ -15,6 +15,7 @@ import re
 import threading
 import time
 import uuid
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from tools.registry import registry, tool_error, tool_result
@@ -411,6 +412,70 @@ def _save_to_hermes_memory(title: str, goal: str, members: list, deliverables: l
     except Exception as e:
         logger.debug("memory save skipped: %s", e)
         return False
+
+
+def _project_state_path() -> Path:
+    """Return the portable PilotFlow state path under Hermes home by default."""
+    override = os.environ.get("PILOTFLOW_STATE_PATH", "").strip()
+    if override:
+        return Path(override).expanduser()
+    hermes_home = os.environ.get("HERMES_HOME", "").strip()
+    base = Path(hermes_home).expanduser() if hermes_home else Path.home() / ".hermes"
+    return base / "pilotflow_projects.json"
+
+
+def _save_project_state(title: str, goal: str, members: list, deliverables: list, deadline: str,
+                        status: str, artifacts: Optional[list] = None, app_token: str = "",
+                        table_id: str = "", record_id: str = "") -> bool:
+    """Persist a sanitized project summary for restart-safe dashboards."""
+    if not title:
+        return False
+    path = _project_state_path()
+    try:
+        existing = _load_project_state()
+        record = {
+            "title": title,
+            "goal": goal or "",
+            "deliverables": _clean_plan_list(deliverables),
+            "deadline": deadline or "",
+            "status": status or "进行中",
+            "updated_at": int(time.time()),
+        }
+        by_title = {item.get("title"): item for item in existing if item.get("title")}
+        by_title[title] = record
+        records = sorted(by_title.values(), key=lambda item: item.get("updated_at", 0), reverse=True)[:_PROJECT_REGISTRY_MAX]
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps({"projects": records}, ensure_ascii=False, indent=2), encoding="utf-8")
+        return True
+    except Exception as e:
+        logger.debug("project state save skipped: %s", e)
+        return False
+
+
+def _load_project_state() -> list[dict]:
+    """Load sanitized project summaries persisted by PilotFlow."""
+    path = _project_state_path()
+    try:
+        if not path.exists():
+            return []
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except Exception as e:
+        logger.debug("project state load skipped: %s", e)
+        return []
+    items = payload.get("projects", payload if isinstance(payload, list) else [])
+    projects = []
+    for item in items if isinstance(items, list) else []:
+        if not isinstance(item, dict) or not item.get("title"):
+            continue
+        projects.append({
+            "title": str(item.get("title", "")),
+            "goal": str(item.get("goal", "")),
+            "deliverables": _clean_plan_list(item.get("deliverables")),
+            "deadline": str(item.get("deadline", "")),
+            "status": str(item.get("status", "进行中")) or "进行中",
+            "source": "state",
+        })
+    return projects
 
 
 def _extract_memory_items(result: Any) -> list[str]:
@@ -1580,6 +1645,12 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
 
     # Save project pattern to Hermes memory for later history-based suggestions.
     _save_to_hermes_memory(title, goal, members, deliverables, deadline)
+    _save_project_state(
+        title, goal, members, deliverables, deadline, "进行中", artifacts,
+        app_token=bitable_meta.get("app_token", "") if bitable_meta else "",
+        table_id=bitable_meta.get("table_id", "") if bitable_meta else "",
+        record_id=bitable_meta.get("record_id", "") if bitable_meta else "",
+    )
 
     # Schedule deadline reminder via Hermes cron (if deadline is set)
     reminder_job = False
@@ -1747,6 +1818,11 @@ def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
                 project["app_token"], project["table_id"], project["record_id"],
                 {"状态": "已完成"},
             )
+        _save_project_state(
+            project_title, project.get("goal", ""), project.get("members", []),
+            project.get("deliverables", []), project.get("deadline", ""), "已完成",
+            project.get("artifacts", []),
+        )
 
         suffix = "，状态表已同步。" if bitable_updated else "。"
         _hermes_send(chat_id, f"项目「{project_title}」已标记为完成{suffix}")
@@ -1911,6 +1987,35 @@ def _handle_query_status(params: Dict[str, Any], **kwargs) -> str:
                         projects.append({"name": t.summary or "无标题", "source": "任务"})
             except Exception as e:
                 logger.debug("task API fallback failed: %s", e)
+
+    # 3. Portable plugin state survives gateway restarts even when Hermes
+    # memory is unavailable in a minimal runtime.
+    if not projects:
+        for item in _load_project_state():
+            deadline = item.get("deadline") or "待确认"
+            cd = _deadline_countdown(deadline)
+            countdown = f" | {cd}" if cd else ""
+            deliverables = "、".join(item.get("deliverables", [])) or "待确认"
+            projects.append({
+                "name": item.get("title") or "历史项目",
+                "source": f"来源: 本地状态 | 交付物: {deliverables} | 截止: {deadline}{countdown} | {item.get('status', '进行中')}",
+            })
+            if len(projects) >= 5:
+                break
+
+    # 4. Hermes memory fallback when the runtime exposes it.
+    if not projects:
+        for item in _load_history_projects(query):
+            deadline = item.get("deadline") or "待确认"
+            cd = _deadline_countdown(deadline)
+            countdown = f" | {cd}" if cd else ""
+            deliverables = "、".join(item.get("deliverables", [])) or "待确认"
+            projects.append({
+                "name": item.get("title") or "历史项目",
+                "source": f"来源: 历史记录 | 交付物: {deliverables} | 截止: {deadline}{countdown} | 进行中",
+            })
+            if len(projects) >= 5:
+                break
 
     # Build dashboard card
     if not projects:

@@ -44,6 +44,8 @@ from tools import (
     _deadline_countdown,
     _send_interactive_card_via_feishu,
     _save_to_hermes_memory,
+    _save_project_state,
+    _load_project_state,
     _schedule_deadline_reminder,
     _clean_plan_list,
     _parse_memory_project_entry,
@@ -53,6 +55,7 @@ from tools import (
     _handle_card_command,
     _handle_generate_plan,
     _handle_create_project_space,
+    _handle_query_status,
     _pending_plans,
     _card_action_refs,
     _plan_lock,
@@ -224,6 +227,34 @@ def test_memory_save_reports_dispatch_failure():
     assert ok is False
 
 
+def test_project_state_roundtrip_is_sanitized_and_portable(tmp_path):
+    state_path = tmp_path / "pilotflow-projects.json"
+
+    with patch.dict(os.environ, {"PILOTFLOW_STATE_PATH": str(state_path)}):
+        ok = _save_project_state(
+            "持久项目",
+            "验证重启后恢复",
+            ["张三"],
+            ["恢复记录"],
+            "2026-05-20",
+            "进行中",
+            artifacts=["文档: https://example.invalid/doc"],
+            app_token="app_secret_like",
+            table_id="tbl_secret_like",
+            record_id="rec_secret_like",
+        )
+        projects = _load_project_state()
+
+    assert ok is True
+    assert projects[0]["title"] == "持久项目"
+    assert projects[0]["deliverables"] == ["恢复记录"]
+    assert "members" not in projects[0]
+    serialized = state_path.read_text(encoding="utf-8")
+    assert "张三" not in serialized
+    assert "example.invalid" not in serialized
+    assert "secret_like" not in serialized
+
+
 def test_deadline_reminder_reports_dispatch_failure():
     import datetime
 
@@ -385,6 +416,36 @@ def test_generate_plan_uses_memory_history_when_fields_missing():
     assert result["history_suggested_fields"]["members"] == ["王五", "赵六"]
     assert result["history_suggested_fields"]["deliverables"] == ["活动方案", "宣传文案"]
     assert result["history_suggestions"]
+
+
+def test_query_status_falls_back_to_hermes_memory_after_restart(tmp_path):
+    with _project_registry_lock:
+        _project_registry.clear()
+    memory_payload = json.dumps({
+        "items": [
+            {"content": "【项目创建】重启恢复项目：目标=验证重启恢复，成员=无，交付物=恢复记录，截止=2026-05-20"}
+        ]
+    })
+    fake_registry = types.SimpleNamespace(dispatch=lambda name, args, **kwargs: memory_payload)
+    captured = {}
+
+    def capture_card(chat_id, card):
+        captured["card"] = card
+        return True
+
+    missing_state = tmp_path / "missing-state.json"
+    with (
+        patch.dict(os.environ, {"PILOTFLOW_STATE_PATH": str(missing_state)}),
+        patch("tools.registry", fake_registry),
+        patch("tools._send_interactive_card_via_feishu", side_effect=capture_card),
+    ):
+        result = _handle_query_status({"query": "项目进展"}, chat_id="oc_memory_status")
+
+    assert "项目看板已发送" in result
+    body = captured["card"]["elements"][0]["text"]["content"]
+    assert "重启恢复项目" in body
+    assert "恢复记录" in body
+    assert "暂无项目记录" not in body
 
 
 def test_project_entry_card_action_marks_project_done():
