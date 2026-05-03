@@ -3068,9 +3068,17 @@ def _handle_card_command(raw_args: str) -> str:
             "blue",
         )
         return None
+    if data.get("status") == "dashboard_page_sent":
+        _mark_card_message(
+            message_id,
+            "看板已翻页",
+            "新的项目看板已发送到群聊。",
+            "blue",
+        )
+        return None
     if data.get("status") in (
         "project_marked_done", "project_reopened", "project_risk_resolved",
-        "project_reminder_sent", "dashboard_page_sent", "dashboard_filter_sent",
+        "project_reminder_sent", "dashboard_filter_sent",
         "history_suggestions_applied",
     ):
         return None
