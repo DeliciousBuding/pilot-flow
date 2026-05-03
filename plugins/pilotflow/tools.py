@@ -572,7 +572,8 @@ def _project_state_path() -> Path:
 
 def _save_project_state(title: str, goal: str, members: list, deliverables: list, deadline: str,
                         status: str, artifacts: Optional[list] = None, app_token: str = "",
-                        table_id: str = "", record_id: str = "") -> bool:
+                        table_id: str = "", record_id: str = "",
+                        updates: Optional[list] = None) -> bool:
     """Persist a sanitized project summary for restart-safe dashboards."""
     if not title:
         return False
@@ -585,6 +586,7 @@ def _save_project_state(title: str, goal: str, members: list, deliverables: list
             "deliverables": _clean_plan_list(deliverables),
             "deadline": deadline or "",
             "status": status or "进行中",
+            "updates": _clean_recent_updates(updates),
             "updated_at": int(time.time()),
         }
         by_title = {item.get("title"): item for item in existing if item.get("title")}
@@ -619,6 +621,7 @@ def _load_project_state() -> list[dict]:
             "deliverables": _clean_plan_list(item.get("deliverables")),
             "deadline": str(item.get("deadline", "")),
             "status": str(item.get("status", "进行中")) or "进行中",
+            "updates": _clean_recent_updates(item.get("updates")),
             "source": "state",
         })
     return projects
@@ -745,6 +748,30 @@ def _clean_plan_list(values: Any) -> list[str]:
         if item and not _is_placeholder_value(item) and item not in cleaned:
             cleaned.append(item)
     return cleaned
+
+
+def _clean_recent_updates(updates: Any, limit: int = 5) -> list[dict]:
+    """Keep restart-safe progress text without links, local paths, IDs, or secrets."""
+    if not updates:
+        return []
+    cleaned: list[dict] = []
+    values = updates if isinstance(updates, list) else [updates]
+    unsafe_pattern = re.compile(
+        r"(https?://|[A-Za-z]:\\|/mnt/[a-z]/|app[_-]?token|table[_-]?id|record[_-]?id|open[_-]?id|chat[_-]?id|message[_-]?id|secret|ticket=)",
+        re.IGNORECASE,
+    )
+    for item in values:
+        action = ""
+        value = ""
+        if isinstance(item, dict):
+            action = str(item.get("action", "")).strip()
+            value = str(item.get("value", "")).strip()
+        else:
+            value = str(item).strip()
+        if not value or unsafe_pattern.search(value):
+            continue
+        cleaned.append({"action": action or "进展", "value": value[:120]})
+    return cleaned[-limit:]
 
 
 def _is_execution_confirmation(text: str) -> bool:
@@ -2409,6 +2436,7 @@ def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
                 "deadline": state_project.get("deadline", ""),
                 "status": state_project.get("status", "进行中"),
                 "artifacts": [],
+                "updates": state_project.get("updates", []),
                 "app_token": "",
                 "table_id": "",
                 "record_id": "",
@@ -2460,7 +2488,7 @@ def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
         _save_project_state(
             project_title, project.get("goal", ""), project.get("members", []),
             project.get("deliverables", []), project.get("deadline", ""), target_status,
-            project.get("artifacts", []),
+            project.get("artifacts", []), updates=project.get("updates", []),
         )
         doc_label = "风险解除" if pilotflow_action == "resolve_risk" else "状态"
         doc_value = "风险已解除" if pilotflow_action == "resolve_risk" else target_status
@@ -2664,9 +2692,11 @@ def _handle_query_status(params: Dict[str, Any], **kwargs) -> str:
             # Deadline countdown with urgency indicators
             cd = _deadline_countdown(deadline)
             countdown = f" | {cd}" if cd else ""
+            recent_updates = _clean_recent_updates(info.get("updates"), limit=1)
+            update_suffix = f" | 最近进展: {recent_updates[-1]['value']}" if recent_updates else ""
             projects.append({
                 "name": title,
-                "source": f"成员: {member_str} | 截止: {deadline}{countdown} | {status}",
+                "source": f"成员: {member_str} | 截止: {deadline}{countdown} | {status}{update_suffix}",
                 "actionable": True,
                 "status": status,
                 "deadline": deadline,
@@ -2702,9 +2732,11 @@ def _handle_query_status(params: Dict[str, Any], **kwargs) -> str:
             cd = _deadline_countdown(deadline)
             countdown = f" | {cd}" if cd else ""
             deliverables = "、".join(item.get("deliverables", [])) or "待确认"
+            recent_updates = _clean_recent_updates(item.get("updates"), limit=1)
+            update_suffix = f" | 最近进展: {recent_updates[-1]['value']}" if recent_updates else ""
             projects.append({
                 "name": item.get("title") or "历史项目",
-                "source": f"来源: 本地状态 | 交付物: {deliverables} | 截止: {deadline}{countdown} | {item.get('status', '进行中')}",
+                "source": f"来源: 本地状态 | 交付物: {deliverables} | 截止: {deadline}{countdown} | {item.get('status', '进行中')}{update_suffix}",
                 "actionable": True,
                 "status": item.get("status", "进行中"),
                 "deadline": deadline,
@@ -2715,6 +2747,7 @@ def _handle_query_status(params: Dict[str, Any], **kwargs) -> str:
                     "deadline": item.get("deadline", ""),
                     "status": item.get("status", "进行中"),
                     "artifacts": [],
+                    "updates": item.get("updates", []),
                 },
             })
             if len(projects) >= 5:
@@ -3107,6 +3140,7 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
             "deadline": state_project.get("deadline", ""),
             "status": state_project.get("status", "进行中"),
             "artifacts": [],
+            "updates": state_project.get("updates", []),
             "app_token": "",
             "table_id": "",
             "record_id": "",
@@ -3159,6 +3193,9 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
                 project["status"] = "有风险"
             elif action == "resolve_risk":
                 project["status"] = "进行中"
+            elif action == "add_progress":
+                project.setdefault("updates", []).append({"action": action_label, "value": value})
+                project["updates"] = _clean_recent_updates(project.get("updates"))
         else:
             with _project_registry_lock:
                 if action == "update_deadline":
@@ -3187,7 +3224,7 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
                     registry_updated = True
                 elif action == "add_progress":
                     project.setdefault("updates", []).append({"action": action_label, "value": value})
-                    project["updates"] = project["updates"][-5:]
+                    project["updates"] = _clean_recent_updates(project.get("updates"))
                     registry_updated = True
 
             if action == "add_deliverable" and chat_id:
@@ -3205,6 +3242,7 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
                 project_name, project.get("goal", ""), project.get("members", []),
                 project.get("deliverables", []), project.get("deadline", ""),
                 project.get("status", "进行中"), project.get("artifacts", []),
+                updates=project.get("updates", []),
             )
             if not state_project:
                 doc_updated = _append_project_doc_update(project_name, project, action_label, value)

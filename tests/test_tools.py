@@ -431,6 +431,37 @@ def test_project_state_roundtrip_is_sanitized_and_portable(tmp_path):
     assert "secret_like" not in serialized
 
 
+def test_project_state_roundtrip_keeps_sanitized_recent_updates(tmp_path):
+    state_path = tmp_path / "pilotflow-projects.json"
+
+    with patch.dict(os.environ, {"PILOTFLOW_STATE_PATH": str(state_path)}):
+        ok = _save_project_state(
+            "进展持久项目",
+            "验证重启后进展恢复",
+            ["张三"],
+            ["恢复记录"],
+            "2026-05-20",
+            "进行中",
+            updates=[
+                {"action": "进展", "value": "完成需求评审"},
+                {"action": "进展", "value": "真实链接 https://example.invalid/doc 不应保存"},
+                {"action": "进展", "value": "app_secret_like 不应保存"},
+                {"action": "进展", "value": "等待业务确认"},
+            ],
+        )
+        projects = _load_project_state()
+
+    assert ok is True
+    assert projects[0]["updates"] == [
+        {"action": "进展", "value": "完成需求评审"},
+        {"action": "进展", "value": "等待业务确认"},
+    ]
+    serialized = state_path.read_text(encoding="utf-8")
+    assert "张三" not in serialized
+    assert "example.invalid" not in serialized
+    assert "secret_like" not in serialized
+
+
 def test_deadline_reminder_reports_dispatch_failure():
     import datetime
 
@@ -719,6 +750,36 @@ def test_query_status_falls_back_to_hermes_memory_after_restart(tmp_path):
     assert "重启恢复项目" in body
     assert "恢复记录" in body
     assert "暂无项目记录" not in body
+
+
+def test_query_status_dashboard_shows_recent_progress_after_restart(tmp_path):
+    state_path = tmp_path / "pilotflow-projects.json"
+    with _project_registry_lock:
+        _project_registry.clear()
+
+    with patch.dict(os.environ, {"PILOTFLOW_STATE_PATH": str(state_path)}):
+        assert _save_project_state(
+            "重启进展项目",
+            "验证重启后看板进展",
+            [],
+            ["验收记录"],
+            "2026-05-20",
+            "进行中",
+            updates=[{"action": "进展", "value": "完成原型评审"}],
+        )
+        captured = {}
+
+        def capture_card(chat_id, card):
+            captured["card"] = card
+            return "om_restart_progress"
+
+        with patch("tools._send_interactive_card_via_feishu", side_effect=capture_card):
+            result = _handle_query_status({"query": "项目进展"}, chat_id="oc_restart_progress")
+
+    assert "项目看板已发送" in result
+    body = captured["card"]["elements"][0]["text"]["content"]
+    assert "重启进展项目" in body
+    assert "最近进展: 完成原型评审" in body
 
 
 def test_query_status_dashboard_includes_project_action_buttons():
@@ -1517,6 +1578,36 @@ def test_update_project_updates_sanitized_state_after_restart(tmp_path):
     assert projects[0]["title"] == "重启更新项目"
     assert projects[0]["deadline"] == "2026-05-25"
     assert projects[0]["status"] == "进行中"
+
+
+def test_update_project_adds_progress_to_sanitized_state_after_restart(tmp_path):
+    state_path = tmp_path / "pilotflow-projects.json"
+    with _project_registry_lock:
+        _project_registry.clear()
+
+    with patch.dict(os.environ, {"PILOTFLOW_STATE_PATH": str(state_path)}):
+        assert _save_project_state(
+            "重启进展更新项目",
+            "验证重启后继续记录进展",
+            [],
+            ["验收记录"],
+            "2026-05-20",
+            "进行中",
+            updates=[{"action": "进展", "value": "完成需求评审"}],
+        )
+        result = json.loads(_handle_update_project(
+            {"project_name": "重启进展更新", "action": "add_progress", "value": "完成原型评审"},
+            chat_id="oc_state_progress_update",
+        ))
+        projects = _load_project_state()
+
+    assert result["status"] == "project_updated"
+    assert result["project"] == "重启进展更新项目"
+    assert result["state_updated"] is True
+    assert projects[0]["updates"] == [
+        {"action": "进展", "value": "完成需求评审"},
+        {"action": "进展", "value": "完成原型评审"},
+    ]
 
 
 def test_update_project_status_uses_sanitized_state_after_restart(tmp_path):
