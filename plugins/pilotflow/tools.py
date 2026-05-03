@@ -2915,6 +2915,8 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
     if chat_id:
         member_at = _format_at(value, chat_id) if action == "add_member" else value
         parts = [f"📝 项目更新: {project_name}", f"{action_label} → {member_at}"]
+        if action == "add_deliverable" and assignee_override:
+            parts.append(f"负责人 → {_format_at(assignee_override, chat_id)}")
         # Add countdown for deadline updates
         if action == "update_deadline":
             cd = _deadline_countdown(value)

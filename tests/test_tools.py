@@ -1247,6 +1247,7 @@ def test_update_project_add_deliverable_assigns_named_member():
         assert project["deliverables"] == ["验收记录", "完成接口联调"]
         assert "李四：完成接口联调" not in project["deliverables"]
     assert "交付物 → 完成接口联调" in send.call_args.args[1]
+    assert "负责人 → 李四" in send.call_args.args[1]
 
 
 def test_update_project_add_member_refreshes_resource_permissions():

@@ -253,6 +253,7 @@
 | 验证方式 | 在 WSL runtime 中注册临时项目，调用 `pilotflow_update_project` 的 `add_deliverable`，输入格式为 `成员：交付物` |
 | 解析结果 | 工具输出确认 `parsed=true`、`assignee_detected=true`、`result_assignee_present=true` |
 | 任务链路 | 工具输出确认 `task_created=true`、`registry_has_clean_deliverable=true`，说明任务正文已从成员前缀中拆出并进入项目交付物 |
+| 群聊回执 | 工具输出确认 `reply_has_assignee=true`、`reply_has_clean_deliverable=true`，说明用户能看到任务负责人和干净任务正文 |
 | 用户价值 | 群里可以直接说“某人：做某任务”，PilotFlow 会按成员意图派发待办，而不是总是分给第一个项目成员 |
 | 边界说明 | 直接工具脚本脱离 gateway 时 `send_message` registry 不可用，但交付物解析、任务创建和项目状态写入均已走运行态插件链路 |
 | 隐私处理 | 真实 chat_id、open_id、message_id、任务 ID、文档链接、状态表链接和 token 不写入公开仓库 |
