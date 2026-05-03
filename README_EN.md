@@ -18,9 +18,7 @@ Mention @PilotFlow in a Feishu group chat with a requirement, and it automatical
 
 ## Demo
 
-> Replace with demo video recording
-
-See [docs/demo/README.md](docs/demo/README.md) for detailed demo script.
+See [docs/demo/README.md](docs/demo/README.md) for the full demo script covering 5 scenarios.
 
 ---
 

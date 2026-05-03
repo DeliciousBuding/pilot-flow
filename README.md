@@ -18,9 +18,7 @@
 
 ## 演示
 
-> 录制演示视频后替换此处
-
-详细演示脚本见 [docs/demo/README.md](docs/demo/README.md)
+详细演示脚本见 [docs/demo/README.md](docs/demo/README.md)，包含 5 个场景的完整流程。
 
 ---
 
