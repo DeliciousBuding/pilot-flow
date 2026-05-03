@@ -134,7 +134,7 @@ def test_full_flow_create_project():
     with _project_registry_lock:
         assert "答辩项目" in _project_registry
         proj = _project_registry["答辩项目"]
-        assert proj["members"] == ["示例成员A"]
+        assert proj["members"] == []
         assert proj["deadline"] == "2026-05-07"
         assert proj["status"] == "进行中"
     print("  PASS  Step 6: Project registered in memory")
@@ -143,7 +143,7 @@ def test_full_flow_create_project():
     memory_calls = [c for c in _call_log if c["name"] == "memory"]
     if memory_calls:
         assert "答辩项目" in memory_calls[0]["args"]["content"]
-        assert "成员=1 人" in memory_calls[0]["args"]["content"]
+        assert "成员=无" in memory_calls[0]["args"]["content"]
         assert "示例成员A" not in memory_calls[0]["args"]["content"]
         print("  PASS  Step 7: Project saved to Hermes memory")
     else:

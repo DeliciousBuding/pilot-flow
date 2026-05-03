@@ -45,6 +45,11 @@ from tools import (
     _send_interactive_card_via_feishu,
     _save_to_hermes_memory,
     _schedule_deadline_reminder,
+    _clean_plan_list,
+    _parse_memory_project_entry,
+    _history_suggestions_for_plan,
+    _create_card_action_ref,
+    _handle_card_action,
     _handle_card_command,
     _handle_generate_plan,
     _pending_plans,
@@ -131,6 +136,19 @@ def test_register_project_with_bitable_metadata():
         assert proj["record_id"] == "rec1"
 
 
+def test_register_project_stores_reusable_project_pattern():
+    with _project_registry_lock:
+        _project_registry.clear()
+    _register_project(
+        "复用项目", ["张三"], "2026-05-15", "进行中", [],
+        goal="验证复用", deliverables=["复盘文档"],
+    )
+    with _project_registry_lock:
+        proj = _project_registry["复用项目"]
+        assert proj["goal"] == "验证复用"
+        assert proj["deliverables"] == ["复盘文档"]
+
+
 def test_register_project_eviction():
     with _project_registry_lock:
         _project_registry.clear()
@@ -214,6 +232,154 @@ def test_deadline_reminder_reports_dispatch_failure():
         ok = _schedule_deadline_reminder("提醒失败项目", future, "oc_deadline_fail")
 
     assert ok is False
+
+
+def test_parse_memory_project_entry():
+    parsed = _parse_memory_project_entry(
+        "【项目创建】答辩项目：目标=准备答辩，成员=张三、李四，交付物=项目简报、任务清单，截止=2026-05-10"
+    )
+
+    assert parsed["title"] == "答辩项目"
+    assert parsed["members"] == ["张三", "李四"]
+    assert parsed["deliverables"] == ["项目简报", "任务清单"]
+    assert parsed["deadline"] == "2026-05-10"
+
+
+def test_clean_plan_list_removes_agent_placeholders():
+    assert _clean_plan_list(["示例成员A", "成员B", "王五", "王五"]) == ["王五"]
+    assert _clean_plan_list("示例交付物、迁移验证记录") == ["迁移验证记录"]
+
+
+def test_generate_plan_does_not_show_placeholder_members():
+    captured_cards = []
+
+    def fake_send(chat_id, card):
+        captured_cards.append(card)
+        return "om_fake"
+
+    with _project_registry_lock:
+        _project_registry.clear()
+    with _plan_lock:
+        _pending_plans.clear()
+        _card_action_refs.clear()
+
+    with patch("tools._hermes_send_card", side_effect=fake_send):
+        result = json.loads(_handle_generate_plan(
+            {
+                "input_text": "帮我准备迁移验证项目",
+                "title": "迁移验证项目",
+                "goal": "验证迁移流程",
+                "members": ["示例成员A"],
+                "deliverables": ["迁移验证记录"],
+                "deadline": "",
+            },
+            chat_id="oc_no_placeholder",
+        ))
+
+    assert result["plan"]["members"] == []
+    card_text = captured_cards[0]["elements"][0]["content"]
+    assert "示例成员A" not in card_text
+    assert "**成员：** 待确认" in card_text
+
+
+def test_history_suggestions_do_not_silently_mutate_plan():
+    with _project_registry_lock:
+        _project_registry.clear()
+    _register_project(
+        "答辩历史项目", ["张三", "李四"], "2026-05-10", "进行中", [],
+        goal="准备答辩", deliverables=["项目简报", "任务清单"],
+    )
+    plan = {"title": "新答辩项目", "goal": "准备答辩", "members": [], "deliverables": [], "deadline": ""}
+
+    suggestions, suggested_fields = _history_suggestions_for_plan(plan, "准备新的答辩项目")
+
+    assert plan["members"] == []
+    assert plan["deliverables"] == []
+    assert suggested_fields["members"] == ["张三", "李四"]
+    assert suggested_fields["deliverables"] == ["项目简报", "任务清单"]
+    assert suggestions
+
+
+def test_history_suggestions_ignore_unrelated_history():
+    with _project_registry_lock:
+        _project_registry.clear()
+    _register_project(
+        "答辩历史项目", ["张三"], "2026-05-10", "进行中", [],
+        goal="准备答辩", deliverables=["项目简报"],
+    )
+    plan = {"title": "迁移项目", "goal": "验证迁移", "members": [], "deliverables": [], "deadline": ""}
+
+    suggestions, suggested_fields = _history_suggestions_for_plan(plan, "帮我准备迁移验证项目")
+
+    assert suggestions == []
+    assert suggested_fields == {}
+
+
+def test_generate_plan_uses_memory_history_when_fields_missing():
+    with _project_registry_lock:
+        _project_registry.clear()
+    with _plan_lock:
+        _pending_plans.clear()
+        _card_action_refs.clear()
+    memory_payload = json.dumps({
+        "items": [
+            {"content": "【项目创建】活动项目：目标=筹备活动，成员=王五、赵六，交付物=活动方案、宣传文案，截止=2026-05-20"}
+        ]
+    })
+    fake_registry = types.SimpleNamespace(dispatch=lambda name, args, **kwargs: memory_payload)
+
+    with patch("tools.registry", fake_registry), patch("tools._send_interactive_card_via_feishu", return_value=True):
+        result = json.loads(_handle_generate_plan(
+            {
+                "input_text": "帮我准备新的活动项目",
+                "title": "新活动项目",
+                "goal": "筹备活动",
+                "members": [],
+                "deliverables": [],
+                "deadline": "",
+            },
+            chat_id="oc_history_memory",
+        ))
+
+    assert result["plan"]["members"] == []
+    assert result["plan"]["deliverables"] == ["活动方案", "预算表", "宣传物料"]
+    assert result["history_suggested_fields"]["members"] == ["王五", "赵六"]
+    assert result["history_suggested_fields"]["deliverables"] == ["活动方案", "宣传文案"]
+    assert result["history_suggestions"]
+
+
+def test_project_entry_card_action_marks_project_done():
+    with _project_registry_lock:
+        _project_registry.clear()
+    _register_project(
+        "动作项目", ["张三"], "2026-05-10", "进行中", [],
+        goal="验证入口卡片动作", deliverables=["验收记录"],
+    )
+    action_value = json.dumps({"pilotflow_action": "mark_project_done", "title": "动作项目"}, ensure_ascii=False)
+
+    with patch("tools._hermes_send", return_value=True):
+        result = json.loads(_handle_card_action({"action_value": action_value}, chat_id="oc_action"))
+
+    assert result["status"] == "project_marked_done"
+    with _project_registry_lock:
+        assert _project_registry["动作项目"]["status"] == "已完成"
+
+
+def test_card_command_opaque_project_action_carries_project_title():
+    with _project_registry_lock:
+        _project_registry.clear()
+    _register_project(
+        "入口按钮项目", ["张三"], "2026-05-10", "进行中", [],
+        goal="验证入口按钮", deliverables=["验收记录"],
+    )
+    action_id = _create_card_action_ref("oc_entry_button", "mark_project_done", {"title": "入口按钮项目"})
+
+    with patch("tools._hermes_send", return_value=True), patch("tools._mark_card_message", return_value=True):
+        result = _handle_card_command(f'button {{"pilotflow_action_id":"{action_id}"}}')
+
+    assert result is None
+    with _project_registry_lock:
+        assert _project_registry["入口按钮项目"]["status"] == "已完成"
 
 
 def test_card_command_bridge_uses_opaque_action_id():

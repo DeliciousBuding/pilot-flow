@@ -25,6 +25,7 @@ logger = logging.getLogger(__name__)
 APP_ID = os.environ.get("FEISHU_APP_ID", "")
 APP_SECRET = os.environ.get("FEISHU_APP_SECRET", "")
 MEMORY_ENABLED = os.environ.get("PILOTFLOW_MEMORY_ENABLED", "true").lower() not in ("0", "false", "no")
+MEMORY_READ_ENABLED = os.environ.get("PILOTFLOW_MEMORY_READ_ENABLED", "true").lower() not in ("0", "false", "no")
 MEMORY_INCLUDE_MEMBERS = os.environ.get("PILOTFLOW_MEMORY_INCLUDE_MEMBERS", "false").lower() in ("1", "true", "yes")
 
 # Lazy-loaded lark client (only for doc/task/bitable — NOT for messaging)
@@ -195,14 +196,17 @@ def _clear_pending_plan_if_matches(chat_id: str, plan: Optional[dict]) -> None:
 
 
 def _register_project(title: str, members: list, deadline: str, status: str, artifacts: list,
-                      app_token: str = "", table_id: str = "", record_id: str = ""):
+                      app_token: str = "", table_id: str = "", record_id: str = "",
+                      goal: str = "", deliverables: Optional[list] = None):
     """Register a project in the in-memory registry for query_status and update_project."""
     with _project_registry_lock:
         if len(_project_registry) >= _PROJECT_REGISTRY_MAX:
             oldest = min(_project_registry, key=lambda k: _project_registry[k].get("created_at", 0))
             del _project_registry[oldest]
         _project_registry[title] = {
+            "goal": goal,
             "members": list(members),
+            "deliverables": list(deliverables or []),
             "deadline": deadline,
             "status": status,
             "created_at": time.time(),
@@ -407,6 +411,223 @@ def _save_to_hermes_memory(title: str, goal: str, members: list, deliverables: l
     except Exception as e:
         logger.debug("memory save skipped: %s", e)
         return False
+
+
+def _extract_memory_items(result: Any) -> list[str]:
+    """Normalize assorted Hermes memory read payloads into strings."""
+    if result is None:
+        return []
+    payload = result
+    if isinstance(result, str):
+        try:
+            payload = json.loads(result)
+        except (json.JSONDecodeError, TypeError):
+            return [result]
+
+    if isinstance(payload, list):
+        items = payload
+    elif isinstance(payload, dict):
+        for key in ("items", "entries", "results", "content", "data"):
+            if key in payload:
+                items = payload[key]
+                break
+        else:
+            items = [payload]
+    else:
+        items = [payload]
+
+    if isinstance(items, dict):
+        for key in ("items", "entries", "results", "content"):
+            if key in items and isinstance(items[key], list):
+                items = items[key]
+                break
+
+    normalized: list[str] = []
+    for item in items if isinstance(items, list) else [items]:
+        if isinstance(item, str):
+            normalized.append(item)
+            continue
+        if isinstance(item, dict):
+            for key in ("content", "text", "message", "summary", "title", "value"):
+                value = item.get(key)
+                if isinstance(value, str) and value.strip():
+                    normalized.append(value)
+                    break
+            else:
+                try:
+                    normalized.append(json.dumps(item, ensure_ascii=False))
+                except TypeError:
+                    normalized.append(str(item))
+            continue
+        normalized.append(str(item))
+    return normalized
+
+
+def _parse_memory_project_entry(text: str) -> Optional[dict]:
+    """Parse a stored project memory line into structured fields."""
+    if not text:
+        return None
+    patterns = [
+        r"【项目创建】(?P<title>[^：:]+)：目标=(?P<goal>.*?)，成员=(?P<members>.*?)，交付物=(?P<deliverables>.*?)，截止=(?P<deadline>[^，。\n]*)",
+        r"\[(?P<title>[^\]]+)\]\s*目标=(?P<goal>.*?)\s*成员=(?P<members>.*?)\s*交付物=(?P<deliverables>.*?)\s*截止=(?P<deadline>[^\s,。]*)",
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, text)
+        if not match:
+            continue
+        members_raw = match.group("members").strip()
+        deliverables_raw = match.group("deliverables").strip()
+        members = [] if members_raw in ("无", "待确认", "") else [m.strip() for m in re.split(r"[、,，]", members_raw) if m.strip()]
+        deliverables = [] if deliverables_raw in ("无", "待确认", "") else [d.strip() for d in re.split(r"[、,，]", deliverables_raw) if d.strip()]
+        return {
+            "title": match.group("title").strip(),
+            "goal": match.group("goal").strip(),
+            "members": members,
+            "deliverables": deliverables,
+            "deadline": match.group("deadline").strip(),
+            "raw": text,
+            "source": "memory",
+        }
+    return None
+
+
+def _project_keyword_tokens(text: str) -> set[str]:
+    """Extract short keywords for fuzzy project matching."""
+    tokens = set()
+    for token in re.findall(r"[\u4e00-\u9fff]{2,}|[A-Za-z0-9_]{3,}", text or ""):
+        if token in {"项目", "计划", "创建", "确认", "执行", "帮我", "请帮", "请", "一下", "进行", "准备"}:
+            continue
+        tokens.add(token)
+    return tokens
+
+
+def _is_placeholder_value(value: str) -> bool:
+    """Detect LLM/example placeholders that must not become project data."""
+    text = (value or "").strip()
+    if not text:
+        return True
+    if "示例" in text or "占位" in text:
+        return True
+    return bool(re.fullmatch(r"(成员|负责人|同学|用户|测试成员)[A-Za-zＡ-Ｚａ-ｚ一二三四五六七八九甲乙丙丁0-9]*", text))
+
+
+def _clean_plan_list(values: Any) -> list[str]:
+    """Keep only non-placeholder string values from Agent/tool inputs."""
+    if not values:
+        return []
+    if isinstance(values, str):
+        values = re.split(r"[、,，]", values)
+    cleaned: list[str] = []
+    for value in values if isinstance(values, list) else [values]:
+        item = str(value).strip()
+        if item and not _is_placeholder_value(item) and item not in cleaned:
+            cleaned.append(item)
+    return cleaned
+
+
+def _score_history_project(query: str, project: dict, plan: Optional[dict] = None) -> int:
+    """Score how closely a history project matches the current request."""
+    haystack = " ".join([
+        project.get("title", ""),
+        project.get("goal", ""),
+        " ".join(project.get("members", [])),
+        " ".join(project.get("deliverables", [])),
+        project.get("deadline", ""),
+    ])
+    plan_text = ""
+    if plan:
+        plan_text = " ".join([
+            plan.get("title", ""),
+            plan.get("goal", ""),
+            " ".join(plan.get("deliverables", [])),
+        ])
+    tokens = _project_keyword_tokens(" ".join([query or "", plan_text]))
+    if not tokens:
+        return 0
+    score = 0
+    for token in tokens:
+        if token and token in haystack:
+            score += 3 if token in (project.get("title", "") or "") else 2
+    return score
+
+
+def _load_history_projects(query: str) -> list[dict]:
+    """Load project patterns from Hermes memory and local registry."""
+    candidates: list[dict] = []
+    if MEMORY_READ_ENABLED:
+        for action in ("scan", "search"):
+            try:
+                result = registry.dispatch("memory", {
+                    "action": action,
+                    "target": "memory",
+                    "query": query,
+                    "limit": 10,
+                })
+            except Exception as e:
+                logger.debug("memory %s skipped: %s", action, e)
+                continue
+            for item in _extract_memory_items(result):
+                parsed = _parse_memory_project_entry(item)
+                if parsed:
+                    candidates.append(parsed)
+            if candidates:
+                break
+
+    with _project_registry_lock:
+        for title, info in _project_registry.items():
+            candidates.append({
+                "title": title,
+                "goal": info.get("goal", ""),
+                "members": list(info.get("members", [])),
+                "deliverables": list(info.get("deliverables", [])),
+                "deadline": info.get("deadline", ""),
+                "raw": title,
+                "source": "registry",
+            })
+
+    dedup: dict[str, dict] = {}
+    for item in candidates:
+        key = item.get("title") or item.get("raw") or json.dumps(item, ensure_ascii=False)
+        if key not in dedup:
+            dedup[key] = item
+    return list(dedup.values())
+
+
+def _history_suggestions_for_plan(plan: dict, query: str) -> tuple[list[str], dict]:
+    """Return history suggestions without silently mutating the plan."""
+    history = _load_history_projects(query)
+    if not history:
+        return [], {}
+    scored = sorted(
+        ((_score_history_project(query, item, plan), item) for item in history),
+        key=lambda pair: pair[0],
+        reverse=True,
+    )
+    best_score, best = scored[0]
+    if best_score <= 0:
+        return [], {}
+
+    suggestions: list[str] = []
+    suggested_fields: dict[str, Any] = {}
+    if not plan.get("members") and best.get("members"):
+        suggested_fields["members"] = list(best["members"])
+        suggestions.append(f"可参考历史项目成员：{', '.join(best['members'])}")
+    if not plan.get("deliverables") and best.get("deliverables"):
+        suggested_fields["deliverables"] = list(best["deliverables"])
+        suggestions.append(f"可参考历史项目交付物：{', '.join(best['deliverables'])}")
+    if best.get("deadline") and not plan.get("deadline"):
+        suggested_fields["deadline"] = best["deadline"]
+        suggestions.append(f"历史项目曾使用截止时间：{best['deadline']}")
+    if suggestions:
+        suggested_fields["source_title"] = best.get("title", "")
+        suggested_fields["source"] = best.get("source", "history")
+        suggested_fields["confidence"] = "medium" if best_score < 5 else "high"
+        suggested_fields["agent_guidance"] = (
+            "把这些作为历史上下文。用户说类似、复用、照上次时可主动建议采用；"
+            "不要在用户未确认时静默替换计划字段。"
+        )
+        logger.info("history suggestion loaded from %s", best.get("title", "unknown"))
+    return suggestions, suggested_fields
 
 
 def _schedule_deadline_reminder(title: str, deadline: str, chat_id: str) -> bool:
@@ -901,6 +1122,7 @@ PILOTFLOW_GENERATE_PLAN_SCHEMA = {
         "3. 自动发送确认卡片到群聊，包含计划摘要和确认/取消按钮\n"
         "4. 把你提取的字段存入 pending plan，用户点击确认按钮即可一键创建（无需重新提取）\n\n"
         "调用时你必须从用户消息中提取并传入：title、goal、members、deliverables、deadline。\n"
+        "成员只能来自用户明确提到的真实姓名、@提及或飞书可解析上下文；不确定就传空数组，禁止编造成员A/示例成员。\n"
         "提取不全也要传，能提多少传多少，剩余字段留空字符串或空数组。\n"
         "模板会补全缺失的 deliverables 和 deadline 默认值。\n\n"
         "调用后，你必须：\n"
@@ -918,8 +1140,16 @@ PILOTFLOW_GENERATE_PLAN_SCHEMA = {
             "input_text": {"type": "string", "description": "用户的原始输入文本，包含项目描述。"},
             "title": {"type": "string", "description": "项目标题（从用户消息提取，可为空字符串）。"},
             "goal": {"type": "string", "description": "项目目标（从用户消息提取，可为空字符串）。"},
-            "members": {"type": "array", "items": {"type": "string"}, "description": "成员列表（中文名，可为空数组）。"},
-            "deliverables": {"type": "array", "items": {"type": "string"}, "description": "交付物列表（可为空数组，会被模板补全）。"},
+            "members": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "真实成员列表。只填写用户明确提到或飞书可解析的成员；不确定传空数组，禁止示例成员。",
+            },
+            "deliverables": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "交付物列表。只填写用户明确要求或上下文合理确定的交付物；不确定可为空数组，由模板或历史建议补充。",
+            },
             "deadline": {"type": "string", "description": "截止时间 YYYY-MM-DD（可为空字符串，会被模板补全）。"},
         },
         "required": ["input_text"],
@@ -974,12 +1204,16 @@ def _handle_generate_plan(params: Dict[str, Any], **kwargs) -> str:
     plan = {
         "title": params.get("title", "") or "",
         "goal": params.get("goal", "") or "",
-        "members": list(params.get("members") or []),
-        "deliverables": list(params.get("deliverables") or []),
+        "members": _clean_plan_list(params.get("members")),
+        "deliverables": _clean_plan_list(params.get("deliverables")),
         "deadline": params.get("deadline", "") or "",
         "risks": [],
     }
-    # Template fills in gaps
+    # History is context for the Agent/user, not a silent overwrite. Templates
+    # may fill generic defaults; history is shown explicitly as suggestions.
+    history_suggestions, history_suggested_fields = _history_suggestions_for_plan(plan, text)
+
+    # Template fills generic gaps.
     if template:
         if not plan["deliverables"]:
             plan["deliverables"] = list(template["deliverables"])
@@ -1010,6 +1244,9 @@ def _handle_generate_plan(params: Dict[str, Any], **kwargs) -> str:
         member_text = ", ".join(plan["members"]) if plan["members"] else "待确认"
         deliverable_text = ", ".join(plan["deliverables"]) if plan["deliverables"] else "待确认"
         deadline_text = plan["deadline"] or "待确认"
+        history_text = ""
+        if history_suggestions:
+            history_text = "\n\n**历史建议：**\n" + "\n".join(f"- {s}" for s in history_suggestions)
         confirm_action_id = _create_card_action_ref(chat_id, "confirm_project", plan)
         cancel_action_id = _create_card_action_ref(chat_id, "cancel_project", plan)
         card = {
@@ -1025,6 +1262,7 @@ def _handle_generate_plan(params: Dict[str, Any], **kwargs) -> str:
                         f"**成员：** {member_text}\n"
                         f"**交付物：** {deliverable_text}\n"
                         f"**截止时间：** {deadline_text}"
+                        f"{history_text}"
                     ),
                 },
                 {
@@ -1058,12 +1296,17 @@ def _handle_generate_plan(params: Dict[str, Any], **kwargs) -> str:
             f"- 建议截止时间：{plan['deadline']}（{template['suggested_deadline_days']}天后）\n"
             f"如果用户没有指定，请使用以上建议。"
         )
+    history_hint = ""
+    if history_suggestions:
+        history_hint = "\n\n【历史建议】\n" + "\n".join(f"- {s}" for s in history_suggestions)
 
     return tool_result({
         "status": "plan_generated",
         "input": text,
         "template": template["description"] if template else None,
         "plan": plan,
+        "history_suggestions": history_suggestions,
+        "history_suggested_fields": history_suggested_fields,
         "card_sent": bool(chat_id),
         "instructions": (
             "✅ 已提取并存储项目信息（pending plan）。\n"
@@ -1080,6 +1323,7 @@ def _handle_generate_plan(params: Dict[str, Any], **kwargs) -> str:
             "1. 绝对不要向用户展示工具名称或英文内容\n"
             "2. 只回复中文，不要显示工具调用过程\n"
             "3. 不要说「正在调用xxx工具」"
+            f"{history_hint}"
             f"{template_hint}"
         ),
     })
@@ -1111,8 +1355,8 @@ PILOTFLOW_DETECT_RISKS_SCHEMA = {
 
 def _handle_detect_risks(params: Dict[str, Any], **kwargs) -> str:
     """Detect risks in a project plan."""
-    members = params.get("members", [])
-    deliverables = params.get("deliverables", [])
+    members = _clean_plan_list(params.get("members"))
+    deliverables = _clean_plan_list(params.get("deliverables"))
     deadline = params.get("deadline", "")
 
     risks = []
@@ -1157,8 +1401,16 @@ PILOTFLOW_CREATE_PROJECT_SPACE_SCHEMA = {
         "properties": {
             "title": {"type": "string", "description": "项目标题（必填），如「答辩项目」。"},
             "goal": {"type": "string", "description": "项目目标（必填），一句话描述项目要达成什么。"},
-            "members": {"type": "array", "items": {"type": "string"}, "description": "项目成员列表，写中文名，如[\"张三\", \"李四\"]。"},
-            "deliverables": {"type": "array", "items": {"type": "string"}, "description": "交付物列表，如[\"项目简报\", \"PPT\"]。"},
+            "members": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "项目成员列表。只填写用户明确提到或飞书可解析的真实成员；不确定就传空数组，禁止编造示例成员。",
+            },
+            "deliverables": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "交付物列表。只填写用户明确要求或根据上下文可合理确定的交付物；禁止使用示例占位。",
+            },
             "deadline": {"type": "string", "description": "截止时间，格式 YYYY-MM-DD，如「2026-05-10」。"},
             "risks": {"type": "array", "items": {"type": "string"}, "description": "已知风险，如[\"时间紧张\"]。"},
         },
@@ -1179,8 +1431,8 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
 
     title = params.get("title", "项目")
     goal = params.get("goal", "")
-    members = params.get("members", [])
-    deliverables = params.get("deliverables", [])
+    members = _clean_plan_list(params.get("members"))
+    deliverables = _clean_plan_list(params.get("deliverables"))
     deadline = params.get("deadline", "")
     risks = params.get("risks", [])
 
@@ -1232,6 +1484,8 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
         link_lines.append(f"📊 [状态表]({bitable_url})")
     link_lines.append(f"⏰ 截止: {deadline or '待确认'}")
 
+    status_action_id = _create_card_action_ref(chat_id, "project_status", {"title": title})
+    done_action_id = _create_card_action_ref(chat_id, "mark_project_done", {"title": title})
     entry_card = {
         "config": {"wide_screen_mode": True},
         "header": {
@@ -1247,9 +1501,29 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
                     + "\n".join(link_lines)
                 ),
             },
+            {
+                "tag": "action",
+                "actions": [
+                    {
+                        "tag": "button",
+                        "text": {"tag": "plain_text", "content": "查看状态"},
+                        "type": "default",
+                        "value": {"pilotflow_action_id": status_action_id},
+                    },
+                    {
+                        "tag": "button",
+                        "text": {"tag": "plain_text", "content": "标记完成"},
+                        "type": "primary",
+                        "value": {"pilotflow_action_id": done_action_id},
+                    },
+                ],
+            },
         ],
     }
-    if _hermes_send_card(chat_id, entry_card):
+    sent_entry_message_id = _hermes_send_card(chat_id, entry_card)
+    if isinstance(sent_entry_message_id, str):
+        _attach_card_message_id([status_action_id, done_action_id], sent_entry_message_id)
+    if sent_entry_message_id:
         artifacts.append("项目入口卡片")
 
     # 5. Calendar event (best effort)
@@ -1266,6 +1540,8 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
         app_token=bitable_meta.get("app_token", "") if bitable_meta else "",
         table_id=bitable_meta.get("table_id", "") if bitable_meta else "",
         record_id=bitable_meta.get("record_id", "") if bitable_meta else "",
+        goal=goal,
+        deliverables=deliverables,
     )
 
     # Save project pattern to Hermes memory for later history-based suggestions.
@@ -1327,7 +1603,9 @@ PILOTFLOW_HANDLE_CARD_ACTION_SCHEMA = {
         "/card button {\"pilotflow_action\": \"confirm_project\"}\n\n"
         "此工具会：\n"
         "- confirm_project: 从 _pending_plans 恢复已提取的项目信息，自动调用创建流程\n"
-        "- cancel_project: 清除确认门控和 pending plan，通知用户已取消\n\n"
+        "- cancel_project: 清除确认门控和 pending plan，通知用户已取消\n"
+        "- project_status: 从入口卡片查看单个项目状态\n"
+        "- mark_project_done: 从入口卡片把项目标记为完成\n\n"
         "收到 /card button 格式的消息时必须调用此工具，不需要重新提取项目参数。\n\n"
         "【输出规则】只用中文回复结果，不要展示工具名称或英文内容。"
     ),
@@ -1402,6 +1680,40 @@ def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
             "risks": recovered_plan.get("risks", []),
         }, **kwargs)
 
+    if pilotflow_action in ("project_status", "mark_project_done"):
+        project_title = action_data.get("title") or action_data.get("project_name")
+        if not project_title:
+            return tool_error("无法识别项目，请在群里直接询问项目状态。")
+
+        with _project_registry_lock:
+            project = _project_registry.get(project_title)
+            if project and pilotflow_action == "mark_project_done":
+                project["status"] = "已完成"
+
+        if not project:
+            return tool_error("没有找到这个项目，可能需要先在当前会话创建项目。")
+
+        if pilotflow_action == "project_status":
+            member_text = "、".join(project.get("members", [])) or "待确认"
+            deliverable_text = "、".join(project.get("deliverables", [])) or "待确认"
+            _hermes_send(
+                chat_id,
+                f"项目「{project_title}」当前状态：{project.get('status', '进行中')}。"
+                f"成员：{member_text}；交付物：{deliverable_text}；截止：{project.get('deadline') or '待确认'}。"
+            )
+            return tool_result({
+                "status": "project_status_sent",
+                "project": project_title,
+                "instructions": "已发送项目状态。不要展示工具名或英文。",
+            })
+
+        _hermes_send(chat_id, f"项目「{project_title}」已标记为完成。")
+        return tool_result({
+            "status": "project_marked_done",
+            "project": project_title,
+            "instructions": "回复用户：已标记完成。不要展示工具名或英文。",
+        })
+
     return tool_error(f"未知的卡片动作: {pilotflow_action}")
 
 
@@ -1431,6 +1743,7 @@ def _handle_card_command(raw_args: str) -> str:
             return "卡片操作已过期或已处理，请重新发起项目创建。"
         chat_id = action_ref["chat_id"]
         action_data["pilotflow_action"] = action_ref["action"]
+        action_data.update(action_ref.get("plan") or {})
     elif not chat_id:
         ref = _resolve_card_action_ref(action_id)
         if not ref:
@@ -1453,6 +1766,13 @@ def _handle_card_command(raw_args: str) -> str:
             "已取消项目创建",
             "本次计划已取消，未创建任何项目产物。",
             "grey",
+        )
+    elif action_id and pilotflow_action == "mark_project_done":
+        _mark_card_message(
+            message_id,
+            "项目已完成",
+            f"**{action_data.get('title', '项目')}** 已标记为完成。",
+            "green",
         )
 
     action_value = json.dumps(action_data, ensure_ascii=False)
@@ -1484,6 +1804,8 @@ def _handle_card_command(raw_args: str) -> str:
             )
         if action_ref:
             _clear_pending_plan_if_matches(chat_id, action_ref.get("plan"))
+        return None
+    if data.get("status") in ("project_status_sent", "project_marked_done"):
         return None
     if data.get("display"):
         return "\n".join(str(item) for item in data["display"])
