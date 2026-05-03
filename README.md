@@ -23,6 +23,7 @@
 | 复赛材料 | 已整理 | [docs/CONTEST_SUBMISSION.md](docs/CONTEST_SUBMISSION.md) |
 | 本地测试 | 47 个测试通过 | `uv run pytest -o addopts='' -q` |
 | 真实飞书卡片 | 已验证发送、按钮确认、原卡片状态更新 | WSL Hermes + 飞书测试群 |
+| 真实状态看板 | 已验证中文文本反馈 + interactive 看板卡片 | [docs/LIVE_TEST_EVIDENCE.md](docs/LIVE_TEST_EVIDENCE.md) |
 | 真实录屏/产物样例 | 提交前补齐 | 成功/取消路径录屏与真实链接样例 |
 
 ---
@@ -143,6 +144,7 @@ uv run hermes gateway
 | [产品规格](docs/PRODUCT_SPEC.md) | 用户承诺、功能分级 |
 | [架构设计](docs/ARCHITECTURE.md) | 组件、状态模型、工具路由 |
 | [复赛材料](docs/CONTEST_SUBMISSION.md) | 答辩定位、演示路线、证据矩阵 |
+| [真实测试证据](docs/LIVE_TEST_EVIDENCE.md) | 脱敏记录真实 Feishu 测试结果 |
 | [个人进度](PERSONAL_PROGRESS.md) | 开发进度和验证结果 |
 | [贡献指南](CONTRIBUTING.md) | 开发环境、代码规范、提交 PR |
 

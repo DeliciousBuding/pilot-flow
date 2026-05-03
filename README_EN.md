@@ -23,6 +23,7 @@ Mention @PilotFlow in a Feishu group chat, get a confirmable project plan, and l
 | Contest submission pack | Prepared | [docs/CONTEST_SUBMISSION.md](docs/CONTEST_SUBMISSION.md) |
 | Local tests | 47 tests passing | `uv run pytest -o addopts='' -q` |
 | Live Feishu card | Verified: interactive send, button confirmation, source-card status update | WSL Hermes + Feishu test chat |
+| Live status dashboard | Verified Chinese text feedback + interactive dashboard card | [docs/LIVE_TEST_EVIDENCE.md](docs/LIVE_TEST_EVIDENCE.md) |
 | Live recording/artifacts | To be completed before submission | Success/cancel path recordings and live link samples |
 
 ---
@@ -139,6 +140,7 @@ uv run hermes gateway
 | [Product Spec](docs/PRODUCT_SPEC.md) | User commitments, feature tiers |
 | [Architecture Design](docs/ARCHITECTURE.md) | Components, state model, tool routing |
 | [Contest Submission Pack](docs/CONTEST_SUBMISSION.md) | Positioning, demo path, evidence matrix |
+| [Live Test Evidence](docs/LIVE_TEST_EVIDENCE.md) | Sanitized real Feishu test evidence |
 | [Personal Progress](PERSONAL_PROGRESS.md) | Development progress and verification results |
 | [Contributing](CONTRIBUTING.md) | Dev setup, coding conventions, submitting PRs |
 
