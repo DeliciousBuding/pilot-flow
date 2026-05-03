@@ -1046,6 +1046,50 @@ def test_card_command_briefing_batch_reminder_updates_card_after_success():
     ]
 
 
+def test_card_command_briefing_followup_feedback_includes_owner_scope():
+    with _project_registry_lock:
+        _project_registry.clear()
+    with _plan_lock:
+        _card_action_refs.clear()
+    due_soon = (dt.date.today() + dt.timedelta(days=2)).isoformat()
+    _register_project(
+        "桥接张三风险待办项目", ["张三"], due_soon, "有风险", [],
+        goal="验证负责人反馈", deliverables=["验收记录"],
+    )
+    action_id = _create_card_action_ref(
+        "oc_bridge_owner_followup",
+        "briefing_batch_followup_task",
+        {"filter": "risk", "member_filters": ["张三"]},
+    )
+    with _plan_lock:
+        _card_action_refs[action_id]["message_id"] = "om_bridge_owner_followup"
+
+    marked_cards = []
+
+    def capture_mark(message_id, title, content, template):
+        marked_cards.append((message_id, title, content, template))
+        return True
+
+    with (
+        patch("tools._create_task", return_value="桥接张三风险待办项目跟进: https://example.invalid/task/task_owner_feedback"),
+        patch("tools._hermes_send", return_value=True),
+        patch("tools._append_project_doc_update", return_value=True),
+        patch("tools._append_bitable_update_record", return_value=False),
+        patch("tools._mark_card_message", side_effect=capture_mark),
+    ):
+        result = _handle_card_command(f'button {{"pilotflow_action_id":"{action_id}"}}')
+
+    assert result is None
+    assert marked_cards == [
+        (
+            "om_bridge_owner_followup",
+            "批量待办已创建",
+            "已为 1 个张三负责的风险项目创建跟进待办。",
+            "green",
+        )
+    ]
+
+
 def test_filtered_briefing_reminder_button_uses_current_filter():
     with _project_registry_lock:
         _project_registry.clear()

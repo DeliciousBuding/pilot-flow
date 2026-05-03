@@ -3041,6 +3041,9 @@ def _handle_card_command(raw_args: str) -> str:
             "due_soon": "近期截止项目",
             "risk": "风险项目",
         }.get(data.get("filter") or action_data.get("filter"), "匹配项目")
+        member_filters = [str(member).strip() for member in data.get("member_filters") or action_data.get("member_filters", []) if str(member).strip()]
+        if member_filters:
+            filter_label = f"{'、'.join(member_filters)}负责的{filter_label}"
         _mark_card_message(
             message_id,
             "批量待办已创建",
@@ -3054,6 +3057,9 @@ def _handle_card_command(raw_args: str) -> str:
             "due_soon": "近期截止项目",
             "risk": "风险项目",
         }.get(data.get("filter") or action_data.get("filter"), "匹配项目")
+        member_filters = [str(member).strip() for member in data.get("member_filters") or action_data.get("member_filters", []) if str(member).strip()]
+        if member_filters:
+            filter_label = f"{'、'.join(member_filters)}负责的{filter_label}"
         _mark_card_message(
             message_id,
             "批量催办已发送",
