@@ -2616,6 +2616,8 @@ def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
         sent_message_id = _hermes_send_card(chat_id, updated_card)
         if isinstance(sent_message_id, str):
             _attach_card_message_id(action_ids, sent_message_id)
+        if not sent_message_id:
+            return tool_error("历史建议已应用，但确认卡片发送失败。请在群里重新生成计划。")
         return tool_result({
             "status": "history_suggestions_applied",
             "instructions": "已应用历史建议并重新发送确认卡片。不要展示工具名或英文。",
@@ -2976,13 +2978,6 @@ def _handle_card_command(raw_args: str) -> str:
             "本次计划已取消，未创建任何项目产物。",
             "grey",
         )
-    elif action_id and pilotflow_action == "apply_history_suggestions":
-        _mark_card_message(
-            message_id,
-            "历史建议已应用",
-            "已将历史建议补入计划，请继续确认执行。",
-            "blue",
-        )
     resolved_action_data = dict(action_data)
     if action_ref:
         resolved_action_data.pop("pilotflow_action_id", None)
@@ -3093,10 +3088,17 @@ def _handle_card_command(raw_args: str) -> str:
             "blue",
         )
         return None
+    if data.get("status") == "history_suggestions_applied":
+        _mark_card_message(
+            message_id,
+            "历史建议已应用",
+            "已将历史建议补入计划，请继续确认执行。",
+            "blue",
+        )
+        return None
     if data.get("status") in (
         "project_marked_done", "project_reopened", "project_risk_resolved",
         "project_reminder_sent",
-        "history_suggestions_applied",
     ):
         return None
     if data.get("display"):
