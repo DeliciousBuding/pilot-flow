@@ -2675,8 +2675,8 @@ def _update_bitable_record(app_token: str, table_id: str, record_id: str, fields
 PILOTFLOW_UPDATE_PROJECT_SCHEMA = {
     "name": "pilotflow_update_project",
     "description": (
-        "更新已有项目信息。当用户说「改截止时间」「加成员」「新增任务」「新增交付物」「改项目状态」「归档项目」「延期」「延期到」时调用。\n"
-        "支持四种操作：update_deadline（改截止时间）、add_member（加成员）、add_deliverable（新增交付物/任务）、update_status（改状态）。\n"
+        "更新已有项目信息。当用户说「改截止时间」「加成员」「新增任务」「新增交付物」「记录进展」「项目有新进展」「改项目状态」「归档项目」「延期」「延期到」时调用。\n"
+        "支持五种操作：update_deadline（改截止时间）、add_member（加成员）、add_deliverable（新增交付物/任务）、add_progress（记录进展）、update_status（改状态）。\n"
         "归档项目时使用 action=update_status 且 value=已归档；归档后默认看板会隐藏该项目。\n"
         "会更新内存注册表、脱敏本地状态；可定位状态表时同步多维表格，新增交付物时会尽量创建飞书任务。\n\n"
         "【输出规则】只用中文回复更新结果，不要展示工具名称或英文内容。"
@@ -2687,7 +2687,7 @@ PILOTFLOW_UPDATE_PROJECT_SCHEMA = {
             "project_name": {"type": "string", "description": "项目名称。"},
             "action": {
                 "type": "string",
-                "enum": ["update_deadline", "add_member", "add_deliverable", "update_status"],
+                "enum": ["update_deadline", "add_member", "add_deliverable", "add_progress", "update_status"],
                 "description": "操作类型。",
             },
             "value": {"type": "string", "description": "新值（新截止时间、新成员名、新交付物/任务、新状态）。"},
@@ -2743,6 +2743,7 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
         "update_deadline": "截止时间",
         "add_member": "成员",
         "add_deliverable": "交付物",
+        "add_progress": "进展",
         "update_status": "状态",
     }
     action_label = action_labels.get(action, action)
@@ -2794,7 +2795,7 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
                     project.setdefault("artifacts", []).append(f"任务: {task_name}")
                     task_created = True
 
-        if action in ("update_deadline", "add_deliverable", "update_status"):
+        if action in ("update_deadline", "add_deliverable", "add_progress", "update_status"):
             state_updated = _save_project_state(
                 project_name, project.get("goal", ""), project.get("members", []),
                 project.get("deliverables", []), project.get("deadline", ""),

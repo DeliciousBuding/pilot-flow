@@ -1356,6 +1356,50 @@ def test_update_project_appends_bitable_update_history():
     assert "状态表记录已追加" in send.call_args.args[1]
 
 
+def test_update_project_adds_progress_log_to_doc_and_bitable():
+    with _project_registry_lock:
+        _project_registry.clear()
+    _register_project(
+        "进展记录项目", ["张三"], "2026-05-20", "进行中", ["文档: https://example.invalid/doc"],
+        goal="验证进展同步", deliverables=["验收记录"],
+        app_token="app1", table_id="tbl1", record_id="rec1",
+    )
+    sent_messages = []
+
+    with (
+        patch("tools._append_project_doc_update", return_value=True) as append_doc,
+        patch("tools._append_bitable_update_record", return_value=True) as append_history,
+        patch("tools._hermes_send", side_effect=lambda chat_id, msg: sent_messages.append(msg) or True),
+        patch("tools._save_project_state", return_value=True) as save_state,
+    ):
+        result = json.loads(_handle_update_project(
+            {
+                "project_name": "进展记录项目",
+                "action": "add_progress",
+                "value": "完成原型评审，等待业务确认",
+            },
+            chat_id="oc_progress_log",
+        ))
+
+    assert result["status"] == "project_updated"
+    assert result["action"] == "add_progress"
+    assert result["doc_updated"] is True
+    assert result["bitable_history_created"] is True
+    assert result["state_updated"] is True
+    append_doc.assert_called_once_with(
+        "进展记录项目",
+        _project_registry["进展记录项目"],
+        "进展",
+        "完成原型评审，等待业务确认",
+    )
+    append_history.assert_called_once()
+    save_state.assert_called_once()
+    assert sent_messages
+    assert "进展 → 完成原型评审，等待业务确认" in sent_messages[0]
+    assert "项目文档已更新" in sent_messages[0]
+    assert "状态表记录已追加" in sent_messages[0]
+
+
 def test_update_project_appends_update_to_project_doc():
     with _project_registry_lock:
         _project_registry.clear()
