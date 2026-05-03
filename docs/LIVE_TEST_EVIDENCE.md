@@ -616,6 +616,17 @@
 | 边界说明 | 直接工具脚本脱离 gateway 时 `send_message` registry 不可用，但文档、多维表格、待办创建和流水写回均走真实 Feishu API |
 | 隐私处理 | 验证只输出布尔结果；不写入真实 chat_id、message_id、Feishu 资源 ID、文档链接、状态表链接、任务链接、token 或本地绝对路径 |
 
+## 2026-05-04 文档评论与任务关注者 live 验证
+
+| 项目 | 证据 |
+| --- | --- |
+| 运行环境 | 使用活动租户 `pilotflow-contest` profile；`lark-cli auth status --verify` 返回 `verified=true`，scope 覆盖文档评论和任务写入 |
+| 文档评论 | 用真实飞书文档创建临时验证文档后执行 `lark-cli drive +add-comment --full-comment`，返回 `ok=true`，随后 `drive file.comments list` 回读到 1 条全文评论 |
+| 评论内容 | 评论回读的 `text_run.text` 为 `请补充内容`，说明新建文档后的引导评论链路可在真实飞书文档中落地 |
+| 任务关注者 | 用真实飞书任务创建临时验证任务后执行 `lark-cli task +followers --add ...`，返回 `ok=true` 且 task guid 与创建结果一致 |
+| 用户价值 | 项目文档创建后能主动引导成员补充内容；跟进待办不再只是单人任务，项目成员可作为关注者进入飞书任务协作链路 |
+| 隐私处理 | 验证只记录布尔结果和脱敏结论；不写入真实文档链接、任务链接、comment_id、task guid、用户 open_id、token 或 app secret |
+
 ## 本地回归
 
 ```bash
@@ -625,7 +636,7 @@ uv run --with pytest pytest -o addopts='' -q
 结果：
 
 ```text
-142 passed
+143 passed
 ```
 
 ## 当前证据边界

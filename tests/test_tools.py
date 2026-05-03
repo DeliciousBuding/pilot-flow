@@ -52,6 +52,7 @@ from tools import (
     _parse_memory_project_entry,
     _history_suggestions_for_plan,
     _create_task,
+    _create_doc,
     _create_bitable,
     _append_bitable_update_record,
     _create_calendar_event,
@@ -126,6 +127,75 @@ def _install_fake_bitable_sdk(monkeypatch):
     monkeypatch.setitem(sys.modules, "lark_oapi.api", modules["lark_oapi.api"])
     monkeypatch.setitem(sys.modules, "lark_oapi.api.bitable", modules["lark_oapi.api.bitable"])
     monkeypatch.setitem(sys.modules, "lark_oapi.api.bitable.v1", fake_v1)
+
+
+def _install_fake_drive_comment_sdk(monkeypatch):
+    """Install the minimal lark_oapi drive comment surface used by _create_doc."""
+    class _Builder:
+        def __init__(self, cls):
+            self.cls = cls
+            self.values = {}
+
+        def __getattr__(self, name):
+            def setter(value):
+                self.values[name] = value
+                return self
+            return setter
+
+        def build(self):
+            return self.cls(**self.values)
+
+    class _Model:
+        def __init__(self, **kwargs):
+            self.__dict__.update(kwargs)
+
+        @classmethod
+        def builder(cls):
+            return _Builder(cls)
+
+    fake_v1 = sys.modules.get("lark_oapi.api.drive.v1")
+    if fake_v1 is None:
+        fake_v1 = types.ModuleType("lark_oapi.api.drive.v1")
+        monkeypatch.setitem(sys.modules, "lark_oapi.api.drive.v1", fake_v1)
+    for name in [
+        "CreateFileCommentRequest",
+        "FileComment",
+        "FileCommentReply",
+    ]:
+        setattr(fake_v1, name, type(name, (_Model,), {}))
+
+    fake_docx_v1 = sys.modules.get("lark_oapi.api.docx.v1")
+    if fake_docx_v1 is None:
+        fake_docx_v1 = types.ModuleType("lark_oapi.api.docx.v1")
+        monkeypatch.setitem(sys.modules, "lark_oapi.api.docx.v1", fake_docx_v1)
+    for name in [
+        "CreateDocumentRequest",
+        "CreateDocumentRequestBody",
+        "CreateDocumentBlockChildrenRequest",
+        "CreateDocumentBlockChildrenRequestBody",
+        "TextElement",
+        "TextRun",
+        "MentionUser",
+        "Block",
+        "Text",
+        "Divider",
+    ]:
+        setattr(fake_docx_v1, name, type(name, (_Model,), {}))
+
+    modules = sys.modules.get("lark_oapi")
+    if modules is None:
+        modules = types.ModuleType("lark_oapi")
+        monkeypatch.setitem(sys.modules, "lark_oapi", modules)
+    api_module = sys.modules.get("lark_oapi.api")
+    if api_module is None:
+        api_module = types.ModuleType("lark_oapi.api")
+        monkeypatch.setitem(sys.modules, "lark_oapi.api", api_module)
+    docx_module = sys.modules.get("lark_oapi.api.docx")
+    if docx_module is None:
+        docx_module = types.ModuleType("lark_oapi.api.docx")
+        monkeypatch.setitem(sys.modules, "lark_oapi.api.docx", docx_module)
+    monkeypatch.setitem(sys.modules, "lark_oapi.api.docx.v1", fake_docx_v1)
+
 
 
 class _FakeBitableResponse:
@@ -270,6 +340,57 @@ def test_create_bitable_includes_deliverables_field_and_initial_value(monkeypatc
     assert "更新内容" in fake_client.field_names
     assert fake_client.records[0]["交付物"] == "验收记录, 评审清单"
 
+
+def test_create_doc_adds_guidance_comment(monkeypatch):
+    _install_fake_drive_comment_sdk(monkeypatch)
+    class _FakeCommentResponse:
+        def __init__(self, success_value=True, data=None):
+            self._success = success_value
+            self.data = data
+            self.msg = ""
+
+        def success(self):
+            return self._success
+
+    class _FakeDocClient:
+        def __init__(self):
+            self.comments = []
+            self.docx = types.SimpleNamespace(
+                v1=types.SimpleNamespace(
+                    document=types.SimpleNamespace(create=self._create_doc),
+                    document_block_children=types.SimpleNamespace(create=self._write_doc),
+                )
+            )
+            self.drive = types.SimpleNamespace(
+                v1=types.SimpleNamespace(
+                    file_comment=types.SimpleNamespace(create=self._create_comment),
+                )
+            )
+
+        def _create_doc(self, _request):
+            data = types.SimpleNamespace(document=types.SimpleNamespace(document_id="doc_test"))
+            return _FakeCommentResponse(success_value=True, data=data)
+
+        def _write_doc(self, _request):
+            return _FakeCommentResponse(success_value=True)
+
+        def _create_comment(self, request):
+            self.comments.append(request.request_body)
+            return _FakeCommentResponse(success_value=True)
+
+    fake_client = _FakeDocClient()
+
+    with (
+        patch("tools._get_client", return_value=fake_client),
+        patch("tools._set_permission", return_value=True),
+        patch("tools._add_editors", return_value=True),
+    ):
+        doc_url = _create_doc("评论文档项目", "# 评论文档项目\n\n- 目标: 验证评论", "oc_doc_comment")
+
+    assert doc_url == "https://feishu.cn/docx/doc_test"
+    assert fake_client.comments
+    comment = fake_client.comments[0]
+    assert getattr(comment, "content", None) == "请补充内容"
 
 def test_append_bitable_update_record_writes_change_log(monkeypatch):
     _install_fake_bitable_sdk(monkeypatch)
@@ -2550,6 +2671,11 @@ def test_create_task_binds_assignee_and_project_followers():
     class _Response:
         msg = "success"
 
+        def __init__(self):
+            self.data = types.SimpleNamespace(
+                task=types.SimpleNamespace(url="https://example.invalid/task/task_123", guid="task_guid_123"),
+            )
+
         def success(self):
             return True
 
@@ -2560,10 +2686,20 @@ def test_create_task_binds_assignee_and_project_followers():
             created["task"] = request.request_body
             return _Response()
 
+    collaborator_requests = []
+
+    class _TaskCollaboratorApi:
+        def create(self, request):
+            collaborator_requests.append(request)
+            return _Response()
+
     fake_v2 = types.ModuleType("lark_oapi.api.task.v2")
     fake_v2.CreateTaskRequest = type("CreateTaskRequest", (_Model,), {})
     fake_v2.InputTask = type("InputTask", (_Model,), {})
     fake_v2.Member = type("Member", (_Model,), {})
+    fake_v1 = types.ModuleType("lark_oapi.api.task.v1")
+    fake_v1.CreateTaskCollaboratorRequest = type("CreateTaskCollaboratorRequest", (_Model,), {})
+    fake_v1.Collaborator = type("Collaborator", (_Model,), {})
 
     with (
         patch.dict(sys.modules, {
@@ -2571,9 +2707,13 @@ def test_create_task_binds_assignee_and_project_followers():
             "lark_oapi.api": types.ModuleType("lark_oapi.api"),
             "lark_oapi.api.task": types.ModuleType("lark_oapi.api.task"),
             "lark_oapi.api.task.v2": fake_v2,
+            "lark_oapi.api.task.v1": fake_v1,
         }),
         patch("tools._get_client", return_value=types.SimpleNamespace(
-            task=types.SimpleNamespace(v2=types.SimpleNamespace(task=_TaskApi())),
+            task=types.SimpleNamespace(
+                v2=types.SimpleNamespace(task=_TaskApi()),
+                v1=types.SimpleNamespace(task_collaborator=_TaskCollaboratorApi()),
+            ),
         )),
         patch("tools._resolve_member", side_effect=lambda name, chat_id: {"张三": "ou_zhang", "李四": "ou_li"}.get(name)),
     ):
@@ -2582,12 +2722,17 @@ def test_create_task_binds_assignee_and_project_followers():
             "oc_task_members", ["张三", "李四", "未入群"],
         )
 
-    assert result == "评审清单"
+    assert result == "评审清单: https://example.invalid/task/task_123"
     members = created["task"].members
     assert [(item.id, item.type, item.role) for item in members] == [
         ("ou_zhang", "user", "assignee"),
         ("ou_li", "user", "follower"),
     ]
+    assert len(collaborator_requests) == 1
+    collaborator_request = collaborator_requests[0]
+    assert collaborator_request.task_id == "task_guid_123"
+    assert collaborator_request.user_id_type == "open_id"
+    assert collaborator_request.request_body.id_list == ["ou_zhang", "ou_li"]
 
 
 def test_create_task_returns_traceable_task_url_when_available():

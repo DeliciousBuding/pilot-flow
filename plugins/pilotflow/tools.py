@@ -1391,6 +1391,24 @@ def _create_doc(title: str, markdown_content: str, chat_id: str) -> Optional[str
             if not write_resp.success():
                 logger.warning("write doc content failed: %s", write_resp.msg)
 
+        try:
+            from lark_oapi.api.drive.v1 import CreateFileCommentRequest, FileComment
+
+            comment_body = FileComment.builder().content("请补充内容").build()
+            comment_req = (
+                CreateFileCommentRequest.builder()
+                .file_token(doc_id)
+                .file_type("docx")
+                .request_body(comment_body)
+                .user_id_type("open_id")
+                .build()
+            )
+            comment_resp = client.drive.v1.file_comment.create(comment_req)
+            if not comment_resp.success():
+                logger.warning("create doc comment failed: %s", comment_resp.msg)
+        except Exception as e:
+            logger.warning("create doc comment error: %s", e)
+
         # Permissions + editors
         _set_permission(doc_id, "docx")
         _add_editors(doc_id, "docx", chat_id)
@@ -1534,6 +1552,33 @@ def _create_task(summary: str, description: str,
         if resp.success():
             logger.info("task created: %s (assignee=%s, deadline=%s)", summary, assignee_name, deadline)
             task_resp = getattr(getattr(resp, "data", None), "task", None)
+            task_id = str(getattr(task_resp, "guid", "") or getattr(task_resp, "task_id", "") or getattr(task_resp, "id", "") or "").strip()
+            if task_id and chat_id:
+                try:
+                    from lark_oapi.api.task.v1 import CreateTaskCollaboratorRequest, Collaborator
+
+                    collaborator_ids = []
+                    seen_collaborator_ids = set()
+                    for mid in [
+                        _resolve_member(name, chat_id)
+                        for name in [assignee_name, *(collaborator_names or [])]
+                    ]:
+                        if mid and mid not in seen_collaborator_ids:
+                            seen_collaborator_ids.add(mid)
+                            collaborator_ids.append(mid)
+                    if collaborator_ids:
+                        collaborator_req = (
+                            CreateTaskCollaboratorRequest.builder()
+                            .task_id(task_id)
+                            .user_id_type("open_id")
+                            .request_body(Collaborator.builder().id_list(collaborator_ids).build())
+                            .build()
+                        )
+                        collaborator_resp = client.task.v1.task_collaborator.create(collaborator_req)
+                        if not collaborator_resp.success():
+                            logger.warning("create task collaborators failed: %s", collaborator_resp.msg)
+                except Exception as e:
+                    logger.warning("create task collaborators error: %s", e)
             task_url = str(getattr(task_resp, "url", "") or "").strip() if task_resp else ""
             return f"{summary}: {task_url}" if task_url else summary
         logger.warning("create task failed: %s", resp.msg)
