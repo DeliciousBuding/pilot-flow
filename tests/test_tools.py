@@ -1571,6 +1571,81 @@ def test_update_project_add_member_cleans_feishu_mention_value():
     assert "成员 → @王五" in sent_text
 
 
+def test_update_project_remove_member_syncs_registry_bitable_doc_and_feedback():
+    with _project_registry_lock:
+        _project_registry.clear()
+    _register_project(
+        "移除成员项目", ["张三", "李四", "王五"], "2026-05-20", "进行中",
+        ["文档: https://example.invalid/docx/doc_token_123"],
+        app_token="app1", table_id="tbl1", record_id="rec1",
+        goal="验证移除成员", deliverables=["验收记录"],
+    )
+    mention_value = '<at user_id="ou_removed_member">李四</at>'
+
+    with (
+        patch("tools._append_project_doc_update", return_value=True) as append_doc,
+        patch("tools._update_bitable_record", return_value=True) as update_bitable,
+        patch("tools._append_bitable_update_record", return_value=True) as append_history,
+        patch("tools._format_at", side_effect=lambda name, chat_id: f"@{name}"),
+        patch("tools._hermes_send", return_value=True) as send,
+    ):
+        result = json.loads(_handle_update_project(
+            {"project_name": "移除成员", "action": "remove_member", "value": mention_value},
+            chat_id="oc_remove_member",
+        ))
+
+    assert result["status"] == "project_updated"
+    assert result["action"] == "remove_member"
+    assert result["value"] == "李四"
+    with _project_registry_lock:
+        members = _project_registry["移除成员项目"]["members"]
+    assert members == ["张三", "王五"]
+    update_bitable.assert_called_once_with("app1", "tbl1", "rec1", {"负责人": "张三, 王五"})
+    append_history.assert_called_once()
+    assert append_history.call_args.args[2] == "成员移除"
+    assert append_history.call_args.args[3] == "李四"
+    append_doc.assert_called_once()
+    assert append_doc.call_args.args[2] == "成员移除"
+    assert append_doc.call_args.args[3] == "李四"
+    sent_text = send.call_args.args[1]
+    assert "<at user_id" not in sent_text
+    assert "成员移除 → @李四" in sent_text
+    assert "项目文档已更新" in sent_text
+    assert "状态表已同步" in sent_text
+
+
+def test_update_project_remove_member_rejects_unknown_member_without_writes():
+    with _project_registry_lock:
+        _project_registry.clear()
+    _register_project(
+        "未知成员移除项目", ["张三"], "2026-05-20", "进行中",
+        ["文档: https://example.invalid/docx/doc_token_123"],
+        app_token="app1", table_id="tbl1", record_id="rec1",
+        goal="验证未知成员移除", deliverables=["验收记录"],
+    )
+
+    with (
+        patch("tools._append_project_doc_update") as append_doc,
+        patch("tools._update_bitable_record") as update_bitable,
+        patch("tools._append_bitable_update_record") as append_history,
+        patch("tools._hermes_send") as send,
+    ):
+        result = json.loads(_handle_update_project(
+            {"project_name": "未知成员移除", "action": "remove_member", "value": "李四"},
+            chat_id="oc_remove_unknown_member",
+        ))
+
+    assert "error" in result
+    assert "不是项目「未知成员移除项目」的成员" in result["error"]
+    with _project_registry_lock:
+        members = _project_registry["未知成员移除项目"]["members"]
+    assert members == ["张三"]
+    append_doc.assert_not_called()
+    update_bitable.assert_not_called()
+    append_history.assert_not_called()
+    send.assert_not_called()
+
+
 def test_update_project_deadline_refreshes_calendar_and_reminder():
     with _project_registry_lock:
         _project_registry.clear()

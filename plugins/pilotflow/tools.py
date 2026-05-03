@@ -2865,8 +2865,8 @@ def _clean_member_update_value(value: str) -> str:
 PILOTFLOW_UPDATE_PROJECT_SCHEMA = {
     "name": "pilotflow_update_project",
     "description": (
-        "更新已有项目信息。当用户说「改截止时间」「加成员」「新增任务」「新增交付物」「记录进展」「项目有新进展」「项目有风险」「项目卡住了」「风险解除」「阻塞已解决」「改项目状态」「归档项目」「延期」「延期到」时调用。\n"
-        "支持七种操作：update_deadline（改截止时间）、add_member（加成员）、add_deliverable（新增交付物/任务）、add_progress（记录进展）、add_risk（上报风险/阻塞）、resolve_risk（解除风险/阻塞）、update_status（改状态）。\n"
+        "更新已有项目信息。当用户说「改截止时间」「加成员」「移除成员」「删除成员」「新增任务」「新增交付物」「记录进展」「项目有新进展」「项目有风险」「项目卡住了」「风险解除」「阻塞已解决」「改项目状态」「归档项目」「延期」「延期到」时调用。\n"
+        "支持八种操作：update_deadline（改截止时间）、add_member（加成员）、remove_member（移除成员）、add_deliverable（新增交付物/任务）、add_progress（记录进展）、add_risk（上报风险/阻塞）、resolve_risk（解除风险/阻塞）、update_status（改状态）。\n"
         "归档项目时使用 action=update_status 且 value=已归档；归档后默认看板会隐藏该项目。\n"
         "会更新内存注册表、脱敏本地状态；可定位状态表时同步多维表格，新增交付物时会尽量创建飞书任务。\n\n"
         "【输出规则】只用中文回复更新结果，不要展示工具名称或英文内容。"
@@ -2877,10 +2877,10 @@ PILOTFLOW_UPDATE_PROJECT_SCHEMA = {
             "project_name": {"type": "string", "description": "项目名称。"},
             "action": {
                 "type": "string",
-                "enum": ["update_deadline", "add_member", "add_deliverable", "add_progress", "add_risk", "resolve_risk", "update_status"],
+                "enum": ["update_deadline", "add_member", "remove_member", "add_deliverable", "add_progress", "add_risk", "resolve_risk", "update_status"],
                 "description": "操作类型。",
             },
-            "value": {"type": "string", "description": "新值（新截止时间、新成员名、新交付物/任务、新状态）。"},
+            "value": {"type": "string", "description": "新值（新截止时间、新成员名、要移除的成员名、新交付物/任务、新状态）。"},
         },
         "required": ["project_name", "action", "value"],
     },
@@ -2898,7 +2898,7 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
         return tool_error("请指定项目名称")
     if not action or not value:
         return tool_error("请指定操作类型和新值")
-    if action == "add_member":
+    if action in ("add_member", "remove_member"):
         value = _clean_member_update_value(value)
 
     # Look up project in registry (fuzzy match: project_name is substring of registry key)
@@ -2916,7 +2916,7 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
         state_project = _find_project_state(project_name)
         if not state_project:
             return tool_error(f"项目「{project_name}」未找到。请先创建项目后再更新。")
-        if action == "add_member":
+        if action in ("add_member", "remove_member"):
             return tool_error("重启后的脱敏状态不保存成员名单。请在项目创建会话内加成员，或重新指定完整项目成员。")
         project_name = state_project.get("title", project_name)
         project = {
@@ -2931,6 +2931,9 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
             "record_id": "",
         }
 
+    if action == "remove_member" and value not in project.get("members", []):
+        return tool_error(f"成员「{value}」不是项目「{project_name}」的成员，无法移除。")
+
     assignee_override = ""
     if action == "add_deliverable":
         value, assignee_override = _parse_deliverable_assignment(value, project.get("members", []))
@@ -2938,6 +2941,7 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
     action_labels = {
         "update_deadline": "截止时间",
         "add_member": "成员",
+        "remove_member": "成员移除",
         "add_deliverable": "交付物",
         "add_progress": "进展",
         "add_risk": "风险",
@@ -2980,6 +2984,10 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
                     if value not in project["members"]:
                         project["members"].append(value)
                     registry_updated = True
+                elif action == "remove_member":
+                    if value in project["members"]:
+                        project["members"].remove(value)
+                    registry_updated = True
                 elif action == "add_deliverable":
                     if value not in project["deliverables"]:
                         project["deliverables"].append(value)
@@ -3004,7 +3012,7 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
                     project.setdefault("artifacts", []).append(f"任务: {task_name}")
                     task_created = True
 
-        if action in ("update_deadline", "add_deliverable", "add_progress", "add_risk", "resolve_risk", "update_status"):
+        if action in ("update_deadline", "remove_member", "add_deliverable", "add_progress", "add_risk", "resolve_risk", "update_status"):
             state_updated = _save_project_state(
                 project_name, project.get("goal", ""), project.get("members", []),
                 project.get("deliverables", []), project.get("deadline", ""),
@@ -3020,6 +3028,9 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
         elif action == "add_member":
             current = ", ".join(project.get("members", []))
             bitable_fields["负责人"] = current
+        elif action == "remove_member":
+            current = ", ".join(project.get("members", []))
+            bitable_fields["负责人"] = current or "待确认"
         elif action == "add_deliverable":
             bitable_fields["交付物"] = ", ".join(project.get("deliverables", [])) or "待确认"
         elif action == "add_risk":
@@ -3049,7 +3060,7 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
 
     # 3. Send notification via Hermes
     if chat_id:
-        member_at = _format_at(value, chat_id) if action == "add_member" else value
+        member_at = _format_at(value, chat_id) if action in ("add_member", "remove_member") else value
         parts = [f"📝 项目更新: {project_name}", f"{action_label} → {member_at}"]
         if action == "add_deliverable" and assignee_override:
             parts.append(f"负责人 → {_format_at(assignee_override, chat_id)}")
