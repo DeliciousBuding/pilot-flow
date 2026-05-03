@@ -1813,8 +1813,9 @@ def _build_project_briefing_card(
 
     action_ids: list[str] = []
     if chat_id and total:
-        risk_action = _create_card_action_ref(chat_id, "dashboard_filter", {"query": "看看风险项目", "filter": "risk"})
-        overdue_action = _create_card_action_ref(chat_id, "dashboard_filter", {"query": "看看逾期项目", "filter": "overdue"})
+        action_scope = {"member_filters": list(member_filters or [])} if member_filters else {}
+        risk_action = _create_card_action_ref(chat_id, "dashboard_filter", {"query": "看看风险项目", "filter": "risk", **action_scope})
+        overdue_action = _create_card_action_ref(chat_id, "dashboard_filter", {"query": "看看逾期项目", "filter": "overdue", **action_scope})
         reminder_filter = status_filter if status_filter in ("risk", "overdue", "due_soon") else "overdue"
         reminder_button_text = "催办逾期"
         if status_filter in ("risk", "overdue", "due_soon"):
@@ -1831,7 +1832,6 @@ def _build_project_briefing_card(
                 "due_soon": "创建近期待办",
                 "overdue": "创建逾期待办",
             }[status_filter]
-        action_scope = {"member_filters": list(member_filters or [])} if member_filters else {}
         reminder_action = _create_card_action_ref(
             chat_id,
             "briefing_batch_reminder",
@@ -2790,6 +2790,9 @@ def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
 
     if pilotflow_action == "dashboard_filter":
         filter_query = action_data.get("query") or "项目进展"
+        member_filters = [str(member).strip() for member in action_data.get("member_filters", []) if str(member).strip()]
+        if member_filters:
+            filter_query = f"{'、'.join(member_filters)}负责的{filter_query}"
         sent_result = _handle_query_status({"query": filter_query}, chat_id=chat_id)
         if isinstance(sent_result, str) and "项目看板已发送" in sent_result:
             return tool_result({

@@ -1751,6 +1751,93 @@ def test_deadline_dashboard_offers_reminder_button_without_chat_id_payload():
     assert {ref["action"] for ref in refs} >= {"project_status", "mark_project_done", "send_project_reminder", "project_followup_task"}
 
 
+def test_filtered_briefing_dashboard_buttons_keep_owner_scope():
+    with _project_registry_lock:
+        _project_registry.clear()
+    with _plan_lock:
+        _card_action_refs.clear()
+    overdue = (dt.date.today() - dt.timedelta(days=1)).isoformat()
+    _register_project(
+        "张三逾期筛选项目", ["张三"], overdue, "进行中", [],
+        goal="验证负责人看板筛选", deliverables=["验收记录"],
+    )
+    _register_project(
+        "李四逾期筛选项目", ["李四"], overdue, "进行中", [],
+        goal="验证负责人看板筛选", deliverables=["验收记录"],
+    )
+    captured_cards = []
+
+    def capture_card(chat_id, card):
+        captured_cards.append(card)
+        return f"mid-{len(captured_cards)}"
+
+    with patch("tools._send_interactive_card_via_feishu", side_effect=capture_card):
+        _handle_query_status({"query": "张三负责的逾期项目简报"}, chat_id="oc_owner_scope_dashboard")
+
+    actions = [element for element in captured_cards[0]["elements"] if element.get("tag") == "action"]
+    assert actions
+    button_texts = [button["text"]["content"] for button in actions[0]["actions"]]
+    assert "查看逾期" in button_texts
+
+    with _plan_lock:
+        filter_action_id = next(
+            action_id for action_id, ref in _card_action_refs.items()
+            if (
+                ref["chat_id"] == "oc_owner_scope_dashboard"
+                and ref["action"] == "dashboard_filter"
+                and ref["plan"].get("filter") == "overdue"
+            )
+        )
+
+    with patch("tools._send_interactive_card_via_feishu", side_effect=capture_card):
+        result = _handle_card_command(f'button {{"pilotflow_action_id":"{filter_action_id}"}}')
+
+    assert result is None
+    assert len(captured_cards) == 2
+    content = json.dumps(captured_cards[1], ensure_ascii=False)
+    assert "张三逾期筛选项目" in content
+    assert "李四逾期筛选项目" not in content
+
+
+def test_dashboard_filter_button_keeps_owner_scope_when_clicked_from_owner_briefing():
+    with _project_registry_lock:
+        _project_registry.clear()
+    with _plan_lock:
+        _card_action_refs.clear()
+    overdue = (dt.date.today() - dt.timedelta(days=1)).isoformat()
+    _register_project(
+        "张三筛选风险项目", ["张三"], overdue, "有风险", [],
+        goal="验证负责人筛选看板", deliverables=["验收记录"],
+    )
+    _register_project(
+        "李四筛选风险项目", ["李四"], overdue, "有风险", [],
+        goal="验证负责人筛选看板", deliverables=["验收记录"],
+    )
+    captured_cards = []
+
+    def capture_card(chat_id, card):
+        captured_cards.append(card)
+        return f"mid-{len(captured_cards)}"
+
+    with patch("tools._send_interactive_card_via_feishu", side_effect=capture_card):
+        _handle_query_status({"query": "张三负责的风险项目简报"}, chat_id="oc_owner_dashboard_filter")
+
+    with _plan_lock:
+        filter_action_id = next(
+            action_id for action_id, ref in _card_action_refs.items()
+            if ref["chat_id"] == "oc_owner_dashboard_filter" and ref["action"] == "dashboard_filter"
+        )
+
+    with patch("tools._send_interactive_card_via_feishu", side_effect=capture_card):
+        result = _handle_card_command(f'button {{"pilotflow_action_id":"{filter_action_id}"}}')
+
+    assert result is None
+    assert len(captured_cards) == 2
+    second_content = json.dumps(captured_cards[1], ensure_ascii=False)
+    assert "张三筛选风险项目" in second_content
+    assert "李四筛选风险项目" not in second_content
+
+
 def test_project_reminder_card_action_sends_chinese_group_reminder():
     with _project_registry_lock:
         _project_registry.clear()
