@@ -107,6 +107,7 @@ uv run hermes gateway
 | Project Dashboard | Query project status, send card to group chat |
 | Risk Detection | Auto-detect missing members, vague deadlines, unclear deliverables |
 | Calendar Integration | Auto-create deadline calendar event (UTC+8) |
+| Deadline Reminder | Auto-schedule reminder 1 day before deadline via Hermes cron |
 | LLM-Driven | gpt-5.5 understands Chinese intent, selects tools automatically |
 | End-to-End Verified | Feishu group @PilotFlow → LLM → 5 Feishu artifacts, ~30 seconds |
 
