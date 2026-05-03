@@ -846,6 +846,61 @@ def test_query_status_filters_active_projects():
     assert "已完成筛选项目" not in content
 
 
+def test_query_status_filters_projects_by_member_name():
+    with _project_registry_lock:
+        _project_registry.clear()
+    _register_project(
+        "张三负责项目", ["张三"], "2026-05-20", "进行中", [],
+        goal="验证负责人筛选", deliverables=["验收记录"],
+    )
+    _register_project(
+        "李四负责项目", ["李四"], "2026-05-20", "进行中", [],
+        goal="验证负责人筛选", deliverables=["验收记录"],
+    )
+    captured = {}
+
+    def capture_card(chat_id, card):
+        captured["card"] = card
+        return True
+
+    with patch("tools._send_interactive_card_via_feishu", side_effect=capture_card):
+        result = _handle_query_status({"query": "张三负责哪些项目"}, chat_id="oc_member_filter")
+
+    assert "项目看板已发送" in result
+    content = json.dumps(captured["card"], ensure_ascii=False)
+    assert "张三负责项目" in content
+    assert "李四负责项目" not in content
+
+
+def test_query_status_filters_projects_by_mentioned_member_without_raw_at_markup():
+    with _project_registry_lock:
+        _project_registry.clear()
+    _register_project(
+        "王五推进项目", ["王五"], "2026-05-20", "进行中", [],
+        goal="验证提及筛选", deliverables=["验收记录"],
+    )
+    _register_project(
+        "赵六推进项目", ["赵六"], "2026-05-20", "进行中", [],
+        goal="验证提及筛选", deliverables=["验收记录"],
+    )
+    captured = {}
+
+    def capture_card(chat_id, card):
+        captured["card"] = card
+        return True
+
+    query = '<at user_id="ou_runtime_member">王五</at> 负责哪些项目'
+    with patch("tools._send_interactive_card_via_feishu", side_effect=capture_card):
+        result = _handle_query_status({"query": query}, chat_id="oc_mention_member_filter")
+
+    assert "项目看板已发送" in result
+    content = json.dumps(captured["card"], ensure_ascii=False)
+    assert "王五推进项目" in content
+    assert "赵六推进项目" not in content
+    assert "<at user_id=" not in content
+    assert "@王五" in content
+
+
 def test_query_status_hides_archived_projects_by_default_and_shows_when_requested():
     with _project_registry_lock:
         _project_registry.clear()

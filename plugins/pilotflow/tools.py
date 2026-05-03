@@ -1479,6 +1479,33 @@ def _status_filter_from_query(query: str) -> str:
     return ""
 
 
+def _display_query_text(query: str) -> str:
+    """Render a user query safely for cards without raw Feishu mention markup."""
+    return _AT_PATTERN.sub(lambda m: f"@{m.group(2).strip()}", query or "")
+
+
+def _project_member_names(project: dict) -> list[str]:
+    detail = project.get("detail_project") or {}
+    members = detail.get("members") or project.get("members") or []
+    return [str(member).strip() for member in members if str(member).strip()]
+
+
+def _member_filters_from_query(query: str, projects: list[dict]) -> list[str]:
+    """Infer member filters from Feishu mentions or natural-language owner queries."""
+    q = query or ""
+    mentioned = [m.group(2).strip() for m in _AT_PATTERN.finditer(q) if m.group(2).strip()]
+    if mentioned:
+        return mentioned
+    if not any(word in q for word in ("负责", "负责人", "成员", "参与", "跟进", "哪些项目", "的项目")):
+        return []
+    candidates = sorted(
+        {member for project in projects for member in _project_member_names(project)},
+        key=len,
+        reverse=True,
+    )
+    return [member for member in candidates if member and member in q]
+
+
 def _dashboard_page_from_query(query: str) -> int:
     """Infer dashboard page from Chinese query text."""
     q = query or ""
@@ -2525,6 +2552,7 @@ def _handle_query_status(params: Dict[str, Any], **kwargs) -> str:
                 "actionable": True,
                 "status": status,
                 "deadline": deadline,
+                "members": list(info.get("members", [])),
                 "detail_project": info.copy(),
             })
 
@@ -2607,7 +2635,13 @@ def _handle_query_status(params: Dict[str, Any], **kwargs) -> str:
 
     # Build dashboard card
     had_projects_before_filter = bool(projects)
+    member_filters = _member_filters_from_query(query, projects)
     projects = [p for p in projects if _project_matches_status_filter(p, status_filter)]
+    if member_filters:
+        projects = [
+            p for p in projects
+            if any(member in set(_project_member_names(p)) for member in member_filters)
+        ]
     total_projects = len(projects)
     page = 1
     total_pages = 1
@@ -2715,7 +2749,7 @@ def _handle_query_status(params: Dict[str, Any], **kwargs) -> str:
             {
                 "tag": "note",
                 "elements": [
-                    {"tag": "plain_text", "content": f"查询: {query} | 第 {page}/{total_pages} 页 | 共 {total_projects if total_projects else len(projects)} 个项目"},
+                    {"tag": "plain_text", "content": f"查询: {_display_query_text(query)} | 第 {page}/{total_pages} 页 | 共 {total_projects if total_projects else len(projects)} 个项目"},
                 ],
             },
         ],
