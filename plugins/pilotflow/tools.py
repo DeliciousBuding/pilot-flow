@@ -1560,6 +1560,12 @@ def _status_filter_from_query(query: str) -> str:
     return ""
 
 
+def _is_briefing_query(query: str) -> bool:
+    """Return whether the user wants a management briefing instead of a list."""
+    q = query or ""
+    return any(word in q for word in ("站会", "日报", "周报", "简报", "汇总", "概览", "总览"))
+
+
 def _display_query_text(query: str) -> str:
     """Render a user query safely for cards without raw Feishu mention markup."""
     return _AT_PATTERN.sub(lambda m: f"@{m.group(2).strip()}", query or "")
@@ -1656,6 +1662,84 @@ def _project_matches_status_filter(project: dict, status_filter: str) -> bool:
         except (TypeError, ValueError):
             return False
     return True
+
+
+def _briefing_priority(project: dict) -> tuple[int, str]:
+    if _project_matches_status_filter(project, "risk"):
+        return (0, "风险")
+    if _project_matches_status_filter(project, "overdue"):
+        return (1, "逾期")
+    if _project_matches_status_filter(project, "due_soon"):
+        return (2, "近期截止")
+    if project.get("status") == "已完成":
+        return (4, "已完成")
+    return (3, "进行中")
+
+
+def _latest_update_text(project: dict) -> str:
+    detail = project.get("detail_project") or {}
+    updates = _clean_recent_updates(detail.get("updates") or project.get("updates"), limit=1)
+    return updates[-1]["value"] if updates else ""
+
+
+def _build_project_briefing_card(query: str, projects: list[dict]) -> tuple[dict, int]:
+    active_projects = [p for p in projects if not _is_archived_status(p.get("status", ""))]
+    total = len(active_projects)
+    risk_count = sum(1 for p in active_projects if _project_matches_status_filter(p, "risk"))
+    overdue_count = sum(1 for p in active_projects if _project_matches_status_filter(p, "overdue"))
+    due_soon_count = sum(1 for p in active_projects if _project_matches_status_filter(p, "due_soon"))
+    done_count = sum(1 for p in active_projects if p.get("status") == "已完成")
+    sorted_projects = sorted(
+        active_projects,
+        key=lambda p: (_briefing_priority(p)[0], str(p.get("deadline", "")), str(p.get("name", ""))),
+    )
+
+    elements = [
+        {
+            "tag": "div",
+            "text": {
+                "tag": "lark_md",
+                "content": (
+                    f"**总项目 {total}** | **风险 {risk_count}** | **逾期 {overdue_count}** | "
+                    f"**近期截止 {due_soon_count}** | **已完成 {done_count}**"
+                ),
+            },
+        },
+        {"tag": "hr"},
+    ]
+    if not sorted_projects:
+        elements.append({
+            "tag": "div",
+            "text": {"tag": "lark_md", "content": "暂无项目记录，请先创建项目。"},
+        })
+    else:
+        for project in sorted_projects[:5]:
+            label = _briefing_priority(project)[1]
+            deadline = project.get("deadline") or "待确认"
+            update = _latest_update_text(project) or "暂无最近进展"
+            elements.append({
+                "tag": "div",
+                "text": {
+                    "tag": "lark_md",
+                    "content": f"**[{label}] {project['name']}**\n截止: {deadline} | 最近进展: {update}",
+                },
+            })
+
+    elements.extend([
+        {"tag": "hr"},
+        {
+            "tag": "note",
+            "elements": [
+                {"tag": "plain_text", "content": f"查询: {_display_query_text(query)} | 按风险和截止时间优先排序"},
+            ],
+        },
+    ])
+    template = "red" if risk_count or overdue_count else ("yellow" if due_soon_count else "green")
+    return {
+        "config": {"wide_screen_mode": True},
+        "header": {"title": {"tag": "plain_text", "content": "项目简报"}, "template": template},
+        "elements": elements,
+    }, total
 
 
 def _find_named_project_query_match(query: str, projects: list) -> Optional[dict]:
@@ -2793,6 +2877,13 @@ def _handle_query_status(params: Dict[str, Any], **kwargs) -> str:
             p for p in projects
             if any(member in set(_project_member_names(p)) for member in member_filters)
         ]
+    if _is_briefing_query(query):
+        briefing_card, briefing_count = _build_project_briefing_card(query, projects)
+        sent = _hermes_send_card(chat_id, briefing_card) if chat_id else False
+        if sent:
+            return tool_result(f"项目简报已发送，共 {briefing_count} 个项目")
+        return tool_error(f"项目简报已生成，共 {briefing_count} 个项目，但发送到群聊失败。请检查 Feishu 连接。")
+
     total_projects = len(projects)
     page = 1
     total_pages = 1

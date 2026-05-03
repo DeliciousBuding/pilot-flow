@@ -782,6 +782,48 @@ def test_query_status_dashboard_shows_recent_progress_after_restart(tmp_path):
     assert "最近进展: 完成原型评审" in body
 
 
+def test_query_status_sends_standup_briefing_card_with_priority_summary():
+    with _project_registry_lock:
+        _project_registry.clear()
+    overdue = (dt.date.today() - dt.timedelta(days=1)).isoformat()
+    due_soon = (dt.date.today() + dt.timedelta(days=2)).isoformat()
+    _register_project(
+        "风险简报项目", ["张三"], due_soon, "有风险", [],
+        goal="验证简报风险优先", deliverables=["修复方案"],
+    )
+    _project_registry["风险简报项目"]["updates"] = [{"action": "进展", "value": "接口仍阻塞"}]
+    _register_project(
+        "逾期简报项目", ["李四"], overdue, "进行中", [],
+        goal="验证简报逾期优先", deliverables=["验收记录"],
+    )
+    _project_registry["逾期简报项目"]["updates"] = [{"action": "进展", "value": "等待业务验收"}]
+    _register_project(
+        "正常简报项目", ["王五"], due_soon, "进行中", [],
+        goal="验证简报正常项目", deliverables=["上线清单"],
+    )
+    captured = {}
+
+    def capture_card(chat_id, card):
+        captured["card"] = card
+        return "om_standup_briefing"
+
+    with patch("tools._send_interactive_card_via_feishu", side_effect=capture_card):
+        result = _handle_query_status({"query": "发一份站会简报"}, chat_id="oc_standup_briefing")
+
+    assert "项目简报已发送" in result
+    card = captured["card"]
+    assert card["header"]["title"]["content"] == "项目简报"
+    content = json.dumps(card, ensure_ascii=False)
+    assert "总项目 3" in content
+    assert "风险 1" in content
+    assert "逾期 1" in content
+    assert "近期截止 2" in content
+    assert content.index("风险简报项目") < content.index("正常简报项目")
+    assert content.index("逾期简报项目") < content.index("正常简报项目")
+    assert "接口仍阻塞" in content
+    assert "等待业务验收" in content
+
+
 def test_query_status_dashboard_includes_project_action_buttons():
     with _project_registry_lock:
         _project_registry.clear()
