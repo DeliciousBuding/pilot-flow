@@ -3025,14 +3025,27 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
         batch_filter = _status_filter_from_query(project_name)
         if batch_filter in ("overdue", "due_soon", "risk"):
             with _project_registry_lock:
-                candidates = [
-                    (title, info)
-                    for title, info in _project_registry.items()
-                    if _project_matches_status_filter({
+                candidate_projects = [
+                    {
+                        "name": title,
                         "status": info.get("status", "进行中"),
                         "deadline": info.get("deadline", ""),
-                    }, batch_filter)
+                        "members": list(info.get("members", [])),
+                        "detail_project": info,
+                    }
+                    for title, info in _project_registry.items()
                 ]
+                member_filters = _member_filters_from_query(project_name, candidate_projects)
+                candidates = []
+                for item in candidate_projects:
+                    if not _project_matches_status_filter({
+                        "status": item.get("status", "进行中"),
+                        "deadline": item.get("deadline", ""),
+                    }, batch_filter):
+                        continue
+                    if member_filters and not any(member in set(_project_member_names(item)) for member in member_filters):
+                        continue
+                    candidates.append((item["name"], item["detail_project"]))
             sent_count = 0
             doc_count = 0
             bitable_count = 0
@@ -3049,6 +3062,7 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
             return tool_result({
                 "status": "project_reminders_sent",
                 "filter": batch_filter,
+                "member_filters": member_filters,
                 "reminder_count": sent_count,
                 "projects": sent_projects,
                 "doc_trace_count": doc_count,

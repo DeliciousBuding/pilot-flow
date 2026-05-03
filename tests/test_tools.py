@@ -1222,6 +1222,46 @@ def test_update_project_send_reminder_can_batch_overdue_projects():
     assert append_history.call_args.args[:4] == ("app_overdue", "tbl_overdue", "催办", "请今天同步进展")
 
 
+def test_update_project_batch_reminder_can_filter_overdue_by_owner():
+    with _project_registry_lock:
+        _project_registry.clear()
+    overdue = (dt.date.today() - dt.timedelta(days=1)).isoformat()
+    _register_project(
+        "张三逾期催办项目", ["张三"], overdue, "进行中", ["文档: https://example.invalid/doc-zhang"],
+        goal="验证按负责人批量催办", deliverables=["验收记录"],
+        app_token="app_zhang", table_id="tbl_zhang", record_id="rec_zhang",
+    )
+    _register_project(
+        "李四逾期催办项目", ["李四"], overdue, "进行中", ["文档: https://example.invalid/doc-li"],
+        goal="验证按负责人批量催办", deliverables=["验收记录"],
+        app_token="app_li", table_id="tbl_li", record_id="rec_li",
+    )
+    sent_messages = []
+
+    with (
+        patch("tools._hermes_send", side_effect=lambda chat_id, msg: sent_messages.append((chat_id, msg)) or True),
+        patch("tools._append_project_doc_update", return_value=True) as append_doc,
+        patch("tools._append_bitable_update_record", return_value=True) as append_history,
+    ):
+        result = json.loads(_handle_update_project(
+            {"project_name": "张三负责的逾期项目", "action": "send_reminder", "value": "请今天同步进展"},
+            chat_id="oc_batch_owner_reminder",
+        ))
+
+    assert result["status"] == "project_reminders_sent"
+    assert result["filter"] == "overdue"
+    assert result["member_filters"] == ["张三"]
+    assert result["reminder_count"] == 1
+    assert result["projects"] == ["张三逾期催办项目"]
+    assert len(sent_messages) == 1
+    assert "张三逾期催办项目" in sent_messages[0][1]
+    assert "李四逾期催办项目" not in sent_messages[0][1]
+    append_doc.assert_called_once()
+    assert append_doc.call_args.args[0] == "张三逾期催办项目"
+    append_history.assert_called_once()
+    assert append_history.call_args.args[:4] == ("app_zhang", "tbl_zhang", "催办", "请今天同步进展")
+
+
 def test_risk_project_dashboard_offers_resolve_risk_button():
     with _project_registry_lock:
         _project_registry.clear()
