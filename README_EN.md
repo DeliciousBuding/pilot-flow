@@ -70,8 +70,7 @@ cd hermes-agent && uv sync --extra feishu
 
 # 2. Install PilotFlow plugin
 git clone https://github.com/DeliciousBuding/PilotFlow.git
-cp -r PilotFlow/plugins/pilotflow hermes-agent/plugins/
-cp -r PilotFlow/skills/pilotflow hermes-agent/skills/
+python PilotFlow/setup.py --hermes-dir .
 
 # 3. Configure
 cp PilotFlow/.env.example ~/.hermes/.env

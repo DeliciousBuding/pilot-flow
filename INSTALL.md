@@ -23,11 +23,14 @@ uv sync --extra feishu
 
 ```bash
 git clone https://github.com/DeliciousBuding/PilotFlow.git
-cp -r PilotFlow/plugins/pilotflow hermes-agent/plugins/
-cp -r PilotFlow/skills/pilotflow hermes-agent/skills/
+python PilotFlow/setup.py --hermes-dir .
 ```
 
-两行 `cp` 即完成安装，无需修改 Hermes 任何代码。
+一行命令完成安装，无需手动复制文件。脚本会自动：
+- 复制插件到 `hermes-agent/plugins/pilotflow/`
+- 复制技能到 `hermes-agent/skills/pilotflow/`
+- 检查环境变量配置
+- 验证安装完整性
 
 ## 第三步：配置环境变量
 
