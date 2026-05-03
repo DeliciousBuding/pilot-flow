@@ -894,7 +894,7 @@ def test_query_status_sends_standup_briefing_card_with_priority_summary():
     actions = [element for element in card["elements"] if element.get("tag") == "action"]
     assert actions
     button_texts = [button["text"]["content"] for button in actions[0]["actions"]]
-    assert button_texts == ["查看风险", "查看逾期", "催办逾期"]
+    assert button_texts == ["查看风险", "查看逾期", "催办逾期", "批量创建待办"]
     button_values = [button["value"] for button in actions[0]["actions"]]
     assert all("pilotflow_action_id" in value for value in button_values)
     assert all("pilotflow_chat_id" not in value for value in button_values)
@@ -953,6 +953,76 @@ def test_standup_briefing_overdue_button_sends_batch_reminders():
     assert sent_messages[0][0] == "oc_briefing_reminder"
     assert "简报逾期催办项目" in sent_messages[0][1]
     assert "简报未逾期项目" not in sent_messages[0][1]
+    append_doc.assert_called_once()
+    append_history.assert_called_once()
+
+
+def test_standup_briefing_overdue_button_can_create_batch_followup_tasks():
+    with _project_registry_lock:
+        _project_registry.clear()
+    with _plan_lock:
+        _card_action_refs.clear()
+    overdue = (dt.date.today() - dt.timedelta(days=1)).isoformat()
+    future = (dt.date.today() + dt.timedelta(days=5)).isoformat()
+    _register_project(
+        "简报待办逾期项目", ["张三"], overdue, "进行中", [],
+        goal="验证简报待办", deliverables=["验收记录"],
+        app_token="app_followup_overdue", table_id="tbl_followup_overdue", record_id="rec_followup_overdue",
+    )
+    _register_project(
+        "简报待办未逾期项目", ["李四"], future, "进行中", [],
+        goal="验证简报待办", deliverables=["验收记录"],
+    )
+    captured = {}
+
+    def capture_card(chat_id, card):
+        captured["card"] = card
+        return "om_briefing_followup"
+
+    with patch("tools._send_interactive_card_via_feishu", side_effect=capture_card):
+        _handle_query_status({"query": "发一份站会简报"}, chat_id="oc_briefing_followup")
+
+    button_texts = [
+        button["text"]["content"]
+        for element in captured["card"]["elements"]
+        if element.get("tag") == "action"
+        for button in element["actions"]
+    ]
+    assert "批量创建待办" in button_texts
+
+    with _plan_lock:
+        followup_action_id = next(
+            action_id for action_id, ref in _card_action_refs.items()
+            if ref["chat_id"] == "oc_briefing_followup" and ref["action"] == "briefing_batch_followup_task"
+        )
+
+    sent_messages = []
+    with (
+        patch("tools._create_task", return_value="简报待办逾期项目跟进: https://example.invalid/task/task_321") as create_task,
+        patch("tools._hermes_send", side_effect=lambda chat_id, msg: sent_messages.append((chat_id, msg)) or True),
+        patch("tools._append_project_doc_update", return_value=True) as append_doc,
+        patch("tools._append_bitable_update_record", return_value=True) as append_history,
+    ):
+        result = json.loads(_handle_card_action(
+            {"action_value": json.dumps({"pilotflow_action_id": followup_action_id}, ensure_ascii=False)},
+            chat_id="ignored_chat",
+        ))
+
+    assert result["status"] == "briefing_batch_followup_task_created"
+    assert result["project_count"] == 1
+    assert result["projects"] == ["简报待办逾期项目"]
+    create_task.assert_called_once_with(
+        "简报待办逾期项目跟进",
+        "项目: 简报待办逾期项目",
+        "张三",
+        overdue,
+        "oc_briefing_followup",
+        ["张三"],
+    )
+    assert sent_messages
+    assert sent_messages[0][0] == "oc_briefing_followup"
+    assert "已为 1 个逾期项目创建跟进待办" in sent_messages[0][1]
+    assert "简报待办逾期项目" in sent_messages[0][1]
     append_doc.assert_called_once()
     append_history.assert_called_once()
 

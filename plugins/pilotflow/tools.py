@@ -1814,7 +1814,12 @@ def _build_project_briefing_card(query: str, projects: list[dict], chat_id: str 
             "briefing_batch_reminder",
             {"filter": "overdue", "value": "请今天同步进展"},
         )
-        action_ids.extend([risk_action, overdue_action, reminder_action])
+        followup_action = _create_card_action_ref(
+            chat_id,
+            "briefing_batch_followup_task",
+            {"filter": "overdue"},
+        )
+        action_ids.extend([risk_action, overdue_action, reminder_action, followup_action])
         elements.append({
             "tag": "action",
             "actions": [
@@ -1835,6 +1840,12 @@ def _build_project_briefing_card(query: str, projects: list[dict], chat_id: str 
                     "text": {"tag": "plain_text", "content": "催办逾期"},
                     "type": "primary",
                     "value": {"pilotflow_action_id": reminder_action},
+                },
+                {
+                    "tag": "button",
+                    "text": {"tag": "plain_text", "content": "批量创建待办"},
+                    "type": "default",
+                    "value": {"pilotflow_action_id": followup_action},
                 },
             ],
         })
@@ -2780,6 +2791,59 @@ def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
             return tool_result(data)
         return sent_result
 
+    if pilotflow_action == "briefing_batch_followup_task":
+        status_filter = action_data.get("filter") or "overdue"
+        if status_filter != "overdue":
+            return tool_error("仅支持逾期项目批量创建待办。")
+        with _project_registry_lock:
+            candidate_projects = [
+                (title, info)
+                for title, info in _project_registry.items()
+                if _project_matches_status_filter({
+                    "status": info.get("status", "进行中"),
+                    "deadline": info.get("deadline", ""),
+                }, status_filter)
+            ]
+        created_projects: list[str] = []
+        for project_name, project in candidate_projects:
+            members = list(project.get("members", []))
+            assignee = members[0] if members else ""
+            task_name = _create_task(
+                f"{project_name}跟进",
+                f"项目: {project_name}",
+                assignee,
+                project.get("deadline", ""),
+                chat_id,
+                members,
+            )
+            if not task_name:
+                continue
+            created_projects.append(project_name)
+            created_entry = f"任务: {task_name}"
+            with _project_registry_lock:
+                if project_name in _project_registry:
+                    _project_registry[project_name].setdefault("artifacts", []).append(created_entry)
+            _save_project_state(
+                project_name, project.get("goal", ""), members,
+                project.get("deliverables", []), project.get("deadline", ""), project.get("status", "进行中"),
+                list(project.get("artifacts", [])) + [created_entry],
+                updates=project.get("updates", []),
+            )
+            _append_project_doc_update(project_name, project, "任务", task_name)
+            if project.get("app_token") and project.get("table_id"):
+                _append_bitable_update_record(
+                    project["app_token"], project["table_id"], "任务", task_name, project,
+                )
+        if not created_projects:
+            return tool_error("没有可批量创建待办的逾期项目。")
+        _hermes_send(chat_id, f"已为 {len(created_projects)} 个逾期项目创建跟进待办：{', '.join(created_projects)}。")
+        return tool_result({
+            "status": "briefing_batch_followup_task_created",
+            "project_count": len(created_projects),
+            "projects": created_projects,
+            "instructions": "已批量创建逾期项目待办。不要展示工具名或英文。",
+        })
+
     return tool_error(f"未知的卡片动作: {pilotflow_action}")
 
 
@@ -2875,6 +2939,13 @@ def _handle_card_command(raw_args: str) -> str:
             "已将历史建议补入计划，请继续确认执行。",
             "blue",
         )
+    elif action_id and pilotflow_action == "briefing_batch_followup_task":
+        _mark_card_message(
+            message_id,
+            "批量待办已创建",
+            "已为逾期项目创建跟进待办。",
+            "green",
+        )
 
     resolved_action_data = dict(action_data)
     if action_ref:
@@ -2912,7 +2983,7 @@ def _handle_card_command(raw_args: str) -> str:
     if data.get("status") in (
         "project_status_sent", "project_marked_done", "project_reopened", "project_risk_resolved",
         "project_reminder_sent", "dashboard_page_sent", "dashboard_filter_sent", "briefing_batch_reminder_sent",
-        "history_suggestions_applied", "project_followup_task_created",
+        "history_suggestions_applied", "project_followup_task_created", "briefing_batch_followup_task_created",
     ):
         return None
     if data.get("display"):
