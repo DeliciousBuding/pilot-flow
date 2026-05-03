@@ -726,7 +726,7 @@ def _handle_generate_plan(params: Dict[str, Any], **kwargs) -> str:
             f"如果用户没有指定，请使用以上建议。"
         )
 
-    return tool_result(json.dumps({
+    return tool_result({
         "status": "plan_generated",
         "input": text,
         "template": template["description"] if template else None,
@@ -744,7 +744,7 @@ def _handle_generate_plan(params: Dict[str, Any], **kwargs) -> str:
             "3. 执行完成后回复结果摘要：已创建 + 产物链接"
             f"{template_hint}"
         ),
-    }, ensure_ascii=False))
+    })
 
 
 # ---------------------------------------------------------------------------
@@ -785,10 +785,10 @@ def _handle_detect_risks(params: Dict[str, Any], **kwargs) -> str:
 
     if not risks:
         return tool_result("未检测到风险，计划信息完整。")
-    return tool_result(json.dumps({
+    return tool_result({
         "risks_found": len(risks), "risks": risks,
         "instructions": "请将以上风险发送到群里，让用户确认处理方式。",
-    }, ensure_ascii=False))
+    })
 
 
 # ---------------------------------------------------------------------------
@@ -927,7 +927,7 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
         display_items.append("📅 日历提醒已创建")
     display_items.append("💬 已通知群成员")
 
-    return tool_result(json.dumps({
+    return tool_result({
         "status": "project_space_created",
         "title": title,
         "artifacts": artifacts,
@@ -937,7 +937,7 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
             "直接使用 display 列表逐行展示，或自行组织语言。"
         ),
         "message": f"已创建 {len(artifacts)} 个产物: {', '.join(artifacts)}",
-    }, ensure_ascii=False))
+    })
 
 
 # ---------------------------------------------------------------------------
@@ -1215,7 +1215,7 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
         msg = "\n".join(parts)
         _hermes_send(chat_id, msg)
 
-    return tool_result(json.dumps({
+    return tool_result({
         "status": "project_updated",
         "project": project_name,
         "action": action,
@@ -1227,4 +1227,4 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
             + ("状态表已同步。" if bitable_updated else "")
             + "不要显示工具名或英文。"
         ),
-    }, ensure_ascii=False))
+    })
