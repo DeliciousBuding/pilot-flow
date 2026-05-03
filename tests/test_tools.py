@@ -448,6 +448,75 @@ def test_query_status_falls_back_to_hermes_memory_after_restart(tmp_path):
     assert "暂无项目记录" not in body
 
 
+def test_query_status_dashboard_includes_project_action_buttons():
+    with _project_registry_lock:
+        _project_registry.clear()
+    with _plan_lock:
+        _card_action_refs.clear()
+    _register_project(
+        "看板操作项目", ["张三"], "2026-05-10", "进行中", [],
+        goal="验证看板按钮", deliverables=["验收记录"],
+    )
+    captured = {}
+
+    def capture_card(chat_id, card):
+        captured["card"] = card
+        return "om_dashboard"
+
+    with patch("tools._send_interactive_card_via_feishu", side_effect=capture_card):
+        result = _handle_query_status({"query": "项目进展"}, chat_id="oc_dashboard_actions")
+
+    assert "项目看板已发送" in result
+    actions = [
+        element for element in captured["card"]["elements"]
+        if element.get("tag") == "action"
+    ]
+    assert actions
+    button_text = [button["text"]["content"] for button in actions[0]["actions"]]
+    assert button_text == ["查看状态", "标记完成"]
+    button_values = [button["value"] for button in actions[0]["actions"]]
+    assert all("pilotflow_action_id" in value for value in button_values)
+    assert all("pilotflow_chat_id" not in value for value in button_values)
+    with _plan_lock:
+        refs = [ref for ref in _card_action_refs.values() if ref["chat_id"] == "oc_dashboard_actions"]
+    assert {ref["action"] for ref in refs} >= {"project_status", "mark_project_done"}
+    assert all(ref["plan"]["title"] == "看板操作项目" for ref in refs)
+
+
+def test_dashboard_card_action_marks_state_project_done_after_restart(tmp_path):
+    state_path = tmp_path / "pilotflow-projects.json"
+    with _project_registry_lock:
+        _project_registry.clear()
+    with _plan_lock:
+        _card_action_refs.clear()
+
+    with patch.dict(os.environ, {"PILOTFLOW_STATE_PATH": str(state_path)}):
+        assert _save_project_state(
+            "重启看板项目",
+            "验证重启后按钮可用",
+            ["张三"],
+            ["验收记录"],
+            "2026-05-20",
+            "进行中",
+            artifacts=["文档: https://example.invalid/doc"],
+        )
+        result = json.loads(_handle_card_action(
+            {
+                "action_value": json.dumps(
+                    {"pilotflow_action": "mark_project_done", "title": "重启看板项目"},
+                    ensure_ascii=False,
+                )
+            },
+            chat_id="oc_state_done",
+        ))
+        projects = _load_project_state()
+
+    assert result["status"] == "project_marked_done"
+    assert result["bitable_updated"] is False
+    assert projects[0]["title"] == "重启看板项目"
+    assert projects[0]["status"] == "已完成"
+
+
 def test_project_entry_card_action_marks_project_done():
     with _project_registry_lock:
         _project_registry.clear()

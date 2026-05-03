@@ -478,6 +478,17 @@ def _load_project_state() -> list[dict]:
     return projects
 
 
+def _find_project_state(title: str) -> Optional[dict]:
+    """Find a sanitized project summary by exact or fuzzy title match."""
+    if not title:
+        return None
+    for item in _load_project_state():
+        item_title = item.get("title", "")
+        if title == item_title or title in item_title or item_title in title:
+            return item
+    return None
+
+
 def _extract_memory_items(result: Any) -> list[str]:
     """Normalize assorted Hermes memory read payloads into strings."""
     if result is None:
@@ -1797,7 +1808,21 @@ def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
                 project["status"] = "已完成"
 
         if not project:
-            return tool_error("没有找到这个项目，可能需要先在当前会话创建项目。")
+            state_project = _find_project_state(project_title)
+            if not state_project:
+                return tool_error("没有找到这个项目，可能需要先在当前会话创建项目。")
+            project = {
+                "goal": state_project.get("goal", ""),
+                "members": [],
+                "deliverables": state_project.get("deliverables", []),
+                "deadline": state_project.get("deadline", ""),
+                "status": state_project.get("status", "进行中"),
+                "artifacts": [],
+                "app_token": "",
+                "table_id": "",
+                "record_id": "",
+            }
+            project_title = state_project.get("title", project_title)
 
         if pilotflow_action == "project_status":
             member_text = "、".join(project.get("members", [])) or "待确认"
@@ -1972,6 +1997,7 @@ def _handle_query_status(params: Dict[str, Any], **kwargs) -> str:
             projects.append({
                 "name": title,
                 "source": f"成员: {member_str} | 截止: {deadline}{countdown} | {status}",
+                "actionable": True,
             })
 
     # 2. Secondary: try Feishu task API (requires user token, may fail)
@@ -1984,7 +2010,7 @@ def _handle_query_status(params: Dict[str, Any], **kwargs) -> str:
                 resp = client.task.v2.task.list(req)
                 if resp.success() and resp.data and resp.data.items:
                     for t in resp.data.items[:5]:
-                        projects.append({"name": t.summary or "无标题", "source": "任务"})
+                        projects.append({"name": t.summary or "无标题", "source": "任务", "actionable": False})
             except Exception as e:
                 logger.debug("task API fallback failed: %s", e)
 
@@ -1999,6 +2025,7 @@ def _handle_query_status(params: Dict[str, Any], **kwargs) -> str:
             projects.append({
                 "name": item.get("title") or "历史项目",
                 "source": f"来源: 本地状态 | 交付物: {deliverables} | 截止: {deadline}{countdown} | {item.get('status', '进行中')}",
+                "actionable": True,
             })
             if len(projects) >= 5:
                 break
@@ -2013,15 +2040,17 @@ def _handle_query_status(params: Dict[str, Any], **kwargs) -> str:
             projects.append({
                 "name": item.get("title") or "历史项目",
                 "source": f"来源: 历史记录 | 交付物: {deliverables} | 截止: {deadline}{countdown} | 进行中",
+                "actionable": False,
             })
             if len(projects) >= 5:
                 break
 
     # Build dashboard card
     if not projects:
-        projects.append({"name": "暂无项目记录", "source": "请先创建项目"})
+        projects.append({"name": "暂无项目记录", "source": "请先创建项目", "actionable": False})
 
     card_elements = []
+    action_ids = []
     for p in projects:
         card_elements.append({
             "tag": "div",
@@ -2030,6 +2059,27 @@ def _handle_query_status(params: Dict[str, Any], **kwargs) -> str:
                 "content": f"📌 **{p['name']}** — {p['source']}",
             },
         })
+        if chat_id and p.get("actionable"):
+            status_action_id = _create_card_action_ref(chat_id, "project_status", {"title": p["name"]})
+            done_action_id = _create_card_action_ref(chat_id, "mark_project_done", {"title": p["name"]})
+            action_ids.extend([status_action_id, done_action_id])
+            card_elements.append({
+                "tag": "action",
+                "actions": [
+                    {
+                        "tag": "button",
+                        "text": {"tag": "plain_text", "content": "查看状态"},
+                        "type": "default",
+                        "value": {"pilotflow_action_id": status_action_id},
+                    },
+                    {
+                        "tag": "button",
+                        "text": {"tag": "plain_text", "content": "标记完成"},
+                        "type": "primary",
+                        "value": {"pilotflow_action_id": done_action_id},
+                    },
+                ],
+            })
 
     card = {
         "config": {"wide_screen_mode": True},
@@ -2049,6 +2099,8 @@ def _handle_query_status(params: Dict[str, Any], **kwargs) -> str:
     }
 
     sent = _hermes_send_card(chat_id, card) if chat_id else False
+    if isinstance(sent, str):
+        _attach_card_message_id(action_ids, sent)
     if sent:
         return tool_result(f"项目看板已发送，共 {len(projects)} 个项目")
     return tool_error(f"项目看板已生成，共 {len(projects)} 个项目，但发送到群聊失败。请检查 Feishu 连接。")
