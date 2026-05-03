@@ -19,9 +19,13 @@ import plugins.pilotflow as pilotflow
 class FakeContext:
     def __init__(self):
         self.calls = []
+        self.commands = []
 
     def register_tool(self, **kwargs):
         self.calls.append(kwargs)
+
+    def register_command(self, **kwargs):
+        self.commands.append(kwargs)
 
 
 def test_register_exposes_exactly_six_tools():
@@ -42,3 +46,13 @@ def test_register_exposes_exactly_six_tools():
     assert all(call["schema"]["name"] == call["name"] for call in ctx.calls)
     assert all(call["handler"] is not None for call in ctx.calls)
     assert all(call["check_fn"] is not None for call in ctx.calls)
+
+
+def test_register_exposes_card_slash_bridge():
+    ctx = FakeContext()
+
+    pilotflow.register(ctx)
+
+    assert len(ctx.commands) == 1
+    assert ctx.commands[0]["name"] == "card"
+    assert ctx.commands[0]["handler"] is not None

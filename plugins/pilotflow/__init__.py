@@ -17,6 +17,7 @@ from plugins.pilotflow.tools import (
     _handle_detect_risks,
     _handle_create_project_space,
     _handle_card_action,
+    _handle_card_command,
     _handle_query_status,
     _handle_update_project,
     _check_available,
@@ -43,4 +44,15 @@ def register(ctx) -> None:
             handler=handler,
             check_fn=_check_available,
             emoji=emoji,
+        )
+
+    # Hermes routes Feishu card clicks as `/card button {...}`. Registering
+    # this bridge keeps PilotFlow plug-in-only; no Hermes core patch required.
+    register_command = getattr(ctx, "register_command", None)
+    if register_command:
+        register_command(
+            name="card",
+            handler=_handle_card_command,
+            description="PilotFlow 飞书卡片按钮回调",
+            args_hint='button {"pilotflow_action":"confirm_project"}',
         )

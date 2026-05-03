@@ -79,6 +79,43 @@ gateway:
     assert setup.check_config(str(config_file)) is True
 
 
+def test_ensure_feishu_quiet_display_appends_when_safe(tmp_path):
+    config_file = tmp_path / "config.yaml"
+    config_file.write_text(
+        """
+model:
+  default: gpt-4.1
+gateway:
+  default_platform: feishu
+  platforms:
+    feishu:
+      connection_mode: websocket
+""",
+        encoding="utf-8",
+    )
+
+    assert setup.ensure_feishu_quiet_display(str(config_file)) is True
+    content = config_file.read_text(encoding="utf-8")
+    assert "tool_progress: off" in content
+    backup_file = tmp_path / "config.yaml.pilotflow.bak"
+    assert backup_file.exists()
+    assert "tool_progress: off" not in backup_file.read_text(encoding="utf-8")
+
+
+def test_ensure_feishu_quiet_display_warns_on_existing_display(tmp_path):
+    config_file = tmp_path / "config.yaml"
+    config_file.write_text(
+        """
+display:
+  tool_progress: new
+""",
+        encoding="utf-8",
+    )
+
+    assert setup.ensure_feishu_quiet_display(str(config_file)) is False
+    assert config_file.read_text(encoding="utf-8").count("display:") == 1
+
+
 def test_copy_plugin_and_skills_to_hermes_layout(tmp_path):
     src_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     hermes_dir = tmp_path / "hermes-agent"

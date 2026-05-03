@@ -14,6 +14,7 @@ import os
 import re
 import threading
 import time
+import uuid
 from typing import Any, Dict, List, Optional
 
 from tools.registry import registry, tool_error, tool_result
@@ -56,6 +57,7 @@ _PROJECT_REGISTRY_MAX = 50
 
 # Pending plans (populated by generate_plan, validated by create_project_space)
 _pending_plans: Dict[str, dict] = {}  # chat_id -> plan params
+_card_action_refs: Dict[str, dict] = {}  # action_id -> {chat_id, action, message_id, timestamp}
 
 # lark_oapi client timeout (seconds)
 _CLIENT_TIMEOUT = 10
@@ -89,6 +91,12 @@ def _evict_caches():
         expired_pending = [k for k in _pending_plans if k not in _plan_generated]
         for k in expired_pending:
             del _pending_plans[k]
+        expired_action_refs = [
+            k for k, ref in _card_action_refs.items()
+            if now - ref.get("timestamp", 0) >= _PLAN_GATE_TTL
+        ]
+        for k in expired_action_refs:
+            del _card_action_refs[k]
         evicted_plans = len(expired_plans) + len(expired_pending)
 
     if evicted_members or evicted_plans:
@@ -114,6 +122,76 @@ def _clear_plan_gate(chat_id: str):
     """Clear the plan gate for this chat_id after execution."""
     with _plan_lock:
         _plan_generated.pop(chat_id, None)
+
+
+def _consume_plan_gate(chat_id: str) -> bool:
+    """Atomically consume the text-confirmation gate for a chat."""
+    with _plan_lock:
+        ts = _plan_generated.get(chat_id)
+        if not ts or time.time() - ts >= _PLAN_GATE_TTL:
+            _plan_generated.pop(chat_id, None)
+            return False
+        _plan_generated.pop(chat_id, None)
+        return True
+
+
+def _create_card_action_ref(chat_id: str, action: str, plan: Optional[dict] = None) -> str:
+    """Create an opaque short-lived card action reference."""
+    action_id = uuid.uuid4().hex
+    with _plan_lock:
+        _card_action_refs[action_id] = {
+            "chat_id": chat_id,
+            "action": action,
+            "plan": dict(plan or {}),
+            "timestamp": time.time(),
+        }
+    return action_id
+
+
+def _resolve_card_action_ref(action_id: str, *, consume: bool = False) -> Optional[dict]:
+    """Resolve a card action reference if it is still within the plan TTL."""
+    if not action_id:
+        return None
+    with _plan_lock:
+        ref = _card_action_refs.get(action_id)
+        if not ref:
+            return None
+        if time.time() - ref.get("timestamp", 0) >= _PLAN_GATE_TTL:
+            _card_action_refs.pop(action_id, None)
+            return None
+        resolved = dict(ref)
+        if consume:
+            _card_action_refs.pop(action_id, None)
+            message_id = resolved.get("message_id")
+            if message_id:
+                stale_ids = [
+                    k for k, v in _card_action_refs.items()
+                    if v.get("message_id") == message_id
+                ]
+                for k in stale_ids:
+                    _card_action_refs.pop(k, None)
+        return resolved
+
+
+def _attach_card_message_id(action_ids: list[str], message_id: str) -> None:
+    """Attach the sent Feishu message_id to the card action refs."""
+    if not message_id:
+        return
+    with _plan_lock:
+        for action_id in action_ids:
+            if action_id in _card_action_refs:
+                _card_action_refs[action_id]["message_id"] = message_id
+
+
+def _clear_pending_plan_if_matches(chat_id: str, plan: Optional[dict]) -> None:
+    """Clear chat-level pending state only when it still refers to this plan."""
+    if not plan:
+        return
+    with _plan_lock:
+        pending = _pending_plans.get(chat_id, {})
+        if pending.get("plan") == plan:
+            _pending_plans.pop(chat_id, None)
+            _plan_generated.pop(chat_id, None)
 
 
 def _register_project(title: str, members: list, deadline: str, status: str, artifacts: list,
@@ -162,23 +240,150 @@ def _hermes_send(chat_id: str, text: str) -> bool:
 
 
 def _hermes_send_card(chat_id: str, card_json: dict) -> bool:
-    """Send an interactive card via Hermes's send_message tool."""
-    result = registry.dispatch("send_message", {
-        "action": "send",
-        "target": f"feishu:{chat_id}",
-        "message": json.dumps(card_json, ensure_ascii=False),
-        "msg_type": "interactive",
-    })
-    ok = _hermes_ok(result)
-    if not ok:
-        logger.warning("hermes send card error: %s", result)
-    return ok
+    """Send an interactive card directly via Feishu.
+
+    Hermes's `send_message` path normalizes outbound content as text/post, so
+    raw interactive card JSON would be downgraded to a plain text bubble.
+    Cards must be sent through the Feishu IM API directly.
+    """
+    return _send_interactive_card_via_feishu(chat_id, card_json)
 
 
-def _save_to_hermes_memory(title: str, goal: str, members: list, deliverables: list, deadline: str):
+def _send_interactive_card_via_feishu(chat_id: str, card_json: dict) -> bool | str:
+    """Send an interactive card with the Feishu IM API.
+
+    Returns Feishu message_id on success. Existing boolean callers can treat
+    the return value as truthy.
+    """
+    client = _get_client()
+    if not client:
+        logger.warning("interactive card send skipped: Feishu client unavailable")
+        return False
+
+    try:
+        from types import SimpleNamespace
+        import uuid as _uuid
+
+        payload = json.dumps(card_json, ensure_ascii=False)
+        try:
+            from lark_oapi.api.im.v1 import CreateMessageRequest, CreateMessageRequestBody
+            body = (
+                CreateMessageRequestBody.builder()
+                .receive_id(chat_id)
+                .msg_type("interactive")
+                .content(payload)
+                .uuid(str(_uuid.uuid4()))
+                .build()
+            )
+            req = (
+                CreateMessageRequest.builder()
+                .receive_id_type("chat_id")
+                .request_body(body)
+                .build()
+            )
+        except ImportError:
+            body = SimpleNamespace(
+                receive_id=chat_id,
+                msg_type="interactive",
+                content=payload,
+                uuid=str(_uuid.uuid4()),
+            )
+            req = SimpleNamespace(receive_id_type="chat_id", request_body=body)
+        resp = client.im.v1.message.create(req)
+        if resp.success():
+            logger.info("interactive card sent: %s", chat_id)
+            data = getattr(resp, "data", None)
+            message_id = getattr(data, "message_id", "") if data else ""
+            return message_id or True
+        logger.warning("interactive card send failed: %s", getattr(resp, "msg", "unknown error"))
+        return False
+    except Exception as e:
+        logger.warning("interactive card send error: %s", e)
+        return False
+
+
+def _build_action_feedback_card(title: str, content: str, template: str) -> dict:
+    """Build a read-only card that replaces the original action card."""
+    return {
+        "config": {"wide_screen_mode": True},
+        "header": {
+            "title": {"tag": "plain_text", "content": title},
+            "template": template,
+        },
+        "elements": [
+            {
+                "tag": "markdown",
+                "content": content,
+            }
+        ],
+    }
+
+
+def _update_interactive_card_via_feishu(message_id: str, card_json: dict) -> bool:
+    """Update an existing Feishu interactive card message."""
+    client = _get_client()
+    if not client or not message_id:
+        return False
+
+    try:
+        from types import SimpleNamespace
+
+        payload = json.dumps(card_json, ensure_ascii=False)
+        try:
+            from lark_oapi.api.im.v1 import PatchMessageRequest, PatchMessageRequestBody
+            body = (
+                PatchMessageRequestBody.builder()
+                .content(payload)
+                .build()
+            )
+            req = (
+                PatchMessageRequest.builder()
+                .message_id(message_id)
+                .request_body(body)
+                .build()
+            )
+        except ImportError:
+            body = SimpleNamespace(content=payload)
+            req = SimpleNamespace(message_id=message_id, request_body=body)
+        resp = client.im.v1.message.patch(req)
+        if resp.success():
+            logger.info("interactive card updated: %s", message_id)
+            return True
+        logger.warning("interactive card update failed: %s", getattr(resp, "msg", "unknown error"))
+        return False
+    except Exception as e:
+        logger.warning("interactive card update error: %s", e)
+        return False
+
+
+def _mark_card_action_message(action_id: str, title: str, content: str, template: str) -> bool:
+    """Replace the original confirmation card with a read-only status card."""
+    ref = _resolve_card_action_ref(action_id)
+    if not ref:
+        return False
+    message_id = ref.get("message_id", "")
+    if not message_id:
+        return False
+    return _update_interactive_card_via_feishu(
+        message_id,
+        _build_action_feedback_card(title, content, template),
+    )
+
+
+def _mark_card_message(message_id: str, title: str, content: str, template: str) -> bool:
+    """Replace a known Feishu card message with a read-only status card."""
+    if not message_id:
+        return False
+    return _update_interactive_card_via_feishu(
+        message_id,
+        _build_action_feedback_card(title, content, template),
+    )
+
+
+def _save_to_hermes_memory(title: str, goal: str, members: list, deliverables: list, deadline: str) -> bool:
     """Save project creation pattern to Hermes memory for future suggestions."""
     if not MEMORY_ENABLED:
-        return
+        return False
     try:
         if MEMORY_INCLUDE_MEMBERS:
             member_str = "、".join(members) if members else "无"
@@ -189,14 +394,19 @@ def _save_to_hermes_memory(title: str, goal: str, members: list, deliverables: l
             f"【项目创建】{title}：目标={goal}，成员={member_str}，"
             f"交付物={deliverable_str}，截止={deadline or '未设'}"
         )
-        registry.dispatch("memory", {
+        result = registry.dispatch("memory", {
             "action": "add",
             "target": "memory",
             "content": content,
         })
-        logger.info("已保存项目模式到 Hermes memory: %s", title)
+        if _hermes_ok(result):
+            logger.info("已保存项目模式到 Hermes memory: %s", title)
+            return True
+        logger.debug("memory save skipped: %s", result)
+        return False
     except Exception as e:
         logger.debug("memory save skipped: %s", e)
+        return False
 
 
 def _schedule_deadline_reminder(title: str, deadline: str, chat_id: str) -> bool:
@@ -226,8 +436,11 @@ def _schedule_deadline_reminder(title: str, deadline: str, chat_id: str) -> bool
             "deliver": f"feishu:{chat_id}",
             "skills": ["pilotflow"],
         })
-        logger.info("deadline reminder scheduled: %s at %s", title, schedule)
-        return True
+        if _hermes_ok(result):
+            logger.info("deadline reminder scheduled: %s at %s", title, schedule)
+            return True
+        logger.debug("deadline reminder skipped: %s", result)
+        return False
     except Exception as e:
         logger.debug("deadline reminder skipped: %s", e)
         return False
@@ -600,7 +813,7 @@ def _create_bitable(title: str, owner: str, deadline: str, risks: list, chat_id:
                 logger.warning("create bitable field '%s' failed: %s", fname, field_resp.msg)
 
         record = AppTableRecord.builder().fields({
-            "类型": "project", "负责人": owner or "TBD", "截止时间": deadline or "TBD",
+            "类型": "project", "负责人": owner or "待确认", "截止时间": deadline or "待确认",
             "状态": "进行中", "风险等级": "高" if risks else "低",
         }).build()
         rec_resp = client.bitable.v1.app_table_record.create(
@@ -657,7 +870,7 @@ def _create_calendar_event(title: str, goal: str, deadline: str) -> Optional[str
         event = (
             CalendarEvent.builder()
             .summary(f"📌 截止: {title}").description(goal)
-            .start_event(start_time).end_event(end_time).build()
+            .start_time(start_time).end_time(end_time).build()
         )
         req = CreateCalendarEventRequest.builder().calendar_id("primary").request_body(event).build()
         resp = client.calendar.v4.calendar_event.create(req)
@@ -797,6 +1010,8 @@ def _handle_generate_plan(params: Dict[str, Any], **kwargs) -> str:
         member_text = ", ".join(plan["members"]) if plan["members"] else "待确认"
         deliverable_text = ", ".join(plan["deliverables"]) if plan["deliverables"] else "待确认"
         deadline_text = plan["deadline"] or "待确认"
+        confirm_action_id = _create_card_action_ref(chat_id, "confirm_project", plan)
+        cancel_action_id = _create_card_action_ref(chat_id, "cancel_project", plan)
         card = {
             "config": {"wide_screen_mode": True},
             "header": {
@@ -819,19 +1034,21 @@ def _handle_generate_plan(params: Dict[str, Any], **kwargs) -> str:
                             "tag": "button",
                             "text": {"tag": "plain_text", "content": "✅ 确认执行"},
                             "type": "primary",
-                            "value": {"pilotflow_action": "confirm_project"},
+                            "value": {"pilotflow_action_id": confirm_action_id},
                         },
                         {
                             "tag": "button",
                             "text": {"tag": "plain_text", "content": "❌ 取消"},
                             "type": "default",
-                            "value": {"pilotflow_action": "cancel_project"},
+                            "value": {"pilotflow_action_id": cancel_action_id},
                         },
                     ],
                 },
             ],
         }
-        _hermes_send_card(chat_id, card)
+        sent_message_id = _hermes_send_card(chat_id, card)
+        if isinstance(sent_message_id, str):
+            _attach_card_message_id([confirm_action_id, cancel_action_id], sent_message_id)
 
     template_hint = ""
     if template:
@@ -854,11 +1071,10 @@ def _handle_generate_plan(params: Dict[str, Any], **kwargs) -> str:
             "【你的下一步】\n"
             "简短回复「已生成计划，请在卡片上确认」即可，不要重复展示完整计划内容（卡片里已有）。\n\n"
             "【用户确认路径】\n"
-            "- 路径A: 用户点击卡片 ✅ 按钮 → 你会收到 /card button {pilotflow_action:\"confirm_project\"}\n"
-            "  → 直接调用 pilotflow_handle_card_action，无需重新提取参数\n"
+            "- 路径A: 用户点击卡片 ✅ 按钮 → PilotFlow 的 /card 插件命令会自动续跑\n"
             "- 路径B: 用户文字回复「确认」「可以」「好的」「行」「ok」\n"
             "  → 调用 pilotflow_create_project_space（使用本次提取的 plan 字段）\n"
-            "- 路径C: 用户点击 ❌ 或回复「取消」\n"
+            "- 路径C: 用户点击 ❌ 或文字回复「取消」\n"
             "  → 调用 pilotflow_handle_card_action（action=cancel_project）\n\n"
             "【输出规则 - 必须遵守】\n"
             "1. 绝对不要向用户展示工具名称或英文内容\n"
@@ -904,7 +1120,7 @@ def _handle_detect_risks(params: Dict[str, Any], **kwargs) -> str:
         risks.append({"level": "high", "title": "未指定项目成员", "suggestion": "请确认至少一名负责人"})
     if not deliverables:
         risks.append({"level": "high", "title": "未指定交付物", "suggestion": "请明确具体交付物"})
-    if not deadline or deadline in ("TBD", "待确认", ""):
+    if not deadline or deadline in ("待确认", ""):
         risks.append({"level": "medium", "title": "截止时间不明确", "suggestion": "请确认具体截止日期"})
 
     if not risks:
@@ -957,9 +1173,9 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
     if not chat_id:
         return tool_error("无法获取群聊 ID，请确认 PILOTFLOW_TEST_CHAT_ID 已配置。")
 
-    if not _check_plan_gate(chat_id):
+    skip_gate = bool(kwargs.get("_pilotflow_gate_consumed"))
+    if not skip_gate and not _consume_plan_gate(chat_id):
         return tool_error("请先调用 pilotflow_generate_plan 生成计划，展示给用户确认后再调用此工具。")
-    _clear_plan_gate(chat_id)
 
     title = params.get("title", "项目")
     goal = params.get("goal", "")
@@ -970,9 +1186,9 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
 
     artifacts = []
     # Use plain names for bitable (no @mention markup)
-    member_plain = _member_names_plain(members) if members else "TBD"
+    member_plain = _member_names_plain(members) if members else "待确认"
     # Use @mention format for docs and messages
-    member_display = _format_members(members, chat_id) if members else "TBD"
+    member_display = _format_members(members, chat_id) if members else "待确认"
 
     # 1. Create doc (lark_oapi) — with @mention in content
     doc_content = f"# {title}\n\n## 目标\n{goal}\n\n"
@@ -1014,7 +1230,7 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
         link_lines.append(f"📄 [项目文档]({doc_url})")
     if bitable_url:
         link_lines.append(f"📊 [状态表]({bitable_url})")
-    link_lines.append(f"⏰ 截止: {deadline or 'TBD'}")
+    link_lines.append(f"⏰ 截止: {deadline or '待确认'}")
 
     entry_card = {
         "config": {"wide_screen_mode": True},
@@ -1056,14 +1272,17 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
     _save_to_hermes_memory(title, goal, members, deliverables, deadline)
 
     # Schedule deadline reminder via Hermes cron (if deadline is set)
+    reminder_job = False
     if deadline:
         reminder_job = _schedule_deadline_reminder(title, deadline, chat_id)
         if reminder_job:
             artifacts.append("截止提醒已设置")
 
-    # Clean up pending plan
-    with _plan_lock:
-        _pending_plans.pop(chat_id, None)
+    # Clean up only text-confirmation pending state. Card confirmations carry
+    # their own plan snapshot, so they must not delete a newer plan in the same chat.
+    if not bool(kwargs.get("_pilotflow_plan_override")):
+        with _plan_lock:
+            _pending_plans.pop(chat_id, None)
 
     # Pre-formatted display lines for LLM to present directly
     display_items = [f"✅ 项目空间已创建: {title}"]
@@ -1080,7 +1299,7 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
     if cal_result:
         display_items.append("📅 日历提醒已创建")
     if deadline:
-        display_items.append("🔔 截止提醒已设置")
+        display_items.append("🔔 截止提醒已设置" if reminder_job else "⚠️ 截止提醒未设置")
     display_items.append("💬 已通知群成员")
 
     return tool_result({
@@ -1142,10 +1361,14 @@ def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
 
     pilotflow_action = action_data.get("pilotflow_action", "")
 
+    recovered_plan_override = kwargs.pop("_pilotflow_plan_override", None)
+    gate_consumed = bool(kwargs.get("_pilotflow_gate_consumed"))
+
     if pilotflow_action == "cancel_project":
-        _clear_plan_gate(chat_id)
-        with _plan_lock:
-            _pending_plans.pop(chat_id, None)
+        if not gate_consumed:
+            _clear_plan_gate(chat_id)
+            with _plan_lock:
+                _pending_plans.pop(chat_id, None)
         _hermes_send(chat_id, "已取消本次项目创建。")
         return tool_result({
             "status": "cancelled",
@@ -1153,17 +1376,23 @@ def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
         })
 
     if pilotflow_action == "confirm_project":
-        if not _check_plan_gate(chat_id):
+        if not gate_consumed and not _consume_plan_gate(chat_id):
             return tool_error("确认超时，请重新发起项目创建。")
+        kwargs["_pilotflow_gate_consumed"] = True
 
         # Recover plan from pending storage
-        with _plan_lock:
-            pending = _pending_plans.get(chat_id, {})
-        recovered_plan = pending.get("plan", {})
+        if recovered_plan_override:
+            recovered_plan = dict(recovered_plan_override)
+        else:
+            with _plan_lock:
+                pending = _pending_plans.get(chat_id, {})
+            recovered_plan = pending.get("plan", {})
         if not recovered_plan.get("title"):
             return tool_error("无法恢复项目信息，请重新用 pilotflow_generate_plan 生成计划。")
 
         # Feed recovered plan into create_project_space
+        if recovered_plan_override:
+            kwargs["_pilotflow_plan_override"] = True
         return _handle_create_project_space({
             "title": recovered_plan.get("title", ""),
             "goal": recovered_plan.get("goal", ""),
@@ -1174,6 +1403,91 @@ def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
         }, **kwargs)
 
     return tool_error(f"未知的卡片动作: {pilotflow_action}")
+
+
+def _handle_card_command(raw_args: str) -> str:
+    """Bridge Hermes plugin slash command `/card button {...}` to PilotFlow.
+
+    Hermes exposes plugin slash commands with only raw arguments, so PilotFlow
+    puts only an opaque short-lived action id in the private button value.
+    """
+    raw = (raw_args or "").strip()
+    if raw.startswith("button"):
+        raw = raw[len("button"):].strip()
+    if not raw:
+        return "无法解析卡片按钮，请回复「确认」或「取消」。"
+
+    try:
+        action_data = json.loads(raw)
+    except (json.JSONDecodeError, TypeError):
+        return "无法解析卡片按钮，请回复「确认」或「取消」。"
+
+    chat_id = action_data.get("pilotflow_chat_id", "")
+    action_id = action_data.get("pilotflow_action_id", "")
+    action_ref = None
+    if action_id:
+        action_ref = _resolve_card_action_ref(action_id, consume=True)
+        if not action_ref:
+            return "卡片操作已过期或已处理，请重新发起项目创建。"
+        chat_id = action_ref["chat_id"]
+        action_data["pilotflow_action"] = action_ref["action"]
+    elif not chat_id:
+        ref = _resolve_card_action_ref(action_id)
+        if not ref:
+            return "卡片操作已过期，请重新发起项目创建。"
+        chat_id = ref["chat_id"]
+        action_data["pilotflow_action"] = ref["action"]
+
+    pilotflow_action = action_data.get("pilotflow_action", "")
+    message_id = action_ref.get("message_id", "") if action_ref else ""
+    if action_id and pilotflow_action == "confirm_project":
+        _mark_card_message(
+            message_id,
+            "⏳ 正在创建项目空间",
+            "已收到确认，正在创建飞书文档、状态表、任务和项目入口卡片。",
+            "blue",
+        )
+    elif action_id and pilotflow_action == "cancel_project":
+        _mark_card_message(
+            message_id,
+            "已取消项目创建",
+            "本次计划已取消，未创建任何项目产物。",
+            "grey",
+        )
+
+    action_value = json.dumps(action_data, ensure_ascii=False)
+    action_kwargs = {"chat_id": chat_id}
+    if action_ref:
+        action_kwargs["_pilotflow_gate_consumed"] = True
+        if action_ref.get("plan"):
+            action_kwargs["_pilotflow_plan_override"] = action_ref["plan"]
+    result = _handle_card_action({"action_value": action_value}, **action_kwargs)
+    try:
+        data = json.loads(result)
+    except (json.JSONDecodeError, TypeError):
+        return result
+
+    if data.get("error"):
+        return str(data["error"])
+    if data.get("status") == "cancelled":
+        if action_ref:
+            _clear_pending_plan_if_matches(chat_id, action_ref.get("plan"))
+        return None
+    if data.get("status") == "project_space_created":
+        if action_id:
+            title = data.get("title", "项目")
+            _mark_card_message(
+                message_id,
+                "✅ 已确认并创建",
+                f"**{title}** 已创建完成。\n\n项目入口卡片已发送到群聊。",
+                "green",
+            )
+        if action_ref:
+            _clear_pending_plan_if_matches(chat_id, action_ref.get("plan"))
+        return None
+    if data.get("display"):
+        return "\n".join(str(item) for item in data["display"])
+    return "已处理卡片操作。"
 
 
 # ---------------------------------------------------------------------------
@@ -1208,8 +1522,8 @@ def _handle_query_status(params: Dict[str, Any], **kwargs) -> str:
     # 1. Primary source: in-memory project registry (always works)
     with _project_registry_lock:
         for title, info in _project_registry.items():
-            member_str = ", ".join(info.get("members", [])) or "TBD"
-            deadline = info.get("deadline", "TBD")
+            member_str = ", ".join(info.get("members", [])) or "待确认"
+            deadline = info.get("deadline", "待确认")
             status = info.get("status", "进行中")
             # Deadline countdown with urgency indicators
             cd = _deadline_countdown(deadline)
@@ -1264,10 +1578,10 @@ def _handle_query_status(params: Dict[str, Any], **kwargs) -> str:
         ],
     }
 
-    if chat_id:
-        _hermes_send_card(chat_id, card)
-
-    return tool_result(f"项目看板已发送，共 {len(projects)} 个项目")
+    sent = _hermes_send_card(chat_id, card) if chat_id else False
+    if sent:
+        return tool_result(f"项目看板已发送，共 {len(projects)} 个项目")
+    return tool_error(f"项目看板已生成，共 {len(projects)} 个项目，但发送到群聊失败。请检查 Feishu 连接。")
 
 
 # ---------------------------------------------------------------------------

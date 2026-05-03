@@ -1,7 +1,7 @@
 name: pilotflow
 version: 1.12.0
 description: PilotFlow — AI project operations officer for Feishu group chats
-author: Tang Ding
+author: PilotFlow Team
 kind: backend
 auto_load: true
 requires:

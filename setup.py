@@ -19,6 +19,14 @@ import sys
 
 REQUIRED_ENV = ["OPENAI_API_KEY", "FEISHU_APP_ID", "FEISHU_APP_SECRET"]
 RECOMMENDED_CONFIG_MARKERS = ("provider:", "gateway:", "default_platform:", "feishu:")
+QUIET_DISPLAY_BLOCK = """
+
+# PilotFlow: keep Feishu group chats free of internal tool-progress text.
+display:
+  platforms:
+    feishu:
+      tool_progress: off
+"""
 PLACEHOLDER_MARKERS = ("your-", "xxx", "xxxxx", "changeme", "example")
 
 
@@ -75,6 +83,13 @@ def _is_configured(value):
     return not any(marker in lowered for marker in PLACEHOLDER_MARKERS)
 
 
+def _backup_file(path):
+    """Create a reversible backup next to the original file."""
+    backup_path = f"{path}.pilotflow.bak"
+    shutil.copy2(path, backup_path)
+    return backup_path
+
+
 def check_env(env_file=None):
     """Check for required environment variables."""
     env_file = env_file or os.path.expanduser("~/.hermes/.env")
@@ -115,6 +130,31 @@ def check_config(config_file=None):
         return False
 
     print(f"  Hermes config OK ({config_file})")
+    return True
+
+
+def ensure_feishu_quiet_display(config_file=None):
+    """Ensure Feishu does not show Hermes internal tool progress in group chat."""
+    config_file = config_file or os.path.expanduser("~/.hermes/config.yaml")
+    if not os.path.exists(config_file):
+        return False
+
+    with open(config_file, encoding="utf-8") as f:
+        content = f.read()
+
+    if "tool_progress: off" in content and "feishu:" in content:
+        print("  Feishu display noise guard OK")
+        return True
+
+    if "display:" in content:
+        print("  WARNING: config.yaml already has display settings")
+        print("  Add display.platforms.feishu.tool_progress: off to hide internal tool names")
+        return False
+
+    backup_path = _backup_file(config_file)
+    with open(config_file, "a", encoding="utf-8") as f:
+        f.write(QUIET_DISPLAY_BLOCK)
+    print(f"  Added Feishu display noise guard (backup: {backup_path})")
     return True
 
 
@@ -171,6 +211,9 @@ def main():
 
     print("4. Checking Hermes config...")
     config_ok = check_config()
+
+    print("4b. Configuring Feishu display...")
+    ensure_feishu_quiet_display()
 
     print("5. Validating installation...")
     install_ok = validate_install(hermes_dir)

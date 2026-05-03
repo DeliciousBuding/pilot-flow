@@ -8,6 +8,7 @@ import os
 import sys
 import time
 import threading
+from unittest.mock import patch
 
 # Add plugin path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "plugins", "pilotflow"))
@@ -41,6 +42,14 @@ from tools import (
     _evict_caches,
     _PLAN_GATE_TTL,
     _deadline_countdown,
+    _send_interactive_card_via_feishu,
+    _save_to_hermes_memory,
+    _schedule_deadline_reminder,
+    _handle_card_command,
+    _handle_generate_plan,
+    _pending_plans,
+    _card_action_refs,
+    _plan_lock,
 )
 
 
@@ -159,6 +168,202 @@ def test_plan_gate_per_chat():
 
 def test_evict_caches_runs_without_error():
     _evict_caches()  # should not raise
+
+
+def test_send_interactive_card_uses_feishu_client():
+    captured = {}
+
+    class _FakeResponse:
+        def success(self):
+            return True
+
+    class _FakeMessageAPI:
+        def create(self, request):
+            captured["request"] = request
+            return _FakeResponse()
+
+    class _FakeClient:
+        def __init__(self):
+            self.im = types.SimpleNamespace(v1=types.SimpleNamespace(message=_FakeMessageAPI()))
+
+    with patch("tools._get_client", return_value=_FakeClient()):
+        ok = _send_interactive_card_via_feishu("oc_test_card", {"header": {"title": "测试"}})
+
+    assert ok is True
+    request = captured["request"]
+    body = request.request_body if hasattr(request, "request_body") else request.body
+    assert body.msg_type == "interactive"
+    assert body.receive_id == "oc_test_card"
+    assert "测试" in body.content
+
+
+def test_memory_save_reports_dispatch_failure():
+    fake_registry = types.SimpleNamespace(dispatch=lambda name, args, **kwargs: json.dumps({"error": "memory disabled"}))
+    with patch("tools.registry", fake_registry):
+        ok = _save_to_hermes_memory("记忆失败项目", "验证失败返回", ["成员A"], ["文档"], "2026-05-10")
+
+    assert ok is False
+
+
+def test_deadline_reminder_reports_dispatch_failure():
+    import datetime
+
+    future = (datetime.date.today() + datetime.timedelta(days=3)).isoformat()
+    fake_registry = types.SimpleNamespace(dispatch=lambda name, args, **kwargs: json.dumps({"error": "cron disabled"}))
+    with patch("tools.registry", fake_registry):
+        ok = _schedule_deadline_reminder("提醒失败项目", future, "oc_deadline_fail")
+
+    assert ok is False
+
+
+def test_card_command_bridge_uses_opaque_action_id():
+    with _project_registry_lock:
+        _project_registry.clear()
+    with _plan_lock:
+        _pending_plans.clear()
+        _card_action_refs.clear()
+    _call_log.clear()
+    chat_id = "oc_card_bridge"
+    with patch("tools._send_interactive_card_via_feishu", return_value=True):
+        _handle_generate_plan(
+            {
+                "input_text": "准备桥接项目",
+                "title": "桥接项目",
+                "goal": "验证按钮桥接",
+                "members": ["示例成员A"],
+                "deliverables": ["项目简报"],
+                "deadline": "2026-05-07",
+            },
+            chat_id=chat_id,
+        )
+
+    with _plan_lock:
+        action_id = next(
+            k for k, v in _card_action_refs.items()
+            if v["chat_id"] == chat_id and v["action"] == "cancel_project"
+        )
+    raw_args = f'button {{"pilotflow_action_id":"{action_id}"}}'
+    with patch("tools._hermes_send", return_value=True) as send:
+        result = _handle_card_command(raw_args)
+
+    assert result is None
+    send.assert_called_once_with(chat_id, "已取消本次项目创建。")
+
+
+def test_card_command_confirm_returns_none_after_direct_card_send():
+    with _project_registry_lock:
+        _project_registry.clear()
+    with _plan_lock:
+        _pending_plans.clear()
+        _card_action_refs.clear()
+    chat_id = "oc_card_confirm_bridge"
+    with patch("tools._send_interactive_card_via_feishu", return_value=True):
+        _handle_generate_plan(
+            {
+                "input_text": "准备确认桥接项目",
+                "title": "确认桥接项目",
+                "goal": "验证确认按钮桥接",
+                "members": ["示例成员A"],
+                "deliverables": ["项目简报"],
+                "deadline": "2026-05-07",
+            },
+            chat_id=chat_id,
+        )
+
+    with _plan_lock:
+        action_id = next(
+            k for k, v in _card_action_refs.items()
+            if v["chat_id"] == chat_id and v["action"] == "confirm_project"
+        )
+    raw_args = f'button {{"pilotflow_action_id":"{action_id}"}}'
+    with patch("tools._send_interactive_card_via_feishu", return_value=True):
+        result = _handle_card_command(raw_args)
+
+    assert result is None
+    with _project_registry_lock:
+        assert "确认桥接项目" in _project_registry
+
+
+def test_old_card_confirm_uses_its_own_plan_snapshot():
+    with _project_registry_lock:
+        _project_registry.clear()
+    with _plan_lock:
+        _pending_plans.clear()
+        _card_action_refs.clear()
+    chat_id = "oc_multi_card"
+    with patch("tools._send_interactive_card_via_feishu", return_value=True):
+        _handle_generate_plan(
+            {
+                "input_text": "准备第一个项目",
+                "title": "第一个项目",
+                "goal": "验证旧卡计划快照",
+                "members": ["成员A"],
+                "deliverables": ["交付物A"],
+                "deadline": "2026-05-07",
+            },
+            chat_id=chat_id,
+        )
+        with _plan_lock:
+            first_action_id = next(
+                k for k, v in _card_action_refs.items()
+                if v["chat_id"] == chat_id and v["action"] == "confirm_project"
+            )
+        _handle_generate_plan(
+            {
+                "input_text": "准备第二个项目",
+                "title": "第二个项目",
+                "goal": "验证不会被旧卡覆盖",
+                "members": ["成员B"],
+                "deliverables": ["交付物B"],
+                "deadline": "2026-05-08",
+            },
+            chat_id=chat_id,
+        )
+
+    raw_args = f'button {{"pilotflow_action_id":"{first_action_id}"}}'
+    with patch("tools._send_interactive_card_via_feishu", return_value=True):
+        result = _handle_card_command(raw_args)
+
+    assert result is None
+    with _project_registry_lock:
+        assert "第一个项目" in _project_registry
+        assert "第二个项目" not in _project_registry
+    with _plan_lock:
+        assert _pending_plans[chat_id]["plan"]["title"] == "第二个项目"
+
+
+def test_card_action_id_is_single_use():
+    with _project_registry_lock:
+        _project_registry.clear()
+    with _plan_lock:
+        _pending_plans.clear()
+        _card_action_refs.clear()
+    chat_id = "oc_single_use_card"
+    with patch("tools._send_interactive_card_via_feishu", return_value=True):
+        _handle_generate_plan(
+            {
+                "input_text": "准备单次点击项目",
+                "title": "单次点击项目",
+                "goal": "验证按钮不能重复创建",
+                "members": ["成员A"],
+                "deliverables": ["交付物A"],
+                "deadline": "2026-05-07",
+            },
+            chat_id=chat_id,
+        )
+    with _plan_lock:
+        action_id = next(
+            k for k, v in _card_action_refs.items()
+            if v["chat_id"] == chat_id and v["action"] == "confirm_project"
+        )
+    raw_args = f'button {{"pilotflow_action_id":"{action_id}"}}'
+    with patch("tools._send_interactive_card_via_feishu", return_value=True):
+        assert _handle_card_command(raw_args) is None
+        second = _handle_card_command(raw_args)
+
+    assert "已处理" in second or "已过期" in second
+    with _project_registry_lock:
+        assert list(_project_registry).count("单次点击项目") == 1
 
 
 # --- Integration tests ---
