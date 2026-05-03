@@ -1333,14 +1333,14 @@ def _append_project_doc_update(project_name: str, project: dict, action_label: s
 
 def _create_task(summary: str, description: str,
                  assignee_name: str = "", deadline: str = "",
-                 chat_id: str = "") -> Optional[str]:
+                 chat_id: str = "", collaborator_names: Optional[list[str]] = None) -> Optional[str]:
     """Create a Feishu task with optional assignee and deadline. Returns summary on success."""
     client = _get_client()
     if not client:
         return None
     try:
         import datetime as _dt
-        from lark_oapi.api.task.v2 import CreateTaskRequest, InputTask
+        from lark_oapi.api.task.v2 import CreateTaskRequest, InputTask, Member
 
         builder = InputTask.builder().summary(summary).description(description)
 
@@ -1356,18 +1356,30 @@ def _create_task(summary: str, description: str,
             except (ValueError, AttributeError) as e:
                 logger.debug("task deadline skipped: %s", e)
 
-        # Assign member
-        if assignee_name and chat_id:
+        # Bind assignee and project followers in one task payload.
+        if chat_id:
             try:
-                open_id = _resolve_member(assignee_name, chat_id)
-                if open_id:
-                    builder = builder.members([{
-                        "id": open_id,
-                        "type": "user",
-                        "role": "assignee",
-                    }])
+                task_members = []
+                seen_open_ids = set()
+
+                def add_member(name: str, role: str) -> None:
+                    if not name:
+                        return
+                    open_id = _resolve_member(name, chat_id)
+                    if not open_id or open_id in seen_open_ids:
+                        return
+                    seen_open_ids.add(open_id)
+                    task_members.append(
+                        Member.builder().id(open_id).type("user").role(role).build()
+                    )
+
+                add_member(assignee_name, "assignee")
+                for member_name in collaborator_names or []:
+                    add_member(member_name, "follower")
+                if task_members:
+                    builder = builder.members(task_members)
             except (TypeError, AttributeError) as e:
-                logger.debug("task assign skipped: %s", e)
+                logger.debug("task member binding skipped: %s", e)
 
         task = builder.build()
         req = CreateTaskRequest.builder().request_body(task).build()
@@ -2105,7 +2117,7 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
         max_tasks = 10
         for i, d in enumerate(deliverables[:max_tasks]):
             assignee = members[i % len(members)] if members else ""
-            task_name = _create_task(d, f"项目: {title}", assignee, deadline, chat_id)
+            task_name = _create_task(d, f"项目: {title}", assignee, deadline, chat_id, members)
             if task_name:
                 artifacts.append(f"任务: {task_name}")
                 created_tasks += 1
@@ -3071,7 +3083,7 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
                 assignee = assignee_override or (project.get("members", [""])[0] if project.get("members") else "")
                 task_name = _create_task(
                     value, f"项目: {project_name}", assignee,
-                    project.get("deadline", ""), chat_id,
+                    project.get("deadline", ""), chat_id, project.get("members", []),
                 )
                 if task_name:
                     project.setdefault("artifacts", []).append(f"任务: {task_name}")

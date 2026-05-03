@@ -51,6 +51,7 @@ from tools import (
     _clean_plan_list,
     _parse_memory_project_entry,
     _history_suggestions_for_plan,
+    _create_task,
     _create_bitable,
     _append_bitable_update_record,
     _create_calendar_event,
@@ -1432,7 +1433,9 @@ def test_update_project_adds_deliverable_and_creates_task():
     assert result["action"] == "add_deliverable"
     assert result["registry_updated"] is True
     assert result["task_created"] is True
-    create_task.assert_called_once_with("评审清单", "项目: 交付物项目", "张三", "2026-05-20", "oc_deliverable")
+    create_task.assert_called_once_with(
+        "评审清单", "项目: 交付物项目", "张三", "2026-05-20", "oc_deliverable", ["张三"],
+    )
     with _project_registry_lock:
         project = _project_registry["交付物项目"]
         assert project["deliverables"] == ["验收记录", "评审清单"]
@@ -1459,7 +1462,9 @@ def test_update_project_add_deliverable_assigns_named_member():
     assert result["status"] == "project_updated"
     assert result["value"] == "完成接口联调"
     assert result["assignee"] == "李四"
-    create_task.assert_called_once_with("完成接口联调", "项目: 指定负责人交付物项目", "李四", "2026-05-20", "oc_named_assignee")
+    create_task.assert_called_once_with(
+        "完成接口联调", "项目: 指定负责人交付物项目", "李四", "2026-05-20", "oc_named_assignee", ["张三", "李四"],
+    )
     with _project_registry_lock:
         project = _project_registry["指定负责人交付物项目"]
         assert project["deliverables"] == ["验收记录", "完成接口联调"]
@@ -1492,13 +1497,83 @@ def test_update_project_add_deliverable_assigns_feishu_mentioned_member():
     assert result["status"] == "project_updated"
     assert result["value"] == "完成接口联调"
     assert result["assignee"] == "李四"
-    create_task.assert_called_once_with("完成接口联调", "项目: 飞书提及交付物项目", "李四", "2026-05-20", "oc_mentioned_assignee")
+    create_task.assert_called_once_with(
+        "完成接口联调", "项目: 飞书提及交付物项目", "李四", "2026-05-20", "oc_mentioned_assignee", ["李四"],
+    )
     with _project_registry_lock:
         project = _project_registry["飞书提及交付物项目"]
         assert project["deliverables"] == ["验收记录", "完成接口联调"]
     sent_text = send.call_args.args[1]
     assert "<at user_id" not in sent_text
     assert "负责人 → 李四" in sent_text
+
+
+def test_create_task_binds_assignee_and_project_followers():
+    import types
+
+    class _Builder:
+        def __init__(self, cls):
+            self.cls = cls
+            self.values = {}
+
+        def __getattr__(self, name):
+            def setter(value):
+                self.values[name] = value
+                return self
+            return setter
+
+        def build(self):
+            return self.cls(**self.values)
+
+    class _Model:
+        def __init__(self, **kwargs):
+            self.__dict__.update(kwargs)
+
+        @classmethod
+        def builder(cls):
+            return _Builder(cls)
+
+    class _Response:
+        msg = "success"
+
+        def success(self):
+            return True
+
+    created = {}
+
+    class _TaskApi:
+        def create(self, request):
+            created["task"] = request.request_body
+            return _Response()
+
+    fake_v2 = types.ModuleType("lark_oapi.api.task.v2")
+    fake_v2.CreateTaskRequest = type("CreateTaskRequest", (_Model,), {})
+    fake_v2.InputTask = type("InputTask", (_Model,), {})
+    fake_v2.Member = type("Member", (_Model,), {})
+
+    with (
+        patch.dict(sys.modules, {
+            "lark_oapi": types.ModuleType("lark_oapi"),
+            "lark_oapi.api": types.ModuleType("lark_oapi.api"),
+            "lark_oapi.api.task": types.ModuleType("lark_oapi.api.task"),
+            "lark_oapi.api.task.v2": fake_v2,
+        }),
+        patch("tools._get_client", return_value=types.SimpleNamespace(
+            task=types.SimpleNamespace(v2=types.SimpleNamespace(task=_TaskApi())),
+        )),
+        patch("tools._resolve_member", side_effect=lambda name, chat_id: {"张三": "ou_zhang", "李四": "ou_li"}.get(name)),
+    ):
+        result = _create_task(
+            "评审清单", "项目: 协作任务项目", "张三", "2026-05-20",
+            "oc_task_members", ["张三", "李四", "未入群"],
+        )
+
+    assert result == "评审清单"
+    members = created["task"].members
+    assert [(item.id, item.type, item.role) for item in members] == [
+        ("ou_zhang", "user", "assignee"),
+        ("ou_li", "user", "follower"),
+    ]
 
 
 def test_update_project_add_member_refreshes_resource_permissions():
