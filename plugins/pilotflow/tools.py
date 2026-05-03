@@ -903,6 +903,78 @@ def _history_suggestions_for_plan(plan: dict, query: str) -> tuple[list[str], di
     return suggestions, suggested_fields
 
 
+def _build_plan_confirmation_card(
+    chat_id: str,
+    text: str,
+    plan: dict,
+    history_suggestions: list[str],
+    history_suggested_fields: dict,
+) -> tuple[dict, list[str]]:
+    """Build the execution plan confirmation card and its action ids."""
+    member_text = ", ".join(plan["members"]) if plan["members"] else "待确认"
+    deliverable_text = ", ".join(plan["deliverables"]) if plan["deliverables"] else "待确认"
+    deadline_text = plan["deadline"] or "待确认"
+    history_text = ""
+    if history_suggestions:
+        history_text = "\n\n**历史建议：**\n" + "\n".join(f"- {s}" for s in history_suggestions)
+    confirm_action_id = _create_card_action_ref(chat_id, "confirm_project", plan)
+    cancel_action_id = _create_card_action_ref(chat_id, "cancel_project", plan)
+    action_ids = [confirm_action_id, cancel_action_id]
+    actions = [
+        {
+            "tag": "button",
+            "text": {"tag": "plain_text", "content": "✅ 确认执行"},
+            "type": "primary",
+            "value": {"pilotflow_action_id": confirm_action_id},
+        },
+        {
+            "tag": "button",
+            "text": {"tag": "plain_text", "content": "❌ 取消"},
+            "type": "default",
+            "value": {"pilotflow_action_id": cancel_action_id},
+        },
+    ]
+    if history_suggested_fields:
+        apply_action_id = _create_card_action_ref(
+            chat_id,
+            "apply_history_suggestions",
+            {"history_suggested_fields": history_suggested_fields},
+        )
+        action_ids.append(apply_action_id)
+        actions.insert(
+            0,
+            {
+                "tag": "button",
+                "text": {"tag": "plain_text", "content": "采用历史建议"},
+                "type": "default",
+                "value": {"pilotflow_action_id": apply_action_id},
+            },
+        )
+    card = {
+        "config": {"wide_screen_mode": True},
+        "header": {
+            "title": {"content": "📋 执行计划", "tag": "plain_text"},
+            "template": "blue",
+        },
+        "elements": [
+            {
+                "tag": "markdown",
+                "content": (
+                    f"**成员：** {member_text}\n"
+                    f"**交付物：** {deliverable_text}\n"
+                    f"**截止时间：** {deadline_text}"
+                    f"{history_text}"
+                ),
+            },
+            {
+                "tag": "action",
+                "actions": actions,
+            },
+        ],
+    }
+    return card, action_ids
+
+
 def _schedule_deadline_reminder(title: str, deadline: str, chat_id: str) -> bool:
     """Schedule a deadline reminder via Hermes cron job."""
     try:
@@ -2057,52 +2129,10 @@ def _handle_generate_plan(params: Dict[str, Any], **kwargs) -> str:
 
     # Send confirmation card with interactive buttons (always send if we have chat_id)
     if chat_id:
-        member_text = ", ".join(plan["members"]) if plan["members"] else "待确认"
-        deliverable_text = ", ".join(plan["deliverables"]) if plan["deliverables"] else "待确认"
-        deadline_text = plan["deadline"] or "待确认"
-        history_text = ""
-        if history_suggestions:
-            history_text = "\n\n**历史建议：**\n" + "\n".join(f"- {s}" for s in history_suggestions)
-        confirm_action_id = _create_card_action_ref(chat_id, "confirm_project", plan)
-        cancel_action_id = _create_card_action_ref(chat_id, "cancel_project", plan)
-        card = {
-            "config": {"wide_screen_mode": True},
-            "header": {
-                "title": {"content": "📋 执行计划", "tag": "plain_text"},
-                "template": "blue",
-            },
-            "elements": [
-                {
-                    "tag": "markdown",
-                    "content": (
-                        f"**成员：** {member_text}\n"
-                        f"**交付物：** {deliverable_text}\n"
-                        f"**截止时间：** {deadline_text}"
-                        f"{history_text}"
-                    ),
-                },
-                {
-                    "tag": "action",
-                    "actions": [
-                        {
-                            "tag": "button",
-                            "text": {"tag": "plain_text", "content": "✅ 确认执行"},
-                            "type": "primary",
-                            "value": {"pilotflow_action_id": confirm_action_id},
-                        },
-                        {
-                            "tag": "button",
-                            "text": {"tag": "plain_text", "content": "❌ 取消"},
-                            "type": "default",
-                            "value": {"pilotflow_action_id": cancel_action_id},
-                        },
-                    ],
-                },
-            ],
-        }
+        card, action_ids = _build_plan_confirmation_card(chat_id, text, plan, history_suggestions, history_suggested_fields)
         sent_message_id = _hermes_send_card(chat_id, card)
         if isinstance(sent_message_id, str):
-            _attach_card_message_id([confirm_action_id, cancel_action_id], sent_message_id)
+            _attach_card_message_id(action_ids, sent_message_id)
 
     template_hint = ""
     if template:
@@ -2536,6 +2566,29 @@ def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
             "risks": recovered_plan.get("risks", []),
         }, **kwargs)
 
+    if pilotflow_action == "apply_history_suggestions":
+        suggested_fields = action_data.get("history_suggested_fields") or {}
+        if not isinstance(suggested_fields, dict) or not suggested_fields:
+            return tool_error("没有可用的历史建议。")
+        with _plan_lock:
+            pending = dict(_pending_plans.get(chat_id, {}))
+            pending_plan = dict(pending.get("plan", {}))
+            for field, value in suggested_fields.items():
+                if field in ("members", "deliverables") and not pending_plan.get(field):
+                    pending_plan[field] = list(value)
+                elif field == "deadline" and not pending_plan.get(field):
+                    pending_plan[field] = value
+            pending["plan"] = pending_plan
+            _pending_plans[chat_id] = pending
+        updated_card, action_ids = _build_plan_confirmation_card(chat_id, "", pending_plan, [], {})
+        sent_message_id = _hermes_send_card(chat_id, updated_card)
+        if isinstance(sent_message_id, str):
+            _attach_card_message_id(action_ids, sent_message_id)
+        return tool_result({
+            "status": "history_suggestions_applied",
+            "instructions": "已应用历史建议并重新发送确认卡片。不要展示工具名或英文。",
+        })
+
     if pilotflow_action in ("project_status", "mark_project_done", "reopen_project", "resolve_risk", "send_project_reminder"):
         project_title = action_data.get("title") or action_data.get("project_name")
         if not project_title:
@@ -2767,6 +2820,13 @@ def _handle_card_command(raw_args: str) -> str:
             f"**{action_data.get('title', '项目')}** 的催办提醒已发送到群聊。",
             "yellow",
         )
+    elif action_id and pilotflow_action == "apply_history_suggestions":
+        _mark_card_message(
+            message_id,
+            "历史建议已应用",
+            "已将历史建议补入计划，请继续确认执行。",
+            "blue",
+        )
 
     resolved_action_data = dict(action_data)
     if action_ref:
@@ -2804,6 +2864,7 @@ def _handle_card_command(raw_args: str) -> str:
     if data.get("status") in (
         "project_status_sent", "project_marked_done", "project_reopened", "project_risk_resolved",
         "project_reminder_sent", "dashboard_page_sent", "dashboard_filter_sent", "briefing_batch_reminder_sent",
+        "history_suggestions_applied",
     ):
         return None
     if data.get("display"):

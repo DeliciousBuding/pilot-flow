@@ -722,6 +722,73 @@ def test_generate_plan_uses_memory_history_when_fields_missing():
     assert result["history_suggestions"]
 
 
+def test_history_suggestions_can_be_applied_from_card_action():
+    with _project_registry_lock:
+        _project_registry.clear()
+    with _plan_lock:
+        _pending_plans.clear()
+        _card_action_refs.clear()
+    memory_payload = json.dumps({
+        "items": [
+            {"content": "【项目创建】活动项目：目标=筹备活动，成员=王五、赵六，交付物=活动方案、宣传文案，截止=2026-05-20"}
+        ]
+    })
+    fake_registry = types.SimpleNamespace(dispatch=lambda name, args, **kwargs: memory_payload)
+    captured_cards = []
+
+    def capture_card(chat_id, card):
+        captured_cards.append(card)
+        return f"om_history_apply_{len(captured_cards)}"
+
+    with (
+        patch("tools.registry", fake_registry),
+        patch("tools._send_interactive_card_via_feishu", side_effect=capture_card),
+        patch("tools._mark_card_message", return_value=True),
+    ):
+        _handle_generate_plan(
+            {
+                "input_text": "帮我准备新的活动项目",
+                "title": "新活动项目",
+                "goal": "筹备活动",
+                "members": [],
+                "deliverables": [],
+                "deadline": "",
+            },
+            chat_id="oc_history_apply",
+        )
+
+    first_card = captured_cards[0]
+    button_texts = [
+        button["text"]["content"]
+        for element in first_card["elements"]
+        if element.get("tag") == "action"
+        for button in element["actions"]
+    ]
+    assert "采用历史建议" in button_texts
+
+    with _plan_lock:
+        apply_action_id = next(
+            action_id for action_id, ref in _card_action_refs.items()
+            if ref["chat_id"] == "oc_history_apply" and ref["action"] == "apply_history_suggestions"
+        )
+
+    with (
+        patch("tools.registry", fake_registry),
+        patch("tools._send_interactive_card_via_feishu", side_effect=capture_card),
+        patch("tools._mark_card_message", return_value=True),
+    ):
+        result = _handle_card_command(f'button {{"pilotflow_action_id":"{apply_action_id}"}}')
+
+    assert result is None
+    assert len(captured_cards) >= 2
+    rebuilt_card = captured_cards[-1]
+    rebuilt_text = rebuilt_card["elements"][0]["content"]
+    assert "王五" in rebuilt_text
+    assert "赵六" in rebuilt_text
+    with _plan_lock:
+        assert _pending_plans["oc_history_apply"]["plan"]["members"] == ["王五", "赵六"]
+
+
 def test_query_status_falls_back_to_hermes_memory_after_restart(tmp_path):
     with _project_registry_lock:
         _project_registry.clear()
