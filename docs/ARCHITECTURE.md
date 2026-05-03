@@ -37,6 +37,7 @@
 | LLM 调度 | 调用 Hermes 配置的 OpenAI-compatible 模型，解析用户意图，选择工具 |
 | 飞书网关 | WebSocket 连接、@mention 解析、消息收发 |
 | 工具注册表 | 插件注册工具、工具发现、handler 调度 |
+| 显示配置 | 通过 `display.platforms.feishu.tool_progress=off` 避免群聊暴露内部工具进度 |
 
 ### PilotFlow 插件
 
@@ -64,14 +65,14 @@
 用户 @PilotFlow → 飞书网关收到消息
   → LLM 理解意图，调用 pilotflow_generate_plan
   → 插件发送确认卡片，保存 pending plan，打开 chat_id 级确认门控
-  → 用户文字确认，或点击卡片按钮触发 pilotflow_handle_card_action
+  → 用户文字确认，或点击卡片按钮进入插件 `/card` 桥接，再触发 pilotflow_handle_card_action
   → 确认后调用 pilotflow_create_project_space
     → lark_oapi: 创建飞书文档（格式化 + @mention + 自动开权限）
     → lark_oapi: 创建多维表格（项目状态台账 + 记录 + 权限）
     → lark_oapi: 创建飞书任务
-    → Hermes: 发送项目入口消息到群（@成员 + 链接）
+    → lark_oapi: 发送项目入口互动卡片到群（@成员 + 链接）
     → lark_oapi: 创建日历事件（截止时间提醒）
-    → Hermes: 写入 memory，调度 cron 截止提醒
+    → Hermes: best-effort 写入 memory，调度 cron 截止提醒
 ```
 
 ### 多轮管理
@@ -94,12 +95,16 @@ PilotFlow 插件
 PilotFlow 通过 lark_oapi SDK 直连飞书 API，无中间层：
 - 文档创建：`client.docx.v1.document.create`
 - 任务创建：`client.task.v2.task.create`
-- 消息发送：`registry.dispatch("send_message")`
+- 文本消息：`registry.dispatch("send_message")`
+- 互动卡片：`client.im.v1.message.create(..., msg_type="interactive")`
+- 卡片状态更新：`client.im.v1.message.patch(..., content=card_json)`
 - 群成员查询：`client.im.v1.chat_members.get`
 - 权限设置：`client.drive.v1.permission_public.patch`
 
 Hermes 深度融合点：
-- 消息发送：复用 Hermes `send_message`
+- 文本消息：复用 Hermes `send_message`
 - 项目模式沉淀：创建成功后写入 Hermes `memory`
-- 截止提醒：创建成功后调度 Hermes `cronjob`
-- 卡片按钮：依赖 Hermes 将飞书 card action 转成 `/card button {...}` 合成命令，再由 `pilotflow_handle_card_action` 执行
+- 截止提醒：创建成功后 best-effort 调度 Hermes `cronjob`，失败不阻断项目创建
+- 卡片按钮：PilotFlow 注册插件级 `/card` 命令，接收 Hermes 的 `/card button {...}` 合成命令后直接执行 `pilotflow_handle_card_action`
+- 卡片反馈：确认卡片发送后记录 Feishu `message_id`，按钮点击时把原卡片更新为“处理中/已创建/已取消”
+- 运行边界：不修改 Hermes 源码；安装脚本只复制插件/skill 并检查用户级 Hermes 配置

@@ -23,7 +23,8 @@ uv sync --extra feishu
 
 ```bash
 git clone https://github.com/DeliciousBuding/PilotFlow.git
-python PilotFlow/setup.py --hermes-dir .
+cd PilotFlow
+python setup.py --hermes-dir <hermes-agent-path>
 ```
 
 一行命令完成安装，无需手动复制文件。脚本会自动：
@@ -38,14 +39,14 @@ Linux / macOS:
 
 ```bash
 mkdir -p ~/.hermes
-cp PilotFlow/.env.example ~/.hermes/.env
+cp .env.example ~/.hermes/.env
 ```
 
 Windows PowerShell:
 
 ```powershell
 New-Item -ItemType Directory -Force "$HOME\.hermes"
-Copy-Item .\PilotFlow\.env.example "$HOME\.hermes\.env"
+Copy-Item .\.env.example "$HOME\.hermes\.env"
 ```
 
 编辑 `~/.hermes/.env`：
@@ -86,6 +87,13 @@ gateway:
     feishu:
       connection_mode: websocket
       group_policy: open
+
+# PilotFlow 建议：飞书群聊不要展示 Hermes 内部工具进度。
+# setup.py 会在没有 display 配置时自动追加这一段。
+display:
+  platforms:
+    feishu:
+      tool_progress: off
 ```
 
 ### 获取配置值
@@ -98,6 +106,19 @@ gateway:
 | `PILOTFLOW_TEST_CHAT_ID` | 飞书群设置 → 群号 → 以 `oc_` 开头 |
 | `PILOTFLOW_MEMORY_ENABLED` | 默认 `true`，项目创建后写入 Hermes memory |
 | `PILOTFLOW_MEMORY_INCLUDE_MEMBERS` | 默认 `false`，共享环境不要持久化成员姓名 |
+
+### 显示降噪
+
+Hermes 默认可能把工具进度发到飞书群里，例如显示内部工具名。PilotFlow 是面向群成员的项目运行官，安装脚本会尽量在 `~/.hermes/config.yaml` 中追加：
+
+```yaml
+display:
+  platforms:
+    feishu:
+      tool_progress: off
+```
+
+如果你的 Hermes 配置已有 `display:` 段，安装脚本不会覆盖它，只会提示手动加入以上设置。
 
 ## 第四步：飞书应用配置
 
@@ -124,6 +145,8 @@ uv run hermes gateway
 
 在飞书群里 @PilotFlow 发一条消息即可测试。
 
+WSL 环境同样使用相同的用户级 Hermes 配置目录：`~/.hermes/.env` 和 `~/.hermes/config.yaml`。不要把本机绝对路径写入插件源码或公开文档。
+
 ## 验证安装
 
 ```bash
@@ -136,6 +159,29 @@ print('PilotFlow loaded OK')
 ```
 
 ## 常见问题
+
+### 群里出现英文工具名
+
+确认 `~/.hermes/config.yaml` 已包含：
+
+```yaml
+display:
+  platforms:
+    feishu:
+      tool_progress: off
+```
+
+这是 Hermes 运行时显示配置，不需要修改 Hermes 源码。
+
+### 卡片按钮点击后没有续跑
+
+重新运行安装脚本，确保插件副本已同步到 Hermes runtime：
+
+```bash
+python setup.py --hermes-dir <hermes-agent-path>
+```
+
+PilotFlow 会注册插件级 `/card` 桥接命令处理 Feishu 按钮回调，不需要修改 Hermes 源码。
 
 ### lark_oapi 未安装
 

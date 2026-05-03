@@ -21,9 +21,9 @@ Mention @PilotFlow in a Feishu group chat, get a confirmable project plan, and l
 | --- | --- | --- |
 | Demo script | Prepared | [docs/demo/README.md](docs/demo/README.md) |
 | Contest submission pack | Prepared | [docs/CONTEST_SUBMISSION.md](docs/CONTEST_SUBMISSION.md) |
-| Local tests | 35 tests passing | `pytest -q` |
-| Live Feishu recording | Pending | To be added after live parity |
-| Live artifact samples | Pending | To be added after live parity |
+| Local tests | 47 tests passing | `uv run pytest -o addopts='' -q` |
+| Live Feishu card | Verified: interactive send, button confirmation, source-card status update | WSL Hermes + Feishu test chat |
+| Live recording/artifacts | To be completed before submission | Success/cancel path recordings and live link samples |
 
 ---
 
@@ -70,7 +70,8 @@ Hermes Agent Runtime (LLM + Feishu Gateway + Tool Registry)
 ```
 
 - **Base**: Hermes provides Agent runtime, Feishu WebSocket gateway, LLM orchestration
-- **Plugin**: PilotFlow provides project management workflow and Feishu API tools (lark_oapi SDK)
+- **Plugin**: PilotFlow provides project management workflow and Feishu API tools (lark_oapi SDK). Interactive cards are sent directly through Feishu IM as `msg_type=interactive`.
+- **Boundary**: PilotFlow is a Hermes plugin, not a Hermes fork. Card actions are handled by a plugin-level `/card` bridge.
 - **LLM**: OpenAI-compatible API. The default example uses `gpt-4.1`, and can be replaced through Hermes config.
 
 ## Quick Start
@@ -84,10 +85,11 @@ cd hermes-agent && uv sync --extra feishu
 
 # 2. Install PilotFlow plugin
 git clone https://github.com/DeliciousBuding/PilotFlow.git
-python PilotFlow/setup.py --hermes-dir .
+cd PilotFlow
+python setup.py --hermes-dir <hermes-agent-path>
 
 # 3. Configure
-cp PilotFlow/.env.example ~/.hermes/.env
+cp .env.example ~/.hermes/.env
 # Edit ~/.hermes/.env with Feishu credentials and LLM API key
 
 # 4. Start
@@ -102,6 +104,7 @@ uv run hermes gateway
 | **Bitable** | Auto-create project status ledger, write records, real-time tracking |
 | **Feishu Tasks** | Auto-create tasks, link to project, assign owners |
 | **Group Messages** | Project entry message (@members + doc/table/deadline links) |
+| **Interactive Cards** | Plan confirmation, status dashboard, button continuation, source-card status feedback via direct Feishu send |
 | **@mention** | Resolve group member list, mention_user in docs, `<at>` tags in messages |
 | **Permission Management** | Auto-open link access + add group members as editors |
 
@@ -109,13 +112,13 @@ uv run hermes gateway
 
 | Capability | Current Evidence | Notes |
 | --- | --- | --- |
-| Feishu docs/bitable/tasks/entry message | Earlier live group path was validated | v1.12 needs a fresh recording |
+| Feishu docs/bitable/tasks/entry message | Validated in a real Feishu group on 2026-05-03 after card confirmation | Sends a project entry interactive card after creation |
 | Confirmation gate | Local integration tests + per-chat TTL | Project creation is blocked before confirmation |
-| Card confirm/cancel | Local integration tests cover both actions | Real Feishu button continuation still needs live parity |
-| Hermes memory write | Local integration tests cover dispatch | Member names are not persisted by default |
-| Hermes cron reminder | Local integration tests cover dispatch | Schedules pre-deadline reminders |
+| Card confirm/cancel | Local integration tests + plugin `/card` bridge + real button confirmation | The source card updates to processing/done/cancelled |
+| Hermes memory write | Local tests cover success/failure dispatch | Best-effort write; member names are not persisted by default |
+| Hermes cron reminder | Local tests cover success/failure dispatch | Attempts pre-deadline scheduling; failures do not block project creation |
 | Templates/risks/dashboard/updates | Unit + integration tests | Covers defense, sprint, event, and launch templates |
-| LLM-driven tool choice | Hermes tool descriptions + skill instructions | Real LLM behavior needs live parity rerun |
+| LLM-driven tool choice | Hermes tool descriptions + skill instructions + live @bot checks | Quiet Feishu output is configured; delivery materials are being finalized |
 
 ## Competitive Positioning
 
@@ -148,7 +151,7 @@ uv run hermes gateway
 | Phase 3 | lark_oapi SDK + @mention + formatted docs + auto permissions | ✅ Done |
 | Phase 4 | Confirmation gate + risk detection + multi-turn management + project dashboard | ✅ Done |
 | Phase 5 | Hermes memory write + smart templates + calendar integration | ✅ Done |
-| Phase 6 | Hermes memory read + live card-button parity + demo recordings | In progress |
+| Phase 6 | Hermes memory read + live card-button recording + quiet Feishu output | In progress |
 
 ## Acknowledgments
 

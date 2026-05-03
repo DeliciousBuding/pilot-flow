@@ -31,19 +31,19 @@ PilotFlow 是飞书群聊中的 AI 项目运行官。它将群聊中的项目讨
 | 确认卡片 | 展示项目计划卡片，等用户回复确认 |
 | 风险检测 | 自动识别缺失成员、模糊截止时间等风险 |
 | 日历集成 | 自动创建截止时间日历事件（UTC+8） |
-| 截止提醒 | 通过 Hermes cron 设置截止前提醒 |
+| 截止提醒 | 通过 Hermes cron best-effort 调度截止前提醒，失败不阻断项目创建 |
 | 多轮管理 | 改截止时间、加成员、改状态 — 同步更新多维表格 |
-| 项目看板 | 查询项目状态，发送看板卡片到群聊 |
+| 项目看板 | 查询项目状态并发送看板卡片；发送失败会返回明确错误 |
 | 项目模板 | 自动识别答辩/sprint/活动/上线模板，建议交付物和工期 |
-| Hermes Memory 写入 | 项目创建时自动保存模式，供后续历史读取使用；默认不保存成员姓名 |
-| 卡片回调工具 | 已实现确认/取消按钮处理；真实飞书 live 续跑待复测 |
+| Hermes Memory 写入 | 项目创建时 best-effort 保存模式，供后续历史读取使用；默认不保存成员姓名 |
+| 卡片回调工具 | 已实现插件级 `/card` 桥接、确认/取消按钮处理和原卡片状态反馈；录屏材料待提交前补齐 |
 
-### P1 — 深度融合（下一轮）
+### P1 — 下一步增强
 
 | 功能 | 说明 |
 | --- | --- |
 | Hermes Memory 读取 | 生成计划时读取历史项目模式，建议成员、交付物和工期 |
-| 真实按钮续跑验证 | 在飞书测试群验证点击确认/取消按钮能稳定续跑 |
+| 真实按钮续跑录屏 | 在飞书测试群录制确认/取消按钮稳定续跑和原卡片状态变化证据 |
 | 录屏证据 | 成功路径、失败/降级路径、按钮确认路径 |
 
 ### P2 — 扩展功能（计划中）
@@ -62,7 +62,7 @@ PilotFlow 是飞书群聊中的 AI 项目运行官。它将群聊中的项目讨
   ↓
 PilotFlow 提取意图，发送确认卡片（展示计划）
   ↓
-用户回复「确认」「可以」或点击确认按钮
+用户回复「确认」「可以」或点击确认按钮；点击按钮时原卡片先变为处理中
   ↓
 PilotFlow 创建：
   - 飞书文档（格式化 + @提及 + 权限 + 编辑者）
@@ -70,7 +70,7 @@ PilotFlow 创建：
   - 飞书任务
   - 群入口消息（@成员 + 文档/表格/截止时间链接）
   ↓
-PilotFlow 发送交付总结
+PilotFlow 发送项目入口卡片，并把原确认卡片更新为已创建/已取消
 ```
 
 ## 技术约束
@@ -78,8 +78,10 @@ PilotFlow 发送交付总结
 - 仅支持飞书平台
 - 依赖 Hermes Agent 运行时（LLM + 飞书网关）
 - 依赖 lark-oapi SDK（Doc/Task/Bitable 操作）
-- 消息发送通过 Hermes registry.dispatch
-- 项目模式通过 Hermes memory 写入；历史读取尚未作为稳定功能发布
+- 文本消息通过 Hermes registry.dispatch；互动卡片通过 Feishu IM API 直发
+- Feishu 群聊建议关闭 Hermes 工具进度展示：`display.platforms.feishu.tool_progress=off`
+- 项目模式通过 Hermes memory best-effort 写入；历史读取尚未作为稳定功能发布
 - 共享环境默认 `PILOTFLOW_MEMORY_INCLUDE_MEMBERS=false`，避免把成员姓名持久化到 memory
-- 截止提醒通过 Hermes cronjob 调度
+- 截止提醒通过 Hermes cronjob best-effort 调度，失败不阻断核心创建流程
 - 需要飞书应用权限（im, docx, bitable, task, drive, calendar）
+- PilotFlow 是插件，不依赖本机绝对路径，不修改 Hermes 源码

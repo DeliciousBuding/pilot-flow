@@ -24,14 +24,14 @@ PilotFlow/
 
 ## Key Technical Decisions
 
-- **Messaging**: via `registry.dispatch("send_message")` (reuses Hermes channels)
+- **Messaging**: text via `registry.dispatch("send_message")`; Feishu interactive cards via `lark_oapi` IM API (`msg_type=interactive`)
 - **Memory**: project creation writes patterns via `registry.dispatch("memory")`; reading/scanning history is next work
 - **Cron**: deadline reminders are scheduled via `registry.dispatch("cronjob")`
 - **Doc/Task/Bitable/Calendar**: via lark_oapi SDK (Hermes doesn't have native write tools for these surfaces)
 - **Permissions**: auto-open link access + add group members as editors after creation
 - **@mention**: resolve group member names to open_id via `im.chat.members.get`
 - **Confirmation gate**: per-chat_id with TTL, prevents execution without user confirmation
-- **Card actions**: Hermes routes Feishu button clicks as `/card button {...}`; `pilotflow_handle_card_action` confirms/cancels using pending plan state
+- **Card actions**: PilotFlow registers a plugin `/card` bridge for Hermes-routed Feishu button clicks; `pilotflow_handle_card_action` confirms/cancels using pending plan state
 
 ## Conventions
 
@@ -42,7 +42,7 @@ PilotFlow/
 
 ## Testing
 
-- Local tests: `pytest -q` in `PilotFlow/`
+- Local tests: `pytest -q` in `PilotFlow/` (47 passing as of 2026-05-03)
 - Gateway test: `uv run hermes gateway` in hermes-agent directory
 - Direct tool test: set `PILOTFLOW_TEST_CHAT_ID` env var
 - End-to-end: @PilotFlow in Feishu group chat

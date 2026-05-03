@@ -30,7 +30,8 @@
 ### 6. 即插即用插件架构（已完成）
 - 基于 Hermes Agent 运行时
 - `python setup.py --hermes-dir ...` 安装，不修改 Hermes 代码
-- 消息通过 Hermes registry.dispatch 走已有渠道
+- 文本消息通过 Hermes registry.dispatch 走已有渠道，互动卡片通过 Feishu IM API 直发
+- 卡片按钮通过插件级 `/card` 桥接处理，不需要 fork Hermes
 - Doc/Task/Bitable 用 lark_oapi SDK 直连
 
 ### 7. 多轮项目管理（已完成）
@@ -58,7 +59,7 @@
 - 发送飞书卡片到群聊
 
 ### 12. Hermes Memory 写入（已完成）
-- 项目创建时自动保存模式到 Hermes memory
+- 项目创建时 best-effort 保存模式到 Hermes memory
 - 通过 registry.dispatch("memory") 深度融合 Hermes 生态
 - 默认只保存成员数量，不保存成员姓名；需要完整成员名时显式开启
 - 目前已完成写入链路；读取历史项目并自动建议成员/交付物属于下一轮
@@ -75,16 +76,16 @@
 
 ---
 
-## 待实现创新（提升竞争力）
+## 下一步增强（提升竞争力）
 
-### 13. Hermes Memory 读取
+### 13. Hermes Memory 读取（下一步）
 - 生成计划时扫描历史项目模式
 - 自动建议常用成员、交付物和工期
 - 让“越用越聪明”成为可录屏功能
 
-### 14. 真实卡片按钮续跑
-- 在飞书测试群验证确认按钮直达创建流程
-- 验证取消按钮清理 pending plan 和确认门控
+### 14. 真实卡片按钮录屏（交付材料）
+- 在飞书测试群录制确认按钮直达创建流程
+- 录制取消按钮清理 pending plan 和确认门控
 - 形成录屏证据
 
 ### 15. 审批流集成
