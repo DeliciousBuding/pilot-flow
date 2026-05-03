@@ -812,6 +812,33 @@ def test_project_status_action_sends_interactive_detail_card():
     assert "pilotflow_chat_id" not in actions[0]["actions"][0]["value"]
 
 
+def test_project_detail_card_includes_registry_resource_links():
+    with _project_registry_lock:
+        _project_registry.clear()
+    _register_project(
+        "资源链接项目", [], "2026-05-20", "进行中",
+        [
+            "文档: https://example.invalid/docx/doc_token_123",
+            "多维表格: https://example.invalid/base/app_token_123",
+        ],
+        goal="验证资源链接", deliverables=["验收记录"],
+    )
+    captured = {}
+    action_value = json.dumps({"pilotflow_action": "project_status", "title": "资源链接项目"}, ensure_ascii=False)
+
+    def capture_card(chat_id, card):
+        captured["card"] = card
+        return "om_detail_links"
+
+    with patch("tools._hermes_send_card", side_effect=capture_card):
+        result = json.loads(_handle_card_action({"action_value": action_value}, chat_id="oc_detail_links"))
+
+    assert result["status"] == "project_status_sent"
+    body = captured["card"]["elements"][0]["content"]
+    assert "[项目文档](https://example.invalid/docx/doc_token_123)" in body
+    assert "[状态表](https://example.invalid/base/app_token_123)" in body
+
+
 def test_completed_project_detail_card_offers_reopen_button():
     with _project_registry_lock:
         _project_registry.clear()

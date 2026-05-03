@@ -335,6 +335,14 @@ def _build_project_detail_card(chat_id: str, title: str, project: dict) -> tuple
     next_text = "重新打开" if next_action == "reopen_project" else "标记完成"
     next_type = "default" if next_action == "reopen_project" else "primary"
     next_action_id = _create_card_action_ref(chat_id, next_action, {"title": title})
+    resource_lines = []
+    for item in project.get("artifacts", []):
+        text = str(item)
+        if text.startswith("文档: "):
+            resource_lines.append(f"[项目文档]({text.split('文档: ', 1)[1].strip()})")
+        elif text.startswith("多维表格: "):
+            resource_lines.append(f"[状态表]({text.split('多维表格: ', 1)[1].strip()})")
+    resource_text = f"\n**资源：** {' | '.join(resource_lines)}" if resource_lines else ""
     card = {
         "config": {"wide_screen_mode": True},
         "header": {
@@ -351,6 +359,7 @@ def _build_project_detail_card(chat_id: str, title: str, project: dict) -> tuple
                     f"**成员：** {member_text}\n"
                     f"**交付物：** {deliverable_text}\n"
                     f"**截止：** {deadline_line}"
+                    f"{resource_text}"
                 ),
             },
             {
