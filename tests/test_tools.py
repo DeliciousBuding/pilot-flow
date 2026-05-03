@@ -1576,6 +1576,67 @@ def test_create_task_binds_assignee_and_project_followers():
     ]
 
 
+def test_create_task_returns_traceable_task_url_when_available():
+    import types
+
+    class _Builder:
+        def __init__(self, cls):
+            self.cls = cls
+            self.values = {}
+
+        def __getattr__(self, name):
+            def setter(value):
+                self.values[name] = value
+                return self
+            return setter
+
+        def build(self):
+            return self.cls(**self.values)
+
+    class _Model:
+        def __init__(self, **kwargs):
+            self.__dict__.update(kwargs)
+
+        @classmethod
+        def builder(cls):
+            return _Builder(cls)
+
+    class _Response:
+        msg = "success"
+
+        def __init__(self):
+            self.data = types.SimpleNamespace(
+                task=types.SimpleNamespace(url="https://example.invalid/task/task_123", guid="task_guid_123"),
+            )
+
+        def success(self):
+            return True
+
+    class _TaskApi:
+        def create(self, request):
+            return _Response()
+
+    fake_v2 = types.ModuleType("lark_oapi.api.task.v2")
+    fake_v2.CreateTaskRequest = type("CreateTaskRequest", (_Model,), {})
+    fake_v2.InputTask = type("InputTask", (_Model,), {})
+    fake_v2.Member = type("Member", (_Model,), {})
+
+    with (
+        patch.dict(sys.modules, {
+            "lark_oapi": types.ModuleType("lark_oapi"),
+            "lark_oapi.api": types.ModuleType("lark_oapi.api"),
+            "lark_oapi.api.task": types.ModuleType("lark_oapi.api.task"),
+            "lark_oapi.api.task.v2": fake_v2,
+        }),
+        patch("tools._get_client", return_value=types.SimpleNamespace(
+            task=types.SimpleNamespace(v2=types.SimpleNamespace(task=_TaskApi())),
+        )),
+    ):
+        result = _create_task("可追踪任务", "项目: 任务追踪项目")
+
+    assert result == "可追踪任务: https://example.invalid/task/task_123"
+
+
 def test_update_project_add_member_refreshes_resource_permissions():
     with _project_registry_lock:
         _project_registry.clear()

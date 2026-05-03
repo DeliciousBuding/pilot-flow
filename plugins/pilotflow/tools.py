@@ -1386,7 +1386,9 @@ def _create_task(summary: str, description: str,
         resp = client.task.v2.task.create(req)
         if resp.success():
             logger.info("task created: %s (assignee=%s, deadline=%s)", summary, assignee_name, deadline)
-            return summary
+            task_resp = getattr(getattr(resp, "data", None), "task", None)
+            task_url = str(getattr(task_resp, "url", "") or "").strip() if task_resp else ""
+            return f"{summary}: {task_url}" if task_url else summary
         logger.warning("create task failed: %s", resp.msg)
         return None
     except Exception as e:
