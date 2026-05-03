@@ -758,6 +758,102 @@ def _clean_plan_list(values: Any) -> list[str]:
     return cleaned
 
 
+def _split_inline_list(value: str) -> list[str]:
+    """Split short Chinese inline lists from group-chat messages."""
+    text = re.sub(r"\s+", "", value or "")
+    if not text:
+        return []
+    text = re.sub(r"(等|这些|几个)?(交付物|产出|输出|任务)$", "", text)
+    return _clean_plan_list(re.split(r"[、,，/]|和|及|以及", text))
+
+
+def _extract_inline_deadline(text: str) -> str:
+    """Extract a YYYY-MM-DD deadline from common Chinese date expressions."""
+    import datetime as _dt
+
+    value = text or ""
+    iso_match = re.search(r"(20\d{2})[-/.年](\d{1,2})[-/.月](\d{1,2})日?", value)
+    if iso_match:
+        year, month, day = (int(iso_match.group(i)) for i in range(1, 4))
+        try:
+            return _dt.date(year, month, day).isoformat()
+        except ValueError:
+            return ""
+
+    month_day_match = re.search(r"(?<!\d)(\d{1,2})月(\d{1,2})[日号]?", value)
+    if month_day_match:
+        today = _dt.date.today()
+        month, day = int(month_day_match.group(1)), int(month_day_match.group(2))
+        try:
+            candidate = _dt.date(today.year, month, day)
+            if candidate < today:
+                candidate = _dt.date(today.year + 1, month, day)
+            return candidate.isoformat()
+        except ValueError:
+            return ""
+
+    relative_days = {
+        "明天": 1,
+        "后天": 2,
+        "大后天": 3,
+    }
+    for keyword, days in relative_days.items():
+        if keyword in value:
+            return (_dt.date.today() + _dt.timedelta(days=days)).isoformat()
+    return ""
+
+
+def _extract_inline_project_fields(text: str) -> dict:
+    """Best-effort extraction from raw Feishu group text when the Agent passes only input_text."""
+    value = text or ""
+    mentioned_names = [m.group(2).strip() for m in _AT_PATTERN.finditer(value) if m.group(2).strip()]
+
+    deadline = _extract_inline_deadline(value)
+    deadline_clauses = [
+        r"(?:20\d{2})[-/.年]\d{1,2}[-/.月]\d{1,2}日?(?:截止|到期|前)?",
+        r"\d{1,2}月\d{1,2}[日号]?(?:截止|到期|前)?",
+        r"(?:明天|后天|大后天)(?:截止|到期|前)?",
+    ]
+    deadline_cleanup_pattern = re.compile("|".join(deadline_clauses))
+
+    def _strip_deadline_clauses(segment: str) -> str:
+        return deadline_cleanup_pattern.sub("", segment or "").strip(" ，,。；;")
+
+    member_segments: list[str] = []
+    member_match = re.search(
+        r"(?:成员|负责人|参与人|参与者|协作人)\s*(?:是|为|:|：)?\s*(?P<value>[^。；;\n]+)",
+        value,
+    )
+    if member_match:
+        segment = re.split(r"(?:，|,)?(?:交付物|产出|输出|截止|到期|deadline)", member_match.group("value"), maxsplit=1)[0]
+        member_segments.extend(_split_inline_list(_AT_PATTERN.sub(lambda m: m.group(2).strip(), segment)))
+
+    deliverables: list[str] = []
+    deliverable_match = re.search(
+        r"(?:交付物|产出|输出|需要完成|要完成|包括)\s*(?:是|为|包括|:|：)?\s*(?P<value>[^。；;\n]+)",
+        value,
+    )
+    if deliverable_match:
+        segment = re.split(r"(?:，|,)?(?:成员|负责人|参与人|截止|到期|deadline)", deliverable_match.group("value"), maxsplit=1)[0]
+        deliverables = _split_inline_list(_strip_deadline_clauses(segment))
+
+    title = ""
+    title_match = re.search(
+        r"(?:创建|新建|准备|启动|开一个|建一个|发起)\s*(?P<title>[^，,。；;\n]{2,30}?项目)",
+        value,
+    )
+    if title_match:
+        title = title_match.group("title").strip()
+
+    members = _clean_plan_list(mentioned_names + member_segments)
+    return {
+        "title": title,
+        "members": members,
+        "deliverables": deliverables,
+        "deadline": deadline,
+    }
+
+
 def _clean_recent_updates(updates: Any, limit: int = 5) -> list[dict]:
     """Keep restart-safe progress text without links, local paths, IDs, or secrets."""
     if not updates:
@@ -2166,6 +2262,7 @@ def _handle_generate_plan(params: Dict[str, Any], **kwargs) -> str:
 
     text = params.get("input_text", "")
     template = _detect_template(text)
+    inline_fields = _extract_inline_project_fields(text)
     session_chat_name = _get_session_value("HERMES_SESSION_CHAT_NAME", "")
     session_user_name = _get_session_value("HERMES_SESSION_USER_NAME", "")
     session_context_used = {
@@ -2178,9 +2275,9 @@ def _handle_generate_plan(params: Dict[str, Any], **kwargs) -> str:
     plan = {
         "title": params.get("title", "") or "",
         "goal": params.get("goal", "") or "",
-        "members": _clean_plan_list(params.get("members")),
-        "deliverables": _clean_plan_list(params.get("deliverables")),
-        "deadline": params.get("deadline", "") or "",
+        "members": _clean_plan_list(params.get("members")) or inline_fields.get("members", []),
+        "deliverables": _clean_plan_list(params.get("deliverables")) or inline_fields.get("deliverables", []),
+        "deadline": params.get("deadline", "") or inline_fields.get("deadline", ""),
         "risks": [],
     }
     if not plan["members"] and session_user_name:
@@ -2201,9 +2298,13 @@ def _handle_generate_plan(params: Dict[str, Any], **kwargs) -> str:
 
     # Title fallback: use chat name + date if extraction failed
     if not plan["title"]:
-        chat_name = session_chat_name or "项目"
-        plan["title"] = f"{chat_name} - {datetime.date.today().isoformat()}"
-        session_context_used["chat_name"] = bool(session_chat_name)
+        if session_chat_name:
+            plan["title"] = f"{session_chat_name} - {datetime.date.today().isoformat()}"
+            session_context_used["chat_name"] = True
+        elif inline_fields.get("title"):
+            plan["title"] = inline_fields["title"]
+        else:
+            plan["title"] = f"项目 - {datetime.date.today().isoformat()}"
 
     # Store full pending plan for card-button-driven creation
     if chat_id:

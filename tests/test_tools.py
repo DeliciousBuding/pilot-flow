@@ -49,6 +49,7 @@ from tools import (
     _load_project_state,
     _schedule_deadline_reminder,
     _clean_plan_list,
+    _extract_inline_project_fields,
     _parse_memory_project_entry,
     _history_suggestions_for_plan,
     _create_task,
@@ -610,6 +611,27 @@ def test_clean_plan_list_removes_agent_placeholders():
     assert _clean_plan_list("示例交付物、迁移验证记录") == ["迁移验证记录"]
 
 
+def test_extract_inline_project_fields_parses_group_message():
+    text = "帮我创建答辩项目，成员张三、李四，交付物是项目简报和任务清单，5月10日截止"
+
+    fields = _extract_inline_project_fields(text)
+
+    assert fields["title"] == "答辩项目"
+    assert fields["members"] == ["张三", "李四"]
+    assert fields["deliverables"] == ["项目简报", "任务清单"]
+    assert fields["deadline"] == "2026-05-10"
+
+
+def test_extract_inline_project_fields_uses_mentions_and_relative_deadline():
+    text = '请准备上线项目，成员是<at user_id="ou_zhangsan">张三</at>和李四，产出上线方案、回滚方案，明天截止'
+
+    fields = _extract_inline_project_fields(text)
+
+    assert fields["members"] == ["张三", "李四"]
+    assert fields["deliverables"] == ["上线方案", "回滚方案"]
+    assert fields["deadline"] == "2026-05-05"
+
+
 def test_generate_plan_does_not_show_placeholder_members():
     captured_cards = []
 
@@ -640,6 +662,37 @@ def test_generate_plan_does_not_show_placeholder_members():
     card_text = captured_cards[0]["elements"][0]["content"]
     assert "示例成员A" not in card_text
     assert "**成员：** 待确认" in card_text
+
+
+def test_generate_plan_fills_missing_fields_from_raw_text():
+    captured_cards = []
+
+    def fake_send(chat_id, card):
+        captured_cards.append(card)
+        return "om_raw"
+
+    with _project_registry_lock:
+        _project_registry.clear()
+    with _plan_lock:
+        _pending_plans.clear()
+        _card_action_refs.clear()
+
+    with patch("tools._hermes_send_card", side_effect=fake_send):
+        result = json.loads(_handle_generate_plan(
+            {
+                "input_text": "帮我创建答辩项目，成员张三、李四，交付物是项目简报和任务清单，5月10日截止",
+            },
+            chat_id="oc_raw_parse",
+        ))
+
+    assert result["plan"]["title"] == "答辩项目"
+    assert result["plan"]["members"] == ["张三", "李四"]
+    assert result["plan"]["deliverables"] == ["项目简报", "任务清单"]
+    assert result["plan"]["deadline"] == "2026-05-10"
+    card_text = captured_cards[0]["elements"][0]["content"]
+    assert "**成员：** 张三, 李四" in card_text
+    assert "**交付物：** 项目简报, 任务清单" in card_text
+    assert "**截止时间：** 2026-05-10" in card_text
 
 
 def test_generate_plan_uses_session_chat_and_initiator_context():
