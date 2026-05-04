@@ -1170,6 +1170,7 @@ def _state_project_candidate(title: str, item: dict) -> dict:
         "goal": item.get("goal", ""),
         "members": [],
         "deliverables": item.get("deliverables", []),
+        "deliverable_assignees": dict(item.get("deliverable_assignees") or {}),
         "initiator": item.get("initiator", ""),
         "deadline": item.get("deadline", ""),
         "status": item.get("status", "进行中"),
@@ -1197,7 +1198,8 @@ def _load_state_project_candidates(status_filter: str) -> list[tuple[str, dict, 
 def _save_project_state(title: str, goal: str, members: list, deliverables: list, deadline: str,
                         status: str, artifacts: Optional[list] = None, app_token: str = "",
                         table_id: str = "", record_id: str = "",
-                        updates: Optional[list] = None, initiator: str = "") -> bool:
+                        updates: Optional[list] = None, initiator: str = "",
+                        deliverable_assignees: Optional[dict] = None) -> bool:
     """Persist a sanitized project summary for restart-safe dashboards."""
     if not title:
         return False
@@ -1206,6 +1208,11 @@ def _save_project_state(title: str, goal: str, members: list, deliverables: list
             "title": title,
             "goal": goal or "",
             "deliverables": _clean_plan_list(deliverables),
+            "deliverable_assignees": _clean_deliverable_assignees(
+                deliverable_assignees,
+                _clean_plan_list(deliverables),
+                _clean_plan_list(members),
+            ),
             "initiator": _clean_initiator_name(initiator),
             "deadline": deadline or "",
             "status": status or "进行中",
@@ -1242,10 +1249,17 @@ def _load_project_state() -> list[dict]:
     for item in items if isinstance(items, list) else []:
         if not isinstance(item, dict) or not item.get("title"):
             continue
+        deliverables = _clean_plan_list(item.get("deliverables"))
         projects.append({
             "title": str(item.get("title", "")),
             "goal": str(item.get("goal", "")),
-            "deliverables": _clean_plan_list(item.get("deliverables")),
+            "deliverables": deliverables,
+            "deliverable_assignees": {
+                str(deliverable).strip(): _clean_member_update_value(str(assignee).strip())
+                for deliverable, assignee in (item.get("deliverable_assignees") or {}).items()
+                if str(deliverable).strip() in set(deliverables)
+                and _clean_member_update_value(str(assignee).strip())
+            },
             "initiator": _clean_initiator_name(item.get("initiator")),
             "deadline": str(item.get("deadline", "")),
             "status": str(item.get("status", "进行中")) or "进行中",
@@ -3789,6 +3803,7 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
         record_id=bitable_meta.get("record_id", "") if bitable_meta else "",
         updates=initial_updates,
         initiator=initiator,
+        deliverable_assignees=deliverable_assignees,
     )
 
     # Clean up only text-confirmation pending state. Card confirmations carry
@@ -4930,6 +4945,7 @@ def _record_action_outcome(
         project_title, project.get("goal", ""), project.get("members", []),
         project.get("deliverables", []), project.get("deadline", ""), project.get("status", "进行中"),
         artifacts, updates=project.get("updates", []), initiator=project.get("initiator", ""),
+        deliverable_assignees=project.get("deliverable_assignees"),
     )
     trace_value = doc_value or public_value
     doc_updated = _append_project_doc_update(project_title, project, action_label, trace_value) if trace_value else False
@@ -5261,6 +5277,8 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
             elif action == "add_deliverable":
                 if value not in project["deliverables"]:
                     project["deliverables"].append(value)
+                if assignee_override:
+                    project.setdefault("deliverable_assignees", {})[value] = assignee_override
                 if chat_id:
                     task_name = _create_task(
                         value, f"项目: {project_name}", assignee_override,
@@ -5294,6 +5312,8 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
                 elif action == "add_deliverable":
                     if value not in project["deliverables"]:
                         project["deliverables"].append(value)
+                    if assignee_override:
+                        project.setdefault("deliverable_assignees", {})[value] = assignee_override
                     registry_updated = True
                 elif action == "update_status":
                     project["status"] = value

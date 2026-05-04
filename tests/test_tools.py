@@ -943,6 +943,36 @@ def test_project_state_roundtrip_is_sanitized_and_portable(tmp_path):
     assert "secret_like" not in serialized
 
 
+def test_project_state_roundtrip_preserves_sanitized_deliverable_assignees(tmp_path):
+    state_path = tmp_path / "pilotflow-projects.json"
+
+    with patch.dict(os.environ, {"PILOTFLOW_STATE_PATH": str(state_path)}):
+        ok = _save_project_state(
+            "持久分工项目",
+            "验证重启后恢复分工",
+            ["张三", "李四"],
+            ["恢复记录", "接口联调"],
+            "2026-05-20",
+            "进行中",
+            deliverable_assignees={
+                "恢复记录": "李四",
+                "接口联调": '<at user_id="ou_secret">张三</at>',
+                "不存在交付物": "李四",
+                "恢复记录副本": "王五",
+            },
+        )
+        projects = _load_project_state()
+
+    assert ok is True
+    assert projects[0]["deliverable_assignees"] == {
+        "恢复记录": "李四",
+        "接口联调": "张三",
+    }
+    serialized = state_path.read_text(encoding="utf-8")
+    assert "ou_secret" not in serialized
+    assert "王五" not in serialized
+
+
 def test_project_state_upgrades_legacy_list_payload_with_schema_version(tmp_path):
     state_path = tmp_path / "pilotflow-projects.json"
     state_path.write_text(json.dumps([
@@ -5184,6 +5214,7 @@ def test_update_project_add_deliverable_accepts_structured_assignee():
     with _project_registry_lock:
         project = _project_registry["结构化负责人交付物项目"]
         assert project["deliverables"] == ["验收记录", "完成接口联调"]
+        assert project["deliverable_assignees"] == {"完成接口联调": "李四"}
     assert "交付物 → 完成接口联调" in send.call_args.args[1]
     assert "负责人 → 李四" in send.call_args.args[1]
 

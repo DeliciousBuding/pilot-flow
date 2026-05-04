@@ -225,6 +225,9 @@ def test_verify_runtime_update_task_summary_is_sanitized(tmp_path, monkeypatch):
     assert result["update_task_schema_assignee_exposed"] is True
     assert result["update_task_feedback_includes_summary"] is True
     assert result["update_task_artifact_recorded"] is True
+    assert result["update_task_assignee_persisted"] is True
+    assert result["update_task_detail_assignee_shown"] is True
+    assert result["update_task_reminder_assignee_shown"] is True
     assert "example.invalid" not in json.dumps(result, ensure_ascii=False)
 
 

@@ -180,6 +180,9 @@ def _sanitize_result(result: dict[str, Any]) -> dict[str, Any]:
         "update_task_schema_assignee_exposed",
         "update_task_feedback_includes_summary",
         "update_task_artifact_recorded",
+        "update_task_assignee_persisted",
+        "update_task_detail_assignee_shown",
+        "update_task_reminder_assignee_shown",
         "archive_gate_required",
         "archive_gate_no_write",
         "archive_gate_confirmed",
@@ -1430,7 +1433,15 @@ def _verify_runtime_update_task_summary(hermes_dir: Path) -> dict[str, Any]:
             chat_id=chat_id,
         ))
         with _project_registry_lock:
-            artifacts = list(_project_registry["运行态交付物验证项目"].get("artifacts", []))
+            project = _project_registry["运行态交付物验证项目"]
+            artifacts = list(project.get("artifacts", []))
+            persisted_assignees = dict(project.get("deliverable_assignees") or {})
+            detail_card, _detail_actions = runtime_tools._build_project_detail_card(
+                chat_id, "运行态交付物验证项目", project,
+            )
+            reminder_text = runtime_tools._build_project_reminder_text(
+                chat_id, "运行态交付物验证项目", project,
+            )
         schema_props = (
             runtime_tools.PILOTFLOW_UPDATE_PROJECT_SCHEMA
             .get("parameters", {})
@@ -1452,6 +1463,9 @@ def _verify_runtime_update_task_summary(hermes_dir: Path) -> dict[str, Any]:
         ),
         "update_task_feedback_includes_summary": any("飞书任务 → 运行态新增待办" in msg for msg in sent_messages),
         "update_task_artifact_recorded": any(item.startswith("任务: 运行态新增待办") for item in artifacts),
+        "update_task_assignee_persisted": persisted_assignees.get("运行态新增待办") == "张三",
+        "update_task_detail_assignee_shown": "运行态新增待办 → 张三" in json.dumps(detail_card, ensure_ascii=False),
+        "update_task_reminder_assignee_shown": "运行态新增待办 → 张三" in reminder_text,
     }
 
 

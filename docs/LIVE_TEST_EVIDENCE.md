@@ -2,6 +2,20 @@
 
 > 本文件只记录可复验结论和脱敏摘要，不提交真实群 ID、用户 open_id、应用 secret、message_id 或飞书文档链接。
 
+## 2026-05-05 新增交付物负责人持久化
+
+| 项目 | 证据 |
+| --- | --- |
+| 功能硬化 | `pilotflow_update_project(action=add_deliverable)` 现在会把结构化 `assignee` 或兼容解析出的负责人同步写入项目 `deliverable_assignees`，不再只用于本次飞书任务创建和群反馈 |
+| 状态延续 | restart-safe project state 现在保存清洗后的 `交付物 → 负责人显示名` 映射；重启后从 state fallback 打开项目详情时仍可展示新增交付物分工 |
+| 隐私边界 | state 不保存成员列表、open_id、chat_id、message_id 或 Feishu URL；保存时按交付物和项目成员清洗，加载时只保留交付物键和脱敏后的显示名 |
+| 本地回归 | `C:\Users\Ding\miniforge3\python.exe -m pytest` 返回 `286 passed`；`tests/test_tools.py tests/test_verify_wsl_feishu_runtime.py` 返回 `252 passed`；`git diff --check` 通过，仅有 CRLF 提示 |
+| WSL 安装态 | `setup.py --hermes-dir D:\Code\LarkProject\hermes-agent --hermes-home \\wsl.localhost\Ubuntu-24.04\home\ding\.hermes` 通过；插件和 skill 已同步到 WSL Hermes runtime profile |
+| Verifier 新字段 | `verify_wsl_feishu_runtime.py --verify-update-task` 在已安装的 WSL Hermes runtime 插件内返回 `update_task_assignee_persisted=true`、`update_task_detail_assignee_shown=true`、`update_task_reminder_assignee_shown=true` |
+| 基线验证 | 同轮继续通过同一 Feishu venv 下 `--send-card` 的 `card_sent=true`、`card_has_title=true`、`card_has_goal=true`、`card_has_initiator=true`、`card_has_risk=true`，以及 `--probe-llm` 的 `llm_probe_ok=true`、`llm_probe_status=200` |
+| 用户价值 | 用户在项目创建后追加“交付物 + 负责人”时，后续详情卡和项目催办会继续显示该分工，不需要回翻群消息或依赖本次更新反馈 |
+| 隐私处理 | 验证只记录布尔结果和脱敏状态；不写入真实 chat_id、open_id、message_id、Feishu URL、任务 URL、token 或 app secret |
+
 ## 2026-05-05 交付物负责人幂等隔离
 
 | 项目 | 证据 |
