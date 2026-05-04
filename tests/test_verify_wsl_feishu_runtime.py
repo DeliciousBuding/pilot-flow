@@ -506,6 +506,8 @@ def test_verify_runtime_dashboard_navigation_is_sanitized(tmp_path, monkeypatch)
     assert result["dashboard_cards_sent"] is True
     assert result["dashboard_used_opaque_refs"] is True
     assert result["dashboard_state_detail_assignees_shown"] is True
+    assert result["dashboard_state_archived_hidden"] is True
+    assert result["dashboard_state_archived_filter_shown"] is True
     assert "example.invalid" not in json.dumps(result, ensure_ascii=False)
 
 
@@ -1254,6 +1256,8 @@ def test_verifier_dashboard_navigation_mode_outputs_sanitized_runtime_result(tmp
         "dashboard_cards_sent": True,
         "dashboard_used_opaque_refs": True,
         "dashboard_state_detail_assignees_shown": True,
+        "dashboard_state_archived_hidden": True,
+        "dashboard_state_archived_filter_shown": True,
         "raw_chat_id": "oc_real_chat_id",
         "raw_doc_url": "https://example.invalid/doc/1",
     }):
@@ -1275,6 +1279,8 @@ def test_verifier_dashboard_navigation_mode_outputs_sanitized_runtime_result(tmp
     assert output["dashboard_cards_sent"] is True
     assert output["dashboard_used_opaque_refs"] is True
     assert output["dashboard_state_detail_assignees_shown"] is True
+    assert output["dashboard_state_archived_hidden"] is True
+    assert output["dashboard_state_archived_filter_shown"] is True
     assert "oc_real_chat_id" not in output_text
     assert "example.invalid" not in output_text
 

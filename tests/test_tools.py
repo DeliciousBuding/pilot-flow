@@ -4227,6 +4227,52 @@ def test_query_status_hides_archived_projects_by_default_and_shows_when_requeste
     assert "已归档生命周期项目" in archived_content
 
 
+def test_query_status_hides_state_archived_projects_after_restart(tmp_path):
+    state_path = tmp_path / "pilotflow-projects.json"
+    with _project_registry_lock:
+        _project_registry.clear()
+
+    with patch.dict(os.environ, {"PILOTFLOW_STATE_PATH": str(state_path)}):
+        assert _save_project_state(
+            "重启看板进行中项目",
+            "验证重启后默认看板",
+            [],
+            ["验收记录"],
+            "2026-05-20",
+            "进行中",
+        )
+        assert _save_project_state(
+            "重启看板已归档项目",
+            "验证重启后归档筛选",
+            [],
+            ["验收记录"],
+            "2026-05-20",
+            "已归档",
+        )
+        captured_cards = []
+
+        def capture_card(chat_id, card):
+            captured_cards.append(card)
+            return True
+
+        with patch("tools._send_interactive_card_via_feishu", side_effect=capture_card):
+            default_result = _handle_query_status({"query": "项目进展"}, chat_id="oc_state_archive_default")
+            archived_result = _handle_query_status(
+                {"query": "看看归档项目", "filter": "archived"},
+                chat_id="oc_state_archive_only",
+            )
+
+    assert "项目看板已发送" in default_result
+    default_content = json.dumps(captured_cards[0], ensure_ascii=False)
+    assert "重启看板进行中项目" in default_content
+    assert "重启看板已归档项目" not in default_content
+
+    assert "项目看板已发送" in archived_result
+    archived_content = json.dumps(captured_cards[1], ensure_ascii=False)
+    assert "重启看板进行中项目" not in archived_content
+    assert "重启看板已归档项目" in archived_content
+
+
 def test_query_status_filters_risk_projects():
     with _project_registry_lock:
         _project_registry.clear()

@@ -293,6 +293,8 @@ def _sanitize_result(result: dict[str, Any]) -> dict[str, Any]:
         "dashboard_cards_sent",
         "dashboard_used_opaque_refs",
         "dashboard_state_detail_assignees_shown",
+        "dashboard_state_archived_hidden",
+        "dashboard_state_archived_filter_shown",
         "error",
     }
     return {key: result[key] for key in allowed if key in result}
@@ -3364,6 +3366,31 @@ def _verify_runtime_dashboard_navigation(hermes_dir: Path) -> dict[str, Any]:
                 {"query": "运行态重启分工详情项目进展如何"},
                 chat_id=chat_id,
             )
+            runtime_tools._DASHBOARD_PAGE_SIZE = 10
+            _save_project_state(
+                "运行态重启看板进行中项目",
+                "验证安装后重启默认看板",
+                [],
+                ["验收记录"],
+                "2026-05-20",
+                "进行中",
+            )
+            _save_project_state(
+                "运行态重启看板已归档项目",
+                "验证安装后重启归档筛选",
+                [],
+                ["验收记录"],
+                "2026-05-20",
+                "已归档",
+            )
+            state_default_dashboard = _handle_query_status(
+                {"query": "项目进展"},
+                chat_id=chat_id,
+            )
+            state_archived_dashboard = _handle_query_status(
+                {"query": "看看归档项目", "filter": "archived"},
+                chat_id=chat_id,
+            )
         finally:
             runtime_tools._DASHBOARD_PAGE_SIZE = original_page_size
             runtime_tools._hermes_send_card = original_send_card
@@ -3377,6 +3404,8 @@ def _verify_runtime_dashboard_navigation(hermes_dir: Path) -> dict[str, Any]:
     filter_card_text = card_text(sent_cards[0]) if sent_cards else ""
     page_card_text = card_text(sent_cards[1]) if len(sent_cards) > 1 else ""
     state_detail_text = card_text(sent_cards[2]) if len(sent_cards) > 2 else ""
+    state_default_text = card_text(sent_cards[3]) if len(sent_cards) > 3 else ""
+    state_archived_text = card_text(sent_cards[4]) if len(sent_cards) > 4 else ""
     return {
         "dashboard_filter_sent": filter_data.get("status") == "dashboard_filter_sent",
         "dashboard_filter_scoped": (
@@ -3390,11 +3419,21 @@ def _verify_runtime_dashboard_navigation(hermes_dir: Path) -> dict[str, Any]:
             and "运行态看板第一页项目" not in page_card_text
             and "第 2/3 页" in page_card_text
         ),
-        "dashboard_cards_sent": len(sent_cards) == 3,
+        "dashboard_cards_sent": len(sent_cards) == 5,
         "dashboard_used_opaque_refs": bool(filter_action_id and page_action_id),
         "dashboard_state_detail_assignees_shown": (
             "项目详情已发送" in state_detail_result
             and "恢复记录 → 李四；接口联调 → 张三" in state_detail_text
+        ),
+        "dashboard_state_archived_hidden": (
+            "项目看板已发送" in state_default_dashboard
+            and "运行态重启看板进行中项目" in state_default_text
+            and "运行态重启看板已归档项目" not in state_default_text
+        ),
+        "dashboard_state_archived_filter_shown": (
+            "项目看板已发送" in state_archived_dashboard
+            and "运行态重启看板进行中项目" not in state_archived_text
+            and "运行态重启看板已归档项目" in state_archived_text
         ),
     }
 

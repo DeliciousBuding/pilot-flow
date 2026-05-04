@@ -2,6 +2,20 @@
 
 > 本文件只记录可复验结论和脱敏摘要，不提交真实群 ID、用户 open_id、应用 secret、message_id 或飞书文档链接。
 
+## 2026-05-05 重启后归档看板筛选
+
+| 项目 | 证据 |
+| --- | --- |
+| 功能验证 | restart-safe state-only 项目处于 `已归档` 状态时，默认项目看板会隐藏该项目；显式 `filter=archived` 时可以重新显示 |
+| 适用边界 | 看板筛选只读取脱敏 state 摘要；不会恢复成员名单，也不会暴露真实文档/Base/任务 URL |
+| 状态延续 | 用户确认归档并重启 Hermes gateway 后，项目不会继续污染默认进行中看板，但仍能通过归档筛选追溯 |
+| 本地回归 | `C:\Users\Ding\miniforge3\python.exe -m pytest` 返回 `301 passed`；`tests/test_tools.py tests/test_verify_wsl_feishu_runtime.py` 返回 `267 passed` |
+| WSL 安装态 | `setup.py --hermes-dir D:\Code\LarkProject\hermes-agent --hermes-home \\wsl.localhost\Ubuntu-24.04\home\ding\.hermes` 通过；插件和 skill 已同步到 WSL Hermes runtime profile |
+| Verifier 新字段 | `--verify-dashboard-navigation` 返回 `dashboard_state_archived_hidden=true`、`dashboard_state_archived_filter_shown=true`，同时看板风险筛选、分页、opaque action 和 state-only 分工详情基线仍为 true |
+| 基线验证 | 同轮继续通过同一 Feishu venv 下 `--send-card` 的 `card_sent=true`、`card_has_title=true`、`card_has_goal=true`、`card_has_initiator=true`、`card_has_risk=true`，以及 `--probe-llm` 的 `llm_probe_ok=true`、`llm_probe_status=200` |
+| 用户价值 | 归档闭环不只停在状态写入：重启后团队默认看板保持干净，历史项目仍可按归档入口查回 |
+| 隐私处理 | 验证只记录布尔结果和脱敏状态；不写入真实 chat_id、open_id、message_id、Feishu URL、token 或 app secret |
+
 ## 2026-05-05 重启后归档确认门控
 
 | 项目 | 证据 |
