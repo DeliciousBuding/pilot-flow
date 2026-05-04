@@ -766,7 +766,7 @@ def _project_resource_refs_path() -> Path:
 
 @contextmanager
 def _state_payload_file_lock():
-    """Hold a small lock file so state updates are serialized across processes."""
+    """Hold one lock file for public state and private refs updates."""
     path = _project_state_path()
     lock_path = path.with_name(f"{path.name}.lock")
     lock_path.parent.mkdir(parents=True, exist_ok=True)
@@ -839,6 +839,28 @@ def _write_state_payload_unlocked(payload: dict) -> bool:
         return False
 
 
+def _load_resource_refs_payload_unlocked() -> dict:
+    """Load private resource refs while the caller owns state locking."""
+    path = _project_resource_refs_path()
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+    except Exception:
+        payload = {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def _write_resource_refs_payload_unlocked(payload: dict) -> bool:
+    """Write private resource refs while the caller owns state locking."""
+    path = _project_resource_refs_path()
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(payload or {}, ensure_ascii=False, indent=2), encoding="utf-8")
+        return True
+    except Exception as e:
+        logger.debug("project resource refs save skipped: %s", e)
+        return False
+
+
 def _update_state_payload(mutator) -> bool:
     """Apply a read-modify-write state update under process and file locks."""
     with _state_file_lock:
@@ -848,6 +870,21 @@ def _update_state_payload(mutator) -> bool:
             if updated is False:
                 return False
             return _write_state_payload_unlocked(payload)
+
+
+def _update_state_and_refs(state_mutator, refs_mutator) -> bool:
+    """Update public state and private refs under the same process/file lock."""
+    with _state_file_lock:
+        with _state_payload_file_lock():
+            payload = _load_state_payload()
+            refs_payload = _load_resource_refs_payload_unlocked()
+            if state_mutator(payload) is False:
+                return False
+            if refs_mutator(refs_payload) is False:
+                return False
+            state_ok = _write_state_payload_unlocked(payload)
+            refs_ok = _write_resource_refs_payload_unlocked(refs_payload)
+            return state_ok and refs_ok
 
 
 def _persist_card_action_ref(action_id: str, ref: dict) -> None:
@@ -1010,13 +1047,27 @@ def _plain_at_mentions(text: Any) -> str:
 def _save_project_resource_refs(title: str, artifacts: Optional[list]) -> None:
     """Persist non-secret resource links separately from the public project summary."""
     refs = _safe_resource_artifacts(artifacts)
-    path = _project_resource_refs_path()
-    try:
-        payload = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
-    except Exception:
-        payload = {}
-    if not isinstance(payload, dict):
-        payload = {}
+
+    def mutate(payload: dict) -> bool:
+        if refs:
+            payload[title] = {
+                "artifacts": refs,
+                "updated_at": int(time.time()),
+            }
+        else:
+            payload.pop(title, None)
+        return True
+
+    with _state_file_lock:
+        with _state_payload_file_lock():
+            payload = _load_resource_refs_payload_unlocked()
+            mutate(payload)
+            _write_resource_refs_payload_unlocked(payload)
+
+
+def _mutate_project_resource_refs(payload: dict, title: str, artifacts: Optional[list]) -> bool:
+    """Mutate private resource refs in memory; caller owns state locking."""
+    refs = _safe_resource_artifacts(artifacts)
     if refs:
         payload[title] = {
             "artifacts": refs,
@@ -1024,24 +1075,16 @@ def _save_project_resource_refs(title: str, artifacts: Optional[list]) -> None:
         }
     else:
         payload.pop(title, None)
-    try:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
-    except Exception as e:
-        logger.debug("project resource refs save skipped: %s", e)
+    return True
 
 
 def _load_project_resource_refs(title: str) -> list[str]:
     """Load persisted non-secret resource links for a project."""
     if not title:
         return []
-    path = _project_resource_refs_path()
-    try:
-        payload = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
-    except Exception:
-        return []
-    if not isinstance(payload, dict):
-        return []
+    with _state_file_lock:
+        with _state_payload_file_lock():
+            payload = _load_resource_refs_payload_unlocked()
     refs = payload.get(title)
     if not isinstance(refs, dict):
         return []
@@ -1095,7 +1138,7 @@ def _save_project_state(title: str, goal: str, members: list, deliverables: list
             "updated_at": int(time.time()),
         }
 
-        def mutate(payload: dict) -> bool:
+        def mutate_state(payload: dict) -> bool:
             items = payload.get("projects", [])
             existing = []
             for item in items if isinstance(items, list) else []:
@@ -1107,8 +1150,10 @@ def _save_project_state(title: str, goal: str, members: list, deliverables: list
             payload["projects"] = records
             return True
 
-        _save_project_resource_refs(title, artifacts)
-        return _update_state_payload(mutate)
+        def mutate_refs(payload: dict) -> bool:
+            return _mutate_project_resource_refs(payload, title, artifacts)
+
+        return _update_state_and_refs(mutate_state, mutate_refs)
     except Exception as e:
         logger.debug("project state save skipped: %s", e)
         return False

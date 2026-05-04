@@ -734,6 +734,34 @@ def test_project_state_concurrent_saves_do_not_lose_updates(tmp_path):
     assert {project["title"] for project in projects} == {f"并发项目{index}" for index in range(20)}
 
 
+def test_project_resource_refs_concurrent_saves_do_not_lose_links(tmp_path):
+    state_path = tmp_path / "pilotflow-projects.json"
+    refs_path = tmp_path / "pilotflow_project_refs.json"
+
+    def save_one(index: int) -> None:
+        with patch.dict(os.environ, {"PILOTFLOW_STATE_PATH": str(state_path)}):
+            assert _save_project_state(
+                f"并发引用项目{index}",
+                "验证引用并发保存",
+                [],
+                [f"记录{index}"],
+                "2026-05-20",
+                "进行中",
+                artifacts=[f"文档: https://example.invalid/doc-{index}"],
+            )
+
+    threads = [threading.Thread(target=save_one, args=(index,)) for index in range(20)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    payload = json.loads(refs_path.read_text(encoding="utf-8"))
+    assert set(payload) == {f"并发引用项目{index}" for index in range(20)}
+    for index in range(20):
+        assert payload[f"并发引用项目{index}"]["artifacts"] == [f"文档: https://example.invalid/doc-{index}"]
+
+
 def test_project_state_roundtrip_keeps_sanitized_recent_updates(tmp_path):
     state_path = tmp_path / "pilotflow-projects.json"
 
