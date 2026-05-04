@@ -1147,6 +1147,19 @@
 | 用户价值 | 站会/项目看板发现逾期或风险项目后，用户可以一键批量创建跟进待办，PilotFlow 自动分配负责人、同步文档/状态表/状态文件并在群里反馈，补齐团队级后续追踪闭环 |
 | 隐私处理 | 证据只记录布尔结果和脱敏结论；不写入真实 chat_id、message_id、Feishu URL、用户 open_id、token 或 app secret |
 
+## 2026-05-05 看板导航运行态验证
+
+| 项目 | 证据 |
+| --- | --- |
+| 运行环境 | PilotFlow 已通过 `setup.py --hermes-home <wsl-hermes-home>` 同步到 WSL Hermes runtime；安装验证返回插件、技能、Hermes config 和 Feishu display 配置均 OK |
+| 本地回归 | `C:\Users\Ding\miniforge3\python.exe -m pytest` 返回 `247 passed`；`tests/test_verify_wsl_feishu_runtime.py` 返回 `28 passed`；`git diff --check` 通过 |
+| Verifier 新模式 | `verify_wsl_feishu_runtime.py --verify-dashboard-navigation` 在已安装的 WSL Hermes runtime 插件内返回 `dashboard_filter_sent=true`、`dashboard_filter_scoped=true`、`dashboard_page_sent=true`、`dashboard_page_scoped=true`、`dashboard_cards_sent=true`、`dashboard_used_opaque_refs=true` |
+| 卡片动作路径 | verifier 使用生产 `_create_card_action_ref` 生成 opaque action，再通过 `_handle_card_action` 执行 `dashboard_filter` 和 `dashboard_page`，覆盖“简报/看板卡片按钮 → 筛选项目看板/翻页项目看板 → 群内发送新卡片”的真实插件路径 |
+| 筛选与分页 | 运行态场景同时注册普通项目和风险项目，风险筛选只展示风险项目；强制分页大小为 1 后，第 2 页只展示第二个项目，并保留页码信息 |
+| 基线验证 | 同轮继续通过 `--probe-llm` 的 `llm_probe_ok=true`、`llm_probe_status=200`，`--send-card` 的 `card_sent=true`、`card_has_title=true`、`card_has_goal=true`、`card_has_risk=true`，`--verify-history` 的 `history_apply_card_sent=true`，`--verify-update-task` 的 `update_task_created=true`，`--verify-archive-gate` 的 `archive_gate_required=true`，`--verify-followup-task` 的 `followup_task_created=true`，`--verify-deadline-update` 的 `deadline_update_applied=true`，`--verify-member-permissions` 的 `member_added=true`，`--verify-risk-cycle` 的 `risk_reported=true`，`--verify-progress-update` 的 `progress_update_applied=true`，`--verify-project-reminder` 的 `reminder_single_sent=true`，`--verify-card-status-cycle` 的 `card_status_done_applied=true`，以及 `--verify-batch-followup-task` 的 `batch_followup_created=true` |
+| 用户价值 | 项目简报和看板上的查看风险、查看逾期、上一页/下一页按钮不只是单元测试行为，而是在安装态插件中可复跑验证，用户可以从群卡片继续浏览筛选后的项目状态 |
+| 隐私处理 | 证据只记录布尔结果和脱敏结论；不写入真实 chat_id、message_id、Feishu URL、用户 open_id、token 或 app secret |
+
 ## 本地回归
 
 ```bash

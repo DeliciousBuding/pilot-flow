@@ -289,6 +289,20 @@ def test_verify_runtime_batch_followup_task_is_sanitized(tmp_path, monkeypatch):
     assert "example.invalid" not in json.dumps(result, ensure_ascii=False)
 
 
+def test_verify_runtime_dashboard_navigation_is_sanitized(tmp_path, monkeypatch):
+    hermes_dir, _sent_cards = _install_runtime_fixture(tmp_path, monkeypatch)
+
+    result = _MODULE._verify_runtime_dashboard_navigation(hermes_dir)
+
+    assert result["dashboard_filter_sent"] is True
+    assert result["dashboard_filter_scoped"] is True
+    assert result["dashboard_page_sent"] is True
+    assert result["dashboard_page_scoped"] is True
+    assert result["dashboard_cards_sent"] is True
+    assert result["dashboard_used_opaque_refs"] is True
+    assert "example.invalid" not in json.dumps(result, ensure_ascii=False)
+
+
 def test_verifier_update_task_mode_outputs_sanitized_runtime_result(tmp_path, capsys):
     env_file = tmp_path / ".env"
     env_file.write_text("PILOTFLOW_TEST_CHAT_ID=oc_real_chat_id\n", encoding="utf-8")
@@ -630,6 +644,41 @@ def test_verifier_batch_followup_task_mode_outputs_sanitized_runtime_result(tmp_
     assert output["batch_followup_state_recorded"] is True
     assert output["batch_followup_feedback_sent"] is True
     assert output["batch_followup_used_opaque_ref"] is True
+    assert "oc_real_chat_id" not in output_text
+    assert "example.invalid" not in output_text
+
+
+def test_verifier_dashboard_navigation_mode_outputs_sanitized_runtime_result(tmp_path, capsys):
+    env_file = tmp_path / ".env"
+    env_file.write_text("PILOTFLOW_TEST_CHAT_ID=oc_real_chat_id\n", encoding="utf-8")
+
+    with patch.object(_MODULE, "_verify_runtime_dashboard_navigation", return_value={
+        "dashboard_filter_sent": True,
+        "dashboard_filter_scoped": True,
+        "dashboard_page_sent": True,
+        "dashboard_page_scoped": True,
+        "dashboard_cards_sent": True,
+        "dashboard_used_opaque_refs": True,
+        "raw_chat_id": "oc_real_chat_id",
+        "raw_doc_url": "https://example.invalid/doc/1",
+    }):
+        exit_code = _MODULE.main([
+            "--hermes-dir", str(tmp_path),
+            "--env-file", str(env_file),
+            "--verify-dashboard-navigation",
+        ])
+
+    output_text = capsys.readouterr().out
+    output = json.loads(output_text)
+    assert exit_code == 0
+    assert output["mode"] == "dashboard-navigation"
+    assert output["would_send_card"] is False
+    assert output["dashboard_filter_sent"] is True
+    assert output["dashboard_filter_scoped"] is True
+    assert output["dashboard_page_sent"] is True
+    assert output["dashboard_page_scoped"] is True
+    assert output["dashboard_cards_sent"] is True
+    assert output["dashboard_used_opaque_refs"] is True
     assert "oc_real_chat_id" not in output_text
     assert "example.invalid" not in output_text
 

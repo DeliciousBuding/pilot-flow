@@ -171,6 +171,12 @@ def _sanitize_result(result: dict[str, Any]) -> dict[str, Any]:
         "batch_followup_state_recorded",
         "batch_followup_feedback_sent",
         "batch_followup_used_opaque_ref",
+        "dashboard_filter_sent",
+        "dashboard_filter_scoped",
+        "dashboard_page_sent",
+        "dashboard_page_scoped",
+        "dashboard_cards_sent",
+        "dashboard_used_opaque_refs",
         "error",
     }
     return {key: result[key] for key in allowed if key in result}
@@ -1383,6 +1389,128 @@ def _verify_runtime_batch_followup_task(hermes_dir: Path) -> dict[str, Any]:
     }
 
 
+def _verify_runtime_dashboard_navigation(hermes_dir: Path) -> dict[str, Any]:
+    """Verify installed PilotFlow can filter and paginate dashboard cards from card actions."""
+    sys.path.insert(0, str(hermes_dir))
+    import datetime as dt
+    import plugins.pilotflow.tools as runtime_tools  # pylint: disable=import-error
+    from plugins.pilotflow.tools import (  # pylint: disable=import-error
+        _create_card_action_ref,
+        _handle_card_action,
+        _project_registry,
+        _project_registry_lock,
+        _register_project,
+    )
+
+    chat_id = os.environ.get("PILOTFLOW_TEST_CHAT_ID", "")
+    original_state_path = os.environ.get("PILOTFLOW_STATE_PATH")
+    original_page_size = runtime_tools._DASHBOARD_PAGE_SIZE
+    original_send_card = runtime_tools._hermes_send_card
+    sent_cards: list[dict[str, Any]] = []
+
+    def fake_send_card(_chat_id: str, card: dict[str, Any]) -> str:
+        sent_cards.append(card)
+        return f"om_dashboard_{len(sent_cards)}"
+
+    def card_text(card: dict[str, Any]) -> str:
+        values: list[str] = []
+
+        def visit(value: Any) -> None:
+            if isinstance(value, dict):
+                for item in value.values():
+                    visit(item)
+            elif isinstance(value, list):
+                for item in value:
+                    visit(item)
+            elif isinstance(value, str):
+                values.append(value)
+
+        visit(card)
+        return "\n".join(values)
+
+    with tempfile.TemporaryDirectory(prefix="pilotflow-dashboard-verify-") as tmpdir:
+        os.environ["PILOTFLOW_STATE_PATH"] = str(Path(tmpdir) / "pilotflow_state.json")
+        with _project_registry_lock:
+            _project_registry.clear()
+        runtime_tools._DASHBOARD_PAGE_SIZE = 1
+        runtime_tools._hermes_send_card = fake_send_card
+        try:
+            today = dt.date.today()
+            _register_project(
+                "运行态看板第一页项目",
+                ["张三"],
+                (today + dt.timedelta(days=5)).isoformat(),
+                "进行中",
+                ["文档: https://example.invalid/doc/dashboard-one"],
+                goal="验证安装后的看板分页第一页",
+                deliverables=["分页验收"],
+            )
+            _register_project(
+                "运行态看板第二页项目",
+                ["李四"],
+                (today + dt.timedelta(days=7)).isoformat(),
+                "进行中",
+                ["文档: https://example.invalid/doc/dashboard-two"],
+                goal="验证安装后的看板分页第二页",
+                deliverables=["分页验收"],
+            )
+            _register_project(
+                "运行态看板风险项目",
+                ["王五"],
+                (today + dt.timedelta(days=2)).isoformat(),
+                "有风险",
+                ["文档: https://example.invalid/doc/dashboard-risk"],
+                goal="验证安装后的看板风险筛选",
+                deliverables=["风险验收"],
+            )
+            filter_action_id = _create_card_action_ref(
+                chat_id,
+                "dashboard_filter",
+                {"query": "看看风险项目", "filter": "risk"},
+            )
+            filter_data = json.loads(_handle_card_action(
+                {"action_value": json.dumps({"pilotflow_action_id": filter_action_id}, ensure_ascii=False)},
+                chat_id=chat_id,
+            ))
+            page_action_id = _create_card_action_ref(
+                chat_id,
+                "dashboard_page",
+                {"query": "项目进展第2页", "page": 2, "filter": "active"},
+            )
+            page_data = json.loads(_handle_card_action(
+                {"action_value": json.dumps({"pilotflow_action_id": page_action_id}, ensure_ascii=False)},
+                chat_id=chat_id,
+            ))
+        finally:
+            runtime_tools._DASHBOARD_PAGE_SIZE = original_page_size
+            runtime_tools._hermes_send_card = original_send_card
+            with _project_registry_lock:
+                _project_registry.clear()
+            if original_state_path is None:
+                os.environ.pop("PILOTFLOW_STATE_PATH", None)
+            else:
+                os.environ["PILOTFLOW_STATE_PATH"] = original_state_path
+
+    filter_card_text = card_text(sent_cards[0]) if sent_cards else ""
+    page_card_text = card_text(sent_cards[1]) if len(sent_cards) > 1 else ""
+    return {
+        "dashboard_filter_sent": filter_data.get("status") == "dashboard_filter_sent",
+        "dashboard_filter_scoped": (
+            "运行态看板风险项目" in filter_card_text
+            and "运行态看板第一页项目" not in filter_card_text
+            and "运行态看板第二页项目" not in filter_card_text
+        ),
+        "dashboard_page_sent": page_data.get("status") == "dashboard_page_sent",
+        "dashboard_page_scoped": (
+            "运行态看板第二页项目" in page_card_text
+            and "运行态看板第一页项目" not in page_card_text
+            and "第 2/3 页" in page_card_text
+        ),
+        "dashboard_cards_sent": len(sent_cards) == 2,
+        "dashboard_used_opaque_refs": bool(filter_action_id and page_action_id),
+    }
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Verify PilotFlow WSL Feishu runtime.")
     parser.add_argument("--hermes-dir", required=True, help="Hermes runtime directory.")
@@ -1401,6 +1529,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--verify-project-reminder", action="store_true", help="Dry-run installed single/batch project reminder behavior.")
     parser.add_argument("--verify-card-status-cycle", action="store_true", help="Dry-run installed card complete/reopen behavior.")
     parser.add_argument("--verify-batch-followup-task", action="store_true", help="Dry-run installed briefing batch follow-up task behavior.")
+    parser.add_argument("--verify-dashboard-navigation", action="store_true", help="Dry-run installed dashboard filter/pagination behavior.")
     args = parser.parse_args(argv)
 
     hermes_dir = Path(args.hermes_dir).resolve()
@@ -1408,7 +1537,8 @@ def main(argv: list[str] | None = None) -> int:
     config_result = _read_runtime_config(Path(args.config_file))
     import_result = _check_imports(hermes_dir)
     mode = (
-        "batch-followup-task" if args.verify_batch_followup_task
+        "dashboard-navigation" if args.verify_dashboard_navigation
+        else "batch-followup-task" if args.verify_batch_followup_task
         else "card-status-cycle" if args.verify_card_status_cycle
         else "project-reminder" if args.verify_project_reminder
         else "progress-update" if args.verify_progress_update
@@ -1457,6 +1587,8 @@ def main(argv: list[str] | None = None) -> int:
         output.update(_verify_runtime_card_status_cycle(hermes_dir))
     if args.verify_batch_followup_task:
         output.update(_verify_runtime_batch_followup_task(hermes_dir))
+    if args.verify_dashboard_navigation:
+        output.update(_verify_runtime_dashboard_navigation(hermes_dir))
     if args.probe_llm:
         output.update(_probe_llm(config_result))
     print(json.dumps(_sanitize_result(output), ensure_ascii=False, sort_keys=True))
