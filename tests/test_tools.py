@@ -862,6 +862,63 @@ def test_generate_plan_uses_session_chat_and_initiator_context():
     assert "**成员：** 王小明" in card_text
 
 
+def test_generate_plan_returns_redacted_flight_record():
+    with _plan_lock:
+        _pending_plans.clear()
+        _card_action_refs.clear()
+
+    with patch("tools._hermes_send_card", return_value="om_real_message_id"):
+        result = json.loads(_handle_generate_plan(
+            {
+                "input_text": "请查看 https://example.feishu.cn/docx/abc?token=secret",
+                "title": "证据链项目",
+                "goal": "验证 Flight Recorder",
+                "members": ["张三"],
+                "deliverables": ["验证记录"],
+                "deadline": "2026-05-10",
+            },
+            chat_id="oc_real_chat_id",
+        ))
+
+    flight_record = result["flight_record"]
+    encoded = json.dumps(flight_record, ensure_ascii=False)
+    assert flight_record["run_id"].startswith("pf_")
+    assert flight_record["final_status"] == "planned"
+    assert "证据链项目" in flight_record["markdown"]
+    assert "oc_real_chat_id" not in encoded
+    assert "om_real_message_id" not in encoded
+    assert "https://example.feishu.cn" not in encoded
+    assert "[redacted:chat_id]" in encoded
+    assert "[redacted:message_id]" in encoded
+    assert "[redacted:url]" in encoded
+
+
+def test_generate_plan_private_scope_returns_trace_without_card():
+    with _plan_lock:
+        _pending_plans.clear()
+        _card_action_refs.clear()
+
+    with patch("tools._hermes_send_card") as send_card:
+        result = json.loads(_handle_generate_plan(
+            {
+                "input_text": "帮我创建个人项目",
+                "title": "个人项目",
+                "goal": "验证私聊自治计划",
+                "members": [],
+                "deliverables": ["验证记录"],
+                "deadline": "2026-05-11",
+            },
+            chat_id="oc_private_plan",
+            chat_scope="private",
+        ))
+
+    assert result["status"] == "plan_generated"
+    assert result["autonomy"]["mode"] == "auto"
+    assert result["card_sent"] is False
+    assert result["flight_record"]["final_status"] == "planned"
+    send_card.assert_not_called()
+
+
 def test_create_project_requires_separate_text_confirmation_after_plan():
     chat_id = "oc_same_turn_guard"
     with _project_registry_lock:
@@ -990,6 +1047,56 @@ def test_create_project_accepts_raw_confirmation_text_fallback():
     assert result["status"] == "project_space_created"
     with _project_registry_lock:
         assert "迁移验证项目" in _project_registry
+
+
+def test_create_project_returns_redacted_flight_record():
+    chat_id = "oc_create_trace"
+    with _project_registry_lock:
+        _project_registry.clear()
+    with _plan_lock:
+        _pending_plans.clear()
+        _card_action_refs.clear()
+
+    with (
+        patch("tools._resolve_member", return_value="ou_real_member"),
+        patch("tools._create_doc", return_value="https://example.feishu.cn/docx/abc?token=secret"),
+        patch("tools._create_bitable", return_value={
+            "url": "https://example.feishu.cn/base/app_token=real_app_token",
+            "app_token": "app_token=real_app_token",
+            "table_id": "tbl1",
+            "record_id": "rec1",
+        }),
+        patch("tools._create_task", return_value="任务已创建"),
+        patch("tools._hermes_send_card", return_value="om_entry_message_id"),
+        patch("tools._create_calendar_event", return_value=None),
+        patch("tools._schedule_deadline_reminder", return_value=False),
+        patch("tools._save_to_hermes_memory", return_value=True),
+    ):
+        result = json.loads(_handle_create_project_space(
+            {
+                "title": "执行证据项目",
+                "goal": "验证创建阶段 Flight Recorder",
+                "members": ["张三"],
+                "deliverables": ["验证记录"],
+                "deadline": "2026-05-10",
+            },
+            chat_id=chat_id,
+            chat_scope="private",
+        ))
+
+    flight_record = result["flight_record"]
+    encoded = json.dumps(flight_record, ensure_ascii=False)
+    assert flight_record["run_id"].startswith("pf_")
+    assert flight_record["final_status"] == "success"
+    assert "执行证据项目" in flight_record["markdown"]
+    assert "oc_create_trace" not in encoded
+    assert "om_entry_message_id" not in encoded
+    assert "https://example.feishu.cn" not in encoded
+    assert "real_app_token" not in encoded
+    assert "[redacted:chat_id]" in encoded
+    assert "[redacted:message_id]" in encoded
+    assert "[redacted:url]" in encoded
+    assert "[redacted:app_token]" in encoded
 
 
 def test_create_project_falls_back_to_pending_plan_fields_when_input_text_only():

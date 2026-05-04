@@ -20,6 +20,11 @@ from typing import Any, Dict, List, Optional
 
 from tools.registry import registry, tool_error, tool_result
 
+try:
+    from plugins.pilotflow.trace import PilotFlowTrace
+except Exception:  # pragma: no cover - fallback for direct file-based test imports
+    from trace import PilotFlowTrace  # type: ignore
+
 logger = logging.getLogger(__name__)
 
 # Feishu app credentials — read from env
@@ -2605,6 +2610,7 @@ def _handle_generate_plan(params: Dict[str, Any], **kwargs) -> str:
 
     should_confirm, autonomy_mode, autonomy_reason = _needs_confirmation_for_create(chat_scope, [])
     # Group chat keeps the explicit confirmation card. Private chat can continue directly.
+    sent_message_id = ""
     if chat_id and should_confirm:
         card, action_ids = _build_plan_confirmation_card(chat_id, text, plan, history_suggestions, history_suggested_fields)
         sent_message_id = _hermes_send_card(chat_id, card)
@@ -2623,6 +2629,27 @@ def _handle_generate_plan(params: Dict[str, Any], **kwargs) -> str:
     if history_suggestions:
         history_hint = "\n\n【历史建议】\n" + "\n".join(f"- {s}" for s in history_suggestions)
 
+    trace = PilotFlowTrace.start(
+        chat_id=chat_id,
+        message_id=sent_message_id if isinstance(sent_message_id, str) else "",
+        source_text=text,
+    )
+    trace.set_intent("project_bootstrap", "Hermes 已提取结构化项目计划")
+    trace.set_plan(plan["title"], plan.get("deliverables") or [])
+    trace.set_confirmation(
+        required=bool(should_confirm),
+        mode="card_or_text" if should_confirm else "autonomous_private",
+        ttl_seconds=_PLAN_GATE_TTL if should_confirm else None,
+    )
+    trace.record_event("plan_generated", {
+        "template": template["description"] if template else None,
+        "autonomy_mode": autonomy_mode,
+        "history_suggestions": history_suggestions,
+    })
+    trace.finish("planned")
+    flight_record = trace.to_dict()
+    flight_record["markdown"] = trace.to_markdown()
+
     return tool_result({
         "status": "plan_generated",
         "input": text,
@@ -2636,7 +2663,8 @@ def _handle_generate_plan(params: Dict[str, Any], **kwargs) -> str:
             "mode": autonomy_mode,
             "reason": autonomy_reason,
         },
-        "card_sent": bool(chat_id),
+        "flight_record": flight_record,
+        "card_sent": bool(sent_message_id),
         "instructions": (
             "✅ 已提取并存储项目信息（pending plan）。\n"
             + ("✅ 确认卡片已自动发送到群聊（包含计划摘要、✅确认/❌取消按钮）。\n\n" if should_confirm and chat_id else "✅ 当前会话可直接推进，不需要先等卡片确认。\n\n")
@@ -2974,6 +3002,49 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
         display_items.append("🔔 截止提醒已设置" if reminder_job else "⚠️ 截止提醒未设置")
     display_items.append("💬 已通知群成员")
 
+    trace = PilotFlowTrace.start(chat_id=chat_id, source_text=params.get("input_text", ""))
+    trace.set_intent("project_space_creation", "PilotFlow 已创建飞书项目协作空间")
+    trace.set_plan(title, deliverables)
+    trace.set_confirmation(
+        required=bool(require_confirm),
+        mode=autonomy_mode,
+        approved_by="card_or_text" if skip_gate or params.get("confirmation_text") or params.get("input_text") else "",
+        ttl_seconds=_PLAN_GATE_TTL if require_confirm else None,
+    )
+    trace.record_tool_call(
+        "feishu_doc",
+        "ok" if doc_url else "skipped",
+        artifacts=[{"type": "doc", "url": doc_url}] if doc_url else [],
+    )
+    trace.record_tool_call(
+        "feishu_bitable",
+        "ok" if bitable_url else "skipped",
+        artifacts=[bitable_meta] if bitable_meta else [],
+    )
+    trace.record_tool_call(
+        "feishu_task",
+        "ok" if deliverables else "skipped",
+        artifacts=[{"count": min(len(deliverables), 10)}] if deliverables else [],
+    )
+    trace.record_tool_call(
+        "feishu_entry_card",
+        "ok" if sent_entry_message_id else "skipped",
+        artifacts=[{"message_id": sent_entry_message_id}] if sent_entry_message_id else [],
+    )
+    trace.record_tool_call(
+        "hermes_deadline_reminder",
+        "ok" if reminder_job else "skipped",
+        artifacts=[{"deadline": deadline}] if deadline else [],
+    )
+    trace.record_event("project_registered", {
+        "title": title,
+        "unresolved_members": unresolved_members,
+        "artifact_count": len(artifacts),
+    })
+    trace.finish("success")
+    flight_record = trace.to_dict()
+    flight_record["markdown"] = trace.to_markdown()
+
     return tool_result({
         "status": "project_space_created",
         "title": title,
@@ -2985,6 +3056,7 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
             "mode": autonomy_mode,
             "reason": autonomy_reason,
         },
+        "flight_record": flight_record,
         "instructions": (
             "用中文回复结果摘要（不要显示工具名或英文）。\n"
             "直接使用 display 列表逐行展示，或自行组织语言。"
