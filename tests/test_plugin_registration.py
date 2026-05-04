@@ -58,3 +58,28 @@ def test_register_exposes_card_slash_bridge():
     assert len(ctx.commands) == 1
     assert ctx.commands[0]["name"] == "card"
     assert ctx.commands[0]["handler"] is not None
+
+
+def test_allow_inferred_schema_fields_are_marked_legacy_only():
+    ctx = FakeContext()
+
+    pilotflow.register(ctx)
+
+    found = []
+    for call in ctx.calls:
+        properties = call["schema"].get("parameters", {}).get("properties", {})
+        for field_name, field_schema in properties.items():
+            if field_name.startswith("allow_inferred_"):
+                description = field_schema.get("description", "")
+                found.append((call["name"], field_name))
+                assert "仅供回归测试" in description
+                assert "旧客户端回放" in description
+                assert "生产 Agent 不应传 true" in description
+                assert "不再保留向前兼容承诺" in description
+
+    assert found == [
+        ("pilotflow_generate_plan", "allow_inferred_fields"),
+        ("pilotflow_generate_plan", "allow_inferred_template"),
+        ("pilotflow_query_status", "allow_inferred_filters"),
+        ("pilotflow_update_project", "allow_inferred_filters"),
+    ]

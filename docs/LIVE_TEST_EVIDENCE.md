@@ -991,6 +991,18 @@
 | 用户价值 | 评审指出的 flaky 根因已变成可复现回归测试和固定清理机制，后续新增真实 Feishu 链路测试不会因为上一个测试遗留状态产生假阳性或假失败 |
 | 隐私处理 | 证据只记录布尔结果和脱敏结论；不写入真实 chat_id、message_id、Feishu URL、用户 open_id、token 或 app secret |
 
+## 2026-05-05 legacy 推断字段 schema 标注
+
+| 项目 | 证据 |
+| --- | --- |
+| 运行环境 | PilotFlow 已通过 `setup.py --hermes-home <wsl-hermes-home>` 同步到 WSL Hermes runtime；安装验证返回插件、技能、Hermes config 和 Feishu display 配置均 OK |
+| 本地回归 | `C:\Users\Ding\miniforge3\python.exe -m pytest` 返回 `224 passed`；新增 schema 注册测试覆盖 4 个 `allow_inferred_*` 字段 |
+| Agent 边界 | `pilotflow_generate_plan`、`pilotflow_query_status`、`pilotflow_update_project` 的 `allow_inferred_fields` / `allow_inferred_template` / `allow_inferred_filters` schema description 均明确标注“仅供回归测试 / 旧客户端回放使用” |
+| 生产约束 | 同一测试确认 description 包含“生产 Agent 不应传 true”和“不再保留向前兼容承诺”，避免评委或 Agent 把 legacy fallback 当成正常生产路径 |
+| 基线验证 | 同轮继续通过 `--probe-llm` 的 `llm_probe_ok=true`、`llm_probe_status=200`，`--send-card` 的 `card_sent=true`、`card_has_title=true`、`card_has_goal=true`、`card_has_risk=true`，`--verify-history` 的 `history_apply_card_sent=true`，以及 `--verify-update-task` 的 `update_task_created=true` |
+| 用户价值 | PilotFlow 的语义理解职责更明确地回到 Hermes Agent；工具层只保留可测试的 legacy escape hatch，不再鼓励生产链路依赖关键词兜底 |
+| 隐私处理 | 证据只记录布尔结果和脱敏结论；不写入真实 chat_id、message_id、Feishu URL、用户 open_id、token 或 app secret |
+
 ## 本地回归
 
 ```bash

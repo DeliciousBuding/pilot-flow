@@ -3050,7 +3050,7 @@ PILOTFLOW_GENERATE_PLAN_SCHEMA = {
             "goal": {"type": "string", "description": "项目目标（从用户消息提取，可为空字符串）。"},
             "allow_inferred_fields": {
                 "type": "boolean",
-                "description": "仅当 Agent 明确决定允许工具使用旧版文本兜底解析时传 true；默认 false。",
+                "description": "仅供回归测试 / 旧客户端回放使用。生产 Agent 不应传 true。本字段不再保留向前兼容承诺。默认 false。",
             },
             "template": {
                 "type": "string",
@@ -3059,7 +3059,7 @@ PILOTFLOW_GENERATE_PLAN_SCHEMA = {
             },
             "allow_inferred_template": {
                 "type": "boolean",
-                "description": "兼容旧链路时才设为 true，允许工具从 input_text 推断模板；默认 false。",
+                "description": "仅供回归测试 / 旧客户端回放使用。生产 Agent 不应传 true。本字段不再保留向前兼容承诺。默认 false。",
             },
             "members": {
                 "type": "array",
@@ -4398,7 +4398,7 @@ PILOTFLOW_QUERY_STATUS_SCHEMA = {
             },
             "allow_inferred_filters": {
                 "type": "boolean",
-                "description": "兼容旧链路时才设为 true，允许工具从 query 推断 filter/member_filters；默认 false。",
+                "description": "仅供回归测试 / 旧客户端回放使用。生产 Agent 不应传 true。本字段不再保留向前兼容承诺。默认 false。",
             },
         },
         "required": ["query"],
@@ -4854,7 +4854,7 @@ PILOTFLOW_UPDATE_PROJECT_SCHEMA = {
             },
             "allow_inferred_filters": {
                 "type": "boolean",
-                "description": "兼容旧链路时才设为 true，允许工具从 project_name 推断批量 filter/member_filters；默认 false。",
+                "description": "仅供回归测试 / 旧客户端回放使用。生产 Agent 不应传 true。本字段不再保留向前兼容承诺。默认 false。",
             },
             "confirmation_text": {"type": "string", "description": "当动作需要确认时，用户最新的明确确认文本。"},
         },
