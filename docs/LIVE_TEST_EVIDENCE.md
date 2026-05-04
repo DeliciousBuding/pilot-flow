@@ -1017,6 +1017,18 @@
 | 用户价值 | 删除成员之外，另一个真实 destructive update 也进入统一确认门控；Agent 不能在未确认时把项目从日常看板隐藏 |
 | 隐私处理 | 证据只记录布尔结果和脱敏结论；不写入真实 chat_id、message_id、Feishu URL、用户 open_id、token 或 app secret |
 
+## 2026-05-05 README 工程边界说明
+
+| 项目 | 证据 |
+| --- | --- |
+| 运行环境 | PilotFlow 已通过 `setup.py --hermes-home <wsl-hermes-home>` 同步到 WSL Hermes runtime；安装验证返回插件、技能、Hermes config 和 Feishu display 配置均 OK |
+| 本地回归 | `C:\Users\Ding\miniforge3\python.exe -m pytest` 返回 `227 passed`；`git diff --check` 通过 |
+| 文档修正 | README 新增“工程边界与重构计划”，明确 `plugins/pilotflow/tools.py` 当前超过 5000 行，属于已识别工程债，不是目标架构 |
+| 拆分计划 | README 列出复赛后第一个重构 issue：按 `state.py`、`feishu_client.py`、`actions.py` 拆分执行层，保留现有 `pilotflow_*` tool schema 与 Hermes 插件注册接口不变 |
+| 基线验证 | 同轮继续通过 `--probe-llm` 的 `llm_probe_ok=true`、`llm_probe_status=200`，`--send-card` 的 `card_sent=true`、`card_has_title=true`、`card_has_goal=true`、`card_has_risk=true`，`--verify-history` 的 `history_apply_card_sent=true`，以及 `--verify-update-task` 的 `update_task_created=true` |
+| 用户价值 | 把评审一定会看到的代码体量问题转成明确工程自觉和可执行拆分边界，同时不牺牲当前已跑通的真实 Feishu 链路稳定性 |
+| 隐私处理 | 证据只记录布尔结果和脱敏结论；不写入真实 chat_id、message_id、Feishu URL、用户 open_id、token 或 app secret |
+
 ## 本地回归
 
 ```bash

@@ -86,6 +86,20 @@ Hermes Agent 运行时（LLM 调度 + 飞书网关 + 工具注册表）
 - **LLM**：OpenAI-compatible API，默认 `gpt-4.1`，可按 Hermes 配置替换模型
 - **权限**：创建文档/表格后自动开放链接访问 + 给群成员加编辑权限
 
+## 工程边界与重构计划
+
+当前核心执行层集中在 `plugins/pilotflow/tools.py`，文件体量已超过 5000 行，超出长期维护的合理上限。这是已识别的工程债，不是目标架构。
+
+复赛前优先保持真实链路稳定、证据可复验和 Hermes 插件边界不漂移；复赛后第一个重构 issue 是拆分执行层：
+
+| 目标文件 | 责任边界 |
+| --- | --- |
+| `state.py` | pending plan、项目状态、私有资源 refs、文件锁和 schema 迁移 |
+| `feishu_client.py` | 文档、Base、任务、日历、权限和成员解析的 lark_oapi 封装 |
+| `actions.py` | 项目创建、更新、卡片动作、确认门控和动作流水 |
+
+拆分目标是每个模块不超过 1500 行，并保留现有 `pilotflow_*` tool schema 与 Hermes 插件注册接口不变，避免影响已跑通的真实 Feishu 链路。
+
 ## 竞品参照
 
 | 维度 | OpenClaw（飞书官方 Agent 插件） | 飞书妙记 | PilotFlow |
