@@ -329,6 +329,7 @@ def test_verify_runtime_progress_update_is_sanitized(tmp_path, monkeypatch):
     assert result["progress_history_recorded"] is True
     assert result["progress_state_recorded"] is True
     assert result["progress_state_initiator_preserved"] is True
+    assert result["progress_state_assignees_preserved"] is True
     assert result["progress_feedback_sent"] is True
     assert "example.invalid" not in json.dumps(result, ensure_ascii=False)
 
@@ -809,6 +810,8 @@ def test_verifier_progress_update_mode_outputs_sanitized_runtime_result(tmp_path
         "progress_doc_updated": True,
         "progress_history_recorded": True,
         "progress_state_recorded": True,
+        "progress_state_initiator_preserved": True,
+        "progress_state_assignees_preserved": True,
         "progress_feedback_sent": True,
         "raw_chat_id": "oc_real_chat_id",
         "raw_doc_url": "https://example.invalid/doc/1",
@@ -828,6 +831,8 @@ def test_verifier_progress_update_mode_outputs_sanitized_runtime_result(tmp_path
     assert output["progress_doc_updated"] is True
     assert output["progress_history_recorded"] is True
     assert output["progress_state_recorded"] is True
+    assert output["progress_state_initiator_preserved"] is True
+    assert output["progress_state_assignees_preserved"] is True
     assert output["progress_feedback_sent"] is True
     assert "oc_real_chat_id" not in output_text
     assert "example.invalid" not in output_text

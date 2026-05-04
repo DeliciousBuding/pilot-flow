@@ -4551,6 +4551,39 @@ def test_send_project_reminder_adds_public_update_after_restart(tmp_path):
     assert "example.invalid" not in serialized
 
 
+def test_update_project_preserves_state_deliverable_assignees_after_restart(tmp_path):
+    state_path = tmp_path / "pilotflow-projects.json"
+    with _project_registry_lock:
+        _project_registry.clear()
+    with patch.dict(os.environ, {"PILOTFLOW_STATE_PATH": str(state_path)}):
+        _save_project_state(
+            "重启保留分工项目",
+            "验证重启更新不丢分工",
+            ["张三", "李四"],
+            ["验收记录", "接口联调"],
+            "2026-05-20",
+            "进行中",
+            ["文档: https://example.invalid/docx/doc_preserve_assignee"],
+            deliverable_assignees={"验收记录": "李四", "接口联调": "张三"},
+        )
+        with patch("tools._hermes_send", return_value=True):
+            result = json.loads(_handle_update_project(
+                {
+                    "project_name": "重启保留分工",
+                    "action": "add_progress",
+                    "value": "完成联调排期",
+                },
+                chat_id="oc_state_preserve_assignees",
+            ))
+        projects = _load_project_state()
+
+    assert result["status"] == "project_updated"
+    assert result["state_updated"] is True
+    assert projects[0]["deliverable_assignees"] == {"验收记录": "李四", "接口联调": "张三"}
+    assert projects[0]["updates"][-1] == {"action": "进展", "value": "完成联调排期"}
+    assert "example.invalid" not in state_path.read_text(encoding="utf-8")
+
+
 def test_update_project_send_reminder_reuses_group_reminder_trace():
     with _project_registry_lock:
         _project_registry.clear()

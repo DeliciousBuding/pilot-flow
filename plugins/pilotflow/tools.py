@@ -5219,6 +5219,7 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
             "goal": state_project.get("goal", ""),
             "members": [],
             "deliverables": state_project.get("deliverables", []),
+            "deliverable_assignees": state_project.get("deliverable_assignees", {}),
             "initiator": state_project.get("initiator", ""),
             "deadline": state_project.get("deadline", ""),
             "status": state_project.get("status", "进行中"),

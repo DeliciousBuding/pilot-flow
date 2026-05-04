@@ -228,6 +228,7 @@ def _sanitize_result(result: dict[str, Any]) -> dict[str, Any]:
         "progress_history_recorded",
         "progress_state_recorded",
         "progress_state_initiator_preserved",
+        "progress_state_assignees_preserved",
         "progress_feedback_sent",
         "reminder_single_sent",
         "reminder_single_doc_updated",
@@ -2162,6 +2163,7 @@ def _verify_runtime_progress_update(hermes_dir: Path) -> dict[str, Any]:
         _project_registry,
         _project_registry_lock,
         _register_project,
+        _save_project_state,
     )
 
     chat_id = os.environ.get("PILOTFLOW_TEST_CHAT_ID", "")
@@ -2215,13 +2217,14 @@ def _verify_runtime_progress_update(hermes_dir: Path) -> dict[str, Any]:
                 _project_registry.clear()
             _save_project_state(
                 "运行态重启发起人留存项目",
-                "验证安装后重启状态进展不丢发起人",
-                [],
-                ["初始验收"],
+                "验证安装后重启状态进展不丢发起人和分工",
+                ["张三", "李四"],
+                ["初始验收", "接口联调"],
                 "2026-05-20",
                 "进行中",
                 updates=[{"action": "进展", "value": "完成需求评审"}],
                 initiator="王小明",
+                deliverable_assignees={"初始验收": "李四", "接口联调": "张三"},
             )
             state_update_data = json.loads(_handle_update_project(
                 {
@@ -2245,11 +2248,13 @@ def _verify_runtime_progress_update(hermes_dir: Path) -> dict[str, Any]:
 
     state_updates = []
     state_initiator = ""
+    state_assignees: dict[str, str] = {}
     for item in state_projects:
         if item.get("title") == "运行态进展记录项目":
             state_updates = item.get("updates", [])
         if item.get("title") == "运行态重启发起人留存项目":
             state_initiator = item.get("initiator", "")
+            state_assignees = dict(item.get("deliverable_assignees") or {})
     feedback_text = "\n".join(sent_messages)
     return {
         "progress_update_applied": data.get("status") == "project_updated" and data.get("action") == "add_progress",
@@ -2265,6 +2270,7 @@ def _verify_runtime_progress_update(hermes_dir: Path) -> dict[str, Any]:
             and state_update_data.get("state_updated") is True
             and state_initiator == "王小明"
         ),
+        "progress_state_assignees_preserved": state_assignees == {"初始验收": "李四", "接口联调": "张三"},
         "progress_feedback_sent": (
             "进展 → 完成原型评审，等待业务确认" in feedback_text
             and "项目文档已更新" in feedback_text
