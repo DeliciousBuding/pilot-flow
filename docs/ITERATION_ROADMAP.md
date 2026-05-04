@@ -80,7 +80,7 @@
 
 ```text
 1. git status --short --branch
-2. C:\Users\Ding\miniforge3\python.exe -m pytest tests\test_tools.py tests\test_setup.py tests\test_plugin_registration.py tests\test_trace.py -q
+2. C:\Users\Ding\miniforge3\python.exe -m pytest tests\test_tools.py tests\test_setup.py tests\test_plugin_registration.py tests\test_trace.py tests\test_verify_wsl_feishu_runtime.py -q
 3. C:\Users\Ding\miniforge3\python.exe setup.py --hermes-dir D:\Code\LarkProject\hermes-agent
 4. WSL Hermes runtime 验证真实飞书链路，记录到 docs/LIVE_TEST_EVIDENCE.md
 5. git add 具体文件，不用 git add .

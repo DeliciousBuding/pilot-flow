@@ -64,6 +64,7 @@ PilotFlow/
 - Local tests: `C:\Users\Ding\miniforge3\python.exe -m pytest tests\test_tools.py tests\test_setup.py tests\test_plugin_registration.py tests\test_trace.py -q`
 - Gateway test: `uv run hermes gateway` in hermes-agent directory
 - Direct tool test: set `PILOTFLOW_TEST_CHAT_ID` env var
+- WSL Feishu runtime verifier: `UV_PROJECT_ENVIRONMENT=/home/$USER/.venvs/hermes-agent-feishu uv run python <PilotFlow>/scripts/verify_wsl_feishu_runtime.py --hermes-dir <hermes-agent-path> --env-file ~/.hermes/.env --send-card`
 - End-to-end: @PilotFlow in Feishu group chat
 
 ## Dependencies

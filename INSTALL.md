@@ -173,6 +173,26 @@ print('PilotFlow loaded OK')
 "
 ```
 
+WSL Feishu runtime 验证（默认不发消息）：
+
+```bash
+cd /mnt/d/Code/LarkProject/hermes-agent
+UV_PROJECT_ENVIRONMENT=/home/$USER/.venvs/hermes-agent-feishu \
+uv run python /mnt/d/Code/LarkProject/PilotFlow/scripts/verify_wsl_feishu_runtime.py \
+  --hermes-dir /mnt/d/Code/LarkProject/hermes-agent \
+  --env-file /mnt/c/Users/Ding/.hermes/.env
+```
+
+确认要向测试群发送真实计划卡片时再加 `--send-card`：
+
+```bash
+UV_PROJECT_ENVIRONMENT=/home/$USER/.venvs/hermes-agent-feishu \
+uv run python /mnt/d/Code/LarkProject/PilotFlow/scripts/verify_wsl_feishu_runtime.py \
+  --hermes-dir /mnt/d/Code/LarkProject/hermes-agent \
+  --env-file /mnt/c/Users/Ding/.hermes/.env \
+  --send-card
+```
+
 ## 常见问题
 
 ### 群里出现英文工具名
