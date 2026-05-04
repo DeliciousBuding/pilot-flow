@@ -1846,6 +1846,54 @@ def test_project_entry_card_displays_known_risks():
     assert "**风险：** API 审批可能卡住" in markdown
 
 
+def test_project_entry_card_for_initial_risk_offers_resolve_risk_action():
+    chat_id = "oc_entry_card_risk_action"
+    captured_cards = []
+
+    def fake_send_card(_chat_id, card):
+        captured_cards.append(card)
+        return "om_entry_risk_action"
+
+    with _project_registry_lock:
+        _project_registry.clear()
+    with _plan_lock:
+        _pending_plans.clear()
+        _card_action_refs.clear()
+
+    with (
+        patch("tools._create_doc", return_value="https://example.invalid/doc"),
+        patch("tools._create_bitable", return_value={
+            "url": "https://example.invalid/base",
+            "app_token": "app1",
+            "table_id": "tbl1",
+            "record_id": "rec1",
+        }),
+        patch("tools._create_task", return_value="任务已创建"),
+        patch("tools._hermes_send_card", side_effect=fake_send_card),
+        patch("tools._create_calendar_event", return_value=None),
+        patch("tools._schedule_deadline_reminder", return_value=False),
+        patch("tools._save_to_hermes_memory", return_value=True),
+    ):
+        result = json.loads(_handle_create_project_space(
+            {
+                "title": "入口卡片风险动作项目",
+                "goal": "验证入口卡风险动作",
+                "members": [],
+                "deliverables": ["验证记录"],
+                "deadline": "2026-05-12",
+                "risks": ["API 审批可能卡住"],
+            },
+            chat_id=chat_id,
+            chat_scope="private",
+        ))
+
+    assert result["status"] == "project_space_created"
+    actions = captured_cards[0]["elements"][1]["actions"]
+    assert actions[1]["text"]["content"] == "解除风险"
+    action_id = actions[1]["value"]["pilotflow_action_id"]
+    assert _card_action_refs[action_id]["action"] == "resolve_risk"
+
+
 def test_create_project_with_initial_risks_is_registered_as_risk_project():
     chat_id = "oc_initial_risk_status"
 

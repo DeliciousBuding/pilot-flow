@@ -3521,7 +3521,9 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
     risk_line = f"**风险：** {risk_text}\n" if risk_text else ""
 
     status_action_id = _create_card_action_ref(chat_id, "project_status", {"title": title})
-    done_action_id = _create_card_action_ref(chat_id, "mark_project_done", {"title": title})
+    next_action = "resolve_risk" if risks else "mark_project_done"
+    next_text = "解除风险" if risks else "标记完成"
+    next_action_id = _create_card_action_ref(chat_id, next_action, {"title": title})
     entry_card = {
         "config": {"wide_screen_mode": True},
         "header": {
@@ -3550,9 +3552,9 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
                     },
                     {
                         "tag": "button",
-                        "text": {"tag": "plain_text", "content": "标记完成"},
+                        "text": {"tag": "plain_text", "content": next_text},
                         "type": "primary",
-                        "value": {"pilotflow_action_id": done_action_id},
+                        "value": {"pilotflow_action_id": next_action_id},
                     },
                 ],
             },
@@ -3560,7 +3562,7 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
     }
     sent_entry_message_id = _hermes_send_card(chat_id, entry_card)
     if isinstance(sent_entry_message_id, str):
-        _attach_card_message_id([status_action_id, done_action_id], sent_entry_message_id)
+        _attach_card_message_id([status_action_id, next_action_id], sent_entry_message_id)
     if sent_entry_message_id:
         artifacts.append("项目入口卡片")
 
