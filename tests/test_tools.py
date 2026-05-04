@@ -6591,6 +6591,46 @@ def test_create_followup_task_adds_public_task_update_after_restart(tmp_path):
     assert "example.invalid" not in serialized
 
 
+def test_create_followup_task_uses_state_deliverable_assignee_after_restart(tmp_path):
+    state_path = tmp_path / "pilotflow-projects.json"
+    with _project_registry_lock:
+        _project_registry.clear()
+    with patch.dict(os.environ, {"PILOTFLOW_STATE_PATH": str(state_path)}):
+        _save_project_state(
+            "重启分工详情待办项目",
+            "验证重启后详情待办负责人",
+            ["张三", "李四"],
+            ["验收记录", "接口联调"],
+            "2026-05-20",
+            "进行中",
+            ["文档: https://example.invalid/docx/doc_followup_assignee_restart"],
+            deliverable_assignees={"验收记录": "李四", "接口联调": "张三"},
+        )
+        action_value = _opaque_card_action_value(
+            "oc_restart_detail_followup_assignee",
+            "create_followup_task",
+            {"title": "重启分工详情待办项目"},
+        )
+
+        with (
+            patch("tools._create_task", return_value="重启分工详情待办项目跟进: https://example.invalid/task/task_detail_assignee") as create_task,
+            patch("tools._hermes_send", return_value=True),
+            patch("tools._append_project_doc_update", return_value=True),
+            patch("tools._append_bitable_update_record", return_value=True),
+        ):
+            result = json.loads(_handle_card_action({"action_value": action_value}, chat_id="oc_restart_detail_followup_assignee"))
+
+    assert result["status"] == "project_followup_task_created"
+    create_task.assert_called_once_with(
+        "重启分工详情待办项目跟进",
+        "项目: 重启分工详情待办项目",
+        "李四",
+        "2026-05-20",
+        "oc_restart_detail_followup_assignee",
+        [],
+    )
+
+
 def test_dashboard_followup_task_reports_doc_and_bitable_traces():
     with _project_registry_lock:
         _project_registry.clear()
@@ -6685,6 +6725,47 @@ def test_dashboard_followup_task_adds_public_update_after_restart(tmp_path):
     assert sent_messages[0][0] == "oc_restart_dashboard_followup"
     assert "重启看板待办项目跟进" in sent_messages[0][1]
     assert projects[0]["updates"][-1] == {"action": "任务", "value": "重启看板待办项目跟进"}
+
+
+def test_dashboard_followup_task_uses_state_deliverable_assignee_after_restart(tmp_path):
+    state_path = tmp_path / "pilotflow-projects.json"
+    with _project_registry_lock:
+        _project_registry.clear()
+    deadline = (dt.date.today() - dt.timedelta(days=1)).isoformat()
+    with patch.dict(os.environ, {"PILOTFLOW_STATE_PATH": str(state_path)}):
+        _save_project_state(
+            "重启分工看板待办项目",
+            "验证重启后看板待办负责人",
+            ["张三", "李四"],
+            ["验收记录", "接口联调"],
+            deadline,
+            "进行中",
+            ["文档: https://example.invalid/docx/doc_dashboard_followup_assignee"],
+            deliverable_assignees={"验收记录": "李四", "接口联调": "张三"},
+        )
+        action_value = _opaque_card_action_value(
+            "oc_restart_dashboard_followup_assignee",
+            "project_followup_task",
+            {"title": "重启分工看板待办项目"},
+        )
+
+        with (
+            patch("tools._create_task", return_value="重启分工看板待办项目跟进: https://example.invalid/task/task_dashboard_assignee") as create_task,
+            patch("tools._hermes_send", return_value=True),
+            patch("tools._append_project_doc_update", return_value=True),
+            patch("tools._append_bitable_update_record", return_value=True),
+        ):
+            result = json.loads(_handle_card_action({"action_value": action_value}, chat_id="oc_restart_dashboard_followup_assignee"))
+
+    assert result["status"] == "project_followup_task_created"
+    create_task.assert_called_once_with(
+        "重启分工看板待办项目跟进",
+        "项目: 重启分工看板待办项目",
+        "李四",
+        deadline,
+        "oc_restart_dashboard_followup_assignee",
+        [],
+    )
     serialized = state_path.read_text(encoding="utf-8")
     assert "example.invalid" not in serialized
 

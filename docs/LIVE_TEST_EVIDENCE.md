@@ -2,6 +2,20 @@
 
 > 本文件只记录可复验结论和脱敏摘要，不提交真实群 ID、用户 open_id、应用 secret、message_id 或飞书文档链接。
 
+## 2026-05-05 重启后跟进待办负责人恢复
+
+| 项目 | 证据 |
+| --- | --- |
+| 功能修复 | 从项目详情卡或看板卡点击“创建待办”时，如果项目只从 restart-safe state 恢复且没有成员名单，PilotFlow 会从已保存的 `deliverable_assignees` 中选择一个可见负责人显示名作为跟进待办负责人 |
+| 适用边界 | 有成员名单的内存项目仍使用项目成员列表第一个成员；无成员名单的 state-only 项目只使用已脱敏、已随交付物保存的负责人显示名，不从自然语言重新推断 |
+| 状态延续 | 跟进待办创建后仍通过统一 `_record_action_outcome` 写公开最近进展、私有任务资源 refs、项目文档和多维表格流水 |
+| 本地回归 | `C:\Users\Ding\miniforge3\python.exe -m pytest` 返回 `292 passed`；`tests/test_tools.py tests/test_verify_wsl_feishu_runtime.py` 返回 `258 passed`；`git diff --check` 通过，仅有 CRLF 提示 |
+| WSL 安装态 | `setup.py --hermes-dir D:\Code\LarkProject\hermes-agent --hermes-home \\wsl.localhost\Ubuntu-24.04\home\ding\.hermes` 通过；插件和 skill 已同步到 WSL Hermes runtime profile |
+| Verifier 新字段 | `--verify-followup-task` 返回 `followup_task_state_assignee_used=true`，证明安装态 state-only 详情卡跟进待办会使用保存的交付物负责人 |
+| 基线验证 | 同轮继续通过同一 Feishu venv 下 `--send-card` 的 `card_sent=true`、`card_has_title=true`、`card_has_goal=true`、`card_has_initiator=true`、`card_has_risk=true`，以及 `--probe-llm` 的 `llm_probe_ok=true`、`llm_probe_status=200` |
+| 用户价值 | Hermes gateway 重启后，用户不必重新声明成员；从详情卡或看板卡创建跟进待办仍能派给已有分工负责人，后续追踪链路更接近真实团队使用 |
+| 隐私处理 | 验证只记录布尔结果和脱敏状态；不写入真实 chat_id、open_id、message_id、Feishu URL、任务 URL、token 或 app secret |
+
 ## 2026-05-05 重启后指定负责人追加交付物
 
 | 项目 | 证据 |

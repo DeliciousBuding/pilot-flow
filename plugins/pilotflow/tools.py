@@ -696,6 +696,16 @@ def _build_project_reminder_text(chat_id: str, title: str, project: dict) -> str
     )
 
 
+def _followup_assignee_from_project(project: dict) -> str:
+    """Choose a visible fallback owner for follow-up tasks."""
+    members = list(project.get("members", []))
+    if members:
+        return members[0]
+    deliverables = list(project.get("deliverables", []))
+    assignees = _clean_deliverable_assignees(project.get("deliverable_assignees"), deliverables, [])
+    return next(iter(assignees.values()), "")
+
+
 def _update_interactive_card_via_feishu(message_id: str, card_json: dict) -> bool:
     """Update an existing Feishu interactive card message."""
     client = _get_client()
@@ -4104,6 +4114,7 @@ def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
                 "goal": state_project.get("goal", ""),
                 "members": [],
                 "deliverables": state_project.get("deliverables", []),
+                "deliverable_assignees": state_project.get("deliverable_assignees", {}),
                 "deadline": state_project.get("deadline", ""),
                 "status": state_project.get("status", "进行中"),
                 "artifacts": _load_project_resource_refs(state_project.get("title", project_title)),
@@ -4116,7 +4127,7 @@ def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
 
         if pilotflow_action == "create_followup_task":
             members = list(project.get("members", []))
-            assignee = members[0] if members else ""
+            assignee = _followup_assignee_from_project(project)
             task_name = _create_task(
                 f"{project_title}跟进",
                 f"项目: {project_title}",
@@ -4353,6 +4364,7 @@ def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
                 "goal": state_project.get("goal", ""),
                 "members": [],
                 "deliverables": state_project.get("deliverables", []),
+                "deliverable_assignees": state_project.get("deliverable_assignees", {}),
                 "deadline": state_project.get("deadline", ""),
                 "status": state_project.get("status", "进行中"),
                 "artifacts": _load_project_resource_refs(state_project.get("title", project_title)),
@@ -4364,7 +4376,7 @@ def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
             project_title = state_project.get("title", project_title)
 
         members = list(project.get("members", []))
-        assignee = members[0] if members else ""
+        assignee = _followup_assignee_from_project(project)
         task_name = _create_task(
             f"{project_title}跟进",
             f"项目: {project_title}",

@@ -255,6 +255,7 @@ def test_verify_runtime_followup_task_is_sanitized(tmp_path, monkeypatch):
     assert result["followup_task_feedback_sent"] is True
     assert result["followup_task_artifact_recorded"] is True
     assert result["followup_task_public_update_recorded"] is True
+    assert result["followup_task_state_assignee_used"] is True
     assert "example.invalid" not in json.dumps(result, ensure_ascii=False)
 
 
@@ -626,6 +627,7 @@ def test_verifier_followup_task_mode_outputs_sanitized_runtime_result(tmp_path, 
         "followup_task_feedback_sent": True,
         "followup_task_artifact_recorded": True,
         "followup_task_public_update_recorded": True,
+        "followup_task_state_assignee_used": True,
         "raw_chat_id": "oc_real_chat_id",
         "raw_task_url": "https://example.invalid/task/1",
     }):
@@ -644,6 +646,7 @@ def test_verifier_followup_task_mode_outputs_sanitized_runtime_result(tmp_path, 
     assert output["followup_task_feedback_sent"] is True
     assert output["followup_task_artifact_recorded"] is True
     assert output["followup_task_public_update_recorded"] is True
+    assert output["followup_task_state_assignee_used"] is True
     assert "oc_real_chat_id" not in output_text
     assert "example.invalid" not in output_text
 

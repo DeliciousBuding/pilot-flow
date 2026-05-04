@@ -194,6 +194,7 @@ def _sanitize_result(result: dict[str, Any]) -> dict[str, Any]:
         "followup_task_feedback_sent",
         "followup_task_artifact_recorded",
         "followup_task_public_update_recorded",
+        "followup_task_state_assignee_used",
         "deadline_update_applied",
         "deadline_calendar_created",
         "deadline_attendees_added",
@@ -1652,6 +1653,7 @@ def _verify_runtime_followup_task(hermes_dir: Path) -> dict[str, Any]:
         _project_registry,
         _project_registry_lock,
         _register_project,
+        _save_project_state,
     )
 
     chat_id = os.environ.get("PILOTFLOW_TEST_CHAT_ID", "")
@@ -1659,8 +1661,10 @@ def _verify_runtime_followup_task(hermes_dir: Path) -> dict[str, Any]:
     original_create_task = runtime_tools._create_task
     original_send = runtime_tools._hermes_send
     sent_messages: list[str] = []
+    task_calls: list[tuple[Any, ...]] = []
 
-    def fake_create_task(*_args: Any, **_kwargs: Any) -> str:
+    def fake_create_task(*args: Any, **_kwargs: Any) -> str:
+        task_calls.append(args)
         return "运行态详情跟进: https://example.invalid/task/followup"
 
     def fake_send(_chat_id: str, text: str) -> bool:
@@ -1698,6 +1702,30 @@ def _verify_runtime_followup_task(hermes_dir: Path) -> dict[str, Any]:
             with _project_registry_lock:
                 artifacts = list(_project_registry["运行态详情跟进项目"].get("artifacts", []))
             state_projects = _load_project_state()
+            with _project_registry_lock:
+                _project_registry.clear()
+            _save_project_state(
+                "运行态重启分工跟进项目",
+                "验证安装后重启跟进待办负责人",
+                ["张三", "李四"],
+                ["验收记录", "接口联调"],
+                "2026-05-20",
+                "进行中",
+                ["文档: https://example.invalid/doc/followup-state"],
+                deliverable_assignees={"验收记录": "李四", "接口联调": "张三"},
+            )
+            state_data = json.loads(_handle_card_action(
+                {
+                    "action_value": json.dumps({
+                        "pilotflow_action_id": _create_card_action_ref(
+                            chat_id,
+                            "create_followup_task",
+                            {"title": "运行态重启分工跟进项目"},
+                        )
+                    }, ensure_ascii=False)
+                },
+                chat_id=chat_id,
+            ))
         finally:
             runtime_tools._create_task = original_create_task
             runtime_tools._hermes_send = original_send
@@ -1721,6 +1749,10 @@ def _verify_runtime_followup_task(hermes_dir: Path) -> dict[str, Any]:
             item.get("action") == "任务" and item.get("value") == "运行态详情跟进"
             for item in public_updates
             if isinstance(item, dict)
+        ),
+        "followup_task_state_assignee_used": (
+            state_data.get("status") == "project_followup_task_created"
+            and any(len(call) >= 3 and call[0] == "运行态重启分工跟进项目跟进" and call[2] == "李四" for call in task_calls)
         ),
     }
 
