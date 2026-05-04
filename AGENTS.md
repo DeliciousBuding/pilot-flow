@@ -10,6 +10,7 @@ PilotFlow is a Hermes Agent plugin for Feishu group chat project supervision. Us
 PilotFlow/
 ├── plugins/pilotflow/       # Core plugin (tools.py + __init__.py + plugin.yaml)
 │   ├── tools.py             # All 6 tool handlers + Feishu API wrappers
+│   ├── trace.py             # Business-readable Flight Recorder trace primitives
 │   ├── __init__.py          # Plugin registration with Hermes tool registry
 │   └── plugin.yaml          # Plugin metadata
 ├── skills/pilotflow/        # Hermes skill definitions
@@ -32,6 +33,8 @@ PilotFlow/
 - **@mention**: resolve group member names to open_id via `im.chat.members.get`
 - **Confirmation gate**: per-chat_id with TTL, prevents execution without user confirmation
 - **Card actions**: PilotFlow registers a plugin `/card` bridge for Hermes-routed Feishu button clicks; `pilotflow_handle_card_action` confirms/cancels using pending plan state
+- **Flight Recorder**: `plugins/pilotflow/trace.py` owns business-readable traces and redaction; future run evidence should build on it instead of ad-hoc logs
+- **Branch policy**: the only default branch is `main`; never recreate `master`. New work uses explicit feature branches when needed.
 
 ## Intelligence Boundary
 
@@ -42,6 +45,13 @@ PilotFlow/
 - If a feature needs "understanding", expose structured schema fields and update `skills/pilotflow/SKILL.md` so Hermes supplies the semantic result. The tool should not infer meaning from raw chat text.
 - Tests for Agent-facing tools should assert structured input/output and safety behavior, not that a keyword phrase is classified as a specific intent.
 
+## Product Direction
+
+- PilotFlow should position itself as the group-chat project kickoff governance layer before Feishu Projects, not as a replacement project-management system.
+- The durable differentiators are group-chat projectization, unified confirmation gates, risk decision cards, idempotency, and Flight Recorder evidence.
+- Treat Base/tasks/docs as current execution backends and fallbacks. If Feishu Projects APIs become available, prefer integrating them as the authoritative project backend.
+- Do not prioritize adding more low-level Feishu API surfaces unless they strengthen project governance, evidence, confirmation, or follow-up.
+
 ## Conventions
 
 - All user-facing text in Chinese
@@ -51,7 +61,7 @@ PilotFlow/
 
 ## Testing
 
-- Local tests: `C:\Users\Ding\miniforge3\python.exe -m pytest tests\test_tools.py tests\test_setup.py tests\test_plugin_registration.py -q`
+- Local tests: `C:\Users\Ding\miniforge3\python.exe -m pytest tests\test_tools.py tests\test_setup.py tests\test_plugin_registration.py tests\test_trace.py -q`
 - Gateway test: `uv run hermes gateway` in hermes-agent directory
 - Direct tool test: set `PILOTFLOW_TEST_CHAT_ID` env var
 - End-to-end: @PilotFlow in Feishu group chat

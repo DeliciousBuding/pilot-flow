@@ -49,7 +49,7 @@ def copy_plugin(src_dir, dst_dir):
     src = os.path.join(src_dir, "plugins", "pilotflow")
     dst = os.path.join(dst_dir, "plugins", "pilotflow")
     os.makedirs(dst, exist_ok=True)
-    for f in ["__init__.py", "tools.py", "plugin.yaml"]:
+    for f in ["__init__.py", "tools.py", "trace.py", "plugin.yaml"]:
         shutil.copy2(os.path.join(src, f), os.path.join(dst, f))
     print(f"  Copied plugin to {dst}")
 
@@ -236,6 +236,7 @@ def validate_install(hermes_dir):
     checks = [
         (os.path.exists(os.path.join(plugin_dir, "__init__.py")), "plugins/pilotflow/__init__.py"),
         (os.path.exists(os.path.join(plugin_dir, "tools.py")), "plugins/pilotflow/tools.py"),
+        (os.path.exists(os.path.join(plugin_dir, "trace.py")), "plugins/pilotflow/trace.py"),
         (os.path.exists(os.path.join(plugin_dir, "plugin.yaml")), "plugins/pilotflow/plugin.yaml"),
         (os.path.exists(os.path.join(skills_dir, "SKILL.md")), "skills/pilotflow/SKILL.md"),
         (os.path.exists(os.path.join(skills_dir, "DESCRIPTION.md")), "skills/pilotflow/DESCRIPTION.md"),

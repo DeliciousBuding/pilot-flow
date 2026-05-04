@@ -269,6 +269,7 @@ def test_copy_plugin_and_skills_to_hermes_layout(tmp_path):
 
     assert (hermes_dir / "plugins" / "pilotflow" / "__init__.py").exists()
     assert (hermes_dir / "plugins" / "pilotflow" / "tools.py").exists()
+    assert (hermes_dir / "plugins" / "pilotflow" / "trace.py").exists()
     assert (hermes_dir / "plugins" / "pilotflow" / "plugin.yaml").exists()
     assert (hermes_dir / "skills" / "pilotflow" / "SKILL.md").exists()
     assert (hermes_dir / "skills" / "pilotflow" / "DESCRIPTION.md").exists()
