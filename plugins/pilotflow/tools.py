@@ -4609,13 +4609,23 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
 
     def send_reminder_for_project(title: str, info: dict) -> dict:
         sent = _hermes_send(chat_id, _build_project_reminder_text(chat_id, title, info)) if chat_id else False
+        state_trace = False
+        if sent:
+            updates = list(info.get("updates", []))
+            updates.append({"action": "催办", "value": "已发送催办提醒"})
+            info["updates"] = updates
+            state_trace = _save_project_state(
+                title, info.get("goal", ""), info.get("members", []),
+                info.get("deliverables", []), info.get("deadline", ""), info.get("status", "进行中"),
+                info.get("artifacts", []), updates=updates,
+            )
         doc_trace = _append_project_doc_update(title, info, "催办", value)
         bitable_trace = False
         if info.get("app_token") and info.get("table_id"):
             bitable_trace = _append_bitable_update_record(
                 info["app_token"], info["table_id"], "催办", value, info,
             )
-        return {"sent": sent, "doc_trace": doc_trace, "bitable_trace": bitable_trace}
+        return {"sent": sent, "doc_trace": doc_trace, "bitable_trace": bitable_trace, "state_trace": state_trace}
 
     if action == "send_reminder":
         batch_filter = _status_filter_from_query(project_name)

@@ -1979,6 +1979,7 @@ def test_briefing_batch_reminder_uses_state_projects_after_restart(tmp_path):
                 {"action_value": json.dumps({"pilotflow_action": "briefing_batch_reminder", "filter": "overdue", "value": "请今天同步进展"}, ensure_ascii=False)},
                 chat_id="oc_restart_batch_reminder",
             ))
+        projects = _load_project_state()
 
     assert result["status"] == "briefing_batch_reminder_sent"
     assert result["source"] == "state"
@@ -1994,6 +1995,7 @@ def test_briefing_batch_reminder_uses_state_projects_after_restart(tmp_path):
     restored_project = append_doc.call_args.args[1]
     assert "文档: https://example.invalid/docx/doc_reminder_restart" in restored_project["artifacts"]
     append_history.assert_not_called()
+    assert projects[0]["updates"][-1] == {"action": "催办", "value": "已发送催办提醒"}
     serialized = state_path.read_text(encoding="utf-8")
     assert "example.invalid" not in serialized
 
