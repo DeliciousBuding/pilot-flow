@@ -1042,6 +1042,19 @@
 | 用户价值 | 归档确认门控不再只有单元测试证据，已进入评委可复跑的 WSL runtime verifier，证明安装后的插件也会阻断未确认 destructive update |
 | 隐私处理 | 证据只记录布尔结果和脱敏结论；不写入真实 chat_id、message_id、Feishu URL、用户 open_id、token 或 app secret |
 
+## 2026-05-05 卡片跟进待办运行态验证
+
+| 项目 | 证据 |
+| --- | --- |
+| 运行环境 | PilotFlow 已通过 `setup.py --hermes-home <wsl-hermes-home>` 同步到 WSL Hermes runtime；安装验证返回插件、技能、Hermes config 和 Feishu display 配置均 OK |
+| 本地回归 | `C:\Users\Ding\miniforge3\python.exe -m pytest` 返回 `231 passed`；`tests/test_verify_wsl_feishu_runtime.py` 返回 `12 passed`；`git diff --check` 通过 |
+| Verifier 新模式 | `verify_wsl_feishu_runtime.py --verify-followup-task` 在已安装的 WSL Hermes runtime 插件内返回 `followup_task_created=true`、`followup_task_feedback_sent=true`、`followup_task_artifact_recorded=true`、`followup_task_public_update_recorded=true` |
+| 卡片动作链路 | verifier 使用生产 `_create_card_action_ref` 生成 opaque action，再通过 `_handle_card_action` 执行 `create_followup_task`，覆盖“项目详情卡按钮 → 创建飞书待办 → 群反馈”的真实插件路径 |
+| 状态留痕 | 跟进待办进入项目 `artifacts`，公开项目状态只记录脱敏任务摘要，不把真实任务 URL 写入公开状态文件；这保证重启后看板能回读最近动作，同时不泄露资源链接 |
+| 基线验证 | 同轮继续通过 `--probe-llm` 的 `llm_probe_ok=true`、`llm_probe_status=200`，`--send-card` 的 `card_sent=true`、`card_has_title=true`、`card_has_goal=true`、`card_has_risk=true`，`--verify-history` 的 `history_apply_card_sent=true`，`--verify-update-task` 的 `update_task_created=true`，以及 `--verify-archive-gate` 的 `archive_gate_required=true` |
+| 用户价值 | PilotFlow 的后续追踪能力从单元测试进入可复跑 runtime 证据：用户打开项目详情卡后，可以直接创建跟进待办，并在群里拿到明确反馈和后续看板状态 |
+| 隐私处理 | 证据只记录布尔结果和脱敏结论；不写入真实 chat_id、message_id、Feishu URL、用户 open_id、token 或 app secret |
+
 ## 本地回归
 
 ```bash

@@ -121,6 +121,10 @@ def _sanitize_result(result: dict[str, Any]) -> dict[str, Any]:
         "archive_gate_no_write",
         "archive_gate_confirmed",
         "archive_gate_feedback_sent",
+        "followup_task_created",
+        "followup_task_feedback_sent",
+        "followup_task_artifact_recorded",
+        "followup_task_public_update_recorded",
         "error",
     }
     return {key: result[key] for key in allowed if key in result}
@@ -504,6 +508,90 @@ def _verify_runtime_archive_gate(hermes_dir: Path) -> dict[str, Any]:
     }
 
 
+def _verify_runtime_followup_task(hermes_dir: Path) -> dict[str, Any]:
+    """Verify installed PilotFlow can create a follow-up task from card action."""
+    sys.path.insert(0, str(hermes_dir))
+    import plugins.pilotflow.tools as runtime_tools  # pylint: disable=import-error
+    from plugins.pilotflow.tools import (  # pylint: disable=import-error
+        _create_card_action_ref,
+        _handle_card_action,
+        _load_project_state,
+        _project_registry,
+        _project_registry_lock,
+        _register_project,
+    )
+
+    chat_id = os.environ.get("PILOTFLOW_TEST_CHAT_ID", "")
+    original_state_path = os.environ.get("PILOTFLOW_STATE_PATH")
+    original_create_task = runtime_tools._create_task
+    original_send = runtime_tools._hermes_send
+    sent_messages: list[str] = []
+
+    def fake_create_task(*_args: Any, **_kwargs: Any) -> str:
+        return "运行态详情跟进: https://example.invalid/task/followup"
+
+    def fake_send(_chat_id: str, text: str) -> bool:
+        sent_messages.append(text)
+        return True
+
+    with tempfile.TemporaryDirectory(prefix="pilotflow-followup-verify-") as tmpdir:
+        os.environ["PILOTFLOW_STATE_PATH"] = str(Path(tmpdir) / "pilotflow_state.json")
+        with _project_registry_lock:
+            _project_registry.clear()
+        runtime_tools._create_task = fake_create_task
+        runtime_tools._hermes_send = fake_send
+        try:
+            _register_project(
+                "运行态详情跟进项目",
+                ["张三"],
+                "2026-05-20",
+                "进行中",
+                ["文档: https://example.invalid/doc/followup"],
+                goal="验证安装后的卡片跟进待办链路",
+                deliverables=["初始验收"],
+            )
+            data = json.loads(_handle_card_action(
+                {
+                    "action_value": json.dumps({
+                        "pilotflow_action_id": _create_card_action_ref(
+                            chat_id,
+                            "create_followup_task",
+                            {"title": "运行态详情跟进项目"},
+                        )
+                    }, ensure_ascii=False)
+                },
+                chat_id=chat_id,
+            ))
+            with _project_registry_lock:
+                artifacts = list(_project_registry["运行态详情跟进项目"].get("artifacts", []))
+            state_projects = _load_project_state()
+        finally:
+            runtime_tools._create_task = original_create_task
+            runtime_tools._hermes_send = original_send
+            with _project_registry_lock:
+                _project_registry.clear()
+            if original_state_path is None:
+                os.environ.pop("PILOTFLOW_STATE_PATH", None)
+            else:
+                os.environ["PILOTFLOW_STATE_PATH"] = original_state_path
+
+    public_updates = []
+    for item in state_projects:
+        if item.get("title") == "运行态详情跟进项目":
+            public_updates = item.get("updates", [])
+            break
+    return {
+        "followup_task_created": data.get("status") == "project_followup_task_created" and data.get("task_created") is True,
+        "followup_task_feedback_sent": any("运行态详情跟进" in msg for msg in sent_messages),
+        "followup_task_artifact_recorded": any(item.startswith("任务: 运行态详情跟进") for item in artifacts),
+        "followup_task_public_update_recorded": any(
+            item.get("action") == "任务" and item.get("value") == "运行态详情跟进"
+            for item in public_updates
+            if isinstance(item, dict)
+        ),
+    }
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Verify PilotFlow WSL Feishu runtime.")
     parser.add_argument("--hermes-dir", required=True, help="Hermes runtime directory.")
@@ -514,6 +602,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--verify-history", action="store_true", help="Send real cards that verify history suggestions can be applied.")
     parser.add_argument("--verify-update-task", action="store_true", help="Dry-run installed update_project task summary behavior.")
     parser.add_argument("--verify-archive-gate", action="store_true", help="Dry-run installed archive confirmation gate behavior.")
+    parser.add_argument("--verify-followup-task", action="store_true", help="Dry-run installed card follow-up task behavior.")
     args = parser.parse_args(argv)
 
     hermes_dir = Path(args.hermes_dir).resolve()
@@ -521,7 +610,8 @@ def main(argv: list[str] | None = None) -> int:
     config_result = _read_runtime_config(Path(args.config_file))
     import_result = _check_imports(hermes_dir)
     mode = (
-        "archive-gate" if args.verify_archive_gate
+        "followup-task" if args.verify_followup_task
+        else "archive-gate" if args.verify_archive_gate
         else "update-task" if args.verify_update_task
         else "history" if args.verify_history
         else "send-card" if args.send_card
@@ -546,6 +636,8 @@ def main(argv: list[str] | None = None) -> int:
         output.update(_verify_runtime_update_task_summary(hermes_dir))
     if args.verify_archive_gate:
         output.update(_verify_runtime_archive_gate(hermes_dir))
+    if args.verify_followup_task:
+        output.update(_verify_runtime_followup_task(hermes_dir))
     if args.probe_llm:
         output.update(_probe_llm(config_result))
     print(json.dumps(_sanitize_result(output), ensure_ascii=False, sort_keys=True))
