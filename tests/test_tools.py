@@ -3891,6 +3891,41 @@ def test_query_status_named_state_project_sends_detail_card_after_restart(tmp_pa
     assert "example.invalid" not in serialized
 
 
+def test_query_status_named_state_project_shows_assignees_after_restart(tmp_path):
+    state_path = tmp_path / "pilotflow-projects.json"
+    with _project_registry_lock:
+        _project_registry.clear()
+    with _plan_lock:
+        _card_action_refs.clear()
+    with patch.dict(os.environ, {"PILOTFLOW_STATE_PATH": str(state_path)}):
+        _save_project_state(
+            "重启分工详情项目",
+            "验证重启后分工展示",
+            ["张三", "李四"],
+            ["恢复记录", "接口联调"],
+            "2026-05-20",
+            "进行中",
+            [],
+            deliverable_assignees={"恢复记录": "李四", "接口联调": "张三"},
+        )
+        captured = {}
+
+        def capture_card(chat_id, card):
+            captured["card"] = card
+            return "om_state_assignee_detail"
+
+        with patch("tools._send_interactive_card_via_feishu", side_effect=capture_card):
+            result = _handle_query_status({"query": "重启分工详情项目进展如何"}, chat_id="oc_state_assignee_detail")
+
+    assert "项目详情已发送" in result
+    body = captured["card"]["elements"][0]["content"]
+    assert "**负责人：** 恢复记录 → 李四；接口联调 → 张三" in body
+    payload = json.loads(state_path.read_text(encoding="utf-8"))
+    assignees = payload["projects"][0]["deliverable_assignees"]
+    assert assignees == {"恢复记录": "李四", "接口联调": "张三"}
+    assert "ou_" not in json.dumps(assignees, ensure_ascii=False)
+
+
 def test_query_status_named_state_project_shows_initiator_after_restart(tmp_path):
     state_path = tmp_path / "pilotflow-projects.json"
     with _project_registry_lock:
@@ -4378,6 +4413,22 @@ def test_project_reminder_text_includes_deliverable_assignees():
     assert "分工：整理上线清单 → 李四；同步审批进度 → 张三" in text
     assert "open_id" not in text
     assert "pilotflow_chat_id" not in text
+
+
+def test_project_reminder_text_includes_state_only_deliverable_assignees():
+    project = {
+        "members": [],
+        "deadline": "2026-05-20",
+        "status": "进行中",
+        "deliverables": ["恢复记录", "接口联调"],
+        "deliverable_assignees": {"恢复记录": "李四", "接口联调": "张三"},
+    }
+
+    text = _build_project_reminder_text("oc_state_reminder_assignees", "重启分工催办项目", project)
+
+    assert "负责人：相关负责人" in text
+    assert "分工：恢复记录 → 李四；接口联调 → 张三" in text
+    assert "open_id" not in text
 
 
 def test_project_reminder_card_action_records_doc_and_bitable_history():

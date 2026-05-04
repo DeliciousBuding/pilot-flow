@@ -339,6 +339,7 @@ def test_verify_runtime_project_reminder_is_sanitized(tmp_path, monkeypatch):
     assert result["reminder_single_history_recorded"] is True
     assert result["reminder_single_state_recorded"] is True
     assert result["reminder_single_assignees_included"] is True
+    assert result["reminder_state_only_assignees_included"] is True
     assert result["reminder_batch_sent"] is True
     assert result["reminder_batch_filtered"] is True
     assert result["reminder_batch_history_recorded"] is True
@@ -483,6 +484,7 @@ def test_verify_runtime_dashboard_navigation_is_sanitized(tmp_path, monkeypatch)
     assert result["dashboard_page_scoped"] is True
     assert result["dashboard_cards_sent"] is True
     assert result["dashboard_used_opaque_refs"] is True
+    assert result["dashboard_state_detail_assignees_shown"] is True
     assert "example.invalid" not in json.dumps(result, ensure_ascii=False)
 
 
@@ -828,6 +830,7 @@ def test_verifier_project_reminder_mode_outputs_sanitized_runtime_result(tmp_pat
         "reminder_single_history_recorded": True,
         "reminder_single_state_recorded": True,
         "reminder_single_assignees_included": True,
+        "reminder_state_only_assignees_included": True,
         "reminder_batch_sent": True,
         "reminder_batch_filtered": True,
         "reminder_batch_history_recorded": True,
@@ -851,6 +854,7 @@ def test_verifier_project_reminder_mode_outputs_sanitized_runtime_result(tmp_pat
     assert output["reminder_single_history_recorded"] is True
     assert output["reminder_single_state_recorded"] is True
     assert output["reminder_single_assignees_included"] is True
+    assert output["reminder_state_only_assignees_included"] is True
     assert output["reminder_batch_sent"] is True
     assert output["reminder_batch_filtered"] is True
     assert output["reminder_batch_history_recorded"] is True
@@ -1184,6 +1188,7 @@ def test_verifier_dashboard_navigation_mode_outputs_sanitized_runtime_result(tmp
         "dashboard_page_scoped": True,
         "dashboard_cards_sent": True,
         "dashboard_used_opaque_refs": True,
+        "dashboard_state_detail_assignees_shown": True,
         "raw_chat_id": "oc_real_chat_id",
         "raw_doc_url": "https://example.invalid/doc/1",
     }):
@@ -1204,6 +1209,7 @@ def test_verifier_dashboard_navigation_mode_outputs_sanitized_runtime_result(tmp
     assert output["dashboard_page_scoped"] is True
     assert output["dashboard_cards_sent"] is True
     assert output["dashboard_used_opaque_refs"] is True
+    assert output["dashboard_state_detail_assignees_shown"] is True
     assert "oc_real_chat_id" not in output_text
     assert "example.invalid" not in output_text
 

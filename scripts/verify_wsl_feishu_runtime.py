@@ -230,6 +230,7 @@ def _sanitize_result(result: dict[str, Any]) -> dict[str, Any]:
         "reminder_single_history_recorded",
         "reminder_single_state_recorded",
         "reminder_single_assignees_included",
+        "reminder_state_only_assignees_included",
         "reminder_batch_sent",
         "reminder_batch_filtered",
         "reminder_batch_history_recorded",
@@ -270,6 +271,7 @@ def _sanitize_result(result: dict[str, Any]) -> dict[str, Any]:
         "dashboard_page_scoped",
         "dashboard_cards_sent",
         "dashboard_used_opaque_refs",
+        "dashboard_state_detail_assignees_shown",
         "error",
     }
     return {key: result[key] for key in allowed if key in result}
@@ -2163,6 +2165,7 @@ def _verify_runtime_project_reminder(hermes_dir: Path) -> dict[str, Any]:
     from plugins.pilotflow.tools import (  # pylint: disable=import-error
         _handle_update_project,
         _load_project_state,
+        _build_project_reminder_text,
         _project_registry,
         _project_registry_lock,
         _register_project,
@@ -2271,6 +2274,17 @@ def _verify_runtime_project_reminder(hermes_dir: Path) -> dict[str, Any]:
             state_updates = item.get("updates", [])
             break
     feedback_text = "\n".join(sent_messages)
+    state_only_reminder = _build_project_reminder_text(
+        chat_id,
+        "运行态重启分工催办项目",
+        {
+            "members": [],
+            "deadline": "2026-05-20",
+            "status": "进行中",
+            "deliverables": ["恢复记录", "接口联调"],
+            "deliverable_assignees": {"恢复记录": "李四", "接口联调": "张三"},
+        },
+    )
     return {
         "reminder_single_sent": single.get("status") == "project_updated" and single.get("reminder_sent") is True,
         "reminder_single_doc_updated": single.get("doc_updated") is True
@@ -2285,6 +2299,11 @@ def _verify_runtime_project_reminder(hermes_dir: Path) -> dict[str, Any]:
         "reminder_single_assignees_included": (
             "分工：整理上线清单 → 张三；同步审批进度 → 张三" in feedback_text
             and "open_id" not in feedback_text
+        ),
+        "reminder_state_only_assignees_included": (
+            "负责人：相关负责人" in state_only_reminder
+            and "分工：恢复记录 → 李四；接口联调 → 张三" in state_only_reminder
+            and "open_id" not in state_only_reminder
         ),
         "reminder_batch_sent": batch.get("status") == "project_reminders_sent" and batch.get("reminder_count") == 1,
         "reminder_batch_filtered": batch.get("projects") == ["运行态批量逾期催办项目"],
@@ -2826,9 +2845,11 @@ def _verify_runtime_dashboard_navigation(hermes_dir: Path) -> dict[str, Any]:
     from plugins.pilotflow.tools import (  # pylint: disable=import-error
         _create_card_action_ref,
         _handle_card_action,
+        _handle_query_status,
         _project_registry,
         _project_registry_lock,
         _register_project,
+        _save_project_state,
     )
 
     chat_id = os.environ.get("PILOTFLOW_TEST_CHAT_ID", "")
@@ -2910,6 +2931,22 @@ def _verify_runtime_dashboard_navigation(hermes_dir: Path) -> dict[str, Any]:
                 {"action_value": json.dumps({"pilotflow_action_id": page_action_id}, ensure_ascii=False)},
                 chat_id=chat_id,
             ))
+            with _project_registry_lock:
+                _project_registry.clear()
+            _save_project_state(
+                "运行态重启分工详情项目",
+                "验证安装后的重启分工详情",
+                ["张三", "李四"],
+                ["恢复记录", "接口联调"],
+                "2026-05-20",
+                "进行中",
+                [],
+                deliverable_assignees={"恢复记录": "李四", "接口联调": "张三"},
+            )
+            state_detail_result = _handle_query_status(
+                {"query": "运行态重启分工详情项目进展如何"},
+                chat_id=chat_id,
+            )
         finally:
             runtime_tools._DASHBOARD_PAGE_SIZE = original_page_size
             runtime_tools._hermes_send_card = original_send_card
@@ -2922,6 +2959,7 @@ def _verify_runtime_dashboard_navigation(hermes_dir: Path) -> dict[str, Any]:
 
     filter_card_text = card_text(sent_cards[0]) if sent_cards else ""
     page_card_text = card_text(sent_cards[1]) if len(sent_cards) > 1 else ""
+    state_detail_text = card_text(sent_cards[2]) if len(sent_cards) > 2 else ""
     return {
         "dashboard_filter_sent": filter_data.get("status") == "dashboard_filter_sent",
         "dashboard_filter_scoped": (
@@ -2935,8 +2973,12 @@ def _verify_runtime_dashboard_navigation(hermes_dir: Path) -> dict[str, Any]:
             and "运行态看板第一页项目" not in page_card_text
             and "第 2/3 页" in page_card_text
         ),
-        "dashboard_cards_sent": len(sent_cards) == 2,
+        "dashboard_cards_sent": len(sent_cards) == 3,
         "dashboard_used_opaque_refs": bool(filter_action_id and page_action_id),
+        "dashboard_state_detail_assignees_shown": (
+            "项目详情已发送" in state_detail_result
+            and "恢复记录 → 李四；接口联调 → 张三" in state_detail_text
+        ),
     }
 
 

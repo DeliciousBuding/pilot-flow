@@ -1112,9 +1112,14 @@ def _plain_at_mentions(text: Any) -> str:
 def _clean_initiator_name(value: Any) -> str:
     """Store only a visible initiator display name, never Feishu IDs."""
     text = _plain_at_mentions(value).strip()
-    if not text or re.fullmatch(r"(ou|on|oc|om|ou_\w+|on_\w+|oc_\w+|om_\w+)", text):
+    if not text or _looks_like_feishu_identifier(text):
         return ""
     return text[:80]
+
+
+def _looks_like_feishu_identifier(text: str) -> bool:
+    """Return whether text looks like an internal Feishu identifier, not a display name."""
+    return bool(re.fullmatch(r"(ou|on|oc|om|ou_\w+|on_\w+|oc_\w+|om_\w+)", str(text or "").strip()))
 
 
 def _save_project_resource_refs(title: str, artifacts: Optional[list]) -> None:
@@ -1411,7 +1416,7 @@ def _clean_plan_list(values: Any) -> list[str]:
 
 def _clean_deliverable_assignees(value: Any, deliverables: list[str], members: list[str]) -> dict[str, str]:
     """Keep only explicit deliverable -> project member assignments."""
-    if not isinstance(value, dict) or not deliverables or not members:
+    if not isinstance(value, dict) or not deliverables:
         return {}
     deliverable_set = set(deliverables)
     member_set = set(members)
@@ -1419,7 +1424,13 @@ def _clean_deliverable_assignees(value: Any, deliverables: list[str], members: l
     for raw_deliverable, raw_assignee in value.items():
         deliverable = str(raw_deliverable or "").strip()
         assignee = _clean_member_update_value(str(raw_assignee or "").strip())
-        if deliverable in deliverable_set and assignee in member_set:
+        if deliverable not in deliverable_set or not assignee:
+            continue
+        if member_set and assignee not in member_set:
+            continue
+        if _looks_like_feishu_identifier(assignee):
+            continue
+        if deliverable in deliverable_set:
             cleaned[deliverable] = assignee
     return cleaned
 
@@ -4684,6 +4695,7 @@ def _handle_query_status(params: Dict[str, Any], **kwargs) -> str:
                     "goal": item.get("goal", ""),
                     "members": [],
                     "deliverables": item.get("deliverables", []),
+                    "deliverable_assignees": item.get("deliverable_assignees", {}),
                     "initiator": item.get("initiator", ""),
                     "deadline": item.get("deadline", ""),
                     "status": item.get("status", "进行中"),
