@@ -1346,6 +1346,21 @@ def _clean_plan_list(values: Any) -> list[str]:
     return cleaned
 
 
+def _clean_deliverable_assignees(value: Any, deliverables: list[str], members: list[str]) -> dict[str, str]:
+    """Keep only explicit deliverable -> project member assignments."""
+    if not isinstance(value, dict) or not deliverables or not members:
+        return {}
+    deliverable_set = set(deliverables)
+    member_set = set(members)
+    cleaned: dict[str, str] = {}
+    for raw_deliverable, raw_assignee in value.items():
+        deliverable = str(raw_deliverable or "").strip()
+        assignee = _clean_member_update_value(str(raw_assignee or "").strip())
+        if deliverable in deliverable_set and assignee in member_set:
+            cleaned[deliverable] = assignee
+    return cleaned
+
+
 def _split_inline_list(value: str) -> list[str]:
     """Split short Chinese inline lists from group-chat messages."""
     text = re.sub(r"\s+", "", value or "")
@@ -1611,6 +1626,11 @@ def _build_plan_confirmation_card(
     member_text = ", ".join(plan["members"]) if plan["members"] else "待确认"
     deliverable_text = ", ".join(plan["deliverables"]) if plan["deliverables"] else "待确认"
     deadline_text = plan["deadline"] or "待确认"
+    assignee_items = [
+        f"{deliverable} → {assignee}"
+        for deliverable, assignee in (plan.get("deliverable_assignees") or {}).items()
+    ]
+    assignee_line = f"\n**负责人：** {'；'.join(assignee_items)}" if assignee_items else ""
     risk_text = ", ".join(_clean_plan_list(plan.get("risks"))[:3])
     risk_line = f"\n**风险：** {risk_text}" if risk_text else ""
     history_text = ""
@@ -1665,6 +1685,7 @@ def _build_plan_confirmation_card(
                     f"**成员：** {member_text}\n"
                     f"**交付物：** {deliverable_text}\n"
                     f"**截止时间：** {deadline_text}"
+                    f"{assignee_line}"
                     f"{risk_line}"
                     f"{history_text}"
                 ),
@@ -3125,6 +3146,11 @@ PILOTFLOW_GENERATE_PLAN_SCHEMA = {
                 "items": {"type": "string"},
                 "description": "交付物列表。只填写用户明确要求或上下文合理确定的交付物；不确定可为空数组，由模板或历史建议补充。",
             },
+            "deliverable_assignees": {
+                "type": "object",
+                "additionalProperties": {"type": "string"},
+                "description": "可选。交付物标题到负责人显示名的映射；key 必须完全匹配 deliverables 中的标题，value 必须是 members 中已有成员的显示名或飞书 @ 提及。不要传 open_id、chat_id、message_id。",
+            },
             "risks": {
                 "type": "array",
                 "items": {"type": "string"},
@@ -3225,6 +3251,11 @@ def _handle_generate_plan(params: Dict[str, Any], **kwargs) -> str:
         })
     if not plan["members"] and session_user_name:
         plan["members"] = [session_user_name]
+    plan["deliverable_assignees"] = _clean_deliverable_assignees(
+        params.get("deliverable_assignees"),
+        plan["deliverables"],
+        plan["members"],
+    )
 
     # History is context for the Agent/user, not a silent overwrite. Templates
     # may fill generic defaults; history is shown explicitly as suggestions.
@@ -3447,6 +3478,11 @@ PILOTFLOW_CREATE_PROJECT_SPACE_SCHEMA = {
                 "items": {"type": "string"},
                 "description": "交付物列表。只填写用户明确要求或根据上下文可合理确定的交付物；禁止使用示例占位。",
             },
+            "deliverable_assignees": {
+                "type": "object",
+                "additionalProperties": {"type": "string"},
+                "description": "可选。交付物标题到负责人显示名的映射；key 必须匹配 deliverables，value 必须是项目成员显示名。不要传 open_id、chat_id、message_id。",
+            },
             "deadline": {"type": "string", "description": "截止时间，格式 YYYY-MM-DD，如「2026-05-10」。"},
             "risks": {"type": "array", "items": {"type": "string"}, "description": "已知风险，如[\"时间紧张\"]。"},
             "confirmation_text": {
@@ -3493,6 +3529,11 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
     initiator = _clean_initiator_name(params.get("initiator")) or _clean_initiator_name(pending_plan.get("initiator"))
     deadline = params.get("deadline", "") or pending_plan.get("deadline", "")
     risks = _clean_plan_list(params.get("risks")) or _clean_plan_list(pending_plan.get("risks"))
+    deliverable_assignees = _clean_deliverable_assignees(
+        params.get("deliverable_assignees") or pending_plan.get("deliverable_assignees"),
+        deliverables,
+        members,
+    )
     idempotency_key = (
         params.get("idempotency_key")
         or pending.get("idempotency_key")
@@ -3568,7 +3609,7 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
         created_tasks = 0
         max_tasks = 10
         for i, d in enumerate(deliverables[:max_tasks]):
-            assignee = members[i % len(members)] if members else ""
+            assignee = deliverable_assignees.get(d) or (members[i % len(members)] if members else "")
             task_name = _create_task(d, f"项目: {title}", assignee, deadline, chat_id, members)
             if task_name:
                 artifacts.append(f"任务: {task_name}")
@@ -3881,6 +3922,7 @@ def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
             "goal": recovered_plan.get("goal", ""),
             "members": recovered_plan.get("members", []),
             "deliverables": recovered_plan.get("deliverables", []),
+            "deliverable_assignees": recovered_plan.get("deliverable_assignees", {}),
             "deadline": recovered_plan.get("deadline", ""),
             "risks": recovered_plan.get("risks", []),
         }, **kwargs)
@@ -3900,6 +3942,7 @@ def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
             "goal": action_data.get("goal", ""),
             "members": action_data.get("members", []),
             "deliverables": action_data.get("deliverables", []),
+            "deliverable_assignees": action_data.get("deliverable_assignees", {}),
             "deadline": action_data.get("deadline", ""),
             "risks": action_data.get("risks", []),
         }, **kwargs)

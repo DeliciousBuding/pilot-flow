@@ -2,6 +2,20 @@
 
 > 本文件只记录可复验结论和脱敏摘要，不提交真实群 ID、用户 open_id、应用 secret、message_id 或飞书文档链接。
 
+## 2026-05-05 创建项目交付物结构化负责人
+
+| 项目 | 证据 |
+| --- | --- |
+| 功能硬化 | `pilotflow_generate_plan` / `pilotflow_create_project_space` 现在支持 `deliverable_assignees` 映射；Agent 可把“交付物标题 → 负责人显示名”作为结构化字段传入，创建飞书任务时按该映射派发，不再只能按成员列表轮询分配 |
+| 确认卡可见性 | 计划确认卡新增 `**负责人：** 交付物 → 成员` 摘要，用户在点击确认前能看到每个交付物的负责人安排 |
+| Agent 指引 | `skills/pilotflow/SKILL.md` 已明确：负责人映射 key 必须等于 `deliverables` 标题，value 必须是 `members` 中已有成员显示名或飞书 @ 提及；不要把负责人写进交付物标题，也不要传 open_id/chat_id/message_id |
+| 安全边界 | `deliverable_assignees` 只保留同时匹配交付物和项目成员的条目；无效负责人不会进入 pending plan 或任务派发，未指定时仍保留原有轮询分配 |
+| 本地回归 | 新增确认卡负责人展示和创建任务结构化负责人单测；`C:\Users\Ding\miniforge3\python.exe -m pytest` 返回 `276 passed`；`tests/test_verify_wsl_feishu_runtime.py` 返回 `45 passed`；`git diff --check` 通过，仅有 CRLF 提示 |
+| WSL 安装态 | `setup.py --hermes-dir D:\Code\LarkProject\hermes-agent --hermes-home \\wsl.localhost\Ubuntu-24.04\home\ding\.hermes` 通过；插件和 skill 已同步到 WSL Hermes runtime profile |
+| 运行态验证 | `--verify-project-creation` 输出脱敏通过：`project_create_structured_assignees_used=true`、`project_create_schema_assignees_exposed=true`、`project_create_task_created=true`、`project_create_doc_created=true`、`project_create_bitable_created=true`、`project_create_entry_card_sent=true`、`project_create_trace_redacted=true` |
+| 基线验证 | 同轮继续通过 `--send-card` 的 `card_sent=true`、`card_has_title=true`、`card_has_goal=true`、`card_has_initiator=true`、`card_has_risk=true`，`--verify-health-check` 的 `health_check_ok=true`、`health_check_sanitized=true`、`health_card_bridge_registered=true`，以及 `--probe-llm` 的 `llm_probe_ok=true`、`llm_probe_status=200` |
+| 隐私处理 | 验证只记录布尔结果和脱敏状态；不写入真实 chat_id、open_id、message_id、Feishu URL、任务 URL、token 或 app secret |
+
 ## 2026-05-05 新增交付物结构化负责人
 
 | 项目 | 证据 |

@@ -292,6 +292,41 @@ def test_generate_plan_confirmation_card_displays_initiator(monkeypatch):
     assert "**发起人：** 王小明" in card_text
 
 
+def test_generate_plan_confirmation_card_displays_deliverable_assignees(monkeypatch):
+    sent_cards = []
+
+    def fake_send_card(chat_id, card):
+        sent_cards.append({"chat_id": chat_id, "card": card})
+        return "om_plan_assignments"
+
+    monkeypatch.setattr("tools._hermes_send_card", fake_send_card)
+
+    result = json.loads(_handle_generate_plan(
+        {
+            "input_text": "帮我准备客户上线项目，张三负责清单，李四负责演练",
+            "title": "客户上线项目",
+            "goal": "完成客户上线",
+            "members": ["张三", "李四"],
+            "deliverables": ["整理上线清单", "完成上线演练"],
+            "deliverable_assignees": {
+                "整理上线清单": "张三",
+                "完成上线演练": "李四",
+            },
+            "deadline": "2026-05-08",
+        },
+        chat_id="oc_plan_card_assignments",
+        chat_type="group",
+    ))
+
+    assert result["status"] == "plan_generated"
+    assert result["plan"]["deliverable_assignees"] == {
+        "整理上线清单": "张三",
+        "完成上线演练": "李四",
+    }
+    card_text = sent_cards[0]["card"]["elements"][0]["content"]
+    assert "**负责人：** 整理上线清单 → 张三；完成上线演练 → 李四" in card_text
+
+
 def test_projectization_suggestion_button_preserves_risks_in_pending_plan(monkeypatch):
     sent_cards = []
 
@@ -1669,6 +1704,63 @@ def test_create_project_accepts_explicit_confirmation_text():
     assert result["status"] == "project_space_created"
     with _project_registry_lock:
         assert "迁移验证项目" in _project_registry
+
+
+def test_create_project_uses_structured_deliverable_assignees():
+    chat_id = "oc_create_assignments"
+    created_tasks = []
+    with _project_registry_lock:
+        _project_registry.clear()
+    with _plan_lock:
+        _pending_plans.clear()
+        _card_action_refs.clear()
+
+    with patch("tools._hermes_send_card", return_value="om_plan_assignments"):
+        _handle_generate_plan(
+            {
+                "input_text": "帮我准备上线项目，张三负责清单，李四负责演练",
+                "title": "上线项目",
+                "goal": "完成上线",
+                "members": ["张三", "李四"],
+                "deliverables": ["整理上线清单", "完成上线演练"],
+                "deliverable_assignees": {
+                    "整理上线清单": "李四",
+                    "完成上线演练": "张三",
+                },
+                "deadline": "2026-05-20",
+            },
+            chat_id=chat_id,
+        )
+
+    def fake_create_task(summary, description, assignee, deadline, target_chat_id, members):
+        created_tasks.append((summary, description, assignee, deadline, target_chat_id, list(members)))
+        return f"{summary}: https://example.invalid/task"
+
+    with (
+        patch("tools._resolve_member", return_value="ou_member"),
+        patch("tools._create_doc", return_value="https://example.invalid/doc"),
+        patch("tools._create_bitable", return_value={
+            "url": "https://example.invalid/base",
+            "app_token": "app1",
+            "table_id": "tbl1",
+            "record_id": "rec1",
+        }),
+        patch("tools._create_task", side_effect=fake_create_task),
+        patch("tools._create_calendar_event", return_value=None),
+        patch("tools._schedule_deadline_reminder", return_value=False),
+        patch("tools._save_to_hermes_memory", return_value=True),
+        patch("tools._hermes_send_card", return_value=True),
+    ):
+        result = json.loads(_handle_create_project_space(
+            {"confirmation_text": "确认执行"},
+            chat_id=chat_id,
+        ))
+
+    assert result["status"] == "project_space_created"
+    assert created_tasks == [
+        ("整理上线清单", "项目: 上线项目", "李四", "2026-05-20", chat_id, ["张三", "李四"]),
+        ("完成上线演练", "项目: 上线项目", "张三", "2026-05-20", chat_id, ["张三", "李四"]),
+    ]
 
 
 def test_text_confirmation_recovers_pending_plan_after_state_reload():

@@ -144,6 +144,8 @@ def _sanitize_result(result: dict[str, Any]) -> dict[str, Any]:
         "project_create_doc_created",
         "project_create_bitable_created",
         "project_create_task_created",
+        "project_create_structured_assignees_used",
+        "project_create_schema_assignees_exposed",
         "project_create_calendar_created",
         "project_create_reminder_scheduled",
         "project_create_entry_card_sent",
@@ -734,8 +736,9 @@ def _verify_runtime_project_creation(hermes_dir: Path) -> dict[str, Any]:
                     "input_text": "创建一个运行态项目创建闭环验证项目，负责人张三，交付验收清单，截止 2026-05-20",
                     "title": "运行态项目创建闭环项目",
                     "goal": "验证安装后的创建项目空间闭环",
-                    "members": ["张三"],
-                    "deliverables": ["验收清单"],
+                    "members": ["张三", "李四"],
+                    "deliverables": ["验收清单", "上线演练"],
+                    "deliverable_assignees": {"验收清单": "李四", "上线演练": "张三"},
                     "deadline": "2026-05-20",
                     "risks": ["需要确认真实资源链路"],
                 },
@@ -767,6 +770,16 @@ def _verify_runtime_project_creation(hermes_dir: Path) -> dict[str, Any]:
     entry_card_text = ""
     if len(sent_cards) >= 2:
         entry_card_text = str(((sent_cards[1].get("elements") or [{}])[0].get("content")) or "")
+    generate_props = (
+        runtime_tools.PILOTFLOW_GENERATE_PLAN_SCHEMA
+        .get("parameters", {})
+        .get("properties", {})
+    )
+    create_props = (
+        runtime_tools.PILOTFLOW_CREATE_PROJECT_SPACE_SCHEMA
+        .get("parameters", {})
+        .get("properties", {})
+    )
     return {
         "project_create_gate_created": plan.get("status") == "plan_generated"
         and bool((plan.get("confirmation") or {}).get("confirm_token")),
@@ -777,23 +790,37 @@ def _verify_runtime_project_creation(hermes_dir: Path) -> dict[str, Any]:
         and "验证安装后的创建项目空间闭环" in created_docs[0][1],
         "project_create_bitable_created": created_bitables == [(
             "运行态项目创建闭环项目",
-            "张三",
+            "张三, 李四",
             "2026-05-20",
-            ["验收清单"],
+            ["验收清单", "上线演练"],
         )],
         "project_create_task_created": created_tasks == [(
             "验收清单",
             "项目: 运行态项目创建闭环项目",
+            "李四",
+            "2026-05-20",
+            chat_id,
+            ["张三", "李四"],
+        ), (
+            "上线演练",
+            "项目: 运行态项目创建闭环项目",
             "张三",
             "2026-05-20",
             chat_id,
-            ["张三"],
+            ["张三", "李四"],
         )],
+        "project_create_structured_assignees_used": [item[2] for item in created_tasks] == ["李四", "张三"],
+        "project_create_schema_assignees_exposed": (
+            "deliverable_assignees" in generate_props
+            and "deliverable_assignees" in create_props
+            and "open_id" in str(generate_props.get("deliverable_assignees", {}).get("description", ""))
+            and "open_id" in str(create_props.get("deliverable_assignees", {}).get("description", ""))
+        ),
         "project_create_calendar_created": created_calendars == [(
             "运行态项目创建闭环项目",
             "验证安装后的创建项目空间闭环",
             "2026-05-20",
-            ["张三"],
+            ["张三", "李四"],
             chat_id,
         )],
         "project_create_reminder_scheduled": scheduled_reminders == [(
@@ -810,14 +837,14 @@ def _verify_runtime_project_creation(hermes_dir: Path) -> dict[str, Any]:
         "project_create_state_recorded": any(
             item.get("title") == "运行态项目创建闭环项目"
             and item.get("status") == "有风险"
-            and item.get("deliverables") == ["验收清单"]
+            and item.get("deliverables") == ["验收清单", "上线演练"]
             for item in state_projects
         ),
         "project_create_memory_saved": saved_memory == [(
             "运行态项目创建闭环项目",
             "验证安装后的创建项目空间闭环",
-            ["张三"],
-            ["验收清单"],
+            ["张三", "李四"],
+            ["验收清单", "上线演练"],
             "2026-05-20",
         )],
         "project_create_trace_redacted": (

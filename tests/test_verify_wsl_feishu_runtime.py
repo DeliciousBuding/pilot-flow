@@ -164,6 +164,8 @@ def test_verify_runtime_project_creation_is_sanitized(tmp_path, monkeypatch):
     assert result["project_create_doc_created"] is True
     assert result["project_create_bitable_created"] is True
     assert result["project_create_task_created"] is True
+    assert result["project_create_structured_assignees_used"] is True
+    assert result["project_create_schema_assignees_exposed"] is True
     assert result["project_create_calendar_created"] is True
     assert result["project_create_reminder_scheduled"] is True
     assert result["project_create_entry_card_sent"] is True
@@ -514,6 +516,8 @@ def test_verifier_project_creation_mode_outputs_sanitized_runtime_result(tmp_pat
         "project_create_doc_created": True,
         "project_create_bitable_created": True,
         "project_create_task_created": True,
+        "project_create_structured_assignees_used": True,
+        "project_create_schema_assignees_exposed": True,
         "project_create_calendar_created": True,
         "project_create_reminder_scheduled": True,
         "project_create_entry_card_sent": True,
@@ -539,6 +543,8 @@ def test_verifier_project_creation_mode_outputs_sanitized_runtime_result(tmp_pat
     assert output["project_create_doc_created"] is True
     assert output["project_create_bitable_created"] is True
     assert output["project_create_task_created"] is True
+    assert output["project_create_structured_assignees_used"] is True
+    assert output["project_create_schema_assignees_exposed"] is True
     assert output["project_create_calendar_created"] is True
     assert output["project_create_reminder_scheduled"] is True
     assert output["project_create_entry_card_sent"] is True
