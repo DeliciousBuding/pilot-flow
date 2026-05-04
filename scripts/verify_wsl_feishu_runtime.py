@@ -135,6 +135,14 @@ def _sanitize_result(result: dict[str, Any]) -> dict[str, Any]:
         "member_permissions_refreshed",
         "member_bitable_owner_synced",
         "member_feedback_sent",
+        "risk_reported",
+        "risk_level_high",
+        "risk_bitable_synced",
+        "risk_history_recorded",
+        "risk_feedback_sent",
+        "risk_resolved",
+        "risk_level_low",
+        "risk_resolve_feedback_sent",
         "error",
     }
     return {key: result[key] for key in allowed if key in result}
@@ -758,6 +766,102 @@ def _verify_runtime_member_permissions(hermes_dir: Path) -> dict[str, Any]:
     }
 
 
+def _verify_runtime_risk_cycle(hermes_dir: Path) -> dict[str, Any]:
+    """Verify installed PilotFlow can report and resolve a project risk."""
+    sys.path.insert(0, str(hermes_dir))
+    import plugins.pilotflow.tools as runtime_tools  # pylint: disable=import-error
+    from plugins.pilotflow.tools import (  # pylint: disable=import-error
+        _handle_update_project,
+        _project_registry,
+        _project_registry_lock,
+        _register_project,
+    )
+
+    chat_id = os.environ.get("PILOTFLOW_TEST_CHAT_ID", "")
+    original_append_doc = runtime_tools._append_project_doc_update
+    original_append_history = runtime_tools._append_bitable_update_record
+    original_update_bitable = runtime_tools._update_bitable_record
+    original_send = runtime_tools._hermes_send
+    bitable_updates: list[dict[str, Any]] = []
+    history_labels: list[str] = []
+    sent_messages: list[str] = []
+
+    def fake_append_doc(*_args: Any, **_kwargs: Any) -> bool:
+        return True
+
+    def fake_append_history(_app_token: str, _table_id: str, label: str, *_args: Any, **_kwargs: Any) -> bool:
+        history_labels.append(label)
+        return True
+
+    def fake_update_bitable(_app_token: str, _table_id: str, _record_id: str, fields: dict) -> bool:
+        bitable_updates.append(dict(fields))
+        return True
+
+    def fake_send(_chat_id: str, text: str) -> bool:
+        sent_messages.append(text)
+        return True
+
+    with _project_registry_lock:
+        _project_registry.clear()
+    runtime_tools._append_project_doc_update = fake_append_doc
+    runtime_tools._append_bitable_update_record = fake_append_history
+    runtime_tools._update_bitable_record = fake_update_bitable
+    runtime_tools._hermes_send = fake_send
+    try:
+        _register_project(
+            "运行态风险闭环项目",
+            ["张三"],
+            "2026-05-20",
+            "进行中",
+            ["文档: https://example.invalid/doc/risk"],
+            app_token="app_runtime",
+            table_id="tbl_runtime",
+            record_id="rec_runtime",
+            goal="验证安装后的风险闭环",
+            deliverables=["初始验收"],
+        )
+        reported = json.loads(_handle_update_project(
+            {
+                "project_name": "运行态风险闭环",
+                "action": "add_risk",
+                "value": "支付接口联调阻塞，高风险",
+            },
+            chat_id=chat_id,
+        ))
+        with _project_registry_lock:
+            reported_status = _project_registry["运行态风险闭环项目"].get("status")
+
+        resolved = json.loads(_handle_update_project(
+            {
+                "project_name": "运行态风险闭环",
+                "action": "resolve_risk",
+                "value": "支付接口联调已恢复",
+            },
+            chat_id=chat_id,
+        ))
+        with _project_registry_lock:
+            resolved_status = _project_registry["运行态风险闭环项目"].get("status")
+    finally:
+        runtime_tools._append_project_doc_update = original_append_doc
+        runtime_tools._append_bitable_update_record = original_append_history
+        runtime_tools._update_bitable_record = original_update_bitable
+        runtime_tools._hermes_send = original_send
+        with _project_registry_lock:
+            _project_registry.clear()
+
+    feedback_text = "\n".join(sent_messages)
+    return {
+        "risk_reported": reported.get("status") == "project_updated" and reported_status == "有风险",
+        "risk_level_high": reported.get("risk_level") == "高",
+        "risk_bitable_synced": {"状态": "有风险", "风险等级": "高"} in bitable_updates,
+        "risk_history_recorded": "风险" in history_labels and "风险解除" in history_labels,
+        "risk_feedback_sent": "风险 → 支付接口联调阻塞，高风险" in feedback_text and "状态已切换为有风险" in feedback_text,
+        "risk_resolved": resolved.get("status") == "project_updated" and resolved_status == "进行中",
+        "risk_level_low": resolved.get("risk_level") == "低",
+        "risk_resolve_feedback_sent": "风险解除 → 支付接口联调已恢复" in feedback_text and "状态已恢复为进行中" in feedback_text,
+    }
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Verify PilotFlow WSL Feishu runtime.")
     parser.add_argument("--hermes-dir", required=True, help="Hermes runtime directory.")
@@ -771,6 +875,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--verify-followup-task", action="store_true", help="Dry-run installed card follow-up task behavior.")
     parser.add_argument("--verify-deadline-update", action="store_true", help="Dry-run installed deadline calendar/reminder behavior.")
     parser.add_argument("--verify-member-permissions", action="store_true", help="Dry-run installed add-member permission refresh behavior.")
+    parser.add_argument("--verify-risk-cycle", action="store_true", help="Dry-run installed risk report/resolve behavior.")
     args = parser.parse_args(argv)
 
     hermes_dir = Path(args.hermes_dir).resolve()
@@ -778,7 +883,8 @@ def main(argv: list[str] | None = None) -> int:
     config_result = _read_runtime_config(Path(args.config_file))
     import_result = _check_imports(hermes_dir)
     mode = (
-        "member-permissions" if args.verify_member_permissions
+        "risk-cycle" if args.verify_risk_cycle
+        else "member-permissions" if args.verify_member_permissions
         else "deadline-update" if args.verify_deadline_update
         else "followup-task" if args.verify_followup_task
         else "archive-gate" if args.verify_archive_gate
@@ -812,6 +918,8 @@ def main(argv: list[str] | None = None) -> int:
         output.update(_verify_runtime_deadline_update(hermes_dir))
     if args.verify_member_permissions:
         output.update(_verify_runtime_member_permissions(hermes_dir))
+    if args.verify_risk_cycle:
+        output.update(_verify_runtime_risk_cycle(hermes_dir))
     if args.probe_llm:
         output.update(_probe_llm(config_result))
     print(json.dumps(_sanitize_result(output), ensure_ascii=False, sort_keys=True))

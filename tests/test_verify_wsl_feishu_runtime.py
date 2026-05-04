@@ -213,6 +213,22 @@ def test_verify_runtime_member_permissions_is_sanitized(tmp_path, monkeypatch):
     assert "example.invalid" not in json.dumps(result, ensure_ascii=False)
 
 
+def test_verify_runtime_risk_cycle_is_sanitized(tmp_path, monkeypatch):
+    hermes_dir, _sent_cards = _install_runtime_fixture(tmp_path, monkeypatch)
+
+    result = _MODULE._verify_runtime_risk_cycle(hermes_dir)
+
+    assert result["risk_reported"] is True
+    assert result["risk_level_high"] is True
+    assert result["risk_bitable_synced"] is True
+    assert result["risk_history_recorded"] is True
+    assert result["risk_feedback_sent"] is True
+    assert result["risk_resolved"] is True
+    assert result["risk_level_low"] is True
+    assert result["risk_resolve_feedback_sent"] is True
+    assert "example.invalid" not in json.dumps(result, ensure_ascii=False)
+
+
 def test_verifier_update_task_mode_outputs_sanitized_runtime_result(tmp_path, capsys):
     env_file = tmp_path / ".env"
     env_file.write_text("PILOTFLOW_TEST_CHAT_ID=oc_real_chat_id\n", encoding="utf-8")
@@ -367,6 +383,45 @@ def test_verifier_member_permissions_mode_outputs_sanitized_runtime_result(tmp_p
     assert output["member_permissions_refreshed"] is True
     assert output["member_bitable_owner_synced"] is True
     assert output["member_feedback_sent"] is True
+    assert "oc_real_chat_id" not in output_text
+    assert "example.invalid" not in output_text
+
+
+def test_verifier_risk_cycle_mode_outputs_sanitized_runtime_result(tmp_path, capsys):
+    env_file = tmp_path / ".env"
+    env_file.write_text("PILOTFLOW_TEST_CHAT_ID=oc_real_chat_id\n", encoding="utf-8")
+
+    with patch.object(_MODULE, "_verify_runtime_risk_cycle", return_value={
+        "risk_reported": True,
+        "risk_level_high": True,
+        "risk_bitable_synced": True,
+        "risk_history_recorded": True,
+        "risk_feedback_sent": True,
+        "risk_resolved": True,
+        "risk_level_low": True,
+        "risk_resolve_feedback_sent": True,
+        "raw_chat_id": "oc_real_chat_id",
+        "raw_doc_url": "https://example.invalid/doc/1",
+    }):
+        exit_code = _MODULE.main([
+            "--hermes-dir", str(tmp_path),
+            "--env-file", str(env_file),
+            "--verify-risk-cycle",
+        ])
+
+    output_text = capsys.readouterr().out
+    output = json.loads(output_text)
+    assert exit_code == 0
+    assert output["mode"] == "risk-cycle"
+    assert output["would_send_card"] is False
+    assert output["risk_reported"] is True
+    assert output["risk_level_high"] is True
+    assert output["risk_bitable_synced"] is True
+    assert output["risk_history_recorded"] is True
+    assert output["risk_feedback_sent"] is True
+    assert output["risk_resolved"] is True
+    assert output["risk_level_low"] is True
+    assert output["risk_resolve_feedback_sent"] is True
     assert "oc_real_chat_id" not in output_text
     assert "example.invalid" not in output_text
 

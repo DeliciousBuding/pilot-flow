@@ -1081,6 +1081,19 @@
 | 用户价值 | 群聊里新增协作者不只是改成员列表，而是同步资源权限、状态表负责人和群反馈，降低项目资源对新增成员不可见的真实办公风险 |
 | 隐私处理 | 证据只记录布尔结果和脱敏结论；不写入真实 chat_id、message_id、Feishu URL、用户 open_id、token 或 app secret |
 
+## 2026-05-05 风险闭环运行态验证
+
+| 项目 | 证据 |
+| --- | --- |
+| 运行环境 | PilotFlow 已通过 `setup.py --hermes-home <wsl-hermes-home>` 同步到 WSL Hermes runtime；安装验证返回插件、技能、Hermes config 和 Feishu display 配置均 OK |
+| 本地回归 | `C:\Users\Ding\miniforge3\python.exe -m pytest` 返回 `237 passed`；`tests/test_verify_wsl_feishu_runtime.py` 返回 `18 passed`；`git diff --check` 通过 |
+| Verifier 新模式 | `verify_wsl_feishu_runtime.py --verify-risk-cycle` 在已安装的 WSL Hermes runtime 插件内返回 `risk_reported=true`、`risk_level_high=true`、`risk_bitable_synced=true`、`risk_history_recorded=true`、`risk_feedback_sent=true`、`risk_resolved=true`、`risk_level_low=true`、`risk_resolve_feedback_sent=true` |
+| 风险上报路径 | verifier 通过生产 `pilotflow_update_project` 的 `add_risk` 分支执行，dry-run 替换文档、Base 和群发送，确认项目状态切到 `有风险`、风险等级为 `高`，并同步状态表和流水 |
+| 风险解除路径 | 同一 verifier 继续执行 `resolve_risk`，确认项目状态恢复 `进行中`、风险等级为 `低`，并产生风险解除群反馈，形成完整风险闭环 |
+| 基线验证 | 同轮继续通过 `--probe-llm` 的 `llm_probe_ok=true`、`llm_probe_status=200`，`--send-card` 的 `card_sent=true`、`card_has_title=true`、`card_has_goal=true`、`card_has_risk=true`，`--verify-history` 的 `history_apply_card_sent=true`，`--verify-update-task` 的 `update_task_created=true`，`--verify-archive-gate` 的 `archive_gate_required=true`，`--verify-followup-task` 的 `followup_task_created=true`，`--verify-deadline-update` 的 `deadline_update_applied=true`，以及 `--verify-member-permissions` 的 `member_added=true` |
+| 用户价值 | 群里上报风险后，PilotFlow 能把项目切入风险态并维护风险等级；风险解除后能恢复项目推进状态，补齐“发现风险 → 跟踪 → 解除”的办公闭环 |
+| 隐私处理 | 证据只记录布尔结果和脱敏结论；不写入真实 chat_id、message_id、Feishu URL、用户 open_id、token 或 app secret |
+
 ## 本地回归
 
 ```bash
