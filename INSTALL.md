@@ -19,6 +19,21 @@ uv sync --extra feishu
 
 `--extra feishu` 会安装 `lark-oapi` SDK。
 
+WSL 注意：如果 Hermes 仓库位于 `/mnt/c` 或 `/mnt/d`，默认 `.venv` 写在 Windows 挂载盘上可能非常慢，甚至卡在复制依赖。推荐把虚拟环境放在 WSL ext4 用户目录：
+
+```bash
+cd /mnt/d/Code/LarkProject/hermes-agent
+UV_PROJECT_ENVIRONMENT=/home/$USER/.venvs/hermes-agent-feishu \
+UV_LINK_MODE=copy \
+uv sync --extra feishu
+```
+
+之后启动 gateway 或做运行态验证时也使用同一个环境变量：
+
+```bash
+UV_PROJECT_ENVIRONMENT=/home/$USER/.venvs/hermes-agent-feishu uv run hermes gateway
+```
+
 ## 第二步：安装 PilotFlow 插件
 
 ```bash
@@ -190,6 +205,8 @@ ModuleNotFoundError: No module named 'lark_oapi'
 ```
 
 运行 `uv sync --extra feishu`
+
+如果在 WSL 的 `/mnt/*` 仓库中长时间无输出，使用前置条件里的 `UV_PROJECT_ENVIRONMENT=/home/$USER/.venvs/hermes-agent-feishu` 方案重新同步，避免跨文件系统 `.venv` 写入卡住。
 
 ### 群消息收不到
 
