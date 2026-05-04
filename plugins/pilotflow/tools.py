@@ -1691,6 +1691,10 @@ def _build_projectization_suggestion_card(
     )
     members = _clean_signal_list(suggested_project.get("members"), limit=20)
     deadline = str(suggested_project.get("deadline") or (signals.get("deadlines") or [""])[0]).strip()
+    risks = _clean_signal_list(
+        suggested_project.get("risks") or signals.get("risks"),
+        limit=10,
+    )
     action_id = _create_card_action_ref(
         chat_id,
         "suggest_project_from_signals",
@@ -1701,6 +1705,7 @@ def _build_projectization_suggestion_card(
             "members": members,
             "deliverables": deliverables,
             "deadline": deadline,
+            "risks": risks,
             "signals": signals,
         },
     )
@@ -3054,6 +3059,11 @@ PILOTFLOW_GENERATE_PLAN_SCHEMA = {
                 "items": {"type": "string"},
                 "description": "交付物列表。只填写用户明确要求或上下文合理确定的交付物；不确定可为空数组，由模板或历史建议补充。",
             },
+            "risks": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "Hermes 从上下文明确识别出的风险/阻塞；不确定传空数组，工具不会从原文推断。",
+            },
             "deadline": {"type": "string", "description": "截止时间 YYYY-MM-DD（可为空字符串，会被模板补全）。"},
         },
         "required": ["input_text"],
@@ -3131,7 +3141,7 @@ def _handle_generate_plan(params: Dict[str, Any], **kwargs) -> str:
         "members": _clean_plan_list(params.get("members")) or inline_fields.get("members", []),
         "deliverables": _clean_plan_list(params.get("deliverables")) or inline_fields.get("deliverables", []),
         "deadline": params.get("deadline", "") or inline_fields.get("deadline", ""),
-        "risks": [],
+        "risks": _clean_plan_list(params.get("risks")),
     }
     has_structured_fields = bool(
         plan["title"] or plan["goal"] or plan["members"] or plan["deliverables"] or params.get("deadline", "")
@@ -3800,6 +3810,7 @@ def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
             "members": action_data.get("members", []),
             "deliverables": action_data.get("deliverables", []),
             "deadline": action_data.get("deadline", ""),
+            "risks": action_data.get("risks", []),
         }, **kwargs)
 
     if pilotflow_action == "apply_history_suggestions":

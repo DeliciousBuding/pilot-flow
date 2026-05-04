@@ -183,6 +183,46 @@ def test_projectization_suggestion_button_generates_pending_plan(monkeypatch):
     assert "确认执行" in followup_card
 
 
+def test_projectization_suggestion_button_preserves_risks_in_pending_plan(monkeypatch):
+    sent_cards = []
+
+    def fake_send_card(chat_id, card):
+        sent_cards.append({"chat_id": chat_id, "card": card})
+        return f"om_signal_risk_{len(sent_cards)}"
+
+    monkeypatch.setattr("tools._hermes_send_card", fake_send_card)
+
+    _handle_scan_chat_signals({
+        "source_text": "目标是完成客户上线，风险是 API 审批可能卡住。",
+        "signals": {
+            "goals": ["完成客户上线"],
+            "commitments": [],
+            "risks": ["API 审批可能卡住"],
+            "action_items": ["整理上线清单"],
+            "deadlines": ["2026-05-08"],
+        },
+        "suggested_project": {
+            "title": "客户上线项目",
+            "goal": "完成客户上线",
+            "members": [],
+            "deliverables": ["整理上线清单"],
+            "deadline": "2026-05-08",
+        },
+        "should_suggest_project": True,
+    }, chat_id="oc_signal_risks", chat_type="group")
+
+    action_id = sent_cards[0]["card"]["elements"][1]["actions"][0]["value"]["pilotflow_action_id"]
+    result = json.loads(_handle_card_action(
+        {"action_value": json.dumps({"pilotflow_action_id": action_id}, ensure_ascii=False)},
+        chat_id="oc_signal_risks",
+        chat_type="group",
+    ))
+
+    assert result["status"] == "plan_generated"
+    assert result["plan"]["risks"] == ["API 审批可能卡住"]
+    assert _pending_plans["oc_signal_risks"]["plan"]["risks"] == ["API 审批可能卡住"]
+
+
 def test_scan_chat_signals_does_not_infer_semantics_from_source_text(monkeypatch):
     monkeypatch.setattr("tools._hermes_send_card", lambda chat_id, card: "om_signal_card")
 

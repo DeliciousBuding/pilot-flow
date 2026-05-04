@@ -39,6 +39,7 @@ sys.modules["tools.registry"] = _mock_registry
 
 from tools import (
     _handle_generate_plan,
+    _handle_scan_chat_signals,
     _handle_create_project_space,
     _handle_card_action,
     _handle_query_status,
@@ -247,6 +248,78 @@ def test_card_action_cancel_clears_pending_plan():
     with _project_registry_lock:
         assert "取消项目" not in _project_registry
     print("  PASS  Card cancel clears gate without creating project")
+
+
+def test_chat_signal_projectization_preserves_risks_through_creation():
+    """Test chat signal risks survive suggestion -> plan -> confirm -> Feishu resource creation."""
+    _clear_state()
+    chat_id = "oc_signal_create_risk"
+    sent_cards = []
+    doc_payloads = []
+    bitable_payloads = []
+
+    def fake_send_card(target_chat_id, card_json):
+        sent_cards.append({"chat_id": target_chat_id, "card": card_json})
+        return f"om_signal_create_risk_{len(sent_cards)}"
+
+    def fake_create_doc(title, content, target_chat_id):
+        doc_payloads.append({"title": title, "content": content, "chat_id": target_chat_id})
+        return "https://example.invalid/docx/risk"
+
+    def fake_create_bitable(title, members, deadline, risks, chat_id_arg, deliverables=None):
+        bitable_payloads.append({
+            "title": title,
+            "members": members,
+            "deadline": deadline,
+            "risks": risks,
+            "chat_id": chat_id_arg,
+            "deliverables": deliverables,
+        })
+        return {"url": "https://example.invalid/base/risk", "app_token": "app_risk", "table_id": "tbl_risk", "record_id": "rec_risk"}
+
+    with (
+        patch("tools._send_interactive_card_via_feishu", side_effect=fake_send_card),
+        patch("tools._create_doc", side_effect=fake_create_doc),
+        patch("tools._create_bitable", side_effect=fake_create_bitable),
+        patch("tools._create_task", return_value="https://example.invalid/task/risk"),
+        patch("tools._create_calendar_event", return_value=None),
+    ):
+        _handle_scan_chat_signals({
+            "source_text": "客户上线要在 5 月 8 日完成，风险是 API 审批可能卡住。",
+            "signals": {
+                "goals": ["完成客户上线"],
+                "commitments": [],
+                "risks": ["API 审批可能卡住"],
+                "action_items": ["整理上线清单"],
+                "deadlines": ["2026-05-08"],
+            },
+            "suggested_project": {
+                "title": "客户上线项目",
+                "goal": "完成客户上线",
+                "members": [],
+                "deliverables": ["整理上线清单"],
+                "deadline": "2026-05-08",
+            },
+            "should_suggest_project": True,
+        }, chat_id=chat_id, chat_type="group")
+
+        suggest_action_id = sent_cards[0]["card"]["elements"][1]["actions"][0]["value"]["pilotflow_action_id"]
+        plan_result = json.loads(_handle_card_action(
+            {"action_value": json.dumps({"pilotflow_action_id": suggest_action_id}, ensure_ascii=False)},
+            chat_id=chat_id,
+        ))
+        assert plan_result["plan"]["risks"] == ["API 审批可能卡住"]
+
+        confirm_action_id = sent_cards[1]["card"]["elements"][1]["actions"][0]["value"]["pilotflow_action_id"]
+        create_result = json.loads(_handle_card_action(
+            {"action_value": json.dumps({"pilotflow_action_id": confirm_action_id}, ensure_ascii=False)},
+            chat_id=chat_id,
+        ))
+
+    assert create_result["status"] == "project_space_created"
+    assert "## 风险\n- API 审批可能卡住" in doc_payloads[0]["content"]
+    assert bitable_payloads[0]["risks"] == ["API 审批可能卡住"]
+    print("  PASS  Chat signal risks preserved through project creation")
 
 
 # --- Integration Test: Query Status After Creation ---

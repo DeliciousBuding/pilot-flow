@@ -18,6 +18,19 @@
 | 已知非阻塞告警 | 文档评论 SDK builder 字段告警、任务关注者“已是协作者”告警均不阻断文档/Base/任务/日历/提醒创建；执行后模型补充响应阶段出现一次 SSL ReadError 并自动重试成功 |
 | 隐私处理 | 真实 chat_id、open_id、message_id、文档 URL、Base URL、任务 ID、calendar event ID、token 和 app secret 不写入公开仓库 |
 
+## 2026-05-04 群聊信号项目化风险贯通
+
+| 项目 | 证据 |
+| --- | --- |
+| 功能硬化 | `pilotflow_scan_chat_signals` 的项目化建议按钮现在会把 Hermes Agent 已提取的 `signals.risks` 或 `suggested_project.risks` 写入短期 opaque action ref；用户点击“整理成项目计划”后，`pilotflow_generate_plan` 会保留这些结构化风险，不再在计划确认链路丢失群聊里的阻塞信息 |
+| 端到端回归 | 新增回归覆盖：群聊信号建议 → 点击项目化按钮 → 生成待确认计划 → 点击确认创建；断言风险进入待确认 plan、项目文档 `## 风险` 段和多维表格创建参数 |
+| Agent 边界 | `pilotflow_generate_plan` 新增结构化 `risks` 参数；工具只接收 Agent 已提取风险，不从 `input_text` 做关键词或正则推断 |
+| 自动化验证 | `C:\Users\Ding\miniforge3\python.exe -m pytest` 通过，结果 `206 passed`；`git diff --check` 通过，仅有 CRLF 提示 |
+| WSL 安装验证 | `setup.py --hermes-dir D:\Code\LarkProject\hermes-agent --hermes-home \\wsl.localhost\Ubuntu-24.04\home\ding\.hermes` 通过；插件和 skill 已同步到 WSL Hermes runtime profile |
+| WSL 模型预检 | WSL `verify_wsl_feishu_runtime.py --probe-llm` 输出脱敏通过：`llm_probe_ok=true`、`llm_probe_provider=vectorcontrol`、`llm_probe_status=200` |
+| 真实 Feishu 卡片验证 | WSL `verify_wsl_feishu_runtime.py --send-card` 成功：`card_sent=true`、`pending_plan_recovered=true`、`card_action_recovered=true`、`redaction_enabled=true` |
+| 隐私处理 | 验证只记录布尔结果和脱敏状态；不写入真实 chat_id、message_id、Feishu URL、任务 ID、confirm token、idempotency key、token 或 app secret |
+
 ## 2026-05-04 卡片输入安全与 WSL 安装复验
 
 | 项目 | 证据 |
