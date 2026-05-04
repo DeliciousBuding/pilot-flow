@@ -129,6 +129,8 @@ def _sanitize_result(result: dict[str, Any]) -> dict[str, Any]:
         "history_apply_card_sent",
         "history_privacy_members_ignored",
         "history_deliverables_recovered",
+        "history_assignees_recovered",
+        "history_assignees_card_shown",
         "history_pending_recovered",
         "history_card_count",
         "projectization_suggestion_sent",
@@ -150,6 +152,7 @@ def _sanitize_result(result: dict[str, Any]) -> dict[str, Any]:
         "project_create_structured_assignees_used",
         "project_create_schema_assignees_exposed",
         "project_create_idempotency_includes_assignees",
+        "project_create_memory_assignees_saved",
         "project_create_calendar_created",
         "project_create_reminder_scheduled",
         "project_create_entry_card_sent",
@@ -451,6 +454,7 @@ def _verify_runtime_history_suggestions(hermes_dir: Path) -> dict[str, Any]:
         _handle_card_action,
         _handle_generate_plan,
         _load_pending_plan,
+        _parse_memory_project_entry,
         _pending_plans,
         _plan_lock,
     )
@@ -466,6 +470,12 @@ def _verify_runtime_history_suggestions(hermes_dir: Path) -> dict[str, Any]:
                 "content": (
                     "【项目创建】历史活动项目：目标=筹备活动，成员=2 人，"
                     "交付物=活动方案、宣传文案，截止=2026-05-20"
+                )
+            },
+            {
+                "content": (
+                    "【项目创建】历史上线项目：目标=客户上线，成员=张三、李四，"
+                    "交付物=整理上线清单、同步审批进度，负责人=整理上线清单->李四、同步审批进度->张三，截止=2026-05-20"
                 )
             }
         ]
@@ -491,9 +501,9 @@ def _verify_runtime_history_suggestions(hermes_dir: Path) -> dict[str, Any]:
         try:
             raw = _handle_generate_plan(
                 {
-                    "input_text": "帮我准备新的活动项目",
-                    "title": "新活动项目",
-                    "goal": "筹备活动",
+                    "input_text": "照上次客户上线项目准备",
+                    "title": "新上线项目",
+                    "goal": "客户上线",
                     "members": [],
                     "deliverables": [],
                     "deadline": "",
@@ -530,12 +540,17 @@ def _verify_runtime_history_suggestions(hermes_dir: Path) -> dict[str, Any]:
     recovered_plan = recovered_pending.get("plan") if isinstance(recovered_pending, dict) else {}
     recovered_members = recovered_plan.get("members") if isinstance(recovered_plan, dict) else []
     recovered_deliverables = recovered_plan.get("deliverables") if isinstance(recovered_plan, dict) else []
+    recovered_assignees = recovered_plan.get("deliverable_assignees") if isinstance(recovered_plan, dict) else {}
+    applied_card_json = json.dumps(sent_cards[-1], ensure_ascii=False) if sent_cards else ""
+    privacy_entry = _parse_memory_project_entry("【项目创建】历史活动项目：目标=筹备活动，成员=2 人，交付物=活动方案、宣传文案，截止=2026-05-20") or {}
     return {
         "history_suggestion_found": bool(data.get("history_suggestions")),
         "history_apply_action_found": bool(apply_action_id),
         "history_apply_card_sent": apply_result.get("status") == "history_suggestions_applied",
-        "history_privacy_members_ignored": recovered_members == [],
-        "history_deliverables_recovered": recovered_deliverables == ["活动方案", "宣传文案"],
+        "history_privacy_members_ignored": privacy_entry.get("members") == [] and privacy_entry.get("privacy_member_summary") is True,
+        "history_deliverables_recovered": recovered_deliverables == ["整理上线清单", "同步审批进度"],
+        "history_assignees_recovered": recovered_assignees == {"整理上线清单": "李四", "同步审批进度": "张三"},
+        "history_assignees_card_shown": "负责人" in applied_card_json and "整理上线清单 → 李四" in applied_card_json,
         "history_pending_recovered": bool(recovered_plan),
         "history_card_count": len(sent_cards),
     }
@@ -678,7 +693,7 @@ def _verify_runtime_project_creation(hermes_dir: Path) -> dict[str, Any]:
     created_tasks: list[tuple[str, str, str, str, str, list[str]]] = []
     created_calendars: list[tuple[str, str, str, list[str], str]] = []
     scheduled_reminders: list[tuple[str, str, str]] = []
-    saved_memory: list[tuple[str, str, list[str], list[str], str]] = []
+    saved_memory: list[tuple[str, str, list[str], list[str], str, dict[str, str]]] = []
     sent_cards: list[dict[str, Any]] = []
 
     def fake_create_doc(title: str, markdown_content: str, target_chat_id: str) -> str:
@@ -726,8 +741,15 @@ def _verify_runtime_project_creation(hermes_dir: Path) -> dict[str, Any]:
         scheduled_reminders.append((title, deadline, target_chat_id))
         return True
 
-    def fake_save_memory(title: str, goal: str, members: list, deliverables: list, deadline: str) -> bool:
-        saved_memory.append((title, goal, list(members), list(deliverables), deadline))
+    def fake_save_memory(
+        title: str,
+        goal: str,
+        members: list,
+        deliverables: list,
+        deadline: str,
+        deliverable_assignees: dict[str, str] | None = None,
+    ) -> bool:
+        saved_memory.append((title, goal, list(members), list(deliverables), deadline, dict(deliverable_assignees or {})))
         return True
 
     def fake_send_card(_chat_id: str, card: dict[str, Any]) -> str:
@@ -881,7 +903,10 @@ def _verify_runtime_project_creation(hermes_dir: Path) -> dict[str, Any]:
             ["张三", "李四"],
             ["验收清单", "上线演练"],
             "2026-05-20",
+            {"验收清单": "李四", "上线演练": "张三"},
         )],
+        "project_create_memory_assignees_saved": bool(saved_memory)
+        and saved_memory[0][5] == {"验收清单": "李四", "上线演练": "张三"},
         "project_create_trace_redacted": (
             bool((data.get("flight_record") or {}).get("redaction", {}).get("enabled"))
             and "example.invalid" not in flight_record_text
@@ -1020,7 +1045,7 @@ def _verify_runtime_session_initiator(hermes_dir: Path) -> dict[str, Any]:
         )
         runtime_tools._create_calendar_event = lambda title, goal, deadline, members=None, target_chat_id="": ""
         runtime_tools._schedule_deadline_reminder = lambda title, deadline, target_chat_id: False
-        runtime_tools._save_to_hermes_memory = lambda title, goal, members, deliverables, deadline: True
+        runtime_tools._save_to_hermes_memory = lambda title, goal, members, deliverables, deadline, deliverable_assignees=None: True
         runtime_tools._hermes_send_card = fake_send_card
         try:
             plan = json.loads(_handle_generate_plan(

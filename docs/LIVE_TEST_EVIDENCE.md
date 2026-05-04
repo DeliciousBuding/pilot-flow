@@ -1339,6 +1339,20 @@
 | 用户价值 | 安装验证不再只检查文件存在；现在能证明 Hermes runtime 会看到 PilotFlow 的工具和卡片回调入口，降低“装上了但 Agent 无法调用”的发布风险 |
 | 隐私处理 | 证据只记录布尔结果和脱敏结论；不写入真实 chat_id、message_id、Feishu URL、用户 open_id、token 或 app secret |
 
+## 2026-05-05 历史分工建议运行态验证
+
+| 项目 | 证据 |
+| --- | --- |
+| 运行环境 | PilotFlow 已通过 `setup.py --hermes-home <wsl-hermes-home>` 同步到 WSL Hermes runtime；安装验证返回插件、技能、Hermes config 和 Feishu display 配置均 OK |
+| 本地回归 | `C:\Users\Ding\miniforge3\python.exe -m pytest` 返回 `282 passed`；`tests/test_verify_wsl_feishu_runtime.py` 返回 `45 passed`；`git diff --check` 通过，仅有 CRLF 提示 |
+| Verifier 新字段 | `verify_wsl_feishu_runtime.py --verify-history` 在已安装的 WSL Hermes runtime 插件内返回 `history_assignees_recovered=true`、`history_assignees_card_shown=true`、`history_privacy_members_ignored=true`、`history_apply_card_sent=true` |
+| 项目创建闭环 | `verify_wsl_feishu_runtime.py --verify-project-creation` 返回 `project_create_memory_assignees_saved=true`、`project_create_structured_assignees_used=true`、`project_create_memory_saved=true`，证明项目创建时会把交付物负责人写入 Hermes memory，并继续优先使用结构化负责人字段 |
+| 历史建议路径 | 历史 memory 中的 `负责人=整理上线清单->李四、同步审批进度->张三` 会被解析为 `deliverable_assignees`；后续“照上次分工”类计划会在历史建议中恢复交付物负责人，并在确认卡展示负责人行 |
+| 卡片动作路径 | `apply_history_suggestions` 使用 opaque card action ref 应用历史建议，负责人映射会经清洗后写入 pending plan，不要求 Agent 从自然语言重新猜测分工 |
+| 基线验证 | 同轮继续通过同一 Feishu venv 下 `--probe-llm` 的 `llm_probe_ok=true`、`llm_probe_status=200`，`--verify-projectization-suggestion` 的 `projectization_assignees_preserved=true`、`projectization_assignees_card_shown=true`、`projectization_schema_assignees_exposed=true`，`--send-card` 的 `card_sent=true`，以及 `--verify-health-check` 的 `health_check_ok=true`、`health_has_client=true` |
+| 用户价值 | 用户复用历史项目经验时，PilotFlow 不只恢复目标、交付物、风险和成员，也能恢复“哪个交付物由谁负责”，避免项目确认前丢失团队分工 |
+| 隐私处理 | 证据只记录布尔结果和脱敏结论；不写入真实 chat_id、message_id、Feishu URL、用户 open_id、token 或 app secret |
+
 ## 本地回归
 
 ```bash

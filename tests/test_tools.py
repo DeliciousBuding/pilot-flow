@@ -890,6 +890,31 @@ def test_memory_save_reports_dispatch_failure():
     assert ok is False
 
 
+def test_memory_save_includes_deliverable_assignees_when_members_allowed():
+    calls = []
+
+    def fake_dispatch(name, args, **kwargs):
+        calls.append((name, args))
+        return json.dumps({"success": True})
+
+    fake_registry = types.SimpleNamespace(dispatch=fake_dispatch)
+    with patch("tools.registry", fake_registry), patch("tools.MEMORY_INCLUDE_MEMBERS", True):
+        ok = _save_to_hermes_memory(
+            "上线项目",
+            "客户上线",
+            ["张三", "李四"],
+            ["整理上线清单", "同步审批进度"],
+            "2026-05-20",
+            {"整理上线清单": "李四", "同步审批进度": "张三"},
+        )
+
+    assert ok is True
+    assert calls[0][0] == "memory"
+    content = calls[0][1]["content"]
+    assert "负责人=整理上线清单->李四、同步审批进度->张三" in content
+    assert "open_id" not in content
+
+
 def test_project_state_roundtrip_is_sanitized_and_portable(tmp_path):
     state_path = tmp_path / "pilotflow-projects.json"
 
@@ -1210,6 +1235,19 @@ def test_parse_memory_project_entry_ignores_privacy_member_summary():
     assert parsed["members"] == []
     assert parsed["privacy_member_summary"] is True
     assert parsed["deliverables"] == ["活动方案", "宣传文案"]
+
+
+def test_parse_memory_project_entry_preserves_deliverable_assignees():
+    parsed = _parse_memory_project_entry(
+        "【项目创建】上线项目：目标=客户上线，成员=张三、李四，交付物=整理上线清单、同步审批进度，负责人=整理上线清单->李四、同步审批进度->张三，截止=2026-05-20"
+    )
+
+    assert parsed["members"] == ["张三", "李四"]
+    assert parsed["deliverables"] == ["整理上线清单", "同步审批进度"]
+    assert parsed["deliverable_assignees"] == {
+        "整理上线清单": "李四",
+        "同步审批进度": "张三",
+    }
 
 
 def test_clean_plan_list_removes_agent_placeholders():
@@ -2762,6 +2800,35 @@ def test_history_suggestions_do_not_silently_mutate_plan():
     assert suggestions
 
 
+def test_history_suggestions_include_deliverable_assignees():
+    with _project_registry_lock:
+        _project_registry.clear()
+    _register_project(
+        "上线历史项目", ["张三", "李四"], "2026-05-20", "进行中", [],
+        goal="客户上线", deliverables=["整理上线清单", "同步审批进度"],
+        deliverable_assignees={"整理上线清单": "李四", "同步审批进度": "张三"},
+    )
+    plan = {
+        "title": "新上线项目",
+        "goal": "客户上线",
+        "members": [],
+        "deliverables": [],
+        "deliverable_assignees": {},
+        "deadline": "",
+    }
+
+    suggestions, suggested_fields = _history_suggestions_for_plan(plan, "照上次客户上线项目准备")
+
+    assert plan["deliverable_assignees"] == {}
+    assert suggested_fields["members"] == ["张三", "李四"]
+    assert suggested_fields["deliverables"] == ["整理上线清单", "同步审批进度"]
+    assert suggested_fields["deliverable_assignees"] == {
+        "整理上线清单": "李四",
+        "同步审批进度": "张三",
+    }
+    assert any("历史项目分工" in item for item in suggestions)
+
+
 def test_history_suggestions_ignore_unrelated_history():
     with _project_registry_lock:
         _project_registry.clear()
@@ -2876,6 +2943,69 @@ def test_history_suggestions_can_be_applied_from_card_action():
     assert "赵六" in rebuilt_text
     with _plan_lock:
         assert _pending_plans["oc_history_apply"]["plan"]["members"] == ["王五", "赵六"]
+
+
+def test_history_suggestions_apply_deliverable_assignees_from_card_action():
+    with _project_registry_lock:
+        _project_registry.clear()
+    with _plan_lock:
+        _pending_plans.clear()
+        _card_action_refs.clear()
+    memory_payload = json.dumps({
+        "items": [
+            {
+                "content": (
+                    "【项目创建】上线项目：目标=客户上线，成员=张三、李四，"
+                    "交付物=整理上线清单、同步审批进度，负责人=整理上线清单->李四、同步审批进度->张三，截止=2026-05-20"
+                )
+            }
+        ]
+    })
+    fake_registry = types.SimpleNamespace(dispatch=lambda name, args, **kwargs: memory_payload)
+    captured_cards = []
+
+    def capture_card(chat_id, card):
+        captured_cards.append(card)
+        return f"om_history_assignee_{len(captured_cards)}"
+
+    with (
+        patch("tools.registry", fake_registry),
+        patch("tools._send_interactive_card_via_feishu", side_effect=capture_card),
+        patch("tools._mark_card_message", return_value=True),
+    ):
+        _handle_generate_plan(
+            {
+                "input_text": "照上次客户上线项目准备",
+                "title": "新上线项目",
+                "goal": "客户上线",
+                "members": [],
+                "deliverables": [],
+                "deadline": "",
+            },
+            chat_id="oc_history_assignee_apply",
+        )
+
+    with _plan_lock:
+        apply_action_id = next(
+            action_id for action_id, ref in _card_action_refs.items()
+            if ref["chat_id"] == "oc_history_assignee_apply" and ref["action"] == "apply_history_suggestions"
+        )
+
+    with (
+        patch("tools.registry", fake_registry),
+        patch("tools._send_interactive_card_via_feishu", side_effect=capture_card),
+        patch("tools._mark_card_message", return_value=True),
+    ):
+        result = _handle_card_command(f'button {{"pilotflow_action_id":"{apply_action_id}"}}')
+
+    assert result is None
+    rebuilt_text = captured_cards[-1]["elements"][0]["content"]
+    assert "**负责人：** 整理上线清单 → 李四；同步审批进度 → 张三" in rebuilt_text
+    with _plan_lock:
+        assert _pending_plans["oc_history_assignee_apply"]["plan"]["deliverable_assignees"] == {
+            "整理上线清单": "李四",
+            "同步审批进度": "张三",
+        }
 
 
 def test_history_suggestions_card_action_reports_failure_when_rebuilt_card_not_sent():

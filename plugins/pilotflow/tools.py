@@ -409,7 +409,8 @@ def _idempotent_project_cache_payload(result: dict) -> dict:
 def _register_project(title: str, members: list, deadline: str, status: str, artifacts: list,
                       app_token: str = "", table_id: str = "", record_id: str = "",
                       goal: str = "", deliverables: Optional[list] = None,
-                      updates: Optional[list] = None, initiator: str = ""):
+                      updates: Optional[list] = None, initiator: str = "",
+                      deliverable_assignees: Optional[dict] = None):
     """Register a project in the in-memory registry for query_status and update_project."""
     with _project_registry_lock:
         if len(_project_registry) >= _PROJECT_REGISTRY_MAX:
@@ -419,6 +420,11 @@ def _register_project(title: str, members: list, deadline: str, status: str, art
             "goal": goal,
             "members": list(members),
             "deliverables": list(deliverables or []),
+            "deliverable_assignees": _clean_deliverable_assignees(
+                deliverable_assignees,
+                list(deliverables or []),
+                list(members),
+            ),
             "initiator": _clean_initiator_name(initiator),
             "deadline": deadline,
             "status": status,
@@ -735,7 +741,14 @@ def _mark_card_message(message_id: str, title: str, content: str, template: str)
     )
 
 
-def _save_to_hermes_memory(title: str, goal: str, members: list, deliverables: list, deadline: str) -> bool:
+def _save_to_hermes_memory(
+    title: str,
+    goal: str,
+    members: list,
+    deliverables: list,
+    deadline: str,
+    deliverable_assignees: Optional[dict] = None,
+) -> bool:
     """Save project creation pattern to Hermes memory for future suggestions."""
     if not MEMORY_ENABLED:
         return False
@@ -745,9 +758,15 @@ def _save_to_hermes_memory(title: str, goal: str, members: list, deliverables: l
         else:
             member_str = f"{len(members)} 人" if members else "无"
         deliverable_str = "、".join(deliverables) if deliverables else "无"
+        assignee_map = _clean_deliverable_assignees(deliverable_assignees, deliverables, members)
+        assignee_str = ""
+        if assignee_map and MEMORY_INCLUDE_MEMBERS:
+            assignee_str = "，负责人=" + "、".join(
+                f"{deliverable}->{assignee}" for deliverable, assignee in assignee_map.items()
+            )
         content = (
             f"【项目创建】{title}：目标={goal}，成员={member_str}，"
-            f"交付物={deliverable_str}，截止={deadline or '未设'}"
+            f"交付物={deliverable_str}{assignee_str}，截止={deadline or '未设'}"
         )
         result = registry.dispatch("memory", {
             "action": "add",
@@ -1286,8 +1305,8 @@ def _parse_memory_project_entry(text: str) -> Optional[dict]:
     if not text:
         return None
     patterns = [
-        r"【项目创建】(?P<title>[^：:]+)：目标=(?P<goal>.*?)，成员=(?P<members>.*?)，交付物=(?P<deliverables>.*?)，截止=(?P<deadline>[^，。\n]*)",
-        r"\[(?P<title>[^\]]+)\]\s*目标=(?P<goal>.*?)\s*成员=(?P<members>.*?)\s*交付物=(?P<deliverables>.*?)\s*截止=(?P<deadline>[^\s,。]*)",
+        r"【项目创建】(?P<title>[^：:]+)：目标=(?P<goal>.*?)，成员=(?P<members>.*?)，交付物=(?P<deliverables>.*?)(?:，负责人=(?P<assignees>.*?))?，截止=(?P<deadline>[^，。\n]*)",
+        r"\[(?P<title>[^\]]+)\]\s*目标=(?P<goal>.*?)\s*成员=(?P<members>.*?)\s*交付物=(?P<deliverables>.*?)(?:\s*负责人=(?P<assignees>.*?))?\s*截止=(?P<deadline>[^\s,。]*)",
     ]
     for pattern in patterns:
         match = re.search(pattern, text)
@@ -1295,16 +1314,29 @@ def _parse_memory_project_entry(text: str) -> Optional[dict]:
             continue
         members_raw = match.group("members").strip()
         deliverables_raw = match.group("deliverables").strip()
+        assignees_raw = (match.groupdict().get("assignees") or "").strip()
         privacy_member_summary = bool(re.fullmatch(r"\d+\s*人", members_raw))
         members = [] if members_raw in ("无", "待确认", "") or privacy_member_summary else [
             m.strip() for m in re.split(r"[、,，]", members_raw) if m.strip()
         ]
         deliverables = [] if deliverables_raw in ("无", "待确认", "") else [d.strip() for d in re.split(r"[、,，]", deliverables_raw) if d.strip()]
+        raw_assignees: dict[str, str] = {}
+        if assignees_raw:
+            for item in re.split(r"[、,，]", assignees_raw):
+                if "->" in item:
+                    raw_deliverable, raw_assignee = item.split("->", 1)
+                elif "→" in item:
+                    raw_deliverable, raw_assignee = item.split("→", 1)
+                else:
+                    continue
+                raw_assignees[raw_deliverable.strip()] = raw_assignee.strip()
+        deliverable_assignees = _clean_deliverable_assignees(raw_assignees, deliverables, members)
         return {
             "title": match.group("title").strip(),
             "goal": match.group("goal").strip(),
             "members": members,
             "deliverables": deliverables,
+            "deliverable_assignees": deliverable_assignees,
             "deadline": match.group("deadline").strip(),
             "raw": text,
             "source": "memory",
@@ -1563,6 +1595,7 @@ def _load_history_projects(query: str) -> list[dict]:
                 "goal": info.get("goal", ""),
                 "members": list(info.get("members", [])),
                 "deliverables": list(info.get("deliverables", [])),
+                "deliverable_assignees": dict(info.get("deliverable_assignees") or {}),
                 "deadline": info.get("deadline", ""),
                 "raw": title,
                 "source": "registry",
@@ -1598,6 +1631,18 @@ def _history_suggestions_for_plan(plan: dict, query: str) -> tuple[list[str], di
     if not plan.get("deliverables") and best.get("deliverables"):
         suggested_fields["deliverables"] = list(best["deliverables"])
         suggestions.append(f"可参考历史项目交付物：{', '.join(best['deliverables'])}")
+    best_assignees = _clean_deliverable_assignees(
+        best.get("deliverable_assignees"),
+        list(best.get("deliverables") or []),
+        list(best.get("members") or []),
+    )
+    if not plan.get("deliverable_assignees") and best_assignees:
+        suggested_fields["deliverable_assignees"] = best_assignees
+        suggestions.append(
+            "可参考历史项目分工：" + "；".join(
+                f"{deliverable} → {assignee}" for deliverable, assignee in best_assignees.items()
+            )
+        )
     if best.get("deadline") and not plan.get("deadline"):
         suggested_fields["deadline"] = best["deadline"]
         suggestions.append(f"历史项目曾使用截止时间：{best['deadline']}")
@@ -3716,10 +3761,11 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
         deliverables=deliverables,
         updates=initial_updates,
         initiator=initiator,
+        deliverable_assignees=deliverable_assignees,
     )
 
     # Save project pattern to Hermes memory for later history-based suggestions.
-    _save_to_hermes_memory(title, goal, members, deliverables, deadline)
+    _save_to_hermes_memory(title, goal, members, deliverables, deadline, deliverable_assignees)
     _save_project_state(
         title, goal, members, deliverables, deadline, initial_status, artifacts,
         app_token=bitable_meta.get("app_token", "") if bitable_meta else "",
@@ -3971,6 +4017,12 @@ def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
                     pending_plan[field] = list(value)
                 elif field == "deadline" and not pending_plan.get(field):
                     pending_plan[field] = value
+                elif field == "deliverable_assignees" and not pending_plan.get(field):
+                    pending_plan[field] = _clean_deliverable_assignees(
+                        value,
+                        list(pending_plan.get("deliverables") or []),
+                        list(pending_plan.get("members") or []),
+                    )
             pending["plan"] = pending_plan
             pending["timestamp"] = time.time()
             _pending_plans[chat_id] = pending

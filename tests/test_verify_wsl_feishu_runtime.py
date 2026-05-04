@@ -149,6 +149,8 @@ def test_verify_runtime_history_suggestions_applies_without_member_leak(tmp_path
     assert result["history_apply_card_sent"] is True
     assert result["history_privacy_members_ignored"] is True
     assert result["history_deliverables_recovered"] is True
+    assert result["history_assignees_recovered"] is True
+    assert result["history_assignees_card_shown"] is True
     assert result["history_pending_recovered"] is True
     assert result["history_card_count"] == 2
     assert sent_cards
@@ -167,6 +169,7 @@ def test_verify_runtime_project_creation_is_sanitized(tmp_path, monkeypatch):
     assert result["project_create_structured_assignees_used"] is True
     assert result["project_create_schema_assignees_exposed"] is True
     assert result["project_create_idempotency_includes_assignees"] is True
+    assert result["project_create_memory_assignees_saved"] is True
     assert result["project_create_calendar_created"] is True
     assert result["project_create_reminder_scheduled"] is True
     assert result["project_create_entry_card_sent"] is True
@@ -523,6 +526,7 @@ def test_verifier_project_creation_mode_outputs_sanitized_runtime_result(tmp_pat
         "project_create_structured_assignees_used": True,
         "project_create_schema_assignees_exposed": True,
         "project_create_idempotency_includes_assignees": True,
+        "project_create_memory_assignees_saved": True,
         "project_create_calendar_created": True,
         "project_create_reminder_scheduled": True,
         "project_create_entry_card_sent": True,
@@ -551,6 +555,7 @@ def test_verifier_project_creation_mode_outputs_sanitized_runtime_result(tmp_pat
     assert output["project_create_structured_assignees_used"] is True
     assert output["project_create_schema_assignees_exposed"] is True
     assert output["project_create_idempotency_includes_assignees"] is True
+    assert output["project_create_memory_assignees_saved"] is True
     assert output["project_create_calendar_created"] is True
     assert output["project_create_reminder_scheduled"] is True
     assert output["project_create_entry_card_sent"] is True
