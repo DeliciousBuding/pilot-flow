@@ -136,6 +136,21 @@ def test_send_runtime_plan_card_verifies_visible_confirmation_content(tmp_path, 
     assert sent_cards
 
 
+def test_verify_runtime_history_suggestions_applies_without_member_leak(tmp_path, monkeypatch):
+    hermes_dir, sent_cards = _install_runtime_fixture(tmp_path, monkeypatch)
+
+    result = _MODULE._verify_runtime_history_suggestions(hermes_dir)
+
+    assert result["history_suggestion_found"] is True
+    assert result["history_apply_action_found"] is True
+    assert result["history_apply_card_sent"] is True
+    assert result["history_privacy_members_ignored"] is True
+    assert result["history_deliverables_recovered"] is True
+    assert result["history_pending_recovered"] is True
+    assert result["history_card_count"] == 2
+    assert sent_cards
+
+
 def test_verifier_probe_llm_outputs_sanitized_success(tmp_path, capsys):
     env_file = tmp_path / ".env"
     config_file = tmp_path / "config.yaml"

@@ -1060,6 +1060,16 @@ def test_parse_memory_project_entry():
     assert parsed["deadline"] == "2026-05-10"
 
 
+def test_parse_memory_project_entry_ignores_privacy_member_summary():
+    parsed = _parse_memory_project_entry(
+        "【项目创建】活动项目：目标=筹备活动，成员=2 人，交付物=活动方案、宣传文案，截止=2026-05-20"
+    )
+
+    assert parsed["members"] == []
+    assert parsed["privacy_member_summary"] is True
+    assert parsed["deliverables"] == ["活动方案", "宣传文案"]
+
+
 def test_clean_plan_list_removes_agent_placeholders():
     assert _clean_plan_list(["示例成员A", "成员B", "王五", "王五"]) == ["王五"]
     assert _clean_plan_list("示例交付物、迁移验证记录") == ["迁移验证记录"]

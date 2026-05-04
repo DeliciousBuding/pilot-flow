@@ -1279,7 +1279,10 @@ def _parse_memory_project_entry(text: str) -> Optional[dict]:
             continue
         members_raw = match.group("members").strip()
         deliverables_raw = match.group("deliverables").strip()
-        members = [] if members_raw in ("无", "待确认", "") else [m.strip() for m in re.split(r"[、,，]", members_raw) if m.strip()]
+        privacy_member_summary = bool(re.fullmatch(r"\d+\s*人", members_raw))
+        members = [] if members_raw in ("无", "待确认", "") or privacy_member_summary else [
+            m.strip() for m in re.split(r"[、,，]", members_raw) if m.strip()
+        ]
         deliverables = [] if deliverables_raw in ("无", "待确认", "") else [d.strip() for d in re.split(r"[、,，]", deliverables_raw) if d.strip()]
         return {
             "title": match.group("title").strip(),
@@ -1289,6 +1292,7 @@ def _parse_memory_project_entry(text: str) -> Optional[dict]:
             "deadline": match.group("deadline").strip(),
             "raw": text,
             "source": "memory",
+            "privacy_member_summary": privacy_member_summary,
         }
     return None
 

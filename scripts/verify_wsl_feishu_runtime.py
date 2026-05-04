@@ -106,6 +106,13 @@ def _sanitize_result(result: dict[str, Any]) -> dict[str, Any]:
         "llm_probe_status",
         "llm_probe_error",
         "llm_probe_provider",
+        "history_suggestion_found",
+        "history_apply_action_found",
+        "history_apply_card_sent",
+        "history_privacy_members_ignored",
+        "history_deliverables_recovered",
+        "history_pending_recovered",
+        "history_card_count",
         "error",
     }
     return {key: result[key] for key in allowed if key in result}
@@ -247,6 +254,105 @@ def _send_runtime_plan_card(hermes_dir: Path) -> dict[str, Any]:
     }
 
 
+def _verify_runtime_history_suggestions(hermes_dir: Path) -> dict[str, Any]:
+    """Verify installed PilotFlow can read/apply history suggestions safely."""
+    sys.path.insert(0, str(hermes_dir))
+    import plugins.pilotflow.tools as runtime_tools  # pylint: disable=import-error
+    from plugins.pilotflow.tools import (  # pylint: disable=import-error
+        _card_action_refs,
+        _handle_card_action,
+        _handle_generate_plan,
+        _load_pending_plan,
+        _pending_plans,
+        _plan_lock,
+    )
+
+    chat_id = os.environ.get("PILOTFLOW_TEST_CHAT_ID", "")
+    original_state_path = os.environ.get("PILOTFLOW_STATE_PATH")
+    original_registry = runtime_tools.registry
+    original_send_card = runtime_tools._hermes_send_card
+    sent_cards: list[dict] = []
+    memory_payload = json.dumps({
+        "items": [
+            {
+                "content": (
+                    "【项目创建】历史活动项目：目标=筹备活动，成员=2 人，"
+                    "交付物=活动方案、宣传文案，截止=2026-05-20"
+                )
+            }
+        ]
+    }, ensure_ascii=False)
+
+    class _HistoryRegistry:
+        def dispatch(self, name: str, args: dict[str, Any], **kwargs: Any) -> str:  # noqa: ARG002
+            if name == "memory" and args.get("action") in {"scan", "search"}:
+                return memory_payload
+            return json.dumps({"success": True})
+
+    def tracking_send_card(target_chat_id: str, card_json: dict) -> bool | str:
+        sent_cards.append(card_json)
+        return original_send_card(target_chat_id, card_json)
+
+    with tempfile.TemporaryDirectory(prefix="pilotflow-history-verify-") as tmpdir:
+        os.environ["PILOTFLOW_STATE_PATH"] = str(Path(tmpdir) / "pilotflow_state.json")
+        with _plan_lock:
+            _pending_plans.clear()
+            _card_action_refs.clear()
+        runtime_tools.registry = _HistoryRegistry()
+        runtime_tools._hermes_send_card = tracking_send_card
+        try:
+            raw = _handle_generate_plan(
+                {
+                    "input_text": "帮我准备新的活动项目",
+                    "title": "新活动项目",
+                    "goal": "筹备活动",
+                    "members": [],
+                    "deliverables": [],
+                    "deadline": "",
+                },
+                chat_id=chat_id,
+            )
+            data = json.loads(raw)
+            with _plan_lock:
+                apply_action_id = next(
+                    (
+                        action_id
+                        for action_id, ref in _card_action_refs.items()
+                        if ref.get("action") == "apply_history_suggestions"
+                    ),
+                    "",
+                )
+            apply_result: dict[str, Any] = {}
+            if apply_action_id:
+                apply_result = json.loads(_handle_card_action(
+                    {"action_value": json.dumps({"pilotflow_action_id": apply_action_id}, ensure_ascii=False)},
+                    chat_id=chat_id,
+                ))
+            with _plan_lock:
+                _pending_plans.clear()
+                _card_action_refs.clear()
+            recovered_pending = _load_pending_plan(chat_id) or {}
+        finally:
+            runtime_tools.registry = original_registry
+            runtime_tools._hermes_send_card = original_send_card
+    if original_state_path is None:
+        os.environ.pop("PILOTFLOW_STATE_PATH", None)
+    else:
+        os.environ["PILOTFLOW_STATE_PATH"] = original_state_path
+    recovered_plan = recovered_pending.get("plan") if isinstance(recovered_pending, dict) else {}
+    recovered_members = recovered_plan.get("members") if isinstance(recovered_plan, dict) else []
+    recovered_deliverables = recovered_plan.get("deliverables") if isinstance(recovered_plan, dict) else []
+    return {
+        "history_suggestion_found": bool(data.get("history_suggestions")),
+        "history_apply_action_found": bool(apply_action_id),
+        "history_apply_card_sent": apply_result.get("status") == "history_suggestions_applied",
+        "history_privacy_members_ignored": recovered_members == [],
+        "history_deliverables_recovered": recovered_deliverables == ["活动方案", "宣传文案"],
+        "history_pending_recovered": bool(recovered_plan),
+        "history_card_count": len(sent_cards),
+    }
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Verify PilotFlow WSL Feishu runtime.")
     parser.add_argument("--hermes-dir", required=True, help="Hermes runtime directory.")
@@ -254,15 +360,17 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--config-file", default=str(Path.home() / ".hermes" / "config.yaml"))
     parser.add_argument("--send-card", action="store_true", help="Send one real Feishu plan card.")
     parser.add_argument("--probe-llm", action="store_true", help="Probe configured OpenAI-compatible /models endpoint.")
+    parser.add_argument("--verify-history", action="store_true", help="Send real cards that verify history suggestions can be applied.")
     args = parser.parse_args(argv)
 
     hermes_dir = Path(args.hermes_dir).resolve()
     env_values = _load_env(Path(args.env_file))
     config_result = _read_runtime_config(Path(args.config_file))
     import_result = _check_imports(hermes_dir)
+    mode = "history" if args.verify_history else "send-card" if args.send_card else "dry-run"
     output: dict[str, Any] = {
-        "mode": "send-card" if args.send_card else "dry-run",
-        "would_send_card": False,
+        "mode": mode,
+        "would_send_card": bool(args.send_card or args.verify_history),
         "has_chat_id": _safe_bool(env_values.get("PILOTFLOW_TEST_CHAT_ID") or os.environ.get("PILOTFLOW_TEST_CHAT_ID")),
         "has_feishu_credentials": _safe_bool(
             (env_values.get("FEISHU_APP_ID") or os.environ.get("FEISHU_APP_ID"))
@@ -273,6 +381,8 @@ def main(argv: list[str] | None = None) -> int:
     }
     if args.send_card:
         output.update(_send_runtime_plan_card(hermes_dir))
+    if args.verify_history:
+        output.update(_verify_runtime_history_suggestions(hermes_dir))
     if args.probe_llm:
         output.update(_probe_llm(config_result))
     print(json.dumps(_sanitize_result(output), ensure_ascii=False, sort_keys=True))

@@ -912,6 +912,19 @@
 | 用户价值 | 用户从项目入口卡即可通过红色 header 识别初始风险项目，并能直接点击“解除风险”继续处理 |
 | 隐私处理 | 证据只记录布尔结果和脱敏结论；不写入真实 chat_id、message_id、Feishu URL、confirm token、idempotency key、token 或 app secret |
 
+## 2026-05-04 历史建议卡片可复现验证
+
+| 项目 | 证据 |
+| --- | --- |
+| 运行环境 | PilotFlow 已通过 `setup.py --hermes-home <wsl-hermes-home>` 同步到 WSL Hermes runtime；安装验证返回插件、技能和 Feishu display 配置均 OK |
+| 本地回归 | `C:\Users\Ding\miniforge3\python.exe -m pytest` 返回 `217 passed`；历史建议和 verifier 定向测试返回通过 |
+| 功能修正 | 从 Hermes memory 读取到默认隐私模式写入的 `成员=2 人` 时，不再把“2 人”当成员姓名回填；仍会建议可复用交付物和截止时间 |
+| 真实历史卡片 | `verify_wsl_feishu_runtime.py --verify-history` 输出确认 `mode=history`、`would_send_card=true`、`history_suggestion_found=true`、`history_apply_action_found=true`、`history_apply_card_sent=true`、`history_card_count=2` |
+| 重启恢复 | 同一验证输出确认 `history_pending_recovered=true`、`history_deliverables_recovered=true`、`history_privacy_members_ignored=true`，说明采用历史建议后的 pending plan 可从状态文件恢复且不泄露隐私成员摘要 |
+| 基线验证 | 同轮继续通过 `--probe-llm` 的 `llm_probe_ok=true`、`llm_probe_status=200`，以及 `--send-card` 的 `card_sent=true`、`pending_plan_recovered=true`、`card_action_recovered=true` |
+| 用户价值 | Agent 可把历史项目模式作为上下文建议交付物，而不是硬编码模板；用户点击“采用历史建议”后，即使 gateway 重启也能继续确认创建 |
+| 隐私处理 | 证据只记录布尔结果和脱敏结论；不写入真实 chat_id、message_id、Feishu URL、confirm token、idempotency key、token 或 app secret |
+
 ## 本地回归
 
 ```bash
