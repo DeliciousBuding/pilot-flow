@@ -2422,7 +2422,11 @@ def test_query_status_named_state_project_sends_detail_card_after_restart(tmp_pa
             ["恢复记录"],
             "2026-05-20",
             "进行中",
-            [],
+            [
+                "文档: https://example.invalid/docx/doc_token_123",
+                "多维表格: https://example.invalid/base/base_token_123",
+                "任务: 评审清单: https://example.invalid/task/task_123",
+            ],
         )
         captured = {}
 
@@ -2440,6 +2444,49 @@ def test_query_status_named_state_project_sends_detail_card_after_restart(tmp_pa
     assert "重启定向项目" in body
     assert "验证重启后定向查询" in body
     assert "恢复记录" in body
+    assert "[项目文档](https://example.invalid/docx/doc_token_123)" in body
+    assert "[状态表](https://example.invalid/base/base_token_123)" in body
+    assert "[任务：评审清单](https://example.invalid/task/task_123)" in body
+    serialized = state_path.read_text(encoding="utf-8")
+    assert "example.invalid" not in serialized
+
+
+def test_card_action_project_status_restores_resource_refs_after_restart(tmp_path):
+    state_path = tmp_path / "pilotflow-projects.json"
+    with _project_registry_lock:
+        _project_registry.clear()
+    with _plan_lock:
+        _card_action_refs.clear()
+    with patch.dict(os.environ, {"PILOTFLOW_STATE_PATH": str(state_path)}):
+        _save_project_state(
+            "重启按钮详情项目",
+            "验证重启后按钮详情恢复资源链接",
+            [],
+            ["按钮验收记录"],
+            "2026-05-20",
+            "进行中",
+            [
+                "文档: https://example.invalid/docx/doc_button_123",
+                "多维表格: https://example.invalid/base/base_button_123",
+            ],
+        )
+        captured = {}
+        action_value = json.dumps({"pilotflow_action": "project_status", "title": "重启按钮详情项目"}, ensure_ascii=False)
+
+        def capture_card(chat_id, card):
+            captured["card"] = card
+            return "om_state_button_detail"
+
+        with patch("tools._hermes_send_card", side_effect=capture_card):
+            result = json.loads(_handle_card_action({"action_value": action_value}, chat_id="oc_state_button_detail"))
+
+    assert result["status"] == "project_status_sent"
+    body = captured["card"]["elements"][0]["content"]
+    assert "重启按钮详情项目" in body
+    assert "[项目文档](https://example.invalid/docx/doc_button_123)" in body
+    assert "[状态表](https://example.invalid/base/base_button_123)" in body
+    serialized = state_path.read_text(encoding="utf-8")
+    assert "example.invalid" not in serialized
 
 
 def test_query_status_filters_active_projects():
