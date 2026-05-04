@@ -2,6 +2,20 @@
 
 > 本文件只记录可复验结论和脱敏摘要，不提交真实群 ID、用户 open_id、应用 secret、message_id 或飞书文档链接。
 
+## 2026-05-05 重启后指定负责人追加交付物
+
+| 项目 | 证据 |
+| --- | --- |
+| 功能修复 | restart-safe state fallback 项目现在允许用户继续追加“交付物 + 负责人显示名”；即使 state 不保存成员名单，也能把负责人传给飞书待办创建链路 |
+| 安全边界 | 仅在重启后的 state-only 项目中放宽成员名单校验；内存项目仍要求负责人属于项目成员。state-only 路径继续拒绝 `ou_*` 等 Feishu 内部 ID 形态，避免把 open_id 当显示名落盘或派发 |
+| 状态延续 | 新增交付物和负责人映射会写入 restart-safe state；真实任务 URL 只进入私有 resource refs，不进入公开项目摘要 |
+| 本地回归 | `C:\Users\Ding\miniforge3\python.exe -m pytest` 返回 `290 passed`；`tests/test_tools.py tests/test_verify_wsl_feishu_runtime.py` 返回 `256 passed`；`git diff --check` 通过，仅有 CRLF 提示 |
+| WSL 安装态 | `setup.py --hermes-dir D:\Code\LarkProject\hermes-agent --hermes-home \\wsl.localhost\Ubuntu-24.04\home\ding\.hermes` 通过；插件和 skill 已同步到 WSL Hermes runtime profile |
+| Verifier 新字段 | `--verify-update-task` 返回 `update_task_state_assignee_used=true`、`update_task_state_assignee_persisted=true`、`update_task_state_internal_id_rejected=true` |
+| 基线验证 | 同轮继续通过同一 Feishu venv 下 `--send-card` 的 `card_sent=true`、`card_has_title=true`、`card_has_goal=true`、`card_has_initiator=true`、`card_has_risk=true`，以及 `--probe-llm` 的 `llm_probe_ok=true`、`llm_probe_status=200` |
+| 用户价值 | Hermes gateway 重启后，用户在群里继续说“新增接口联调，张三负责”不会退化成无负责人任务或被错误拒绝，后续详情卡和催办仍能显示新分工 |
+| 隐私处理 | 验证只记录布尔结果和脱敏状态；不写入真实 chat_id、open_id、message_id、Feishu URL、任务 URL、token 或 app secret |
+
 ## 2026-05-05 重启后分工展示恢复
 
 | 项目 | 证据 |

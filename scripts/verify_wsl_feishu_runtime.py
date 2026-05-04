@@ -183,6 +183,9 @@ def _sanitize_result(result: dict[str, Any]) -> dict[str, Any]:
         "update_task_assignee_persisted",
         "update_task_detail_assignee_shown",
         "update_task_reminder_assignee_shown",
+        "update_task_state_assignee_used",
+        "update_task_state_assignee_persisted",
+        "update_task_state_internal_id_rejected",
         "archive_gate_required",
         "archive_gate_no_write",
         "archive_gate_confirmed",
@@ -1391,13 +1394,18 @@ def _verify_runtime_update_task_summary(hermes_dir: Path) -> dict[str, Any]:
         _handle_update_project,
         _create_card_action_ref,
         _card_action_refs,
+        _load_project_resource_refs,
+        _load_project_state,
         _project_registry,
         _project_registry_lock,
         _register_project,
+        _save_project_state,
         _plan_lock,
     )
 
     chat_id = os.environ.get("PILOTFLOW_TEST_CHAT_ID", "")
+    original_state_path = os.environ.get("PILOTFLOW_STATE_PATH")
+    original_refs_path = os.environ.get("PILOTFLOW_PROJECT_REFS_PATH")
     original_create_task = runtime_tools._create_task
     original_send = runtime_tools._hermes_send
     sent_messages: list[str] = []
@@ -1455,6 +1463,67 @@ def _verify_runtime_update_task_summary(hermes_dir: Path) -> dict[str, Any]:
         with _project_registry_lock:
             _project_registry.clear()
 
+    with tempfile.TemporaryDirectory(prefix="pilotflow-update-task-state-") as tmpdir:
+        os.environ["PILOTFLOW_STATE_PATH"] = str(Path(tmpdir) / "pilotflow_state.json")
+        os.environ["PILOTFLOW_PROJECT_REFS_PATH"] = str(Path(tmpdir) / "pilotflow_refs.json")
+        state_task_calls: list[tuple[Any, ...]] = []
+
+        def fake_state_create_task(*args: Any, **_kwargs: Any) -> str:
+            state_task_calls.append(args)
+            return "运行态重启新增待办: https://example.invalid/task/state-runtime"
+
+        with _project_registry_lock:
+            _project_registry.clear()
+        runtime_tools._create_task = fake_state_create_task
+        runtime_tools._hermes_send = fake_send
+        try:
+            _save_project_state(
+                "运行态重启交付物项目",
+                "验证安装后重启继续派发待办",
+                [],
+                ["初始验收"],
+                "2026-05-20",
+                "进行中",
+            )
+            state_data = json.loads(_handle_update_project(
+                {
+                    "project_name": "运行态重启交付物",
+                    "action": "add_deliverable",
+                    "value": "运行态重启新增待办",
+                    "assignee": "张三",
+                },
+                chat_id=chat_id,
+            ))
+            internal_data = json.loads(_handle_update_project(
+                {
+                    "project_name": "运行态重启交付物",
+                    "action": "add_deliverable",
+                    "value": "运行态内部待办",
+                    "assignee": "ou_secret_user",
+                },
+                chat_id=chat_id,
+            ))
+            state_projects = _load_project_state()
+            state_refs = _load_project_resource_refs("运行态重启交付物项目")
+        finally:
+            runtime_tools._create_task = original_create_task
+            runtime_tools._hermes_send = original_send
+            with _project_registry_lock:
+                _project_registry.clear()
+            if original_state_path is None:
+                os.environ.pop("PILOTFLOW_STATE_PATH", None)
+            else:
+                os.environ["PILOTFLOW_STATE_PATH"] = original_state_path
+            if original_refs_path is None:
+                os.environ.pop("PILOTFLOW_PROJECT_REFS_PATH", None)
+            else:
+                os.environ["PILOTFLOW_PROJECT_REFS_PATH"] = original_refs_path
+
+    state_project = next(
+        (item for item in state_projects if item.get("title") == "运行态重启交付物项目"),
+        {},
+    )
+
     return {
         "update_task_created": data.get("task_created") is True,
         "update_task_name_returned": bool(data.get("task_name")),
@@ -1468,6 +1537,21 @@ def _verify_runtime_update_task_summary(hermes_dir: Path) -> dict[str, Any]:
         "update_task_assignee_persisted": persisted_assignees.get("运行态新增待办") == "张三",
         "update_task_detail_assignee_shown": "运行态新增待办 → 张三" in json.dumps(detail_card, ensure_ascii=False),
         "update_task_reminder_assignee_shown": "运行态新增待办 → 张三" in reminder_text,
+        "update_task_state_assignee_used": (
+            state_data.get("status") == "project_updated"
+            and bool(state_task_calls)
+            and len(state_task_calls[0]) >= 3
+            and state_task_calls[0][2] == "张三"
+        ),
+        "update_task_state_assignee_persisted": (
+            state_project.get("deliverable_assignees", {}).get("运行态重启新增待办") == "张三"
+            and any(item.startswith("任务: 运行态重启新增待办") for item in state_refs)
+            and "example.invalid" not in json.dumps(state_projects, ensure_ascii=False)
+        ),
+        "update_task_state_internal_id_rejected": (
+            "error" in internal_data
+            and not any(len(call) >= 1 and call[0] == "运行态内部待办" for call in state_task_calls)
+        ),
     }
 
 

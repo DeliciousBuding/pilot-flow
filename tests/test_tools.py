@@ -6264,6 +6264,90 @@ def test_update_project_adds_deliverable_to_sanitized_state_after_restart(tmp_pa
     assert "飞书任务 → 评审清单: https://example.invalid/task/restart" in sent_text
 
 
+def test_update_project_adds_state_deliverable_with_structured_assignee_after_restart(tmp_path):
+    state_path = tmp_path / "pilotflow-projects.json"
+    refs_path = tmp_path / "pilotflow-project-refs.json"
+    with _project_registry_lock:
+        _project_registry.clear()
+
+    with patch.dict(os.environ, {
+        "PILOTFLOW_STATE_PATH": str(state_path),
+        "PILOTFLOW_PROJECT_REFS_PATH": str(refs_path),
+    }):
+        assert _save_project_state(
+            "重启负责人交付物项目",
+            "验证重启后继续指定负责人",
+            [],
+            ["验收记录"],
+            "2026-05-20",
+            "进行中",
+        )
+        with (
+            patch("tools._create_task", return_value="接口联调: https://example.invalid/task/state-assignee") as create_task,
+            patch("tools._hermes_send", return_value=True) as send,
+        ):
+            result = json.loads(_handle_update_project(
+                {
+                    "project_name": "重启负责人交付物",
+                    "action": "add_deliverable",
+                    "value": "接口联调",
+                    "assignee": "张三",
+                },
+                chat_id="oc_state_deliverable_assignee",
+            ))
+        projects = _load_project_state()
+        refs = _load_project_resource_refs("重启负责人交付物项目")
+
+    assert result["status"] == "project_updated"
+    assert result["assignee"] == "张三"
+    assert result["task_created"] is True
+    create_task.assert_called_once_with(
+        "接口联调", "项目: 重启负责人交付物项目", "张三", "2026-05-20", "oc_state_deliverable_assignee", [],
+    )
+    assert projects[0]["deliverables"] == ["验收记录", "接口联调"]
+    assert projects[0]["deliverable_assignees"] == {"接口联调": "张三"}
+    assert "任务: 接口联调: https://example.invalid/task/state-assignee" in refs
+    sent_text = send.call_args.args[1]
+    assert "负责人 → 张三" in sent_text
+    assert "飞书任务 → 接口联调: https://example.invalid/task/state-assignee" in sent_text
+
+
+def test_update_project_rejects_state_deliverable_internal_assignee_after_restart(tmp_path):
+    state_path = tmp_path / "pilotflow-projects.json"
+    with _project_registry_lock:
+        _project_registry.clear()
+
+    with patch.dict(os.environ, {"PILOTFLOW_STATE_PATH": str(state_path)}):
+        assert _save_project_state(
+            "重启内部负责人项目",
+            "验证重启后拒绝内部 ID",
+            [],
+            ["验收记录"],
+            "2026-05-20",
+            "进行中",
+        )
+        with (
+            patch("tools._create_task") as create_task,
+            patch("tools._hermes_send") as send,
+        ):
+            result = json.loads(_handle_update_project(
+                {
+                    "project_name": "重启内部负责人",
+                    "action": "add_deliverable",
+                    "value": "接口联调",
+                    "assignee": "ou_secret_user",
+                },
+                chat_id="oc_state_deliverable_internal",
+            ))
+        projects = _load_project_state()
+
+    assert result["error"] == "负责人只能使用可见姓名或飞书 @ 提及，不要传 open_id、chat_id 或 message_id。"
+    create_task.assert_not_called()
+    send.assert_not_called()
+    assert projects[0]["deliverables"] == ["验收记录"]
+    assert projects[0]["deliverable_assignees"] == {}
+
+
 def test_project_status_action_sends_interactive_detail_card():
     with _project_registry_lock:
         _project_registry.clear()

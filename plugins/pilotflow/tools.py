@@ -5013,7 +5013,12 @@ def _risk_level_from_text(text: str) -> str:
     return "中"
 
 
-def _parse_deliverable_assignment(value: str, members: list[str]) -> tuple[str, str, str]:
+def _parse_deliverable_assignment(
+    value: str,
+    members: list[str],
+    *,
+    allow_unverified_assignee: bool = False,
+) -> tuple[str, str, str]:
     """Parse 'member: deliverable' and report unknown assignees explicitly."""
     text = str(value or "").strip()
     match = re.match(r"^\s*([^:：]+)\s*[:：]\s*(.+)$", text)
@@ -5025,6 +5030,8 @@ def _parse_deliverable_assignment(value: str, members: list[str]) -> tuple[str, 
         assignee = at_match.group(2).strip()
     deliverable = match.group(2).strip()
     if assignee and deliverable and assignee in set(members or []):
+        return deliverable, assignee, ""
+    if assignee and deliverable and allow_unverified_assignee and not _looks_like_feishu_identifier(assignee):
         return deliverable, assignee, ""
     if assignee and deliverable:
         return deliverable, "", assignee
@@ -5211,6 +5218,7 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
         }
 
     require_confirm, autonomy_mode, autonomy_reason = _needs_confirmation_for_update(action, value, project, chat_scope, chat_id)
+    state_only_project = bool(state_project and not project.get("members"))
 
     if action == "remove_member" and value not in project.get("members", []):
         return tool_error(f"成员「{value}」不是项目「{project_name}」的成员，无法移除。")
@@ -5233,13 +5241,19 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
     if action == "add_deliverable":
         structured_assignee = _clean_member_update_value(params.get("assignee") or "")
         if structured_assignee:
-            if structured_assignee not in project.get("members", []):
+            if _looks_like_feishu_identifier(structured_assignee):
+                return tool_error("负责人只能使用可见姓名或飞书 @ 提及，不要传 open_id、chat_id 或 message_id。")
+            if structured_assignee not in project.get("members", []) and not state_only_project:
                 return tool_error(
                     f"负责人「{structured_assignee}」不是项目「{project_name}」的成员。"
                     "请先确认是否新增成员，再为该交付物指定负责人。"
                 )
             assignee_override = structured_assignee
-        value, parsed_assignee, unknown_assignee = _parse_deliverable_assignment(value, project.get("members", []))
+        value, parsed_assignee, unknown_assignee = _parse_deliverable_assignment(
+            value,
+            project.get("members", []),
+            allow_unverified_assignee=state_only_project,
+        )
         if parsed_assignee:
             assignee_override = parsed_assignee
         elif structured_assignee and not unknown_assignee:
