@@ -1029,6 +1029,19 @@
 | 用户价值 | 把评审一定会看到的代码体量问题转成明确工程自觉和可执行拆分边界，同时不牺牲当前已跑通的真实 Feishu 链路稳定性 |
 | 隐私处理 | 证据只记录布尔结果和脱敏结论；不写入真实 chat_id、message_id、Feishu URL、用户 open_id、token 或 app secret |
 
+## 2026-05-05 归档确认门控运行态验证
+
+| 项目 | 证据 |
+| --- | --- |
+| 运行环境 | PilotFlow 已通过 `setup.py --hermes-home <wsl-hermes-home>` 同步到 WSL Hermes runtime；安装验证返回插件、技能、Hermes config 和 Feishu display 配置均 OK |
+| 本地回归 | `C:\Users\Ding\miniforge3\python.exe -m pytest` 返回 `229 passed`；`tests/test_verify_wsl_feishu_runtime.py` 返回 `10 passed`；`git diff --check` 通过 |
+| Verifier 新模式 | `verify_wsl_feishu_runtime.py --verify-archive-gate` 在已安装的 WSL Hermes runtime 插件内返回 `archive_gate_required=true`、`archive_gate_no_write=true`、`archive_gate_confirmed=true`、`archive_gate_feedback_sent=true` |
+| 写入保护 | 运行态 verifier 先发起未确认 `update_status=已归档`，确认返回 `confirmation_required`，项目仍保持 `进行中`，且未触发状态表、项目文档、流水或群通知写入 |
+| 确认路径 | 同一 verifier 再传入 `confirmation_text=确认执行`，确认返回 `project_updated`，项目状态变为 `已归档`，并产生状态表同步反馈 |
+| 基线验证 | 同轮继续通过 `--probe-llm` 的 `llm_probe_ok=true`、`llm_probe_status=200`，`--send-card` 的 `card_sent=true`、`card_has_title=true`、`card_has_goal=true`、`card_has_risk=true`，`--verify-history` 的 `history_apply_card_sent=true`，以及 `--verify-update-task` 的 `update_task_created=true` |
+| 用户价值 | 归档确认门控不再只有单元测试证据，已进入评委可复跑的 WSL runtime verifier，证明安装后的插件也会阻断未确认 destructive update |
+| 隐私处理 | 证据只记录布尔结果和脱敏结论；不写入真实 chat_id、message_id、Feishu URL、用户 open_id、token 或 app secret |
+
 ## 本地回归
 
 ```bash

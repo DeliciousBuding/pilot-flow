@@ -117,6 +117,10 @@ def _sanitize_result(result: dict[str, Any]) -> dict[str, Any]:
         "update_task_name_returned",
         "update_task_feedback_includes_summary",
         "update_task_artifact_recorded",
+        "archive_gate_required",
+        "archive_gate_no_write",
+        "archive_gate_confirmed",
+        "archive_gate_feedback_sent",
         "error",
     }
     return {key: result[key] for key in allowed if key in result}
@@ -418,6 +422,88 @@ def _verify_runtime_update_task_summary(hermes_dir: Path) -> dict[str, Any]:
     }
 
 
+def _verify_runtime_archive_gate(hermes_dir: Path) -> dict[str, Any]:
+    """Verify installed PilotFlow pauses archive updates until explicit confirmation."""
+    sys.path.insert(0, str(hermes_dir))
+    import plugins.pilotflow.tools as runtime_tools  # pylint: disable=import-error
+    from plugins.pilotflow.tools import (  # pylint: disable=import-error
+        _handle_update_project,
+        _project_registry,
+        _project_registry_lock,
+        _register_project,
+    )
+
+    chat_id = os.environ.get("PILOTFLOW_TEST_CHAT_ID", "")
+    original_update_bitable = runtime_tools._update_bitable_record
+    original_append_doc = runtime_tools._append_project_doc_update
+    original_append_history = runtime_tools._append_bitable_update_record
+    original_send = runtime_tools._hermes_send
+    write_calls: list[str] = []
+    sent_messages: list[str] = []
+
+    def fake_write(*_args: Any, **_kwargs: Any) -> bool:
+        write_calls.append("write")
+        return True
+
+    def fake_send(_chat_id: str, text: str) -> bool:
+        sent_messages.append(text)
+        return True
+
+    with _project_registry_lock:
+        _project_registry.clear()
+    runtime_tools._update_bitable_record = fake_write
+    runtime_tools._append_project_doc_update = fake_write
+    runtime_tools._append_bitable_update_record = fake_write
+    runtime_tools._hermes_send = fake_send
+    try:
+        _register_project(
+            "运行态归档验证项目",
+            ["张三"],
+            "2026-05-20",
+            "进行中",
+            [],
+            app_token="app_runtime",
+            table_id="tbl_runtime",
+            record_id="rec_runtime",
+            goal="验证安装后的归档确认门控",
+            deliverables=["初始验收"],
+        )
+        blocked = json.loads(_handle_update_project(
+            {"project_name": "运行态归档", "action": "update_status", "value": "已归档"},
+            chat_id=chat_id,
+        ))
+        blocked_write_count = len(write_calls)
+        blocked_send_count = len(sent_messages)
+        with _project_registry_lock:
+            blocked_status = _project_registry["运行态归档验证项目"].get("status")
+
+        confirmed = json.loads(_handle_update_project(
+            {
+                "project_name": "运行态归档",
+                "action": "update_status",
+                "value": "已归档",
+                "confirmation_text": "确认执行",
+            },
+            chat_id=chat_id,
+        ))
+        with _project_registry_lock:
+            confirmed_status = _project_registry["运行态归档验证项目"].get("status")
+    finally:
+        runtime_tools._update_bitable_record = original_update_bitable
+        runtime_tools._append_project_doc_update = original_append_doc
+        runtime_tools._append_bitable_update_record = original_append_history
+        runtime_tools._hermes_send = original_send
+        with _project_registry_lock:
+            _project_registry.clear()
+
+    return {
+        "archive_gate_required": blocked.get("status") == "confirmation_required",
+        "archive_gate_no_write": blocked_status == "进行中" and blocked_write_count == 0 and blocked_send_count == 0,
+        "archive_gate_confirmed": confirmed.get("status") == "project_updated" and confirmed_status == "已归档",
+        "archive_gate_feedback_sent": any("状态表已同步" in msg for msg in sent_messages),
+    }
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Verify PilotFlow WSL Feishu runtime.")
     parser.add_argument("--hermes-dir", required=True, help="Hermes runtime directory.")
@@ -427,13 +513,20 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--probe-llm", action="store_true", help="Probe configured OpenAI-compatible /models endpoint.")
     parser.add_argument("--verify-history", action="store_true", help="Send real cards that verify history suggestions can be applied.")
     parser.add_argument("--verify-update-task", action="store_true", help="Dry-run installed update_project task summary behavior.")
+    parser.add_argument("--verify-archive-gate", action="store_true", help="Dry-run installed archive confirmation gate behavior.")
     args = parser.parse_args(argv)
 
     hermes_dir = Path(args.hermes_dir).resolve()
     env_values = _load_env(Path(args.env_file))
     config_result = _read_runtime_config(Path(args.config_file))
     import_result = _check_imports(hermes_dir)
-    mode = "update-task" if args.verify_update_task else "history" if args.verify_history else "send-card" if args.send_card else "dry-run"
+    mode = (
+        "archive-gate" if args.verify_archive_gate
+        else "update-task" if args.verify_update_task
+        else "history" if args.verify_history
+        else "send-card" if args.send_card
+        else "dry-run"
+    )
     output: dict[str, Any] = {
         "mode": mode,
         "would_send_card": bool(args.send_card or args.verify_history),
@@ -451,6 +544,8 @@ def main(argv: list[str] | None = None) -> int:
         output.update(_verify_runtime_history_suggestions(hermes_dir))
     if args.verify_update_task:
         output.update(_verify_runtime_update_task_summary(hermes_dir))
+    if args.verify_archive_gate:
+        output.update(_verify_runtime_archive_gate(hermes_dir))
     if args.probe_llm:
         output.update(_probe_llm(config_result))
     print(json.dumps(_sanitize_result(output), ensure_ascii=False, sort_keys=True))

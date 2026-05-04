@@ -163,6 +163,18 @@ def test_verify_runtime_update_task_summary_is_sanitized(tmp_path, monkeypatch):
     assert "example.invalid" not in json.dumps(result, ensure_ascii=False)
 
 
+def test_verify_runtime_archive_gate_is_sanitized(tmp_path, monkeypatch):
+    hermes_dir, _sent_cards = _install_runtime_fixture(tmp_path, monkeypatch)
+
+    result = _MODULE._verify_runtime_archive_gate(hermes_dir)
+
+    assert result["archive_gate_required"] is True
+    assert result["archive_gate_no_write"] is True
+    assert result["archive_gate_confirmed"] is True
+    assert result["archive_gate_feedback_sent"] is True
+    assert "example.invalid" not in json.dumps(result, ensure_ascii=False)
+
+
 def test_verifier_update_task_mode_outputs_sanitized_runtime_result(tmp_path, capsys):
     env_file = tmp_path / ".env"
     env_file.write_text("PILOTFLOW_TEST_CHAT_ID=oc_real_chat_id\n", encoding="utf-8")
@@ -189,6 +201,37 @@ def test_verifier_update_task_mode_outputs_sanitized_runtime_result(tmp_path, ca
     assert output["update_task_name_returned"] is True
     assert output["update_task_feedback_includes_summary"] is True
     assert output["update_task_artifact_recorded"] is True
+    assert "oc_real_chat_id" not in output_text
+    assert "example.invalid" not in output_text
+
+
+def test_verifier_archive_gate_mode_outputs_sanitized_runtime_result(tmp_path, capsys):
+    env_file = tmp_path / ".env"
+    env_file.write_text("PILOTFLOW_TEST_CHAT_ID=oc_real_chat_id\n", encoding="utf-8")
+
+    with patch.object(_MODULE, "_verify_runtime_archive_gate", return_value={
+        "archive_gate_required": True,
+        "archive_gate_no_write": True,
+        "archive_gate_confirmed": True,
+        "archive_gate_feedback_sent": True,
+        "raw_chat_id": "oc_real_chat_id",
+        "raw_doc_url": "https://example.invalid/doc/1",
+    }):
+        exit_code = _MODULE.main([
+            "--hermes-dir", str(tmp_path),
+            "--env-file", str(env_file),
+            "--verify-archive-gate",
+        ])
+
+    output_text = capsys.readouterr().out
+    output = json.loads(output_text)
+    assert exit_code == 0
+    assert output["mode"] == "archive-gate"
+    assert output["would_send_card"] is False
+    assert output["archive_gate_required"] is True
+    assert output["archive_gate_no_write"] is True
+    assert output["archive_gate_confirmed"] is True
+    assert output["archive_gate_feedback_sent"] is True
     assert "oc_real_chat_id" not in output_text
     assert "example.invalid" not in output_text
 
