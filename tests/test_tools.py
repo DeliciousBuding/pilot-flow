@@ -4688,6 +4688,52 @@ def test_project_detail_card_can_create_followup_task_from_action():
     assert "待办详情项目跟进" in sent_messages[0][1]
 
 
+def test_create_followup_task_adds_public_task_update_after_restart(tmp_path):
+    state_path = tmp_path / "pilotflow-projects.json"
+    with _project_registry_lock:
+        _project_registry.clear()
+    with patch.dict(os.environ, {"PILOTFLOW_STATE_PATH": str(state_path)}):
+        _save_project_state(
+            "重启详情待办项目",
+            "验证重启后详情待办进入进展",
+            [],
+            ["验收记录"],
+            "2026-05-20",
+            "进行中",
+            ["文档: https://example.invalid/docx/doc_followup_restart"],
+        )
+        sent_messages = []
+        action_value = json.dumps({"pilotflow_action": "create_followup_task", "title": "重启详情待办项目"}, ensure_ascii=False)
+
+        with (
+            patch("tools._create_task", return_value="重启详情待办项目跟进: https://example.invalid/task/task_detail_restart") as create_task,
+            patch("tools._hermes_send", side_effect=lambda chat_id, msg: sent_messages.append((chat_id, msg)) or True),
+            patch("tools._append_project_doc_update", return_value=True) as append_doc,
+            patch("tools._append_bitable_update_record", return_value=True) as append_history,
+        ):
+            result = json.loads(_handle_card_action({"action_value": action_value}, chat_id="oc_restart_detail_followup"))
+        projects = _load_project_state()
+
+    assert result["status"] == "project_followup_task_created"
+    create_task.assert_called_once_with(
+        "重启详情待办项目跟进",
+        "项目: 重启详情待办项目",
+        "",
+        "2026-05-20",
+        "oc_restart_detail_followup",
+        [],
+    )
+    append_doc.assert_called_once()
+    restored_project = append_doc.call_args.args[1]
+    assert "文档: https://example.invalid/docx/doc_followup_restart" in restored_project["artifacts"]
+    append_history.assert_not_called()
+    assert sent_messages
+    assert "重启详情待办项目跟进" in sent_messages[0][1]
+    assert projects[0]["updates"][-1] == {"action": "任务", "value": "重启详情待办项目跟进"}
+    serialized = state_path.read_text(encoding="utf-8")
+    assert "example.invalid" not in serialized
+
+
 def test_dashboard_followup_task_reports_doc_and_bitable_traces():
     with _project_registry_lock:
         _project_registry.clear()

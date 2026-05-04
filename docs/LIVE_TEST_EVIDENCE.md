@@ -668,7 +668,7 @@
 | 项目 | 证据 |
 | --- | --- |
 | 运行环境 | PilotFlow 已通过 `setup.py --hermes-dir <hermes-agent-path>` 同步到 WSL Hermes runtime；Hermes 测试模型已配置为 `mimo-v2.5-pro` |
-| 本地回归 | `C:\Users\Ding\miniforge3\python.exe -m pytest tests\test_tools.py tests\test_setup.py tests\test_plugin_registration.py tests\test_trace.py tests\test_verify_wsl_feishu_runtime.py -q` 返回 `171 passed` |
+| 本地回归 | `C:\Users\Ding\miniforge3\python.exe -m pytest tests\test_tools.py tests\test_setup.py tests\test_plugin_registration.py tests\test_trace.py tests\test_verify_wsl_feishu_runtime.py -q` 返回 `172 passed` |
 | 安装验证 | `setup.py --hermes-dir <hermes-agent-path>` 返回 `OK: plugins/pilotflow/tools.py` 和 `OK: plugins/pilotflow/trace.py` |
 | Runtime 直调 | 在 WSL Hermes runtime 中加载 `.hermes/.env` 后调用已安装的 `pilotflow_generate_plan`，输出确认 `status=plan_generated`、`has_confirm_token=true`、`has_idempotency_key=true`、`trace_has_key=true`、`redaction_enabled=true` |
 | 真实链路修复 | WSL Hermes `.venv` 曾缺少 `lark_oapi`，且在 `/mnt/d` 仓库内执行 `uv sync --extra feishu` 会卡在跨文件系统 `.venv` 写入阶段；改用 `UV_PROJECT_ENVIRONMENT=/home/ding/.venvs/hermes-agent-feishu UV_LINK_MODE=copy uv sync --extra feishu` 后 3.26 秒完成安装，`lark-oapi==1.5.3` 可用 |
@@ -683,6 +683,7 @@
 | 重启后状态动作留痕 | 新增回归验证：Hermes gateway 重启后 registry 为空时，卡片 `mark_project_done` 从脱敏状态恢复项目并标记完成，公开状态写入 `已完成`，传给项目文档留痕的项目快照也同步为新状态，避免文档记录出现旧状态 |
 | 重启后批量催办 | 新增回归验证：Hermes gateway 重启后 registry 为空时，简报卡片的 `briefing_batch_reminder` 可从脱敏项目状态恢复逾期/近期截止/风险候选项目，发送群催办并继续写项目文档留痕；成员缺失时使用“相关负责人”，不向公开状态补写成员 |
 | 重启后批量待办 | 新增回归验证：Hermes gateway 重启后 registry 为空时，简报卡片的 `briefing_batch_followup_task` 可从脱敏项目状态恢复逾期/近期截止/风险候选项目，创建跟进待办并把任务入口写入私有资源 refs；公开状态只保存任务摘要，不保存任务 URL |
+| 重启后详情待办进展 | 新增回归验证：Hermes gateway 重启后 registry 为空时，项目详情卡 `create_followup_task` 创建跟进待办后，公开状态追加脱敏任务摘要作为最近进展，任务 URL 仍只进入私有资源 refs，后续看板可直接回读“刚创建了跟进待办” |
 | 用户价值 | 计划生成和创建执行现在都有可追踪 `confirm_token` 与稳定 `idempotency_key`，并写入 Flight Recorder；重复确认和按钮单次消费可被审计 |
 | 隐私处理 | 验证只记录布尔结果；不写入真实 chat_id、message_id、confirm token、idempotency key、Feishu URL、token 或 app secret |
 
