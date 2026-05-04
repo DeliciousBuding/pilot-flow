@@ -135,6 +135,14 @@ def _sanitize_result(result: dict[str, Any]) -> dict[str, Any]:
         "member_permissions_refreshed",
         "member_bitable_owner_synced",
         "member_feedback_sent",
+        "member_remove_gate_required",
+        "member_remove_gate_no_write",
+        "member_removed",
+        "member_remove_bitable_synced",
+        "member_remove_doc_recorded",
+        "member_remove_history_recorded",
+        "member_remove_feedback_sent",
+        "member_remove_mention_cleaned",
         "risk_reported",
         "risk_level_high",
         "risk_bitable_synced",
@@ -797,6 +805,116 @@ def _verify_runtime_member_permissions(hermes_dir: Path) -> dict[str, Any]:
         "member_permissions_refreshed": data.get("permission_refreshed") is True,
         "member_bitable_owner_synced": any(fields.get("负责人") == "张三, 王五" for fields in bitable_updates),
         "member_feedback_sent": "成员 → @王五" in feedback_text and "项目资源权限已刷新" in feedback_text,
+    }
+
+
+def _verify_runtime_member_removal(hermes_dir: Path) -> dict[str, Any]:
+    """Verify installed PilotFlow gates and applies member removal with trace sync."""
+    sys.path.insert(0, str(hermes_dir))
+    import plugins.pilotflow.tools as runtime_tools  # pylint: disable=import-error
+    from plugins.pilotflow.tools import (  # pylint: disable=import-error
+        _handle_update_project,
+        _project_registry,
+        _project_registry_lock,
+        _register_project,
+    )
+
+    chat_id = os.environ.get("PILOTFLOW_TEST_CHAT_ID", "")
+    original_update_bitable = runtime_tools._update_bitable_record
+    original_append_doc = runtime_tools._append_project_doc_update
+    original_append_history = runtime_tools._append_bitable_update_record
+    original_format_at = runtime_tools._format_at
+    original_send = runtime_tools._hermes_send
+    bitable_updates: list[dict[str, Any]] = []
+    doc_labels: list[tuple[str, str, str]] = []
+    history_labels: list[tuple[str, str, str, str]] = []
+    sent_messages: list[str] = []
+
+    def fake_update_bitable(_app_token: str, _table_id: str, _record_id: str, fields: dict) -> bool:
+        bitable_updates.append(dict(fields))
+        return True
+
+    def fake_append_doc(title: str, _project: dict, label: str, value: str, *_args: Any, **_kwargs: Any) -> bool:
+        doc_labels.append((title, label, value))
+        return True
+
+    def fake_append_history(app_token: str, table_id: str, label: str, value: str, *_args: Any, **_kwargs: Any) -> bool:
+        history_labels.append((app_token, table_id, label, value))
+        return True
+
+    def fake_send(_chat_id: str, text: str) -> bool:
+        sent_messages.append(text)
+        return True
+
+    with _project_registry_lock:
+        _project_registry.clear()
+    runtime_tools._update_bitable_record = fake_update_bitable
+    runtime_tools._append_project_doc_update = fake_append_doc
+    runtime_tools._append_bitable_update_record = fake_append_history
+    runtime_tools._format_at = lambda name, _chat_id: f"@{name}"
+    runtime_tools._hermes_send = fake_send
+    try:
+        _register_project(
+            "运行态成员移除项目",
+            ["张三", "李四", "王五"],
+            "2026-05-20",
+            "进行中",
+            ["文档: https://example.invalid/docx/remove-member"],
+            app_token="app_remove_member",
+            table_id="tbl_remove_member",
+            record_id="rec_remove_member",
+            goal="验证安装后的成员移除闭环",
+            deliverables=["初始验收"],
+        )
+        gated = json.loads(_handle_update_project(
+            {
+                "project_name": "运行态成员移除",
+                "action": "remove_member",
+                "value": '<at user_id="ou_removed_member">李四</at>',
+            },
+            chat_id=chat_id,
+        ))
+        with _project_registry_lock:
+            members_after_gate = list(_project_registry["运行态成员移除项目"].get("members", []))
+        gate_had_no_write = (
+            not bitable_updates
+            and not doc_labels
+            and not history_labels
+            and not sent_messages
+        )
+        data = json.loads(_handle_update_project(
+            {
+                "project_name": "运行态成员移除",
+                "action": "remove_member",
+                "value": '<at user_id="ou_removed_member">李四</at>',
+                "confirmation_text": "确认执行",
+            },
+            chat_id=chat_id,
+        ))
+        with _project_registry_lock:
+            members_after_remove = list(_project_registry["运行态成员移除项目"].get("members", []))
+    finally:
+        runtime_tools._update_bitable_record = original_update_bitable
+        runtime_tools._append_project_doc_update = original_append_doc
+        runtime_tools._append_bitable_update_record = original_append_history
+        runtime_tools._format_at = original_format_at
+        runtime_tools._hermes_send = original_send
+        with _project_registry_lock:
+            _project_registry.clear()
+
+    feedback_text = "\n".join(sent_messages)
+    return {
+        "member_remove_gate_required": gated.get("status") == "confirmation_required"
+        and gated.get("action") == "remove_member",
+        "member_remove_gate_no_write": members_after_gate == ["张三", "李四", "王五"] and gate_had_no_write,
+        "member_removed": data.get("status") == "project_updated" and members_after_remove == ["张三", "王五"],
+        "member_remove_bitable_synced": any(fields.get("负责人") == "张三, 王五" for fields in bitable_updates),
+        "member_remove_doc_recorded": ("运行态成员移除项目", "成员移除", "李四") in doc_labels,
+        "member_remove_history_recorded": (
+            "app_remove_member", "tbl_remove_member", "成员移除", "李四"
+        ) in history_labels,
+        "member_remove_feedback_sent": "成员移除 → @李四" in feedback_text,
+        "member_remove_mention_cleaned": data.get("value") == "李四" and "<at user_id" not in feedback_text,
     }
 
 
@@ -1524,6 +1642,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--verify-followup-task", action="store_true", help="Dry-run installed card follow-up task behavior.")
     parser.add_argument("--verify-deadline-update", action="store_true", help="Dry-run installed deadline calendar/reminder behavior.")
     parser.add_argument("--verify-member-permissions", action="store_true", help="Dry-run installed add-member permission refresh behavior.")
+    parser.add_argument("--verify-member-removal", action="store_true", help="Dry-run installed remove-member confirmation and sync behavior.")
     parser.add_argument("--verify-risk-cycle", action="store_true", help="Dry-run installed risk report/resolve behavior.")
     parser.add_argument("--verify-progress-update", action="store_true", help="Dry-run installed progress recording behavior.")
     parser.add_argument("--verify-project-reminder", action="store_true", help="Dry-run installed single/batch project reminder behavior.")
@@ -1543,6 +1662,7 @@ def main(argv: list[str] | None = None) -> int:
         else "project-reminder" if args.verify_project_reminder
         else "progress-update" if args.verify_progress_update
         else "risk-cycle" if args.verify_risk_cycle
+        else "member-removal" if args.verify_member_removal
         else "member-permissions" if args.verify_member_permissions
         else "deadline-update" if args.verify_deadline_update
         else "followup-task" if args.verify_followup_task
@@ -1577,6 +1697,8 @@ def main(argv: list[str] | None = None) -> int:
         output.update(_verify_runtime_deadline_update(hermes_dir))
     if args.verify_member_permissions:
         output.update(_verify_runtime_member_permissions(hermes_dir))
+    if args.verify_member_removal:
+        output.update(_verify_runtime_member_removal(hermes_dir))
     if args.verify_risk_cycle:
         output.update(_verify_runtime_risk_cycle(hermes_dir))
     if args.verify_progress_update:

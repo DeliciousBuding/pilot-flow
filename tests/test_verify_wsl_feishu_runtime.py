@@ -213,6 +213,22 @@ def test_verify_runtime_member_permissions_is_sanitized(tmp_path, monkeypatch):
     assert "example.invalid" not in json.dumps(result, ensure_ascii=False)
 
 
+def test_verify_runtime_member_removal_is_sanitized(tmp_path, monkeypatch):
+    hermes_dir, _sent_cards = _install_runtime_fixture(tmp_path, monkeypatch)
+
+    result = _MODULE._verify_runtime_member_removal(hermes_dir)
+
+    assert result["member_remove_gate_required"] is True
+    assert result["member_remove_gate_no_write"] is True
+    assert result["member_removed"] is True
+    assert result["member_remove_bitable_synced"] is True
+    assert result["member_remove_doc_recorded"] is True
+    assert result["member_remove_history_recorded"] is True
+    assert result["member_remove_feedback_sent"] is True
+    assert result["member_remove_mention_cleaned"] is True
+    assert "example.invalid" not in json.dumps(result, ensure_ascii=False)
+
+
 def test_verify_runtime_risk_cycle_is_sanitized(tmp_path, monkeypatch):
     hermes_dir, _sent_cards = _install_runtime_fixture(tmp_path, monkeypatch)
 
@@ -457,6 +473,45 @@ def test_verifier_member_permissions_mode_outputs_sanitized_runtime_result(tmp_p
     assert output["member_permissions_refreshed"] is True
     assert output["member_bitable_owner_synced"] is True
     assert output["member_feedback_sent"] is True
+    assert "oc_real_chat_id" not in output_text
+    assert "example.invalid" not in output_text
+
+
+def test_verifier_member_removal_mode_outputs_sanitized_runtime_result(tmp_path, capsys):
+    env_file = tmp_path / ".env"
+    env_file.write_text("PILOTFLOW_TEST_CHAT_ID=oc_real_chat_id\n", encoding="utf-8")
+
+    with patch.object(_MODULE, "_verify_runtime_member_removal", return_value={
+        "member_remove_gate_required": True,
+        "member_remove_gate_no_write": True,
+        "member_removed": True,
+        "member_remove_bitable_synced": True,
+        "member_remove_doc_recorded": True,
+        "member_remove_history_recorded": True,
+        "member_remove_feedback_sent": True,
+        "member_remove_mention_cleaned": True,
+        "raw_chat_id": "oc_real_chat_id",
+        "raw_doc_url": "https://example.invalid/doc/1",
+    }):
+        exit_code = _MODULE.main([
+            "--hermes-dir", str(tmp_path),
+            "--env-file", str(env_file),
+            "--verify-member-removal",
+        ])
+
+    output_text = capsys.readouterr().out
+    output = json.loads(output_text)
+    assert exit_code == 0
+    assert output["mode"] == "member-removal"
+    assert output["would_send_card"] is False
+    assert output["member_remove_gate_required"] is True
+    assert output["member_remove_gate_no_write"] is True
+    assert output["member_removed"] is True
+    assert output["member_remove_bitable_synced"] is True
+    assert output["member_remove_doc_recorded"] is True
+    assert output["member_remove_history_recorded"] is True
+    assert output["member_remove_feedback_sent"] is True
+    assert output["member_remove_mention_cleaned"] is True
     assert "oc_real_chat_id" not in output_text
     assert "example.invalid" not in output_text
 

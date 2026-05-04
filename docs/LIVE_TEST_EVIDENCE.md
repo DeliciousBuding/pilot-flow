@@ -1160,6 +1160,20 @@
 | 用户价值 | 项目简报和看板上的查看风险、查看逾期、上一页/下一页按钮不只是单元测试行为，而是在安装态插件中可复跑验证，用户可以从群卡片继续浏览筛选后的项目状态 |
 | 隐私处理 | 证据只记录布尔结果和脱敏结论；不写入真实 chat_id、message_id、Feishu URL、用户 open_id、token 或 app secret |
 
+## 2026-05-05 成员移除运行态验证
+
+| 项目 | 证据 |
+| --- | --- |
+| 运行环境 | PilotFlow 已通过 `setup.py --hermes-home <wsl-hermes-home>` 同步到 WSL Hermes runtime；安装验证返回插件、技能、Hermes config 和 Feishu display 配置均 OK |
+| 本地回归 | `C:\Users\Ding\miniforge3\python.exe -m pytest` 返回 `249 passed`；`tests/test_verify_wsl_feishu_runtime.py` 返回 `30 passed`；`git diff --check` 通过 |
+| Verifier 新模式 | `verify_wsl_feishu_runtime.py --verify-member-removal` 在已安装的 WSL Hermes runtime 插件内返回 `member_remove_gate_required=true`、`member_remove_gate_no_write=true`、`member_removed=true`、`member_remove_bitable_synced=true`、`member_remove_doc_recorded=true`、`member_remove_history_recorded=true`、`member_remove_feedback_sent=true`、`member_remove_mention_cleaned=true` |
+| 确认门路径 | verifier 先通过生产 `pilotflow_update_project` 的 `remove_member` 分支执行无确认请求，确认返回 `confirmation_required`，且不会改成员列表、状态表、项目文档、Base 流水或群反馈 |
+| 执行路径 | 同一 verifier 再传入明确确认文本执行成员移除，确认负责人列表从三人变为两人，并同步状态表负责人字段、项目文档、Base 流水和群反馈 |
+| @ 提及清理 | 运行态输入使用 Feishu `<at user_id=...>李四</at>` 形式，工具结果和群反馈只保留纯姓名/可展示 @，不把原始 open_id markup 写入结果 |
+| 基线验证 | 同轮继续通过 `--probe-llm` 的 `llm_probe_ok=true`、`llm_probe_status=200`，`--send-card` 的 `card_sent=true`、`card_has_title=true`、`card_has_goal=true`、`card_has_risk=true`，`--verify-history` 的 `history_apply_card_sent=true`，`--verify-update-task` 的 `update_task_created=true`，`--verify-archive-gate` 的 `archive_gate_required=true`，`--verify-followup-task` 的 `followup_task_created=true`，`--verify-deadline-update` 的 `deadline_update_applied=true`，`--verify-member-permissions` 的 `member_added=true`，`--verify-risk-cycle` 的 `risk_reported=true`，`--verify-progress-update` 的 `progress_update_applied=true`，`--verify-project-reminder` 的 `reminder_single_sent=true`，`--verify-card-status-cycle` 的 `card_status_done_applied=true`，`--verify-batch-followup-task` 的 `batch_followup_created=true`，以及 `--verify-dashboard-navigation` 的 `dashboard_filter_sent=true` |
+| 用户价值 | 群聊里移除项目成员属于权限收缩动作，PilotFlow 会先要求确认；确认后才更新负责人、文档/状态表流水和群反馈，降低误删协作者造成的办公风险 |
+| 隐私处理 | 证据只记录布尔结果和脱敏结论；不写入真实 chat_id、message_id、Feishu URL、用户 open_id、token 或 app secret |
+
 ## 本地回归
 
 ```bash
