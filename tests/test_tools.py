@@ -1281,11 +1281,13 @@ def test_generate_plan_uses_session_chat_and_initiator_context():
 
     today = datetime.date.today().isoformat()
     assert result["plan"]["title"] == f"增长小组 - {today}"
+    assert result["plan"]["initiator"] == "王小明"
     assert result["plan"]["members"] == ["王小明"]
     assert result["session_context_used"] == {
         "chat_name": True,
         "initiator": True,
     }
+    assert _pending_plans["oc_session_context"]["plan"]["initiator"] == "王小明"
     assert _pending_plans["oc_session_context"]["plan"]["members"] == ["王小明"]
     card_text = captured_cards[0]["elements"][0]["content"]
     assert "**成员：** 王小明" in card_text
@@ -3459,6 +3461,39 @@ def test_query_status_named_state_project_sends_detail_card_after_restart(tmp_pa
     assert "[任务：评审清单](https://example.invalid/task/task_123)" in body
     serialized = state_path.read_text(encoding="utf-8")
     assert "example.invalid" not in serialized
+
+
+def test_query_status_named_state_project_shows_initiator_after_restart(tmp_path):
+    state_path = tmp_path / "pilotflow-projects.json"
+    with _project_registry_lock:
+        _project_registry.clear()
+    with _plan_lock:
+        _card_action_refs.clear()
+    with patch.dict(os.environ, {"PILOTFLOW_STATE_PATH": str(state_path)}):
+        _save_project_state(
+            "重启发起人项目",
+            "验证重启后发起人展示",
+            [],
+            ["恢复记录"],
+            "2026-05-20",
+            "进行中",
+            [],
+            initiator="王小明",
+        )
+        captured = {}
+
+        def capture_card(chat_id, card):
+            captured["card"] = card
+            return "om_state_initiator_detail"
+
+        with patch("tools._send_interactive_card_via_feishu", side_effect=capture_card):
+            result = _handle_query_status({"query": "重启发起人项目进展如何"}, chat_id="oc_state_initiator_detail")
+
+    assert "项目详情已发送" in result
+    body = captured["card"]["elements"][0]["content"]
+    assert "**发起人：** 王小明" in body
+    serialized = state_path.read_text(encoding="utf-8")
+    assert "王小明" in serialized
 
 
 def test_card_action_project_status_restores_resource_refs_after_restart(tmp_path):

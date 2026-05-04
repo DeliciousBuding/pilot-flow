@@ -2,6 +2,17 @@
 
 > 本文件只记录可复验结论和脱敏摘要，不提交真实群 ID、用户 open_id、应用 secret、message_id 或飞书文档链接。
 
+## 2026-05-05 会话发起人元数据贯穿
+
+| 项目 | 证据 |
+| --- | --- |
+| 功能硬化 | `pilotflow_generate_plan` 现在把 Hermes session 的用户显示名作为独立 `initiator` 元数据写入 plan，不再只能通过 `members` 表达“谁发起”；保留原有无成员时把发起人补入成员的兼容行为 |
+| 状态贯穿 | `pilotflow_create_project_space` 会从 pending plan 或显式参数继承 `initiator`，写入 in-memory registry 和 restart-safe state；项目详情卡展示 `**发起人：** ...` |
+| 隐私边界 | 只保存显示名；伪 open_id / chat_id / message_id 形态的值会被丢弃，不把 Feishu 原始 ID 写入公开项目状态 |
+| 自动化验证 | 新增回归覆盖 plan/pending plan 的 `initiator`、重启后 state 详情卡发起人展示，以及 installed-runtime verifier `--verify-session-initiator` 的 dry-run 断言 |
+| WSL 验证项 | 新 verifier 仅输出脱敏布尔结论：`session_initiator_plan_recorded`、`session_initiator_project_created`、`session_initiator_registry_recorded`、`session_initiator_state_recorded`、`session_initiator_detail_card_shown` |
+| 隐私处理 | 验证不打印真实 chat_id、open_id、message_id、Feishu URL、confirm token、idempotency key、token 或 app secret |
+
 ## 2026-05-04 完整 @Bot 自动调用端到端场景
 
 | 项目 | 证据 |

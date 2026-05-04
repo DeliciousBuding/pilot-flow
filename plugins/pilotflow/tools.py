@@ -408,7 +408,7 @@ def _idempotent_project_cache_payload(result: dict) -> dict:
 def _register_project(title: str, members: list, deadline: str, status: str, artifacts: list,
                       app_token: str = "", table_id: str = "", record_id: str = "",
                       goal: str = "", deliverables: Optional[list] = None,
-                      updates: Optional[list] = None):
+                      updates: Optional[list] = None, initiator: str = ""):
     """Register a project in the in-memory registry for query_status and update_project."""
     with _project_registry_lock:
         if len(_project_registry) >= _PROJECT_REGISTRY_MAX:
@@ -418,6 +418,7 @@ def _register_project(title: str, members: list, deadline: str, status: str, art
             "goal": goal,
             "members": list(members),
             "deliverables": list(deliverables or []),
+            "initiator": _clean_initiator_name(initiator),
             "deadline": deadline,
             "status": status,
             "created_at": time.time(),
@@ -563,6 +564,8 @@ def _project_needs_reminder_action(project: dict) -> bool:
 def _build_project_detail_card(chat_id: str, title: str, project: dict) -> tuple[dict, list[str]]:
     """Build an actionable project detail card for Feishu."""
     member_text = "、".join(project.get("members", [])) or "待确认"
+    initiator_text = _clean_initiator_name(project.get("initiator"))
+    initiator_line = f"**发起人：** {initiator_text}\n" if initiator_text else ""
     deliverable_text = "、".join(project.get("deliverables", [])) or "待确认"
     deadline = project.get("deadline") or "待确认"
     countdown = _deadline_countdown(deadline)
@@ -636,6 +639,7 @@ def _build_project_detail_card(chat_id: str, title: str, project: dict) -> tuple
                 "content": (
                     f"**项目：** {title}\n"
                     f"**目标：** {project.get('goal') or '待确认'}\n"
+                    f"{initiator_line}"
                     f"**状态：** {project.get('status', '进行中')}\n"
                     f"**成员：** {member_text}\n"
                     f"**交付物：** {deliverable_text}\n"
@@ -1069,6 +1073,14 @@ def _plain_at_mentions(text: Any) -> str:
     return _AT_PATTERN.sub(lambda match: f"@{match.group(2).strip()}", str(text or ""))
 
 
+def _clean_initiator_name(value: Any) -> str:
+    """Store only a visible initiator display name, never Feishu IDs."""
+    text = _plain_at_mentions(value).strip()
+    if not text or re.fullmatch(r"(ou|on|oc|om|ou_\w+|on_\w+|oc_\w+|om_\w+)", text):
+        return ""
+    return text[:80]
+
+
 def _save_project_resource_refs(title: str, artifacts: Optional[list]) -> None:
     """Persist non-secret resource links separately from the public project summary."""
     refs = _safe_resource_artifacts(artifacts)
@@ -1122,6 +1134,7 @@ def _state_project_candidate(title: str, item: dict) -> dict:
         "goal": item.get("goal", ""),
         "members": [],
         "deliverables": item.get("deliverables", []),
+        "initiator": item.get("initiator", ""),
         "deadline": item.get("deadline", ""),
         "status": item.get("status", "进行中"),
         "artifacts": _load_project_resource_refs(title),
@@ -1148,7 +1161,7 @@ def _load_state_project_candidates(status_filter: str) -> list[tuple[str, dict, 
 def _save_project_state(title: str, goal: str, members: list, deliverables: list, deadline: str,
                         status: str, artifacts: Optional[list] = None, app_token: str = "",
                         table_id: str = "", record_id: str = "",
-                        updates: Optional[list] = None) -> bool:
+                        updates: Optional[list] = None, initiator: str = "") -> bool:
     """Persist a sanitized project summary for restart-safe dashboards."""
     if not title:
         return False
@@ -1157,6 +1170,7 @@ def _save_project_state(title: str, goal: str, members: list, deliverables: list
             "title": title,
             "goal": goal or "",
             "deliverables": _clean_plan_list(deliverables),
+            "initiator": _clean_initiator_name(initiator),
             "deadline": deadline or "",
             "status": status or "进行中",
             "updates": _clean_recent_updates(updates),
@@ -1196,6 +1210,7 @@ def _load_project_state() -> list[dict]:
             "title": str(item.get("title", "")),
             "goal": str(item.get("goal", "")),
             "deliverables": _clean_plan_list(item.get("deliverables")),
+            "initiator": _clean_initiator_name(item.get("initiator")),
             "deadline": str(item.get("deadline", "")),
             "status": str(item.get("status", "进行中")) or "进行中",
             "updates": _clean_recent_updates(item.get("updates")),
@@ -3172,7 +3187,7 @@ def _handle_generate_plan(params: Dict[str, Any], **kwargs) -> str:
         template = _detect_template(text)
     inline_fields = _extract_inline_project_fields(text) if allow_inferred_fields else {}
     session_chat_name = _get_session_value("HERMES_SESSION_CHAT_NAME", "")
-    session_user_name = _get_session_value("HERMES_SESSION_USER_NAME", "")
+    session_user_name = _clean_initiator_name(_get_session_value("HERMES_SESSION_USER_NAME", ""))
     session_context_used = {
         "chat_name": False,
         "initiator": False,
@@ -3187,6 +3202,7 @@ def _handle_generate_plan(params: Dict[str, Any], **kwargs) -> str:
         "deliverables": _clean_plan_list(params.get("deliverables")) or inline_fields.get("deliverables", []),
         "deadline": params.get("deadline", "") or inline_fields.get("deadline", ""),
         "risks": _clean_plan_list(params.get("risks")),
+        "initiator": _clean_initiator_name(params.get("initiator")) or session_user_name,
     }
     has_structured_fields = bool(
         plan["title"] or plan["goal"] or plan["members"] or plan["deliverables"] or params.get("deadline", "")
@@ -3462,6 +3478,7 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
     goal = params.get("goal", "") or pending_plan.get("goal", "")
     members = _clean_plan_list(params.get("members")) or _clean_plan_list(pending_plan.get("members"))
     deliverables = _clean_plan_list(params.get("deliverables")) or _clean_plan_list(pending_plan.get("deliverables"))
+    initiator = _clean_initiator_name(params.get("initiator")) or _clean_initiator_name(pending_plan.get("initiator"))
     deadline = params.get("deadline", "") or pending_plan.get("deadline", "")
     risks = _clean_plan_list(params.get("risks")) or _clean_plan_list(pending_plan.get("risks"))
     idempotency_key = (
@@ -3633,6 +3650,7 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
         goal=goal,
         deliverables=deliverables,
         updates=initial_updates,
+        initiator=initiator,
     )
 
     # Save project pattern to Hermes memory for later history-based suggestions.
@@ -3643,6 +3661,7 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
         table_id=bitable_meta.get("table_id", "") if bitable_meta else "",
         record_id=bitable_meta.get("record_id", "") if bitable_meta else "",
         updates=initial_updates,
+        initiator=initiator,
     )
 
     # Clean up only text-confirmation pending state. Card confirmations carry
@@ -4515,6 +4534,7 @@ def _handle_query_status(params: Dict[str, Any], **kwargs) -> str:
                     "goal": item.get("goal", ""),
                     "members": [],
                     "deliverables": item.get("deliverables", []),
+                    "initiator": item.get("initiator", ""),
                     "deadline": item.get("deadline", ""),
                     "status": item.get("status", "进行中"),
                     "artifacts": _load_project_resource_refs(item.get("title") or "历史项目"),

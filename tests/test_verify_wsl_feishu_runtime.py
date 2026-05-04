@@ -170,6 +170,21 @@ def test_verify_runtime_project_creation_is_sanitized(tmp_path, monkeypatch):
     assert "example.invalid" not in json.dumps(result, ensure_ascii=False)
 
 
+def test_verify_runtime_session_initiator_is_sanitized(tmp_path, monkeypatch):
+    hermes_dir, _sent_cards = _install_runtime_fixture(tmp_path, monkeypatch)
+
+    result = _MODULE._verify_runtime_session_initiator(hermes_dir)
+
+    assert result["session_initiator_plan_recorded"] is True
+    assert result["session_initiator_project_created"] is True
+    assert result["session_initiator_registry_recorded"] is True
+    assert result["session_initiator_state_recorded"] is True
+    assert result["session_initiator_detail_card_shown"] is True
+    sanitized = _MODULE._sanitize_result(result)
+    assert sanitized == result
+    assert "example.invalid" not in json.dumps(result, ensure_ascii=False)
+
+
 def test_verify_runtime_collaboration_resources_are_wired(tmp_path, monkeypatch):
     hermes_dir, _sent_cards = _install_runtime_fixture(tmp_path, monkeypatch)
 

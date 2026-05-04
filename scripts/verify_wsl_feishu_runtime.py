@@ -148,6 +148,11 @@ def _sanitize_result(result: dict[str, Any]) -> dict[str, Any]:
         "project_create_state_recorded",
         "project_create_memory_saved",
         "project_create_trace_redacted",
+        "session_initiator_plan_recorded",
+        "session_initiator_project_created",
+        "session_initiator_registry_recorded",
+        "session_initiator_state_recorded",
+        "session_initiator_detail_card_shown",
         "collab_doc_created",
         "collab_doc_comment_created",
         "collab_doc_permission_refreshed",
@@ -858,6 +863,136 @@ def _verify_runtime_plugin_registration(hermes_dir: Path) -> dict[str, Any]:
         and callable(card_commands[0].get("handler"))
         and "pilotflow_action" in str(card_commands[0].get("args_hint", "")),
         "registration_handlers_present": all(callable(item.get("handler")) for item in ctx.tools),
+    }
+
+
+def _verify_runtime_session_initiator(hermes_dir: Path) -> dict[str, Any]:
+    """Verify installed PilotFlow preserves sanitized session initiator metadata."""
+    sys.path.insert(0, str(hermes_dir))
+    import types
+    import plugins.pilotflow.tools as runtime_tools  # pylint: disable=import-error
+    from plugins.pilotflow.tools import (  # pylint: disable=import-error
+        _handle_create_project_space,
+        _handle_generate_plan,
+        _handle_query_status,
+        _load_project_state,
+        _pending_plans,
+        _plan_lock,
+        _project_registry,
+        _project_registry_lock,
+    )
+
+    chat_id = os.environ.get("PILOTFLOW_TEST_CHAT_ID", "") or "oc_runtime_session_initiator"
+    original_state_path = os.environ.get("PILOTFLOW_STATE_PATH")
+    original_modules = {
+        "gateway": sys.modules.get("gateway"),
+        "gateway.session_context": sys.modules.get("gateway.session_context"),
+    }
+    original_create_doc = runtime_tools._create_doc
+    original_create_bitable = runtime_tools._create_bitable
+    original_create_task = runtime_tools._create_task
+    original_create_calendar = runtime_tools._create_calendar_event
+    original_schedule_reminder = runtime_tools._schedule_deadline_reminder
+    original_save_memory = runtime_tools._save_to_hermes_memory
+    original_send_card = runtime_tools._hermes_send_card
+    sent_cards: list[dict[str, Any]] = []
+
+    def fake_get_session_env(name: str, default: str = "") -> str:
+        values = {
+            "HERMES_SESSION_CHAT_NAME": "运行态发起人群",
+            "HERMES_SESSION_USER_NAME": "王小明",
+        }
+        return values.get(name, default)
+
+    fake_session_context = types.ModuleType("gateway.session_context")
+    fake_session_context.get_session_env = fake_get_session_env
+    fake_gateway = types.ModuleType("gateway")
+    fake_gateway.session_context = fake_session_context
+
+    def fake_send_card(_chat_id: str, card: dict[str, Any]) -> str:
+        sent_cards.append(card)
+        return f"om_session_initiator_{len(sent_cards)}"
+
+    with tempfile.TemporaryDirectory(prefix="pilotflow-session-initiator-verify-") as tmpdir:
+        os.environ["PILOTFLOW_STATE_PATH"] = str(Path(tmpdir) / "pilotflow_state.json")
+        sys.modules["gateway"] = fake_gateway
+        sys.modules["gateway.session_context"] = fake_session_context
+        with _plan_lock:
+            _pending_plans.clear()
+        with _project_registry_lock:
+            _project_registry.clear()
+        runtime_tools._create_doc = lambda title, content, target_chat_id: "https://example.invalid/doc/session-initiator"
+        runtime_tools._create_bitable = lambda title, owner, deadline, risks, target_chat_id, deliverables=None: {
+            "url": "https://example.invalid/base/session-initiator",
+            "app_token": "app_session_initiator",
+            "table_id": "tbl_session_initiator",
+            "record_id": "rec_session_initiator",
+        }
+        runtime_tools._create_task = lambda summary, description, assignee, deadline, target_chat_id, members: (
+            f"{summary}: https://example.invalid/task/session-initiator"
+        )
+        runtime_tools._create_calendar_event = lambda title, goal, deadline, members=None, target_chat_id="": ""
+        runtime_tools._schedule_deadline_reminder = lambda title, deadline, target_chat_id: False
+        runtime_tools._save_to_hermes_memory = lambda title, goal, members, deliverables, deadline: True
+        runtime_tools._hermes_send_card = fake_send_card
+        try:
+            plan = json.loads(_handle_generate_plan(
+                {
+                    "input_text": "请创建运行态发起人贯穿验证项目",
+                    "title": "运行态发起人贯穿项目",
+                    "goal": "验证安装后的发起人字段",
+                    "members": [],
+                    "deliverables": ["发起人验收记录"],
+                    "deadline": "2026-05-20",
+                },
+                chat_id=chat_id,
+            ))
+            created = json.loads(_handle_create_project_space({"confirmation_text": "确认执行"}, chat_id=chat_id))
+            with _project_registry_lock:
+                registry_project = dict(_project_registry.get("运行态发起人贯穿项目", {}))
+                _project_registry.clear()
+            state_projects = _load_project_state()
+            _handle_query_status({"query": "运行态发起人贯穿项目进展如何"}, chat_id=chat_id)
+        finally:
+            runtime_tools._create_doc = original_create_doc
+            runtime_tools._create_bitable = original_create_bitable
+            runtime_tools._create_task = original_create_task
+            runtime_tools._create_calendar_event = original_create_calendar
+            runtime_tools._schedule_deadline_reminder = original_schedule_reminder
+            runtime_tools._save_to_hermes_memory = original_save_memory
+            runtime_tools._hermes_send_card = original_send_card
+            with _plan_lock:
+                _pending_plans.clear()
+            with _project_registry_lock:
+                _project_registry.clear()
+            for name, module in original_modules.items():
+                if module is None:
+                    sys.modules.pop(name, None)
+                else:
+                    sys.modules[name] = module
+            if original_state_path is None:
+                os.environ.pop("PILOTFLOW_STATE_PATH", None)
+            else:
+                os.environ["PILOTFLOW_STATE_PATH"] = original_state_path
+
+    detail_card_text = str(((sent_cards[-1].get("elements") or [{}])[0].get("content")) or "") if sent_cards else ""
+    return {
+        "session_initiator_plan_recorded": (
+            plan.get("status") == "plan_generated"
+            and (plan.get("plan") or {}).get("initiator") == "王小明"
+            and (plan.get("plan") or {}).get("members") == ["王小明"]
+        ),
+        "session_initiator_project_created": (
+            created.get("status") == "project_space_created"
+            and created.get("title") == "运行态发起人贯穿项目"
+        ),
+        "session_initiator_registry_recorded": registry_project.get("initiator") == "王小明",
+        "session_initiator_state_recorded": any(
+            item.get("title") == "运行态发起人贯穿项目"
+            and item.get("initiator") == "王小明"
+            for item in state_projects
+        ),
+        "session_initiator_detail_card_shown": "**发起人：** 王小明" in detail_card_text,
     }
 
 
@@ -2555,6 +2690,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--probe-llm", action="store_true", help="Probe configured OpenAI-compatible /models endpoint.")
     parser.add_argument("--verify-health-check", action="store_true", help="Dry-run installed PilotFlow runtime health check.")
     parser.add_argument("--verify-plugin-registration", action="store_true", help="Dry-run installed PilotFlow Hermes tool/command registration.")
+    parser.add_argument("--verify-session-initiator", action="store_true", help="Dry-run installed session initiator metadata propagation.")
     parser.add_argument("--verify-history", action="store_true", help="Send real cards that verify history suggestions can be applied.")
     parser.add_argument("--verify-projectization-suggestion", action="store_true", help="Send real cards that verify chat signal projectization suggestion flow.")
     parser.add_argument("--verify-project-creation", action="store_true", help="Dry-run installed create-project resource orchestration.")
@@ -2597,6 +2733,7 @@ def main(argv: list[str] | None = None) -> int:
         else "collaboration-resources" if args.verify_collaboration_resources
         else "project-creation" if args.verify_project_creation
         else "projectization-suggestion" if args.verify_projectization_suggestion
+        else "session-initiator" if args.verify_session_initiator
         else "plugin-registration" if args.verify_plugin_registration
         else "health-check" if args.verify_health_check
         else "history" if args.verify_history
@@ -2620,6 +2757,8 @@ def main(argv: list[str] | None = None) -> int:
         output.update(_verify_runtime_health_check(hermes_dir))
     if args.verify_plugin_registration:
         output.update(_verify_runtime_plugin_registration(hermes_dir))
+    if args.verify_session_initiator:
+        output.update(_verify_runtime_session_initiator(hermes_dir))
     if args.verify_history:
         output.update(_verify_runtime_history_suggestions(hermes_dir))
     if args.verify_projectization_suggestion:
