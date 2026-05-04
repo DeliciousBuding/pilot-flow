@@ -3524,11 +3524,12 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
     next_action = "resolve_risk" if risks else "mark_project_done"
     next_text = "解除风险" if risks else "标记完成"
     next_action_id = _create_card_action_ref(chat_id, next_action, {"title": title})
+    entry_template = "red" if risks else "green"
     entry_card = {
         "config": {"wide_screen_mode": True},
         "header": {
             "title": {"content": f"📌 {title}", "tag": "plain_text"},
-            "template": "green",
+            "template": entry_template,
         },
         "elements": [
             {

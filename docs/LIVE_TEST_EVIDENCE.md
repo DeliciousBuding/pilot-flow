@@ -900,6 +900,18 @@
 | 用户价值 | 计划生成和创建执行现在都有可追踪 `confirm_token` 与稳定 `idempotency_key`，并写入 Flight Recorder；重复确认和按钮单次消费可被审计 |
 | 隐私处理 | 验证只记录布尔结果；不写入真实 chat_id、message_id、confirm token、idempotency key、Feishu URL、token 或 app secret |
 
+## 2026-05-04 初始风险入口卡颜色一致性
+
+| 项目 | 证据 |
+| --- | --- |
+| 运行环境 | PilotFlow 已通过 `setup.py --hermes-home <wsl-hermes-home>` 同步到 WSL Hermes runtime；安装验证返回插件、技能和 Feishu display 配置均 OK |
+| 本地回归 | `C:\Users\Ding\miniforge3\python.exe -m pytest` 返回 `215 passed`；定向入口卡风险测试返回 `2 passed` |
+| 入口卡状态 | 新增回归确认带初始 `risks` 创建项目时，项目入口卡 `header.template=red`，与已注册的 `有风险` 项目状态一致；无风险项目仍使用绿色入口卡 |
+| WSL LLM 探针 | `verify_wsl_feishu_runtime.py --probe-llm` 输出确认 `llm_probe_ok=true`、`llm_probe_provider=vectorcontrol`、`llm_probe_status=200` |
+| 真实卡片发送 | `verify_wsl_feishu_runtime.py --send-card` 输出确认 `card_sent=true`、`card_has_title=true`、`card_has_goal=true`、`card_has_risk=true`、`pending_plan_recovered=true`、`card_action_recovered=true`、`redaction_enabled=true` |
+| 用户价值 | 用户从项目入口卡即可通过红色 header 识别初始风险项目，并能直接点击“解除风险”继续处理 |
+| 隐私处理 | 证据只记录布尔结果和脱敏结论；不写入真实 chat_id、message_id、Feishu URL、confirm token、idempotency key、token 或 app secret |
+
 ## 本地回归
 
 ```bash
