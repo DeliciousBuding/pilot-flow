@@ -95,6 +95,7 @@ def test_verifier_send_card_mode_outputs_sanitized_runtime_result(tmp_path, caps
     with patch.object(_MODULE, "_send_runtime_plan_card", return_value={
         "status": "plan_generated",
         "card_sent": True,
+        "card_has_initiator": True,
         "has_confirm_token": True,
         "has_idempotency_key": True,
         "trace_has_key": True,
@@ -116,6 +117,7 @@ def test_verifier_send_card_mode_outputs_sanitized_runtime_result(tmp_path, caps
     assert exit_code == 0
     assert output["mode"] == "send-card"
     assert output["card_sent"] is True
+    assert output["card_has_initiator"] is True
     assert output["has_confirm_token"] is True
     assert output["action_ref_count"] == 2
     assert output["pending_plan_recovered"] is True
@@ -132,6 +134,7 @@ def test_send_runtime_plan_card_verifies_visible_confirmation_content(tmp_path, 
     assert result["card_sent"] is True
     assert result["card_has_title"] is True
     assert result["card_has_goal"] is True
+    assert result["card_has_initiator"] is True
     assert result["card_has_risk"] is True
     assert sent_cards
 

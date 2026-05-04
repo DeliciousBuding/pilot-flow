@@ -14,6 +14,9 @@
 | WSL 验证项 | 新 verifier 仅输出脱敏布尔结论：`session_initiator_plan_recorded`、`session_initiator_project_created`、`session_initiator_registry_recorded`、`session_initiator_state_recorded`、`session_initiator_detail_card_shown`、`session_initiator_context_marked_with_explicit_members` |
 | 注册验证项 | `--verify-plugin-registration` 新增脱敏布尔结论 `registration_initiator_schema_exposed=true`，证明安装后的 Hermes plugin registry 能发现该结构化字段 |
 | 进展验证项 | `--verify-progress-update` 新增脱敏布尔结论 `progress_state_initiator_preserved=true`，证明安装后的 restart-safe 进展更新不会丢失发起人 |
+| 确认卡验证项 | 计划确认卡现在在用户点击确认前展示 `**发起人：** ...`；`--send-card` 新增脱敏布尔结论 `card_has_initiator=true`，证明安装后的真实 Feishu interactive card 已包含发起人字段 |
+| 本地回归 | `C:\Users\Ding\miniforge3\python.exe -m pytest` 返回 `273 passed`；`tests/test_verify_wsl_feishu_runtime.py` 返回 `45 passed`；`git diff --check` 通过，仅有 CRLF 提示 |
+| WSL 基线 | 同轮通过 `--send-card` 的 `card_sent=true`、`card_has_title=true`、`card_has_goal=true`、`card_has_initiator=true`、`card_has_risk=true`、`pending_plan_recovered=true`、`card_action_recovered=true`、`redaction_enabled=true`；`--verify-health-check` 返回 `health_check_ok=true`、`health_check_sanitized=true`、`health_card_bridge_registered=true`；`--probe-llm` 返回 `llm_probe_ok=true`、`llm_probe_status=200` |
 | 隐私处理 | 验证不打印真实 chat_id、open_id、message_id、Feishu URL、confirm token、idempotency key、token 或 app secret |
 
 ## 2026-05-04 完整 @Bot 自动调用端到端场景

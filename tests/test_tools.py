@@ -264,6 +264,34 @@ def test_generate_plan_confirmation_card_displays_title_and_goal(monkeypatch):
     assert "**目标：** 完成客户上线" in card_text
 
 
+def test_generate_plan_confirmation_card_displays_initiator(monkeypatch):
+    sent_cards = []
+
+    def fake_send_card(chat_id, card):
+        sent_cards.append({"chat_id": chat_id, "card": card})
+        return "om_plan_initiator"
+
+    monkeypatch.setattr("tools._hermes_send_card", fake_send_card)
+
+    result = json.loads(_handle_generate_plan(
+        {
+            "input_text": "帮我准备客户上线项目",
+            "title": "客户上线项目",
+            "goal": "完成客户上线",
+            "initiator": "王小明",
+            "members": ["张三"],
+            "deliverables": ["整理上线清单"],
+            "deadline": "2026-05-08",
+        },
+        chat_id="oc_plan_card_initiator",
+        chat_type="group",
+    ))
+
+    assert result["status"] == "plan_generated"
+    card_text = sent_cards[0]["card"]["elements"][0]["content"]
+    assert "**发起人：** 王小明" in card_text
+
+
 def test_projectization_suggestion_button_preserves_risks_in_pending_plan(monkeypatch):
     sent_cards = []
 
@@ -1314,6 +1342,7 @@ def test_generate_plan_uses_session_chat_and_initiator_context():
     assert _pending_plans["oc_session_context"]["plan"]["initiator"] == "王小明"
     assert _pending_plans["oc_session_context"]["plan"]["members"] == ["王小明"]
     card_text = captured_cards[0]["elements"][0]["content"]
+    assert "**发起人：** 王小明" in card_text
     assert "**成员：** 王小明" in card_text
 
 

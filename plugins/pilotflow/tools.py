@@ -1607,6 +1607,7 @@ def _build_plan_confirmation_card(
     """Build the execution plan confirmation card and its action ids."""
     title_text = str(plan.get("title") or "待确认").strip() or "待确认"
     goal_text = str(plan.get("goal") or "待确认").strip() or "待确认"
+    initiator_text = _clean_initiator_name(plan.get("initiator")) or "待确认"
     member_text = ", ".join(plan["members"]) if plan["members"] else "待确认"
     deliverable_text = ", ".join(plan["deliverables"]) if plan["deliverables"] else "待确认"
     deadline_text = plan["deadline"] or "待确认"
@@ -1660,6 +1661,7 @@ def _build_plan_confirmation_card(
                 "content": (
                     f"**项目：** {title_text}\n"
                     f"**目标：** {goal_text}\n"
+                    f"**发起人：** {initiator_text}\n"
                     f"**成员：** {member_text}\n"
                     f"**交付物：** {deliverable_text}\n"
                     f"**截止时间：** {deadline_text}"
