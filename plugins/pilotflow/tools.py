@@ -3625,6 +3625,8 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
         display_items.append(member_warning)
     if deliverables:
         display_items.append(f"📋 任务: {', '.join(deliverables)}")
+    for risk in risks[:3]:
+        display_items.append(f"⚠️ 风险: {risk}")
     if deadline:
         display_items.append(f"⏰ 截止: {deadline}")
     if cal_result:

@@ -1894,6 +1894,46 @@ def test_project_entry_card_for_initial_risk_offers_resolve_risk_action():
     assert _card_action_refs[action_id]["action"] == "resolve_risk"
 
 
+def test_create_project_with_initial_risks_includes_risk_in_display_summary():
+    chat_id = "oc_initial_risk_display"
+
+    with _project_registry_lock:
+        _project_registry.clear()
+    with _plan_lock:
+        _pending_plans.clear()
+        _card_action_refs.clear()
+
+    with (
+        patch("tools._create_doc", return_value="https://example.invalid/doc"),
+        patch("tools._create_bitable", return_value={
+            "url": "https://example.invalid/base",
+            "app_token": "app1",
+            "table_id": "tbl1",
+            "record_id": "rec1",
+        }),
+        patch("tools._create_task", return_value="任务已创建"),
+        patch("tools._hermes_send_card", return_value="om_initial_risk_display"),
+        patch("tools._create_calendar_event", return_value=None),
+        patch("tools._schedule_deadline_reminder", return_value=False),
+        patch("tools._save_to_hermes_memory", return_value=True),
+    ):
+        result = json.loads(_handle_create_project_space(
+            {
+                "title": "初始风险摘要项目",
+                "goal": "验证创建摘要包含风险",
+                "members": [],
+                "deliverables": ["验证记录"],
+                "deadline": "2026-05-12",
+                "risks": ["API 审批可能卡住"],
+            },
+            chat_id=chat_id,
+            chat_scope="private",
+        ))
+
+    assert result["status"] == "project_space_created"
+    assert "⚠️ 风险: API 审批可能卡住" in result["display"]
+
+
 def test_create_project_with_initial_risks_is_registered_as_risk_project():
     chat_id = "oc_initial_risk_status"
 
