@@ -979,6 +979,18 @@
 | 用户价值 | Hermes gateway 重启后，用户在群里继续补任务/交付物仍会得到真实飞书待办和群反馈，项目不会因为内存 registry 丢失而降级成只改本地状态 |
 | 隐私处理 | 证据只记录布尔结果和脱敏结论；不写入真实 chat_id、message_id、Feishu URL、用户 open_id、token 或 app secret |
 
+## 2026-05-05 测试模块状态隔离
+
+| 项目 | 证据 |
+| --- | --- |
+| 运行环境 | PilotFlow 已通过 `setup.py --hermes-home <wsl-hermes-home>` 同步到 WSL Hermes runtime；安装验证返回插件、技能、Hermes config 和 Feishu display 配置均 OK |
+| 本地回归 | `C:\Users\Ding\miniforge3\python.exe -m pytest` 返回 `223 passed`；新增 `tests/test_state_isolation.py` 先复现模块级 dict 泄漏，再由 `tests/conftest.py` autouse fixture 修复 |
+| 测试稳定性 | 每个测试结束后清理 `_project_registry`、`_pending_plans`、`_card_action_refs`、`_recent_confirmed_projects` 和 `_idempotent_project_results`，降低测试顺序依赖和 cp936 环境下偶发污染风险 |
+| 导入安全 | fixture 不主动导入 `tools`，只在测试模块完成自身 `tools.registry` mock 并导入 `tools` 后清理，避免破坏现有测试初始化顺序 |
+| 基线验证 | 同轮继续通过 `--probe-llm` 的 `llm_probe_ok=true`、`llm_probe_status=200`，`--send-card` 的 `card_sent=true`、`card_has_title=true`、`card_has_goal=true`、`card_has_risk=true`，`--verify-history` 的 `history_apply_card_sent=true`，以及 `--verify-update-task` 的 `update_task_created=true` |
+| 用户价值 | 评审指出的 flaky 根因已变成可复现回归测试和固定清理机制，后续新增真实 Feishu 链路测试不会因为上一个测试遗留状态产生假阳性或假失败 |
+| 隐私处理 | 证据只记录布尔结果和脱敏结论；不写入真实 chat_id、message_id、Feishu URL、用户 open_id、token 或 app secret |
+
 ## 本地回归
 
 ```bash
