@@ -9,6 +9,7 @@ import os
 import json
 import datetime
 from unittest.mock import patch
+import pytest
 
 # Add plugin path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "plugins", "pilotflow"))
@@ -53,13 +54,28 @@ from tools import (
     _member_names_plain,
     _evict_caches,
     _send_interactive_card_via_feishu,
+    _pending_plans,
+    _card_action_refs,
+    _recent_confirmed_projects,
+    _idempotent_project_results,
+    _plan_lock,
 )
+
+
+@pytest.fixture(autouse=True)
+def _isolated_pilotflow_state(tmp_path, monkeypatch):
+    monkeypatch.setenv("PILOTFLOW_STATE_PATH", str(tmp_path / "pilotflow-projects.json"))
 
 
 def _clear_state():
     """Reset all state between tests."""
     with _project_registry_lock:
         _project_registry.clear()
+    with _plan_lock:
+        _pending_plans.clear()
+        _card_action_refs.clear()
+        _recent_confirmed_projects.clear()
+        _idempotent_project_results.clear()
     _call_log.clear()
 
 

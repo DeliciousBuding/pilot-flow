@@ -18,6 +18,17 @@
 | 已知非阻塞告警 | 文档评论 SDK builder 字段告警、任务关注者“已是协作者”告警均不阻断文档/Base/任务/日历/提醒创建；执行后模型补充响应阶段出现一次 SSL ReadError 并自动重试成功 |
 | 隐私处理 | 真实 chat_id、open_id、message_id、文档 URL、Base URL、任务 ID、calendar event ID、token 和 app secret 不写入公开仓库 |
 
+## 2026-05-04 卡片输入安全与 WSL 安装复验
+
+| 项目 | 证据 |
+| --- | --- |
+| 功能硬化 | 新增回归验证：项目标题、成员名和最近进展中伪造的 `<at user_id="...">姓名</at>` 会在公开催办文本和脱敏状态进展里降级为普通 `@姓名`/姓名，不让用户输入或卡片 action 伪造 Feishu open_id mention |
+| 测试隔离 | 集成测试新增临时 `PILOTFLOW_STATE_PATH` 和幂等/卡片/确认缓存清理，避免真实 runtime 或上次测试写入的 idempotency 状态让创建链路误判为 `project_space_replayed` |
+| 自动化验证 | `C:\Users\Ding\miniforge3\python.exe -m pytest` 通过，结果 `188 passed` |
+| WSL 安装验证 | `setup.py --hermes-dir D:\Code\LarkProject\hermes-agent --hermes-home \\wsl.localhost\Ubuntu-24.04\home\ding\.hermes` 通过；`.env`、`config.yaml`、Feishu display guard 和插件/skill 文件均指向 WSL runtime profile |
+| WSL runtime dry-run | `verify_wsl_feishu_runtime.py --env-file /home/ding/.hermes/.env --config-file /home/ding/.hermes/config.yaml` 输出脱敏通过：`config_model=mimo-v2.5-pro`、`config_provider=vectorcontrol`、`config_has_feishu_gateway=true` |
+| 真实 Feishu 卡片验证 | WSL `verify_wsl_feishu_runtime.py --send-card` 成功：`card_sent=true`、`pending_plan_recovered=true`、`card_action_recovered=true`、`redaction_enabled=true`，输出不包含真实 chat_id、message_id、confirm token 或 idempotency key |
+
 ## 2026-05-03 状态看板场景
 
 | 项目 | 证据 |

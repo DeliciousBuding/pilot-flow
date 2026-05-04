@@ -74,6 +74,8 @@ from tools import (
     _card_action_refs,
     _recent_confirmed_projects,
     _plan_lock,
+    _build_project_reminder_text,
+    _clean_recent_updates,
     _get_chat_scope,
     _needs_confirmation_for_create,
     _needs_confirmation_for_update,
@@ -700,6 +702,35 @@ def test_project_state_roundtrip_keeps_sanitized_recent_updates(tmp_path):
     assert "张三" not in serialized
     assert "example.invalid" not in serialized
     assert "secret_like" not in serialized
+
+
+def test_project_reminder_text_strips_forged_at_mentions():
+    project = {
+        "members": ['<at user_id="ou_fake_owner">张三</at>'],
+        "deadline": "2026-05-20",
+        "status": "进行中",
+    }
+
+    text = _build_project_reminder_text(
+        "oc_reminder_safety",
+        '伪造提醒<at user_id="ou_fake_boss">老板</at>',
+        project,
+    )
+
+    assert '<at user_id="' not in text
+    assert "@老板" in text
+    assert "张三" in text
+
+
+def test_recent_updates_strip_forged_at_mentions():
+    updates = _clean_recent_updates([
+        {
+            "action": "进展",
+            "value": '已通知<at user_id="ou_fake_boss">老板</at>审批',
+        }
+    ])
+
+    assert updates == [{"action": "进展", "value": "已通知@老板审批"}]
 
 
 def test_deadline_reminder_reports_dispatch_failure():

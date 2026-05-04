@@ -643,11 +643,11 @@ def _build_project_reminder_text(chat_id: str, title: str, project: dict) -> str
     deadline = project.get("deadline") or "待确认"
     countdown = _deadline_countdown(deadline)
     deadline_text = deadline + (f"（{countdown}）" if countdown else "")
-    members = project.get("members", [])
+    members = [_plain_at_mentions(member).lstrip("@") for member in project.get("members", [])]
     owner_text = _format_members(members, chat_id) if members else "相关负责人"
     status = project.get("status", "进行中")
     return (
-        f"项目催办：请关注项目「{title}」。\n"
+        f"项目催办：请关注项目「{_plain_at_mentions(title)}」。\n"
         f"负责人：{owner_text}\n"
         f"截止：{deadline_text}\n"
         f"当前状态：{status}\n"
@@ -940,6 +940,11 @@ def _public_task_update_value(task_name: str) -> str:
     if sep and url.startswith(("http://", "https://")):
         return summary.strip()
     return str(task_name or "").strip()
+
+
+def _plain_at_mentions(text: Any) -> str:
+    """Render user-supplied Feishu mention markup as plain visible names."""
+    return _AT_PATTERN.sub(lambda match: f"@{match.group(2).strip()}", str(text or ""))
 
 
 def _save_project_resource_refs(title: str, artifacts: Optional[list]) -> None:
@@ -1299,6 +1304,8 @@ def _clean_recent_updates(updates: Any, limit: int = 5) -> list[dict]:
             value = str(item.get("value", "")).strip()
         else:
             value = str(item).strip()
+        action = _plain_at_mentions(action)
+        value = _plain_at_mentions(value)
         if not value or unsafe_pattern.search(value):
             continue
         cleaned.append({"action": action or "进展", "value": value[:120]})
