@@ -64,7 +64,7 @@ PilotFlow/
 - Local tests: `C:\Users\Ding\miniforge3\python.exe -m pytest -q`
 - Gateway test: `uv run hermes gateway` in hermes-agent directory
 - Direct tool test: set `PILOTFLOW_TEST_CHAT_ID` env var
-- WSL Feishu runtime verifier: run `scripts/verify_wsl_feishu_runtime.py` from WSL Hermes runtime with `--env-file ~/.hermes/.env --config-file ~/.hermes/config.yaml`; use `--probe-llm`, `--send-card`, `--verify-history`, `--verify-update-task`, `--verify-archive-gate`, `--verify-followup-task`, `--verify-deadline-update`, `--verify-member-permissions`, `--verify-risk-cycle`, `--verify-progress-update`, `--verify-project-reminder`, and `--verify-card-status-cycle` for release evidence.
+- WSL Feishu runtime verifier: run `scripts/verify_wsl_feishu_runtime.py` from WSL Hermes runtime with `--env-file ~/.hermes/.env --config-file ~/.hermes/config.yaml`; use `--probe-llm`, `--send-card`, `--verify-history`, `--verify-update-task`, `--verify-archive-gate`, `--verify-followup-task`, `--verify-deadline-update`, `--verify-member-permissions`, `--verify-risk-cycle`, `--verify-progress-update`, `--verify-project-reminder`, `--verify-card-status-cycle`, and `--verify-batch-followup-task` for release evidence.
 - End-to-end: @PilotFlow in Feishu group chat
 
 ## Dependencies

@@ -273,6 +273,22 @@ def test_verify_runtime_card_status_cycle_is_sanitized(tmp_path, monkeypatch):
     assert "example.invalid" not in json.dumps(result, ensure_ascii=False)
 
 
+def test_verify_runtime_batch_followup_task_is_sanitized(tmp_path, monkeypatch):
+    hermes_dir, _sent_cards = _install_runtime_fixture(tmp_path, monkeypatch)
+
+    result = _MODULE._verify_runtime_batch_followup_task(hermes_dir)
+
+    assert result["batch_followup_created"] is True
+    assert result["batch_followup_filtered"] is True
+    assert result["batch_followup_task_created"] is True
+    assert result["batch_followup_doc_recorded"] is True
+    assert result["batch_followup_history_recorded"] is True
+    assert result["batch_followup_state_recorded"] is True
+    assert result["batch_followup_feedback_sent"] is True
+    assert result["batch_followup_used_opaque_ref"] is True
+    assert "example.invalid" not in json.dumps(result, ensure_ascii=False)
+
+
 def test_verifier_update_task_mode_outputs_sanitized_runtime_result(tmp_path, capsys):
     env_file = tmp_path / ".env"
     env_file.write_text("PILOTFLOW_TEST_CHAT_ID=oc_real_chat_id\n", encoding="utf-8")
@@ -575,6 +591,45 @@ def test_verifier_card_status_cycle_mode_outputs_sanitized_runtime_result(tmp_pa
     assert output["card_status_state_recorded"] is True
     assert output["card_status_feedback_sent"] is True
     assert output["card_status_used_opaque_refs"] is True
+    assert "oc_real_chat_id" not in output_text
+    assert "example.invalid" not in output_text
+
+
+def test_verifier_batch_followup_task_mode_outputs_sanitized_runtime_result(tmp_path, capsys):
+    env_file = tmp_path / ".env"
+    env_file.write_text("PILOTFLOW_TEST_CHAT_ID=oc_real_chat_id\n", encoding="utf-8")
+
+    with patch.object(_MODULE, "_verify_runtime_batch_followup_task", return_value={
+        "batch_followup_created": True,
+        "batch_followup_filtered": True,
+        "batch_followup_task_created": True,
+        "batch_followup_doc_recorded": True,
+        "batch_followup_history_recorded": True,
+        "batch_followup_state_recorded": True,
+        "batch_followup_feedback_sent": True,
+        "batch_followup_used_opaque_ref": True,
+        "raw_chat_id": "oc_real_chat_id",
+        "raw_task_url": "https://example.invalid/task/1",
+    }):
+        exit_code = _MODULE.main([
+            "--hermes-dir", str(tmp_path),
+            "--env-file", str(env_file),
+            "--verify-batch-followup-task",
+        ])
+
+    output_text = capsys.readouterr().out
+    output = json.loads(output_text)
+    assert exit_code == 0
+    assert output["mode"] == "batch-followup-task"
+    assert output["would_send_card"] is False
+    assert output["batch_followup_created"] is True
+    assert output["batch_followup_filtered"] is True
+    assert output["batch_followup_task_created"] is True
+    assert output["batch_followup_doc_recorded"] is True
+    assert output["batch_followup_history_recorded"] is True
+    assert output["batch_followup_state_recorded"] is True
+    assert output["batch_followup_feedback_sent"] is True
+    assert output["batch_followup_used_opaque_ref"] is True
     assert "oc_real_chat_id" not in output_text
     assert "example.invalid" not in output_text
 

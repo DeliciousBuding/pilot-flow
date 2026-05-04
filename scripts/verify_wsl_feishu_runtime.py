@@ -163,6 +163,14 @@ def _sanitize_result(result: dict[str, Any]) -> dict[str, Any]:
         "card_status_state_recorded",
         "card_status_feedback_sent",
         "card_status_used_opaque_refs",
+        "batch_followup_created",
+        "batch_followup_filtered",
+        "batch_followup_task_created",
+        "batch_followup_doc_recorded",
+        "batch_followup_history_recorded",
+        "batch_followup_state_recorded",
+        "batch_followup_feedback_sent",
+        "batch_followup_used_opaque_ref",
         "error",
     }
     return {key: result[key] for key in allowed if key in result}
@@ -1236,6 +1244,145 @@ def _verify_runtime_card_status_cycle(hermes_dir: Path) -> dict[str, Any]:
     }
 
 
+def _verify_runtime_batch_followup_task(hermes_dir: Path) -> dict[str, Any]:
+    """Verify installed PilotFlow can create filtered batch follow-up tasks from a card action."""
+    sys.path.insert(0, str(hermes_dir))
+    import datetime as dt
+    import plugins.pilotflow.tools as runtime_tools  # pylint: disable=import-error
+    from plugins.pilotflow.tools import (  # pylint: disable=import-error
+        _create_card_action_ref,
+        _handle_card_action,
+        _load_project_state,
+        _project_registry,
+        _project_registry_lock,
+        _register_project,
+    )
+
+    chat_id = os.environ.get("PILOTFLOW_TEST_CHAT_ID", "")
+    original_state_path = os.environ.get("PILOTFLOW_STATE_PATH")
+    original_create_task = runtime_tools._create_task
+    original_append_doc = runtime_tools._append_project_doc_update
+    original_append_history = runtime_tools._append_bitable_update_record
+    original_send = runtime_tools._hermes_send
+    created_tasks: list[tuple[str, str, str, str, str, list[str]]] = []
+    doc_labels: list[tuple[str, str, str]] = []
+    history_labels: list[tuple[str, str, str, str]] = []
+    sent_messages: list[str] = []
+
+    def fake_create_task(
+        title: str,
+        description: str,
+        assignee: str,
+        deadline: str,
+        task_chat_id: str,
+        members: list[str],
+    ) -> str:
+        created_tasks.append((title, description, assignee, deadline, task_chat_id, list(members)))
+        return f"{title}: https://example.invalid/task/batch-followup"
+
+    def fake_append_doc(title: str, _project: dict, label: str, value: str, *_args: Any, **_kwargs: Any) -> bool:
+        doc_labels.append((title, label, value))
+        return True
+
+    def fake_append_history(app_token: str, table_id: str, label: str, value: str, *_args: Any, **_kwargs: Any) -> bool:
+        history_labels.append((app_token, table_id, label, value))
+        return True
+
+    def fake_send(_chat_id: str, text: str) -> bool:
+        sent_messages.append(text)
+        return True
+
+    with tempfile.TemporaryDirectory(prefix="pilotflow-batch-followup-verify-") as tmpdir:
+        os.environ["PILOTFLOW_STATE_PATH"] = str(Path(tmpdir) / "pilotflow_state.json")
+        with _project_registry_lock:
+            _project_registry.clear()
+        runtime_tools._create_task = fake_create_task
+        runtime_tools._append_project_doc_update = fake_append_doc
+        runtime_tools._append_bitable_update_record = fake_append_history
+        runtime_tools._hermes_send = fake_send
+        try:
+            overdue = (dt.date.today() - dt.timedelta(days=1)).isoformat()
+            future = (dt.date.today() + dt.timedelta(days=10)).isoformat()
+            _register_project(
+                "运行态批量待办逾期项目",
+                ["张三"],
+                overdue,
+                "进行中",
+                ["文档: https://example.invalid/doc/batch-followup-overdue"],
+                app_token="app_batch_followup",
+                table_id="tbl_batch_followup",
+                record_id="rec_batch_followup",
+                goal="验证安装后的批量跟进待办",
+                deliverables=["初始验收"],
+            )
+            _register_project(
+                "运行态批量待办未到期项目",
+                ["李四"],
+                future,
+                "进行中",
+                ["文档: https://example.invalid/doc/batch-followup-future"],
+                app_token="app_batch_future",
+                table_id="tbl_batch_future",
+                record_id="rec_batch_future",
+                goal="验证安装后的批量跟进待办过滤",
+                deliverables=["初始验收"],
+            )
+            action_id = _create_card_action_ref(chat_id, "briefing_batch_followup_task", {"filter": "overdue"})
+            data = json.loads(_handle_card_action(
+                {"action_value": json.dumps({"pilotflow_action_id": action_id}, ensure_ascii=False)},
+                chat_id=chat_id,
+            ))
+            state_projects = _load_project_state()
+        finally:
+            runtime_tools._create_task = original_create_task
+            runtime_tools._append_project_doc_update = original_append_doc
+            runtime_tools._append_bitable_update_record = original_append_history
+            runtime_tools._hermes_send = original_send
+            with _project_registry_lock:
+                _project_registry.clear()
+            if original_state_path is None:
+                os.environ.pop("PILOTFLOW_STATE_PATH", None)
+            else:
+                os.environ["PILOTFLOW_STATE_PATH"] = original_state_path
+
+    state_updates: list[dict[str, Any]] = []
+    for item in state_projects:
+        if item.get("title") == "运行态批量待办逾期项目":
+            state_updates = item.get("updates", [])
+            break
+    feedback_text = "\n".join(sent_messages)
+    task_title = "运行态批量待办逾期项目跟进"
+    task_name = f"{task_title}: https://example.invalid/task/batch-followup"
+    return {
+        "batch_followup_created": data.get("status") == "briefing_batch_followup_task_created"
+        and data.get("project_count") == 1,
+        "batch_followup_filtered": data.get("projects") == ["运行态批量待办逾期项目"],
+        "batch_followup_task_created": created_tasks == [(
+            task_title,
+            "项目: 运行态批量待办逾期项目",
+            "张三",
+            overdue,
+            chat_id,
+            ["张三"],
+        )],
+        "batch_followup_doc_recorded": ("运行态批量待办逾期项目", "任务", task_name) in doc_labels,
+        "batch_followup_history_recorded": (
+            "app_batch_followup", "tbl_batch_followup", "任务", task_name
+        ) in history_labels,
+        "batch_followup_state_recorded": any(
+            item.get("action") == "任务" and item.get("value") == task_title
+            for item in state_updates
+            if isinstance(item, dict)
+        ),
+        "batch_followup_feedback_sent": (
+            "已为 1 个逾期项目创建跟进待办" in feedback_text
+            and "运行态批量待办逾期项目" in feedback_text
+            and "运行态批量待办未到期项目" not in feedback_text
+        ),
+        "batch_followup_used_opaque_ref": bool(action_id),
+    }
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Verify PilotFlow WSL Feishu runtime.")
     parser.add_argument("--hermes-dir", required=True, help="Hermes runtime directory.")
@@ -1253,6 +1400,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--verify-progress-update", action="store_true", help="Dry-run installed progress recording behavior.")
     parser.add_argument("--verify-project-reminder", action="store_true", help="Dry-run installed single/batch project reminder behavior.")
     parser.add_argument("--verify-card-status-cycle", action="store_true", help="Dry-run installed card complete/reopen behavior.")
+    parser.add_argument("--verify-batch-followup-task", action="store_true", help="Dry-run installed briefing batch follow-up task behavior.")
     args = parser.parse_args(argv)
 
     hermes_dir = Path(args.hermes_dir).resolve()
@@ -1260,7 +1408,8 @@ def main(argv: list[str] | None = None) -> int:
     config_result = _read_runtime_config(Path(args.config_file))
     import_result = _check_imports(hermes_dir)
     mode = (
-        "card-status-cycle" if args.verify_card_status_cycle
+        "batch-followup-task" if args.verify_batch_followup_task
+        else "card-status-cycle" if args.verify_card_status_cycle
         else "project-reminder" if args.verify_project_reminder
         else "progress-update" if args.verify_progress_update
         else "risk-cycle" if args.verify_risk_cycle
@@ -1306,6 +1455,8 @@ def main(argv: list[str] | None = None) -> int:
         output.update(_verify_runtime_project_reminder(hermes_dir))
     if args.verify_card_status_cycle:
         output.update(_verify_runtime_card_status_cycle(hermes_dir))
+    if args.verify_batch_followup_task:
+        output.update(_verify_runtime_batch_followup_task(hermes_dir))
     if args.probe_llm:
         output.update(_probe_llm(config_result))
     print(json.dumps(_sanitize_result(output), ensure_ascii=False, sort_keys=True))

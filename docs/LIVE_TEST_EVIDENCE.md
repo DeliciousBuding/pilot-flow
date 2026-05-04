@@ -1133,6 +1133,20 @@
 | 用户价值 | 用户不需要重新描述项目，只要点击卡片即可完成或重新打开项目；PilotFlow 会同步群反馈、状态表、文档流水和重启状态，补齐项目生命周期的关键交互闭环 |
 | 隐私处理 | 证据只记录布尔结果和脱敏结论；不写入真实 chat_id、message_id、Feishu URL、用户 open_id、token 或 app secret |
 
+## 2026-05-05 批量跟进待办运行态验证
+
+| 项目 | 证据 |
+| --- | --- |
+| 运行环境 | PilotFlow 已通过 `setup.py --hermes-home <wsl-hermes-home>` 同步到 WSL Hermes runtime；安装验证返回插件、技能、Hermes config 和 Feishu display 配置均 OK |
+| 本地回归 | `C:\Users\Ding\miniforge3\python.exe -m pytest` 返回 `245 passed`；`tests/test_verify_wsl_feishu_runtime.py` 返回 `26 passed`；`git diff --check` 通过 |
+| Verifier 新模式 | `verify_wsl_feishu_runtime.py --verify-batch-followup-task` 在已安装的 WSL Hermes runtime 插件内返回 `batch_followup_created=true`、`batch_followup_filtered=true`、`batch_followup_task_created=true`、`batch_followup_doc_recorded=true`、`batch_followup_history_recorded=true`、`batch_followup_state_recorded=true`、`batch_followup_feedback_sent=true`、`batch_followup_used_opaque_ref=true` |
+| 卡片动作路径 | verifier 使用生产 `_create_card_action_ref` 生成 opaque action，再通过 `_handle_card_action` 执行 `briefing_batch_followup_task`，覆盖“简报/看板卡片按钮 → 批量筛选项目 → 创建飞书跟进待办 → 群反馈”的真实插件路径 |
+| 批量筛选 | 运行态场景同时注册逾期和未到期项目，显式 `filter=overdue` 后只为逾期项目创建跟进待办，不误触未到期项目 |
+| 留痕闭环 | 命中项目会调用生产 `_create_task` 入口，追加项目文档、Base 流水和脱敏状态更新；任务 URL 不进入公开 evidence |
+| 基线验证 | 同轮继续通过 `--probe-llm` 的 `llm_probe_ok=true`、`llm_probe_status=200`，`--send-card` 的 `card_sent=true`、`card_has_title=true`、`card_has_goal=true`、`card_has_risk=true`，`--verify-history` 的 `history_apply_card_sent=true`，`--verify-update-task` 的 `update_task_created=true`，`--verify-archive-gate` 的 `archive_gate_required=true`，`--verify-followup-task` 的 `followup_task_created=true`，`--verify-deadline-update` 的 `deadline_update_applied=true`，`--verify-member-permissions` 的 `member_added=true`，`--verify-risk-cycle` 的 `risk_reported=true`，`--verify-progress-update` 的 `progress_update_applied=true`，`--verify-project-reminder` 的 `reminder_single_sent=true`，以及 `--verify-card-status-cycle` 的 `card_status_done_applied=true` |
+| 用户价值 | 站会/项目看板发现逾期或风险项目后，用户可以一键批量创建跟进待办，PilotFlow 自动分配负责人、同步文档/状态表/状态文件并在群里反馈，补齐团队级后续追踪闭环 |
+| 隐私处理 | 证据只记录布尔结果和脱敏结论；不写入真实 chat_id、message_id、Feishu URL、用户 open_id、token 或 app secret |
+
 ## 本地回归
 
 ```bash
