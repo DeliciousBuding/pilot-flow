@@ -3096,6 +3096,10 @@ PILOTFLOW_GENERATE_PLAN_SCHEMA = {
             "input_text": {"type": "string", "description": "用户的原始输入文本，包含项目描述。"},
             "title": {"type": "string", "description": "项目标题（从用户消息提取，可为空字符串）。"},
             "goal": {"type": "string", "description": "项目目标（从用户消息提取，可为空字符串）。"},
+            "initiator": {
+                "type": "string",
+                "description": "项目发起人的可见显示名。优先使用 Hermes/飞书会话中的用户显示名；不要传 open_id、chat_id、message_id 或其他原始 ID。",
+            },
             "allow_inferred_fields": {
                 "type": "boolean",
                 "description": "仅供回归测试 / 旧客户端回放使用。生产 Agent 不应传 true。本字段不再保留向前兼容承诺。默认 false。",
@@ -3425,6 +3429,10 @@ PILOTFLOW_CREATE_PROJECT_SPACE_SCHEMA = {
             },
             "title": {"type": "string", "description": "项目标题（必填），如「答辩项目」。"},
             "goal": {"type": "string", "description": "项目目标（必填），一句话描述项目要达成什么。"},
+            "initiator": {
+                "type": "string",
+                "description": "项目发起人的可见显示名；通常从 pending plan 自动继承。显式传入时也只能传显示名，不要传 open_id、chat_id、message_id 或其他原始 ID。",
+            },
             "members": {
                 "type": "array",
                 "items": {"type": "string"},

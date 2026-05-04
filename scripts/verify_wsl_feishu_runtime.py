@@ -122,6 +122,7 @@ def _sanitize_result(result: dict[str, Any]) -> dict[str, Any]:
         "registration_check_fns_present",
         "registration_card_command_exposed",
         "registration_handlers_present",
+        "registration_initiator_schema_exposed",
         "history_suggestion_found",
         "history_apply_action_found",
         "history_apply_card_sent",
@@ -851,6 +852,17 @@ def _verify_runtime_plugin_registration(hermes_dir: Path) -> dict[str, Any]:
     runtime_plugin.register(ctx)
     tool_names = [item.get("name") for item in ctx.tools]
     card_commands = [item for item in ctx.commands if item.get("name") == "card"]
+    schemas_by_name = {item.get("name"): item.get("schema") or {} for item in ctx.tools}
+    generate_props = (
+        schemas_by_name.get("pilotflow_generate_plan", {})
+        .get("parameters", {})
+        .get("properties", {})
+    )
+    create_props = (
+        schemas_by_name.get("pilotflow_create_project_space", {})
+        .get("parameters", {})
+        .get("properties", {})
+    )
     return {
         "registration_tools_exposed": tool_names == expected_tools,
         "registration_expected_tool_count": len(tool_names) == len(expected_tools),
@@ -863,6 +875,12 @@ def _verify_runtime_plugin_registration(hermes_dir: Path) -> dict[str, Any]:
         and callable(card_commands[0].get("handler"))
         and "pilotflow_action" in str(card_commands[0].get("args_hint", "")),
         "registration_handlers_present": all(callable(item.get("handler")) for item in ctx.tools),
+        "registration_initiator_schema_exposed": (
+            "initiator" in generate_props
+            and "initiator" in create_props
+            and "open_id" in str(generate_props.get("initiator", {}).get("description", ""))
+            and "open_id" in str(create_props.get("initiator", {}).get("description", ""))
+        ),
     }
 
 

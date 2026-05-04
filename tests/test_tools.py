@@ -10,6 +10,7 @@ import time
 import threading
 import subprocess
 import datetime as dt
+from pathlib import Path
 from unittest.mock import patch
 import pytest
 
@@ -82,6 +83,8 @@ from tools import (
     _get_chat_scope,
     _needs_confirmation_for_create,
     _needs_confirmation_for_update,
+    PILOTFLOW_GENERATE_PLAN_SCHEMA,
+    PILOTFLOW_CREATE_PROJECT_SPACE_SCHEMA,
 )
 
 
@@ -93,6 +96,27 @@ def _isolated_pilotflow_state(tmp_path, monkeypatch):
 def _opaque_card_action_value(chat_id: str, action: str, plan: dict) -> str:
     action_id = _create_card_action_ref(chat_id, action, plan)
     return json.dumps({"pilotflow_action_id": action_id}, ensure_ascii=False)
+
+
+def test_project_creation_schemas_expose_initiator_for_agent_structured_context():
+    generate_props = PILOTFLOW_GENERATE_PLAN_SCHEMA["parameters"]["properties"]
+    create_props = PILOTFLOW_CREATE_PROJECT_SPACE_SCHEMA["parameters"]["properties"]
+
+    assert "initiator" in generate_props
+    assert "显示名" in generate_props["initiator"]["description"]
+    assert "open_id" in generate_props["initiator"]["description"]
+    assert "initiator" in create_props
+    assert "pending plan" in create_props["initiator"]["description"]
+    assert "open_id" in create_props["initiator"]["description"]
+
+
+def test_skill_guidance_tells_agent_to_pass_initiator_display_name():
+    skill_text = (Path(__file__).resolve().parents[1] / "skills" / "pilotflow" / "SKILL.md").read_text(encoding="utf-8")
+
+    assert "initiator" in skill_text
+    assert "发起人" in skill_text
+    assert "显示名" in skill_text
+    assert "不要传 open_id" in skill_text
 
 
 def test_scan_chat_signals_suggests_projectization_card(monkeypatch):

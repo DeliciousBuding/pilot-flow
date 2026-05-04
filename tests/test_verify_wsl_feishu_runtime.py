@@ -384,6 +384,7 @@ def test_verify_runtime_plugin_registration_exposes_tools_and_card_command(tmp_p
     assert result["registration_check_fns_present"] is True
     assert result["registration_card_command_exposed"] is True
     assert result["registration_handlers_present"] is True
+    assert result["registration_initiator_schema_exposed"] is True
 
 
 def test_verify_runtime_briefing_batch_reminder_is_sanitized(tmp_path, monkeypatch):
@@ -906,6 +907,7 @@ def test_verifier_plugin_registration_mode_outputs_runtime_result(tmp_path, caps
         "registration_check_fns_present": True,
         "registration_card_command_exposed": True,
         "registration_handlers_present": True,
+        "registration_initiator_schema_exposed": True,
         "raw_chat_id": "oc_real_chat_id",
     }):
         exit_code = _MODULE.main([
@@ -925,6 +927,7 @@ def test_verifier_plugin_registration_mode_outputs_runtime_result(tmp_path, caps
     assert output["registration_check_fns_present"] is True
     assert output["registration_card_command_exposed"] is True
     assert output["registration_handlers_present"] is True
+    assert output["registration_initiator_schema_exposed"] is True
     assert "oc_real_chat_id" not in output_text
 
 
