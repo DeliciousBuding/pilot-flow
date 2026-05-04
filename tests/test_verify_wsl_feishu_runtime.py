@@ -308,6 +308,22 @@ def test_verify_runtime_briefing_batch_reminder_is_sanitized(tmp_path, monkeypat
     assert "example.invalid" not in json.dumps(result, ensure_ascii=False)
 
 
+def test_verify_runtime_card_command_bridge_is_sanitized(tmp_path, monkeypatch):
+    hermes_dir, _sent_cards = _install_runtime_fixture(tmp_path, monkeypatch)
+
+    result = _MODULE._verify_runtime_card_command_bridge(hermes_dir)
+
+    assert result["card_command_bridge_executed"] is True
+    assert result["card_command_bridge_suppressed_text"] is True
+    assert result["card_command_bridge_marked_origin"] is True
+    assert result["card_command_bridge_doc_recorded"] is True
+    assert result["card_command_bridge_history_recorded"] is True
+    assert result["card_command_bridge_state_recorded"] is True
+    assert result["card_command_bridge_used_opaque_ref"] is True
+    assert result["card_command_bridge_feedback_sanitized"] is True
+    assert "example.invalid" not in json.dumps(result, ensure_ascii=False)
+
+
 def test_verify_runtime_card_status_cycle_is_sanitized(tmp_path, monkeypatch):
     hermes_dir, _sent_cards = _install_runtime_fixture(tmp_path, monkeypatch)
 
@@ -739,6 +755,45 @@ def test_verifier_briefing_batch_reminder_mode_outputs_sanitized_runtime_result(
     assert output["briefing_batch_reminder_state_recorded"] is True
     assert output["briefing_batch_reminder_feedback_sent"] is True
     assert output["briefing_batch_reminder_used_opaque_ref"] is True
+    assert "oc_real_chat_id" not in output_text
+    assert "example.invalid" not in output_text
+
+
+def test_verifier_card_command_bridge_mode_outputs_sanitized_runtime_result(tmp_path, capsys):
+    env_file = tmp_path / ".env"
+    env_file.write_text("PILOTFLOW_TEST_CHAT_ID=oc_real_chat_id\n", encoding="utf-8")
+
+    with patch.object(_MODULE, "_verify_runtime_card_command_bridge", return_value={
+        "card_command_bridge_executed": True,
+        "card_command_bridge_suppressed_text": True,
+        "card_command_bridge_marked_origin": True,
+        "card_command_bridge_doc_recorded": True,
+        "card_command_bridge_history_recorded": True,
+        "card_command_bridge_state_recorded": True,
+        "card_command_bridge_used_opaque_ref": True,
+        "card_command_bridge_feedback_sanitized": True,
+        "raw_chat_id": "oc_real_chat_id",
+        "raw_doc_url": "https://example.invalid/doc/1",
+    }):
+        exit_code = _MODULE.main([
+            "--hermes-dir", str(tmp_path),
+            "--env-file", str(env_file),
+            "--verify-card-command-bridge",
+        ])
+
+    output_text = capsys.readouterr().out
+    output = json.loads(output_text)
+    assert exit_code == 0
+    assert output["mode"] == "card-command-bridge"
+    assert output["would_send_card"] is False
+    assert output["card_command_bridge_executed"] is True
+    assert output["card_command_bridge_suppressed_text"] is True
+    assert output["card_command_bridge_marked_origin"] is True
+    assert output["card_command_bridge_doc_recorded"] is True
+    assert output["card_command_bridge_history_recorded"] is True
+    assert output["card_command_bridge_state_recorded"] is True
+    assert output["card_command_bridge_used_opaque_ref"] is True
+    assert output["card_command_bridge_feedback_sanitized"] is True
     assert "oc_real_chat_id" not in output_text
     assert "example.invalid" not in output_text
 

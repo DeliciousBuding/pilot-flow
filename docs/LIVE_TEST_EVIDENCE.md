@@ -1203,6 +1203,20 @@
 | 用户价值 | 站会/日报简报发现逾期项目后，用户可以直接点卡片批量催办；PilotFlow 自动筛选项目、发送群提醒并同步文档/状态表/状态文件，补齐简报后的团队级推进动作 |
 | 隐私处理 | 证据只记录布尔结果和脱敏结论；不写入真实 chat_id、message_id、Feishu URL、用户 open_id、token 或 app secret |
 
+## 2026-05-05 卡片命令桥接运行态验证
+
+| 项目 | 证据 |
+| --- | --- |
+| 运行环境 | PilotFlow 已通过 `setup.py --hermes-home <wsl-hermes-home>` 同步到 WSL Hermes runtime；安装验证返回插件、技能、Hermes config 和 Feishu display 配置均 OK |
+| 本地回归 | `C:\Users\Ding\miniforge3\python.exe -m pytest` 返回 `257 passed`；`tests/test_verify_wsl_feishu_runtime.py` 返回 `36 passed`；`git diff --check` 通过 |
+| Verifier 新模式 | `verify_wsl_feishu_runtime.py --verify-card-command-bridge` 在已安装的 WSL Hermes runtime 插件内返回 `card_command_bridge_executed=true`、`card_command_bridge_suppressed_text=true`、`card_command_bridge_marked_origin=true`、`card_command_bridge_doc_recorded=true`、`card_command_bridge_history_recorded=true`、`card_command_bridge_state_recorded=true`、`card_command_bridge_used_opaque_ref=true`、`card_command_bridge_feedback_sanitized=true` |
+| Hermes 入口路径 | verifier 使用生产 `_create_card_action_ref` 和 `_attach_card_message_id` 准备按钮引用，再通过生产 `_handle_card_command` 执行 `/card button {"pilotflow_action_id":...}` 桥接路径，覆盖 Hermes 实际卡片回调入口 |
+| 原卡片反馈 | 执行成功后 `_handle_card_command` 返回 `None`，避免向群聊额外吐 JSON/英文；原始卡片会被更新为“批量催办已发送”的只读反馈卡 |
+| 办公链路 | 桥接入口继续触发 `briefing_batch_reminder`，只催办逾期项目，并追加项目文档、Base 流水和脱敏状态更新 |
+| 基线验证 | 同轮继续通过 `--send-card` 的 `card_sent=true`、`card_has_title=true`、`card_has_goal=true`、`card_has_risk=true`，`--verify-briefing-batch-reminder` 的 `briefing_batch_reminder_sent=true`，`--verify-card-status-cycle` 的 `card_status_done_applied=true`，以及 `--verify-dashboard-navigation` 的 `dashboard_filter_sent=true` |
+| 用户价值 | 用户实际点击飞书卡片按钮时，PilotFlow 走的是 Hermes `/card` 桥接入口；本验证证明该入口能执行真实项目动作、更新原卡片状态并保持群聊反馈干净 |
+| 隐私处理 | 证据只记录布尔结果和脱敏结论；不写入真实 chat_id、message_id、Feishu URL、用户 open_id、token 或 app secret |
+
 ## 本地回归
 
 ```bash
@@ -1212,7 +1226,7 @@ C:\Users\Ding\miniforge3\python.exe -m pytest tests\test_tools.py tests\test_set
 结果：
 
 ```text
-255 passed
+257 passed
 ```
 
 ## 当前证据边界
