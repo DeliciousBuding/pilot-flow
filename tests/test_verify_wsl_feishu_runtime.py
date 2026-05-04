@@ -335,6 +335,7 @@ def test_verify_runtime_project_reminder_is_sanitized(tmp_path, monkeypatch):
     assert result["reminder_single_doc_updated"] is True
     assert result["reminder_single_history_recorded"] is True
     assert result["reminder_single_state_recorded"] is True
+    assert result["reminder_single_assignees_included"] is True
     assert result["reminder_batch_sent"] is True
     assert result["reminder_batch_filtered"] is True
     assert result["reminder_batch_history_recorded"] is True
@@ -823,6 +824,7 @@ def test_verifier_project_reminder_mode_outputs_sanitized_runtime_result(tmp_pat
         "reminder_single_doc_updated": True,
         "reminder_single_history_recorded": True,
         "reminder_single_state_recorded": True,
+        "reminder_single_assignees_included": True,
         "reminder_batch_sent": True,
         "reminder_batch_filtered": True,
         "reminder_batch_history_recorded": True,
@@ -845,6 +847,7 @@ def test_verifier_project_reminder_mode_outputs_sanitized_runtime_result(tmp_pat
     assert output["reminder_single_doc_updated"] is True
     assert output["reminder_single_history_recorded"] is True
     assert output["reminder_single_state_recorded"] is True
+    assert output["reminder_single_assignees_included"] is True
     assert output["reminder_batch_sent"] is True
     assert output["reminder_batch_filtered"] is True
     assert output["reminder_batch_history_recorded"] is True

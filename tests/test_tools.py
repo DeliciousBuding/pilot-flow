@@ -4334,6 +4334,22 @@ def test_project_reminder_card_action_sends_chinese_group_reminder():
     assert "pilotflow" not in message.lower()
 
 
+def test_project_reminder_text_includes_deliverable_assignees():
+    project = {
+        "members": ["张三", "李四"],
+        "deadline": "2026-05-20",
+        "status": "有风险",
+        "deliverables": ["整理上线清单", "同步审批进度"],
+        "deliverable_assignees": {"整理上线清单": "李四", "同步审批进度": "张三"},
+    }
+
+    text = _build_project_reminder_text("oc_reminder_assignees", "分工催办项目", project)
+
+    assert "分工：整理上线清单 → 李四；同步审批进度 → 张三" in text
+    assert "open_id" not in text
+    assert "pilotflow_chat_id" not in text
+
+
 def test_project_reminder_card_action_records_doc_and_bitable_history():
     with _project_registry_lock:
         _project_registry.clear()

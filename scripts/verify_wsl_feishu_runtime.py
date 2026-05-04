@@ -226,6 +226,7 @@ def _sanitize_result(result: dict[str, Any]) -> dict[str, Any]:
         "reminder_single_doc_updated",
         "reminder_single_history_recorded",
         "reminder_single_state_recorded",
+        "reminder_single_assignees_included",
         "reminder_batch_sent",
         "reminder_batch_filtered",
         "reminder_batch_history_recorded",
@@ -2194,7 +2195,8 @@ def _verify_runtime_project_reminder(hermes_dir: Path) -> dict[str, Any]:
                 table_id="tbl_single",
                 record_id="rec_single",
                 goal="验证安装后的单项目催办",
-                deliverables=["初始验收"],
+                deliverables=["整理上线清单", "同步审批进度"],
+                deliverable_assignees={"整理上线清单": "张三", "同步审批进度": "张三"},
             )
             _register_project(
                 "运行态批量逾期催办项目",
@@ -2265,6 +2267,10 @@ def _verify_runtime_project_reminder(hermes_dir: Path) -> dict[str, Any]:
             item.get("action") == "催办" and item.get("value") == "已发送催办提醒"
             for item in state_updates
             if isinstance(item, dict)
+        ),
+        "reminder_single_assignees_included": (
+            "分工：整理上线清单 → 张三；同步审批进度 → 张三" in feedback_text
+            and "open_id" not in feedback_text
         ),
         "reminder_batch_sent": batch.get("status") == "project_reminders_sent" and batch.get("reminder_count") == 1,
         "reminder_batch_filtered": batch.get("projects") == ["运行态批量逾期催办项目"],

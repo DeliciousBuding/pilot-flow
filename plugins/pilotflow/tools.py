@@ -682,9 +682,14 @@ def _build_project_reminder_text(chat_id: str, title: str, project: dict) -> str
     members = [_plain_at_mentions(member).lstrip("@") for member in project.get("members", [])]
     owner_text = _format_members(members, chat_id) if members else "相关负责人"
     status = project.get("status", "进行中")
+    deliverables = list(project.get("deliverables", []))
+    assignees = _clean_deliverable_assignees(project.get("deliverable_assignees"), deliverables, members)
+    assignee_items = [f"{deliverable} → {assignee}" for deliverable, assignee in assignees.items()]
+    assignee_line = f"分工：{'；'.join(assignee_items)}\n" if assignee_items else ""
     return (
         f"项目催办：请关注项目「{_plain_at_mentions(title)}」。\n"
         f"负责人：{owner_text}\n"
+        f"{assignee_line}"
         f"截止：{deadline_text}\n"
         f"当前状态：{status}\n"
         "请在群里同步最新进展；如已完成，请点击项目卡片标记完成。"
