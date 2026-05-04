@@ -190,6 +190,10 @@ def _sanitize_result(result: dict[str, Any]) -> dict[str, Any]:
         "archive_gate_no_write",
         "archive_gate_confirmed",
         "archive_gate_feedback_sent",
+        "archive_state_gate_required",
+        "archive_state_gate_no_write",
+        "archive_state_confirmed",
+        "archive_state_feedback_sent",
         "followup_task_created",
         "followup_task_feedback_sent",
         "followup_task_artifact_recorded",
@@ -1578,13 +1582,16 @@ def _verify_runtime_archive_gate(hermes_dir: Path) -> dict[str, Any]:
         _handle_update_project,
         _create_card_action_ref,
         _card_action_refs,
+        _load_project_state,
         _project_registry,
         _project_registry_lock,
         _register_project,
+        _save_project_state,
         _plan_lock,
     )
 
     chat_id = os.environ.get("PILOTFLOW_TEST_CHAT_ID", "")
+    original_state_path = os.environ.get("PILOTFLOW_STATE_PATH")
     original_update_bitable = runtime_tools._update_bitable_record
     original_append_doc = runtime_tools._append_project_doc_update
     original_append_history = runtime_tools._append_bitable_update_record
@@ -1639,19 +1646,78 @@ def _verify_runtime_archive_gate(hermes_dir: Path) -> dict[str, Any]:
         ))
         with _project_registry_lock:
             confirmed_status = _project_registry["运行态归档验证项目"].get("status")
+        with tempfile.TemporaryDirectory() as tmpdir:
+            os.environ["PILOTFLOW_STATE_PATH"] = str(Path(tmpdir) / "pilotflow_archive_state.json")
+            _save_project_state(
+                "运行态重启归档门控项目",
+                "验证安装后重启归档门控",
+                [],
+                ["验收记录"],
+                "2026-05-20",
+                "进行中",
+                ["文档: https://example.invalid/doc/archive-state"],
+            )
+            state_write_start = len(write_calls)
+            state_send_start = len(sent_messages)
+            state_blocked = json.loads(_handle_update_project(
+                {
+                    "project_name": "运行态重启归档门控",
+                    "action": "update_status",
+                    "value": "已归档",
+                },
+                chat_id=chat_id,
+            ))
+            state_after_block = _load_project_state()
+            state_block_write_count = len(write_calls) - state_write_start
+            state_block_send_count = len(sent_messages) - state_send_start
+            state_confirmed = json.loads(_handle_update_project(
+                {
+                    "project_name": "运行态重启归档门控",
+                    "action": "update_status",
+                    "value": "已归档",
+                    "confirmation_text": "确认执行",
+                },
+                chat_id=chat_id,
+            ))
+            state_after_confirm = _load_project_state()
     finally:
         runtime_tools._update_bitable_record = original_update_bitable
         runtime_tools._append_project_doc_update = original_append_doc
         runtime_tools._append_bitable_update_record = original_append_history
         runtime_tools._hermes_send = original_send
+        if original_state_path is None:
+            os.environ.pop("PILOTFLOW_STATE_PATH", None)
+        else:
+            os.environ["PILOTFLOW_STATE_PATH"] = original_state_path
         with _project_registry_lock:
             _project_registry.clear()
 
+    state_block_project = next(
+        (item for item in state_after_block if item.get("title") == "运行态重启归档门控项目"),
+        {},
+    )
+    state_confirm_project = next(
+        (item for item in state_after_confirm if item.get("title") == "运行态重启归档门控项目"),
+        {},
+    )
     return {
         "archive_gate_required": blocked.get("status") == "confirmation_required",
         "archive_gate_no_write": blocked_status == "进行中" and blocked_write_count == 0 and blocked_send_count == 0,
         "archive_gate_confirmed": confirmed.get("status") == "project_updated" and confirmed_status == "已归档",
         "archive_gate_feedback_sent": any("状态表已同步" in msg for msg in sent_messages),
+        "archive_state_gate_required": state_blocked.get("status") == "confirmation_required",
+        "archive_state_gate_no_write": state_block_project.get("status") == "进行中"
+        and not state_block_project.get("updates")
+        and state_block_write_count == 0
+        and state_block_send_count == 0,
+        "archive_state_confirmed": state_confirmed.get("status") == "project_updated"
+        and state_confirmed.get("state_updated") is True
+        and state_confirm_project.get("status") == "已归档"
+        and {"action": "状态", "value": "已归档"} in state_confirm_project.get("updates", []),
+        "archive_state_feedback_sent": any(
+            "运行态重启归档门控项目" in msg and "本地状态已更新" in msg
+            for msg in sent_messages
+        ),
     }
 
 

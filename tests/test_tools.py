@@ -6044,6 +6044,67 @@ def test_update_project_archive_allows_explicit_confirmation():
         assert _project_registry["确认后归档项目"]["status"] == "已归档"
 
 
+def test_update_project_archive_state_project_requires_confirmation(tmp_path):
+    state_path = tmp_path / "pilotflow-projects.json"
+    with _project_registry_lock:
+        _project_registry.clear()
+
+    with patch.dict(os.environ, {"PILOTFLOW_STATE_PATH": str(state_path)}):
+        assert _save_project_state(
+            "重启归档门控项目",
+            "验证重启后归档确认",
+            [],
+            ["验收记录"],
+            "2026-05-20",
+            "进行中",
+            artifacts=["文档: https://example.invalid/doc/archive-state"],
+        )
+        with (
+            patch("tools._append_project_doc_update", return_value=True) as append_doc,
+            patch("tools._hermes_send") as send,
+        ):
+            blocked = json.loads(_handle_update_project(
+                {"project_name": "重启归档门控", "action": "update_status", "value": "已归档"},
+                chat_id="oc_state_archive_gate",
+            ))
+        projects_after_block = _load_project_state()
+
+        with (
+            patch("tools._append_project_doc_update", return_value=True) as append_doc_confirmed,
+            patch("tools._hermes_send", return_value=True) as send_confirmed,
+        ):
+            confirmed = json.loads(_handle_update_project(
+                {
+                    "project_name": "重启归档门控",
+                    "action": "update_status",
+                    "value": "已归档",
+                    "confirmation_text": "确认执行",
+                },
+                chat_id="oc_state_archive_gate",
+            ))
+        projects_after_confirm = _load_project_state()
+
+    assert blocked["status"] == "confirmation_required"
+    assert blocked["action"] == "update_status"
+    assert "归档" in blocked["reason"]
+    append_doc.assert_not_called()
+    send.assert_not_called()
+    assert projects_after_block[0]["status"] == "进行中"
+    assert projects_after_block[0].get("updates", []) == []
+
+    assert confirmed["status"] == "project_updated"
+    assert confirmed["project"] == "重启归档门控项目"
+    assert confirmed["autonomy"]["mode"] == "must_confirm"
+    assert confirmed["state_updated"] is True
+    assert confirmed["bitable_updated"] is False
+    assert confirmed["doc_updated"] is True
+    assert projects_after_confirm[0]["status"] == "已归档"
+    assert projects_after_confirm[0]["updates"][-1] == {"action": "状态", "value": "已归档"}
+    append_doc_confirmed.assert_called_once()
+    assert "状态 → 已归档" in send_confirmed.call_args.args[1]
+    assert "本地状态已更新" in send_confirmed.call_args.args[1]
+
+
 def test_update_project_remove_member_rejects_unknown_member_without_writes():
     with _project_registry_lock:
         _project_registry.clear()

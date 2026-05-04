@@ -243,6 +243,10 @@ def test_verify_runtime_archive_gate_is_sanitized(tmp_path, monkeypatch):
     assert result["archive_gate_no_write"] is True
     assert result["archive_gate_confirmed"] is True
     assert result["archive_gate_feedback_sent"] is True
+    assert result["archive_state_gate_required"] is True
+    assert result["archive_state_gate_no_write"] is True
+    assert result["archive_state_confirmed"] is True
+    assert result["archive_state_feedback_sent"] is True
     assert "example.invalid" not in json.dumps(result, ensure_ascii=False)
 
 
@@ -609,6 +613,10 @@ def test_verifier_archive_gate_mode_outputs_sanitized_runtime_result(tmp_path, c
         "archive_gate_no_write": True,
         "archive_gate_confirmed": True,
         "archive_gate_feedback_sent": True,
+        "archive_state_gate_required": True,
+        "archive_state_gate_no_write": True,
+        "archive_state_confirmed": True,
+        "archive_state_feedback_sent": True,
         "raw_chat_id": "oc_real_chat_id",
         "raw_doc_url": "https://example.invalid/doc/1",
     }):
@@ -627,6 +635,10 @@ def test_verifier_archive_gate_mode_outputs_sanitized_runtime_result(tmp_path, c
     assert output["archive_gate_no_write"] is True
     assert output["archive_gate_confirmed"] is True
     assert output["archive_gate_feedback_sent"] is True
+    assert output["archive_state_gate_required"] is True
+    assert output["archive_state_gate_no_write"] is True
+    assert output["archive_state_confirmed"] is True
+    assert output["archive_state_feedback_sent"] is True
     assert "oc_real_chat_id" not in output_text
     assert "example.invalid" not in output_text
 
