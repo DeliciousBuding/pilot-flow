@@ -2160,6 +2160,70 @@ def test_standup_briefing_overdue_button_can_create_batch_followup_tasks():
     append_history.assert_called_once()
 
 
+def test_briefing_batch_followup_uses_state_projects_after_restart(tmp_path):
+    state_path = tmp_path / "pilotflow-projects.json"
+    with _project_registry_lock:
+        _project_registry.clear()
+    overdue = (dt.date.today() - dt.timedelta(days=1)).isoformat()
+    future = (dt.date.today() + dt.timedelta(days=5)).isoformat()
+    with patch.dict(os.environ, {"PILOTFLOW_STATE_PATH": str(state_path)}):
+        _save_project_state(
+            "重启逾期待办项目",
+            "验证重启后批量待办",
+            [],
+            ["验收记录"],
+            overdue,
+            "进行中",
+            ["文档: https://example.invalid/docx/doc_batch_restart"],
+        )
+        _save_project_state(
+            "重启未逾期待办项目",
+            "验证重启后批量待办过滤",
+            [],
+            ["验收记录"],
+            future,
+            "进行中",
+            ["文档: https://example.invalid/docx/doc_batch_future"],
+        )
+        sent_messages = []
+        with (
+            patch("tools._create_task", return_value="重启逾期待办项目跟进: https://example.invalid/task/task_restart") as create_task,
+            patch("tools._hermes_send", side_effect=lambda chat_id, msg: sent_messages.append((chat_id, msg)) or True),
+            patch("tools._append_project_doc_update", return_value=True) as append_doc,
+            patch("tools._append_bitable_update_record", return_value=True) as append_history,
+        ):
+            result = json.loads(_handle_card_action(
+                {"action_value": json.dumps({"pilotflow_action": "briefing_batch_followup_task", "filter": "overdue"}, ensure_ascii=False)},
+                chat_id="oc_restart_batch_followup",
+            ))
+        projects = _load_project_state()
+
+    assert result["status"] == "briefing_batch_followup_task_created"
+    assert result["source"] == "state"
+    assert result["project_count"] == 1
+    assert result["projects"] == ["重启逾期待办项目"]
+    create_task.assert_called_once_with(
+        "重启逾期待办项目跟进",
+        "项目: 重启逾期待办项目",
+        "",
+        overdue,
+        "oc_restart_batch_followup",
+        [],
+    )
+    append_doc.assert_called_once()
+    restored_project = append_doc.call_args.args[1]
+    assert "文档: https://example.invalid/docx/doc_batch_restart" in restored_project["artifacts"]
+    append_history.assert_not_called()
+    assert sent_messages
+    assert sent_messages[0][0] == "oc_restart_batch_followup"
+    assert "重启逾期待办项目" in sent_messages[0][1]
+    assert "重启未逾期待办项目" not in sent_messages[0][1]
+    assert projects[0]["title"] == "重启逾期待办项目"
+    assert projects[0]["updates"][-1] == {"action": "任务", "value": "重启逾期待办项目跟进"}
+    serialized = state_path.read_text(encoding="utf-8")
+    assert "example.invalid" not in serialized
+
+
 def test_standup_briefing_risk_button_can_create_batch_followup_tasks():
     with _project_registry_lock:
         _project_registry.clear()

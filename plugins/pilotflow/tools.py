@@ -934,6 +934,14 @@ def _safe_resource_artifacts(artifacts: Optional[list]) -> list[str]:
     return safe[:20]
 
 
+def _public_task_update_value(task_name: str) -> str:
+    """Return a restart-safe task update without a Feishu task URL."""
+    summary, sep, url = str(task_name or "").partition(": ")
+    if sep and url.startswith(("http://", "https://")):
+        return summary.strip()
+    return str(task_name or "").strip()
+
+
 def _save_project_resource_refs(title: str, artifacts: Optional[list]) -> None:
     """Persist non-secret resource links separately from the public project summary."""
     refs = _safe_resource_artifacts(artifacts)
@@ -3812,7 +3820,7 @@ def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
             return tool_error("仅支持风险、逾期或近期截止项目批量创建待办。")
         with _project_registry_lock:
             candidate_projects = [
-                (title, info)
+                (title, info, "registry")
                 for title, info in _project_registry.items()
                 if _project_matches_status_filter({
                     "status": info.get("status", "进行中"),
@@ -3820,8 +3828,28 @@ def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
                 }, status_filter)
                 and (not member_filters or any(member in set(_project_member_names({"detail_project": info})) for member in member_filters))
             ]
+        if not candidate_projects and not member_filters:
+            for item in _load_project_state():
+                title = item.get("title") or ""
+                if not title:
+                    continue
+                state_project = {
+                    "goal": item.get("goal", ""),
+                    "members": [],
+                    "deliverables": item.get("deliverables", []),
+                    "deadline": item.get("deadline", ""),
+                    "status": item.get("status", "进行中"),
+                    "artifacts": _load_project_resource_refs(title),
+                    "updates": item.get("updates", []),
+                    "app_token": "",
+                    "table_id": "",
+                    "record_id": "",
+                }
+                if _project_matches_status_filter(state_project, status_filter):
+                    candidate_projects.append((title, state_project, "state"))
         created_projects: list[str] = []
-        for project_name, project in candidate_projects:
+        sources = set()
+        for project_name, project, source in candidate_projects:
             members = list(project.get("members", []))
             assignee = members[0] if members else ""
             task_name = _create_task(
@@ -3835,7 +3863,12 @@ def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
             if not task_name:
                 continue
             created_projects.append(project_name)
+            sources.add(source)
             created_entry = f"任务: {task_name}"
+            public_task_value = _public_task_update_value(task_name)
+            updates = list(project.get("updates", []))
+            if public_task_value:
+                updates.append({"action": "任务", "value": public_task_value})
             with _project_registry_lock:
                 if project_name in _project_registry:
                     _project_registry[project_name].setdefault("artifacts", []).append(created_entry)
@@ -3843,7 +3876,7 @@ def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
                 project_name, project.get("goal", ""), members,
                 project.get("deliverables", []), project.get("deadline", ""), project.get("status", "进行中"),
                 list(project.get("artifacts", [])) + [created_entry],
-                updates=project.get("updates", []),
+                updates=updates,
             )
             _append_project_doc_update(project_name, project, "任务", task_name)
             if project.get("app_token") and project.get("table_id"):
@@ -3864,6 +3897,7 @@ def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
             "member_filters": member_filters,
             "project_count": len(created_projects),
             "projects": created_projects,
+            "source": "state" if sources == {"state"} else "registry",
             "instructions": "已批量创建筛选项目待办。不要展示工具名或英文。",
         })
 
