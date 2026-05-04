@@ -2895,6 +2895,10 @@ PILOTFLOW_GENERATE_PLAN_SCHEMA = {
             "input_text": {"type": "string", "description": "用户的原始输入文本，包含项目描述。"},
             "title": {"type": "string", "description": "项目标题（从用户消息提取，可为空字符串）。"},
             "goal": {"type": "string", "description": "项目目标（从用户消息提取，可为空字符串）。"},
+            "allow_inferred_fields": {
+                "type": "boolean",
+                "description": "仅当 Agent 明确决定允许工具使用旧版文本兜底解析时传 true；默认 false。",
+            },
             "members": {
                 "type": "array",
                 "items": {"type": "string"},
@@ -2954,7 +2958,8 @@ def _handle_generate_plan(params: Dict[str, Any], **kwargs) -> str:
 
     text = params.get("input_text", "")
     template = _detect_template(text)
-    inline_fields = _extract_inline_project_fields(text)
+    allow_inferred_fields = bool(params.get("allow_inferred_fields"))
+    inline_fields = _extract_inline_project_fields(text) if allow_inferred_fields else {}
     session_chat_name = _get_session_value("HERMES_SESSION_CHAT_NAME", "")
     session_user_name = _get_session_value("HERMES_SESSION_USER_NAME", "")
     session_context_used = {
@@ -2972,6 +2977,16 @@ def _handle_generate_plan(params: Dict[str, Any], **kwargs) -> str:
         "deadline": params.get("deadline", "") or inline_fields.get("deadline", ""),
         "risks": [],
     }
+    has_structured_fields = bool(
+        plan["title"] or plan["goal"] or plan["members"] or plan["deliverables"] or params.get("deadline", "")
+    )
+    if not has_structured_fields and not allow_inferred_fields:
+        return tool_result({
+            "status": "needs_clarification",
+            "missing": ["title", "goal", "deliverables", "deadline"],
+            "input": text,
+            "instructions": "请用中文向用户追问缺失的项目字段，不要自行从原文兜底解析。",
+        })
     if not plan["members"] and session_user_name:
         plan["members"] = [session_user_name]
         session_context_used["initiator"] = True

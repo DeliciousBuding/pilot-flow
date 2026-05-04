@@ -40,6 +40,18 @@
 | WSL runtime dry-run | `verify_wsl_feishu_runtime.py --env-file /home/ding/.hermes/.env --config-file /home/ding/.hermes/config.yaml` 输出脱敏通过：`config_model=mimo-v2.5-pro`、`config_provider=vectorcontrol`、`config_has_feishu_gateway=true` |
 | 真实 Feishu 卡片验证 | WSL `verify_wsl_feishu_runtime.py --send-card` 成功：`card_sent=true`、`pending_plan_recovered=true`、`card_action_recovered=true`、`redaction_enabled=true`，继续证明真实卡片只暴露 opaque action id 且可恢复 |
 
+## 2026-05-04 Agent 主驾驶边界：计划生成结构化字段门控
+
+| 项目 | 证据 |
+| --- | --- |
+| 功能硬化 | `pilotflow_generate_plan` 默认不再从 `input_text` 兜底解析标题、成员、交付物和截止时间；当 Agent 只传原文且没有任何结构化项目字段时，工具返回 `needs_clarification` 和缺失字段清单，不发送确认卡片 |
+| 兼容路径 | 仅当 Agent 显式传 `allow_inferred_fields=true` 时，旧 `_extract_inline_project_fields` 文本解析才会启用；这让“工具做推断”成为显式行为，而不是默认偷偷修正 Agent 提取失败 |
+| 真实路径兼容 | 集成测试已改为模拟 Agent 传入结构化 `title/goal/members/deliverables/deadline`；WSL `--send-card` verifier 继续通过，证明真实卡片计划生成路径不依赖 raw text fallback |
+| 自动化验证 | `C:\Users\Ding\miniforge3\python.exe -m pytest` 通过，结果 `191 passed` |
+| WSL 安装验证 | `setup.py --hermes-dir D:\Code\LarkProject\hermes-agent --hermes-home \\wsl.localhost\Ubuntu-24.04\home\ding\.hermes` 通过；插件文件已同步到 WSL Hermes runtime |
+| WSL runtime dry-run | `verify_wsl_feishu_runtime.py --env-file /home/ding/.hermes/.env --config-file /home/ding/.hermes/config.yaml` 输出脱敏通过：`config_model=mimo-v2.5-pro`、`config_provider=vectorcontrol`、`config_has_feishu_gateway=true` |
+| 真实 Feishu 卡片验证 | WSL `verify_wsl_feishu_runtime.py --send-card` 成功：`card_sent=true`、`pending_plan_recovered=true`、`card_action_recovered=true`、`redaction_enabled=true` |
+
 ## 2026-05-03 状态看板场景
 
 | 项目 | 证据 |
