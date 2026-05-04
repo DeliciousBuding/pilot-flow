@@ -218,6 +218,9 @@ def _sanitize_result(result: dict[str, Any]) -> dict[str, Any]:
         "risk_bitable_synced",
         "risk_history_recorded",
         "risk_feedback_sent",
+        "risk_state_reported",
+        "risk_state_recorded",
+        "risk_state_feedback_sent",
         "risk_resolved",
         "risk_level_low",
         "risk_resolve_feedback_sent",
@@ -2137,6 +2140,24 @@ def _verify_runtime_risk_cycle(hermes_dir: Path) -> dict[str, Any]:
         with tempfile.TemporaryDirectory() as tmpdir:
             os.environ["PILOTFLOW_STATE_PATH"] = str(Path(tmpdir) / "pilotflow_risk_state.json")
             _save_project_state(
+                "运行态重启风险上报项目",
+                "验证安装后重启状态继续上报风险",
+                ["张三"],
+                ["验收记录"],
+                "2026-05-20",
+                "进行中",
+                ["文档: https://example.invalid/doc/risk-report-state"],
+            )
+            state_reported = json.loads(_handle_update_project(
+                {
+                    "project_name": "运行态重启风险上报",
+                    "action": "add_risk",
+                    "value": "验收环境阻塞，高风险",
+                },
+                chat_id=chat_id,
+            ))
+            state_report_projects = _load_project_state()
+            _save_project_state(
                 "运行态重启风险卡片项目",
                 "验证安装后重启状态卡片解除风险",
                 ["张三"],
@@ -2173,15 +2194,28 @@ def _verify_runtime_risk_cycle(hermes_dir: Path) -> dict[str, Any]:
         "risk_bitable_synced": {"状态": "有风险", "风险等级": "高"} in bitable_updates,
         "risk_history_recorded": "风险" in history_labels and "风险解除" in history_labels,
         "risk_feedback_sent": "风险 → 支付接口联调阻塞，高风险" in feedback_text and "状态已切换为有风险" in feedback_text,
+        "risk_state_reported": state_reported.get("status") == "project_updated"
+        and state_reported.get("risk_level") == "高"
+        and state_reported.get("state_updated") is True,
+        "risk_state_recorded": any(
+            item.get("title") == "运行态重启风险上报项目"
+            and item.get("status") == "有风险"
+            and {"action": "风险", "value": "验收环境阻塞，高风险"} in item.get("updates", [])
+            for item in state_report_projects
+        ),
+        "risk_state_feedback_sent": "运行态重启风险上报项目" in feedback_text
+        and "状态已切换为有风险" in feedback_text,
         "risk_resolved": resolved.get("status") == "project_updated" and resolved_status == "进行中",
         "risk_level_low": resolved.get("risk_level") == "低",
         "risk_resolve_feedback_sent": "风险解除 → 支付接口联调已恢复" in feedback_text and "状态已恢复为进行中" in feedback_text,
         "risk_state_card_resolved": state_resolved.get("status") == "project_risk_resolved"
         and state_resolved.get("state_updated") is True,
-        "risk_state_card_recorded": len(state_projects) == 1
-        and state_projects[0].get("title") == "运行态重启风险卡片项目"
-        and state_projects[0].get("status") == "进行中"
-        and {"action": "风险解除", "value": "风险已解除"} in state_projects[0].get("updates", []),
+        "risk_state_card_recorded": any(
+            item.get("title") == "运行态重启风险卡片项目"
+            and item.get("status") == "进行中"
+            and {"action": "风险解除", "value": "风险已解除"} in item.get("updates", [])
+            for item in state_projects
+        ),
         "risk_state_card_feedback_sent": "运行态重启风险卡片项目" in feedback_text
         and "风险已解除" in feedback_text,
         "risk_detail_reminder_action_shown": detail.get("status") == "project_status_sent"

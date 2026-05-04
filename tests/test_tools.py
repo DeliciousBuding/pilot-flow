@@ -5348,6 +5348,53 @@ def test_update_project_adds_progress_to_sanitized_state_after_restart(tmp_path)
     ]
 
 
+def test_update_project_reports_risk_to_sanitized_state_after_restart(tmp_path):
+    state_path = tmp_path / "pilotflow-projects.json"
+    with _project_registry_lock:
+        _project_registry.clear()
+
+    with patch.dict(os.environ, {"PILOTFLOW_STATE_PATH": str(state_path)}):
+        assert _save_project_state(
+            "重启风险上报项目",
+            "验证重启后继续上报风险",
+            [],
+            ["验收记录"],
+            "2026-05-20",
+            "进行中",
+            artifacts=["文档: https://example.invalid/doc/risk-report-state"],
+        )
+        with (
+            patch("tools._append_project_doc_update", return_value=True) as append_doc,
+            patch("tools._hermes_send", return_value=True) as send,
+        ):
+            result = json.loads(_handle_update_project(
+                {
+                    "project_name": "重启风险上报",
+                    "action": "add_risk",
+                    "value": "验收环境阻塞，高风险",
+                },
+                chat_id="oc_state_risk_report",
+            ))
+        projects = _load_project_state()
+
+    assert result["status"] == "project_updated"
+    assert result["project"] == "重启风险上报项目"
+    assert result["action"] == "add_risk"
+    assert result["risk_level"] == "高"
+    assert result["registry_updated"] is False
+    assert result["state_updated"] is True
+    assert result["bitable_updated"] is False
+    assert result["doc_updated"] is True
+    assert projects[0]["title"] == "重启风险上报项目"
+    assert projects[0]["status"] == "有风险"
+    assert projects[0]["updates"][-1] == {"action": "风险", "value": "验收环境阻塞，高风险"}
+    append_doc.assert_called_once()
+    sent_text = send.call_args.args[1]
+    assert "风险 → 验收环境阻塞，高风险" in sent_text
+    assert "状态已切换为有风险" in sent_text
+    assert "本地状态已更新" in sent_text
+
+
 def test_update_project_preserves_state_initiator_after_restart(tmp_path):
     state_path = tmp_path / "pilotflow-projects.json"
     with _project_registry_lock:

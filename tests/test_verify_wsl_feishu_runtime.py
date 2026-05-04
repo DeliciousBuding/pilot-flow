@@ -311,6 +311,9 @@ def test_verify_runtime_risk_cycle_is_sanitized(tmp_path, monkeypatch):
     assert result["risk_bitable_synced"] is True
     assert result["risk_history_recorded"] is True
     assert result["risk_feedback_sent"] is True
+    assert result["risk_state_reported"] is True
+    assert result["risk_state_recorded"] is True
+    assert result["risk_state_feedback_sent"] is True
     assert result["risk_resolved"] is True
     assert result["risk_level_low"] is True
     assert result["risk_resolve_feedback_sent"] is True
@@ -773,6 +776,9 @@ def test_verifier_risk_cycle_mode_outputs_sanitized_runtime_result(tmp_path, cap
         "risk_bitable_synced": True,
         "risk_history_recorded": True,
         "risk_feedback_sent": True,
+        "risk_state_reported": True,
+        "risk_state_recorded": True,
+        "risk_state_feedback_sent": True,
         "risk_resolved": True,
         "risk_level_low": True,
         "risk_resolve_feedback_sent": True,
@@ -800,6 +806,9 @@ def test_verifier_risk_cycle_mode_outputs_sanitized_runtime_result(tmp_path, cap
     assert output["risk_bitable_synced"] is True
     assert output["risk_history_recorded"] is True
     assert output["risk_feedback_sent"] is True
+    assert output["risk_state_reported"] is True
+    assert output["risk_state_recorded"] is True
+    assert output["risk_state_feedback_sent"] is True
     assert output["risk_resolved"] is True
     assert output["risk_level_low"] is True
     assert output["risk_resolve_feedback_sent"] is True
