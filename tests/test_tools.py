@@ -4686,6 +4686,35 @@ def test_update_project_adds_progress_to_sanitized_state_after_restart(tmp_path)
     ]
 
 
+def test_update_project_preserves_state_initiator_after_restart(tmp_path):
+    state_path = tmp_path / "pilotflow-projects.json"
+    with _project_registry_lock:
+        _project_registry.clear()
+
+    with patch.dict(os.environ, {"PILOTFLOW_STATE_PATH": str(state_path)}):
+        assert _save_project_state(
+            "重启发起人留存项目",
+            "验证重启后更新不丢发起人",
+            [],
+            ["验收记录"],
+            "2026-05-20",
+            "进行中",
+            updates=[{"action": "进展", "value": "完成需求评审"}],
+            initiator="王小明",
+        )
+        result = json.loads(_handle_update_project(
+            {"project_name": "重启发起人留存", "action": "add_progress", "value": "完成原型评审"},
+            chat_id="oc_state_initiator_update",
+        ))
+        projects = _load_project_state()
+
+    assert result["status"] == "project_updated"
+    assert result["state_updated"] is True
+    assert projects[0]["title"] == "重启发起人留存项目"
+    assert projects[0]["initiator"] == "王小明"
+    assert projects[0]["updates"][-1] == {"action": "进展", "value": "完成原型评审"}
+
+
 def test_update_project_status_uses_sanitized_state_after_restart(tmp_path):
     state_path = tmp_path / "pilotflow-projects.json"
     with _project_registry_lock:

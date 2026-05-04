@@ -205,6 +205,7 @@ def _sanitize_result(result: dict[str, Any]) -> dict[str, Any]:
         "progress_doc_updated",
         "progress_history_recorded",
         "progress_state_recorded",
+        "progress_state_initiator_preserved",
         "progress_feedback_sent",
         "reminder_single_sent",
         "reminder_single_doc_updated",
@@ -1857,6 +1858,7 @@ def _verify_runtime_progress_update(hermes_dir: Path) -> dict[str, Any]:
         _project_registry,
         _project_registry_lock,
         _register_project,
+        _save_project_state,
     )
 
     chat_id = os.environ.get("PILOTFLOW_TEST_CHAT_ID", "")
@@ -1906,6 +1908,26 @@ def _verify_runtime_progress_update(hermes_dir: Path) -> dict[str, Any]:
                 },
                 chat_id=chat_id,
             ))
+            with _project_registry_lock:
+                _project_registry.clear()
+            _save_project_state(
+                "运行态重启发起人留存项目",
+                "验证安装后重启状态进展不丢发起人",
+                [],
+                ["初始验收"],
+                "2026-05-20",
+                "进行中",
+                updates=[{"action": "进展", "value": "完成需求评审"}],
+                initiator="王小明",
+            )
+            state_update_data = json.loads(_handle_update_project(
+                {
+                    "project_name": "运行态重启发起人留存",
+                    "action": "add_progress",
+                    "value": "完成原型评审",
+                },
+                chat_id=chat_id,
+            ))
             state_projects = _load_project_state()
         finally:
             runtime_tools._append_project_doc_update = original_append_doc
@@ -1919,10 +1941,12 @@ def _verify_runtime_progress_update(hermes_dir: Path) -> dict[str, Any]:
                 os.environ["PILOTFLOW_STATE_PATH"] = original_state_path
 
     state_updates = []
+    state_initiator = ""
     for item in state_projects:
         if item.get("title") == "运行态进展记录项目":
             state_updates = item.get("updates", [])
-            break
+        if item.get("title") == "运行态重启发起人留存项目":
+            state_initiator = item.get("initiator", "")
     feedback_text = "\n".join(sent_messages)
     return {
         "progress_update_applied": data.get("status") == "project_updated" and data.get("action") == "add_progress",
@@ -1932,6 +1956,11 @@ def _verify_runtime_progress_update(hermes_dir: Path) -> dict[str, Any]:
             item.get("action") == "进展" and item.get("value") == "完成原型评审，等待业务确认"
             for item in state_updates
             if isinstance(item, dict)
+        ),
+        "progress_state_initiator_preserved": (
+            state_update_data.get("status") == "project_updated"
+            and state_update_data.get("state_updated") is True
+            and state_initiator == "王小明"
         ),
         "progress_feedback_sent": (
             "进展 → 完成原型评审，等待业务确认" in feedback_text

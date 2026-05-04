@@ -4804,7 +4804,7 @@ def _record_action_outcome(
     state_updated = _save_project_state(
         project_title, project.get("goal", ""), project.get("members", []),
         project.get("deliverables", []), project.get("deadline", ""), project.get("status", "进行中"),
-        artifacts, updates=project.get("updates", []),
+        artifacts, updates=project.get("updates", []), initiator=project.get("initiator", ""),
     )
     trace_value = doc_value or public_value
     doc_updated = _append_project_doc_update(project_title, project, action_label, trace_value) if trace_value else False
@@ -5043,6 +5043,7 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
             "goal": state_project.get("goal", ""),
             "members": [],
             "deliverables": state_project.get("deliverables", []),
+            "initiator": state_project.get("initiator", ""),
             "deadline": state_project.get("deadline", ""),
             "status": state_project.get("status", "进行中"),
             "artifacts": _load_project_resource_refs(state_project.get("title", project_name)),
