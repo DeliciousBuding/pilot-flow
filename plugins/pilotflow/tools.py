@@ -1585,6 +1585,8 @@ def _build_plan_confirmation_card(
     history_suggested_fields: dict,
 ) -> tuple[dict, list[str]]:
     """Build the execution plan confirmation card and its action ids."""
+    title_text = str(plan.get("title") or "待确认").strip() or "待确认"
+    goal_text = str(plan.get("goal") or "待确认").strip() or "待确认"
     member_text = ", ".join(plan["members"]) if plan["members"] else "待确认"
     deliverable_text = ", ".join(plan["deliverables"]) if plan["deliverables"] else "待确认"
     deadline_text = plan["deadline"] or "待确认"
@@ -1636,6 +1638,8 @@ def _build_plan_confirmation_card(
             {
                 "tag": "markdown",
                 "content": (
+                    f"**项目：** {title_text}\n"
+                    f"**目标：** {goal_text}\n"
                     f"**成员：** {member_text}\n"
                     f"**交付物：** {deliverable_text}\n"
                     f"**截止时间：** {deadline_text}"

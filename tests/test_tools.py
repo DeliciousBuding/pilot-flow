@@ -211,6 +211,34 @@ def test_generate_plan_confirmation_card_displays_structured_risks(monkeypatch):
     assert "**风险：** API 审批可能卡住" in card_text
 
 
+def test_generate_plan_confirmation_card_displays_title_and_goal(monkeypatch):
+    sent_cards = []
+
+    def fake_send_card(chat_id, card):
+        sent_cards.append({"chat_id": chat_id, "card": card})
+        return "om_plan_title_goal"
+
+    monkeypatch.setattr("tools._hermes_send_card", fake_send_card)
+
+    result = json.loads(_handle_generate_plan(
+        {
+            "input_text": "帮我准备客户上线项目",
+            "title": "客户上线项目",
+            "goal": "完成客户上线",
+            "members": ["张三"],
+            "deliverables": ["整理上线清单"],
+            "deadline": "2026-05-08",
+        },
+        chat_id="oc_plan_card_title_goal",
+        chat_type="group",
+    ))
+
+    assert result["status"] == "plan_generated"
+    card_text = sent_cards[0]["card"]["elements"][0]["content"]
+    assert "**项目：** 客户上线项目" in card_text
+    assert "**目标：** 完成客户上线" in card_text
+
+
 def test_projectization_suggestion_button_preserves_risks_in_pending_plan(monkeypatch):
     sent_cards = []
 
