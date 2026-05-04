@@ -4896,6 +4896,40 @@ def test_project_entry_card_action_appends_completion_to_project_doc():
     assert "项目文档已更新" in send.call_args.args[1]
 
 
+def test_card_action_mark_done_uses_updated_state_project_in_doc_after_restart(tmp_path):
+    state_path = tmp_path / "pilotflow-projects.json"
+    with _project_registry_lock:
+        _project_registry.clear()
+    with patch.dict(os.environ, {"PILOTFLOW_STATE_PATH": str(state_path)}):
+        _save_project_state(
+            "重启完成留痕项目",
+            "验证重启后完成动作写入新状态",
+            [],
+            ["验收记录"],
+            "2026-05-20",
+            "进行中",
+            ["文档: https://example.invalid/docx/doc_done_restart"],
+        )
+        action_value = json.dumps({"pilotflow_action": "mark_project_done", "title": "重启完成留痕项目"}, ensure_ascii=False)
+
+        with (
+            patch("tools._append_project_doc_update", return_value=True) as append_doc,
+            patch("tools._hermes_send", return_value=True),
+        ):
+            result = json.loads(_handle_card_action({"action_value": action_value}, chat_id="oc_restart_done_doc"))
+        projects = _load_project_state()
+
+    assert result["status"] == "project_marked_done"
+    assert result["doc_updated"] is True
+    assert projects[0]["status"] == "已完成"
+    append_doc.assert_called_once()
+    restored_project = append_doc.call_args.args[1]
+    assert restored_project["status"] == "已完成"
+    assert "文档: https://example.invalid/docx/doc_done_restart" in restored_project["artifacts"]
+    serialized = state_path.read_text(encoding="utf-8")
+    assert "example.invalid" not in serialized
+
+
 def test_project_entry_card_action_appends_reopen_to_project_doc():
     with _project_registry_lock:
         _project_registry.clear()

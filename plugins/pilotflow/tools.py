@@ -3749,6 +3749,7 @@ def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
             })
 
         target_status = "已完成" if pilotflow_action == "mark_project_done" else "进行中"
+        project["status"] = target_status
         if project.get("app_token") and project.get("table_id") and project.get("record_id"):
             bitable_fields = {"状态": target_status}
             if pilotflow_action == "resolve_risk":
