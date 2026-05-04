@@ -82,6 +82,9 @@ def _sanitize_result(result: dict[str, Any]) -> dict[str, Any]:
         "mode",
         "status",
         "card_sent",
+        "card_has_title",
+        "card_has_goal",
+        "card_has_risk",
         "would_send_card",
         "has_chat_id",
         "has_feishu_credentials",
@@ -164,6 +167,7 @@ def _send_runtime_plan_card(hermes_dir: Path) -> dict[str, Any]:
         _check_plan_gate,
         _create_card_action_ref,
         _handle_generate_plan,
+        _hermes_send_card,
         _load_pending_plan,
         _pending_plans,
         _plan_lock,
@@ -172,22 +176,36 @@ def _send_runtime_plan_card(hermes_dir: Path) -> dict[str, Any]:
 
     chat_id = os.environ.get("PILOTFLOW_TEST_CHAT_ID", "")
     original_state_path = os.environ.get("PILOTFLOW_STATE_PATH")
+    sent_cards: list[dict] = []
+
+    def tracking_send_card(target_chat_id: str, card_json: dict) -> bool | str:
+        sent_cards.append(card_json)
+        return _hermes_send_card(target_chat_id, card_json)
+
     with tempfile.TemporaryDirectory(prefix="pilotflow-runtime-verify-") as tmpdir:
         os.environ["PILOTFLOW_STATE_PATH"] = str(Path(tmpdir) / "pilotflow_state.json")
         with _plan_lock:
             _pending_plans.clear()
             _card_action_refs.clear()
-        raw = _handle_generate_plan(
-            {
-                "input_text": "PilotFlow runtime verifier: send one confirmation card only",
-                "title": "确认幂等验证项目",
-                "goal": "验证真实 Feishu 卡片发送后返回 confirm token 和 idempotency key",
-                "members": [],
-                "deliverables": ["验证记录"],
-                "deadline": "2026-05-10",
-            },
-            chat_id=chat_id,
-        )
+        import plugins.pilotflow.tools as runtime_tools  # pylint: disable=import-error
+
+        original_send_card = runtime_tools._hermes_send_card
+        runtime_tools._hermes_send_card = tracking_send_card
+        try:
+            raw = _handle_generate_plan(
+                {
+                    "input_text": "PilotFlow runtime verifier: send one confirmation card only",
+                    "title": "确认幂等验证项目",
+                    "goal": "验证真实 Feishu 卡片发送后返回 confirm token 和 idempotency key",
+                    "members": [],
+                    "deliverables": ["验证记录"],
+                    "deadline": "2026-05-10",
+                    "risks": ["验证卡片必须展示风险"],
+                },
+                chat_id=chat_id,
+            )
+        finally:
+            runtime_tools._hermes_send_card = original_send_card
         data = json.loads(raw)
         with _plan_lock:
             action_refs = list(_card_action_refs.values())
@@ -206,9 +224,15 @@ def _send_runtime_plan_card(hermes_dir: Path) -> dict[str, Any]:
         os.environ.pop("PILOTFLOW_STATE_PATH", None)
     else:
         os.environ["PILOTFLOW_STATE_PATH"] = original_state_path
+    card_markdown = ""
+    if sent_cards:
+        card_markdown = str(((sent_cards[0].get("elements") or [{}])[0].get("content")) or "")
     return {
         "status": data.get("status"),
         "card_sent": _safe_bool(data.get("card_sent")),
+        "card_has_title": "确认幂等验证项目" in card_markdown,
+        "card_has_goal": "验证真实 Feishu 卡片发送后返回 confirm token 和 idempotency key" in card_markdown,
+        "card_has_risk": "验证卡片必须展示风险" in card_markdown,
         "has_confirm_token": _safe_bool((data.get("confirmation") or {}).get("confirm_token")),
         "has_idempotency_key": _safe_bool((data.get("confirmation") or {}).get("idempotency_key")),
         "trace_has_key": _safe_bool(((data.get("flight_record") or {}).get("confirmation") or {}).get("idempotency_key")),

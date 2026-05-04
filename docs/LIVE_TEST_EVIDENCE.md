@@ -57,6 +57,18 @@
 | 真实 Feishu 卡片验证 | WSL `verify_wsl_feishu_runtime.py --send-card` 成功：`card_sent=true`、`pending_plan_recovered=true`、`card_action_recovered=true`、`redaction_enabled=true` |
 | 隐私处理 | 验证只记录布尔结果和脱敏状态；不写入真实 chat_id、message_id、Feishu URL、confirm token、idempotency key、token 或 app secret |
 
+## 2026-05-04 WSL 卡片内容门禁
+
+| 项目 | 证据 |
+| --- | --- |
+| 功能硬化 | `verify_wsl_feishu_runtime.py --send-card` 不再只验证“卡片已发送”，还会捕获本次真实发送的计划确认卡并输出脱敏布尔断言：`card_has_title`、`card_has_goal`、`card_has_risk` |
+| 真实链路覆盖 | verifier 的测试计划卡显式包含标题、目标和风险；真实 WSL 发送后输出 `card_has_title=true`、`card_has_goal=true`、`card_has_risk=true`，证明前几轮确认卡可见性改动进入安装后的 Hermes runtime |
+| 隐私处理 | 新增输出仍只有布尔结果，不打印卡片正文、chat_id、message_id、confirm token、idempotency key、Feishu URL、token 或 app secret |
+| 自动化验证 | `C:\Users\Ding\miniforge3\python.exe -m pytest` 通过，结果 `210 passed`；`git diff --check` 通过，仅有 CRLF 提示 |
+| WSL 安装验证 | `setup.py --hermes-dir D:\Code\LarkProject\hermes-agent --hermes-home \\wsl.localhost\Ubuntu-24.04\home\ding\.hermes` 通过；插件和 skill 已同步到 WSL Hermes runtime profile |
+| WSL 模型预检 | WSL `verify_wsl_feishu_runtime.py --probe-llm` 输出脱敏通过：`llm_probe_ok=true`、`llm_probe_provider=vectorcontrol`、`llm_probe_status=200` |
+| 真实 Feishu 卡片验证 | WSL `verify_wsl_feishu_runtime.py --send-card` 成功：`card_sent=true`、`card_has_title=true`、`card_has_goal=true`、`card_has_risk=true`、`pending_plan_recovered=true`、`card_action_recovered=true`、`redaction_enabled=true` |
+
 ## 2026-05-04 卡片输入安全与 WSL 安装复验
 
 | 项目 | 证据 |

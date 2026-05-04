@@ -2,6 +2,9 @@
 
 import importlib.util
 import json
+import shutil
+import sys
+import types
 from pathlib import Path
 from unittest.mock import patch
 from urllib.error import HTTPError
@@ -11,6 +14,35 @@ _SCRIPT_PATH = Path(__file__).resolve().parents[1] / "scripts" / "verify_wsl_fei
 _SPEC = importlib.util.spec_from_file_location("verify_wsl_feishu_runtime", _SCRIPT_PATH)
 _MODULE = importlib.util.module_from_spec(_SPEC)
 _SPEC.loader.exec_module(_MODULE)
+
+
+def _install_runtime_fixture(tmp_path, monkeypatch):
+    hermes_dir = tmp_path / "hermes"
+    plugin_root = hermes_dir / "plugins" / "pilotflow"
+    plugin_root.parent.mkdir(parents=True)
+    shutil.copytree(Path(__file__).resolve().parents[1] / "plugins" / "pilotflow", plugin_root)
+    (hermes_dir / "plugins" / "__init__.py").write_text("", encoding="utf-8")
+    sent_cards = []
+
+    fake_registry_module = types.ModuleType("tools.registry")
+    fake_registry_module.registry = types.SimpleNamespace(dispatch=lambda name, args, **kwargs: json.dumps({"success": True}))
+    fake_registry_module.tool_error = lambda msg: json.dumps({"error": msg})
+    fake_registry_module.tool_result = lambda msg: msg if isinstance(msg, str) else json.dumps(msg)
+    monkeypatch.setitem(sys.modules, "tools.registry", fake_registry_module)
+    monkeypatch.setenv("PILOTFLOW_TEST_CHAT_ID", "oc_runtime_card")
+
+    for name in list(sys.modules):
+        if name == "plugins.pilotflow" or name.startswith("plugins.pilotflow."):
+            monkeypatch.delitem(sys.modules, name, raising=False)
+    sys.path.insert(0, str(hermes_dir))
+    import plugins.pilotflow.tools as runtime_tools
+
+    def fake_send_card(chat_id, card):
+        sent_cards.append({"chat_id": chat_id, "card": card})
+        return "om_runtime_card"
+
+    monkeypatch.setattr(runtime_tools, "_send_interactive_card_via_feishu", fake_send_card)
+    return hermes_dir, sent_cards
 
 
 def test_verifier_defaults_to_dry_run_and_does_not_send_card(tmp_path, capsys):
@@ -89,6 +121,19 @@ def test_verifier_send_card_mode_outputs_sanitized_runtime_result(tmp_path, caps
     assert output["pending_plan_recovered"] is True
     assert output["card_action_recovered"] is True
     assert "oc_real_chat_id" not in output_text
+
+
+def test_send_runtime_plan_card_verifies_visible_confirmation_content(tmp_path, monkeypatch):
+    hermes_dir, sent_cards = _install_runtime_fixture(tmp_path, monkeypatch)
+
+    result = _MODULE._send_runtime_plan_card(hermes_dir)
+
+    assert result["status"] == "plan_generated"
+    assert result["card_sent"] is True
+    assert result["card_has_title"] is True
+    assert result["card_has_goal"] is True
+    assert result["card_has_risk"] is True
+    assert sent_cards
 
 
 def test_verifier_probe_llm_outputs_sanitized_success(tmp_path, capsys):
