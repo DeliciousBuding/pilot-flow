@@ -2722,7 +2722,18 @@ def _display_query_text(query: str) -> str:
 def _project_member_names(project: dict) -> list[str]:
     detail = project.get("detail_project") or {}
     members = detail.get("members") or project.get("members") or []
-    return [str(member).strip() for member in members if str(member).strip()]
+    deliverables = list(detail.get("deliverables") or project.get("deliverables") or [])
+    assignees = _clean_deliverable_assignees(
+        detail.get("deliverable_assignees") or project.get("deliverable_assignees"),
+        deliverables,
+        list(members),
+    )
+    names: list[str] = []
+    for value in [*members, *assignees.values()]:
+        name = str(value).strip()
+        if name and name not in names:
+            names.append(name)
+    return names
 
 
 def _member_filters_from_query(query: str, projects: list[dict]) -> list[str]:
@@ -5164,8 +5175,13 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
                     if member_filters and not any(member in set(_project_member_names(item)) for member in member_filters):
                         continue
                     candidates.append((item["name"], item["detail_project"], "registry"))
-            if not candidates and not member_filters:
-                candidates = _load_state_project_candidates(batch_filter)
+            if not candidates:
+                state_candidates = _load_state_project_candidates(batch_filter)
+                candidates = [
+                    (title, info, source)
+                    for title, info, source in state_candidates
+                    if not member_filters or any(member in set(_project_member_names(info)) for member in member_filters)
+                ]
             sent_count = 0
             doc_count = 0
             bitable_count = 0

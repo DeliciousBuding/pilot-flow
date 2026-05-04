@@ -4723,6 +4723,61 @@ def test_update_project_batch_reminder_can_filter_overdue_by_owner():
     assert append_history.call_args.args[:4] == ("app_zhang", "tbl_zhang", "催办", "请今天同步进展")
 
 
+def test_update_project_batch_reminder_filters_state_projects_by_saved_assignee(tmp_path):
+    state_path = tmp_path / "pilotflow-projects.json"
+    with _project_registry_lock:
+        _project_registry.clear()
+    overdue = (dt.date.today() - dt.timedelta(days=1)).isoformat()
+    with patch.dict(os.environ, {"PILOTFLOW_STATE_PATH": str(state_path)}):
+        _save_project_state(
+            "重启李四逾期催办项目",
+            "验证重启后按保存负责人批量催办",
+            ["张三", "李四"],
+            ["验收记录", "接口联调"],
+            overdue,
+            "进行中",
+            ["文档: https://example.invalid/docx/doc_state_owner_li"],
+            deliverable_assignees={"验收记录": "李四", "接口联调": "张三"},
+        )
+        _save_project_state(
+            "重启王五逾期催办项目",
+            "验证重启后按保存负责人过滤",
+            ["王五"],
+            ["验收记录"],
+            overdue,
+            "进行中",
+            ["文档: https://example.invalid/docx/doc_state_owner_wang"],
+            deliverable_assignees={"验收记录": "王五"},
+        )
+        sent_messages = []
+        with (
+            patch("tools._hermes_send", side_effect=lambda chat_id, msg: sent_messages.append((chat_id, msg)) or True),
+            patch("tools._append_project_doc_update", return_value=True) as append_doc,
+            patch("tools._append_bitable_update_record", return_value=True) as append_history,
+        ):
+            result = json.loads(_handle_update_project(
+                {
+                    "project_name": "李四负责的逾期项目",
+                    "action": "send_reminder",
+                    "value": "请今天同步进展",
+                    "filter": "overdue",
+                    "member_filters": ["李四"],
+                },
+                chat_id="oc_state_owner_batch_reminder",
+            ))
+
+    assert result["status"] == "project_reminders_sent"
+    assert result["source"] == "state"
+    assert result["member_filters"] == ["李四"]
+    assert result["reminder_count"] == 1
+    assert result["projects"] == ["重启李四逾期催办项目"]
+    assert len(sent_messages) == 1
+    assert "分工：验收记录 → 李四；接口联调 → 张三" in sent_messages[0][1]
+    assert "重启王五逾期催办项目" not in sent_messages[0][1]
+    append_doc.assert_called_once()
+    append_history.assert_not_called()
+
+
 def test_update_project_send_reminder_does_not_infer_batch_filter_by_default():
     with _project_registry_lock:
         _project_registry.clear()

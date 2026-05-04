@@ -347,6 +347,7 @@ def test_verify_runtime_project_reminder_is_sanitized(tmp_path, monkeypatch):
     assert result["reminder_state_only_assignees_included"] is True
     assert result["reminder_batch_sent"] is True
     assert result["reminder_batch_filtered"] is True
+    assert result["reminder_batch_state_assignee_filtered"] is True
     assert result["reminder_batch_history_recorded"] is True
     assert result["reminder_feedback_sanitized"] is True
     assert "example.invalid" not in json.dumps(result, ensure_ascii=False)
@@ -851,6 +852,7 @@ def test_verifier_project_reminder_mode_outputs_sanitized_runtime_result(tmp_pat
         "reminder_state_only_assignees_included": True,
         "reminder_batch_sent": True,
         "reminder_batch_filtered": True,
+        "reminder_batch_state_assignee_filtered": True,
         "reminder_batch_history_recorded": True,
         "reminder_feedback_sanitized": True,
         "raw_chat_id": "oc_real_chat_id",
@@ -875,6 +877,7 @@ def test_verifier_project_reminder_mode_outputs_sanitized_runtime_result(tmp_pat
     assert output["reminder_state_only_assignees_included"] is True
     assert output["reminder_batch_sent"] is True
     assert output["reminder_batch_filtered"] is True
+    assert output["reminder_batch_state_assignee_filtered"] is True
     assert output["reminder_batch_history_recorded"] is True
     assert output["reminder_feedback_sanitized"] is True
     assert "oc_real_chat_id" not in output_text

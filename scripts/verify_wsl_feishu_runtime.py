@@ -238,6 +238,7 @@ def _sanitize_result(result: dict[str, Any]) -> dict[str, Any]:
         "reminder_state_only_assignees_included",
         "reminder_batch_sent",
         "reminder_batch_filtered",
+        "reminder_batch_state_assignee_filtered",
         "reminder_batch_history_recorded",
         "reminder_feedback_sanitized",
         "briefing_batch_reminder_sent",
@@ -1768,6 +1769,7 @@ def _verify_runtime_deadline_update(hermes_dir: Path) -> dict[str, Any]:
         _project_registry,
         _project_registry_lock,
         _register_project,
+        _save_project_state,
     )
 
     chat_id = os.environ.get("PILOTFLOW_TEST_CHAT_ID", "")
@@ -1840,6 +1842,7 @@ def _verify_runtime_member_permissions(hermes_dir: Path) -> dict[str, Any]:
         _project_registry,
         _project_registry_lock,
         _register_project,
+        _save_project_state,
     )
 
     chat_id = os.environ.get("PILOTFLOW_TEST_CHAT_ID", "")
@@ -2291,6 +2294,7 @@ def _verify_runtime_project_reminder(hermes_dir: Path) -> dict[str, Any]:
         _project_registry,
         _project_registry_lock,
         _register_project,
+        _save_project_state,
     )
 
     chat_id = os.environ.get("PILOTFLOW_TEST_CHAT_ID", "")
@@ -2379,6 +2383,39 @@ def _verify_runtime_project_reminder(hermes_dir: Path) -> dict[str, Any]:
                 chat_id=chat_id,
             ))
             state_projects = _load_project_state()
+            with _project_registry_lock:
+                _project_registry.clear()
+            os.environ["PILOTFLOW_STATE_PATH"] = str(Path(tmpdir) / "pilotflow_state_owner_filter.json")
+            _save_project_state(
+                "运行态重启李四逾期催办项目",
+                "验证安装后按保存负责人过滤",
+                ["张三", "李四"],
+                ["验收记录", "接口联调"],
+                overdue,
+                "进行中",
+                ["文档: https://example.invalid/doc/reminder-state-owner-li"],
+                deliverable_assignees={"验收记录": "李四", "接口联调": "张三"},
+            )
+            _save_project_state(
+                "运行态重启王五逾期催办项目",
+                "验证安装后按保存负责人排除",
+                ["王五"],
+                ["验收记录"],
+                overdue,
+                "进行中",
+                ["文档: https://example.invalid/doc/reminder-state-owner-wang"],
+                deliverable_assignees={"验收记录": "王五"},
+            )
+            state_owner_batch = json.loads(_handle_update_project(
+                {
+                    "project_name": "李四负责的逾期项目",
+                    "action": "send_reminder",
+                    "value": "请今天同步最新进展",
+                    "filter": "overdue",
+                    "member_filters": ["李四"],
+                },
+                chat_id=chat_id,
+            ))
         finally:
             runtime_tools._append_project_doc_update = original_append_doc
             runtime_tools._append_bitable_update_record = original_append_history
@@ -2429,6 +2466,12 @@ def _verify_runtime_project_reminder(hermes_dir: Path) -> dict[str, Any]:
         ),
         "reminder_batch_sent": batch.get("status") == "project_reminders_sent" and batch.get("reminder_count") == 1,
         "reminder_batch_filtered": batch.get("projects") == ["运行态批量逾期催办项目"],
+        "reminder_batch_state_assignee_filtered": state_owner_batch.get("status") == "project_reminders_sent"
+        and state_owner_batch.get("source") == "state"
+        and state_owner_batch.get("projects") == ["运行态重启李四逾期催办项目"]
+        and state_owner_batch.get("member_filters") == ["李四"]
+        and "运行态重启李四逾期催办项目" in feedback_text
+        and "运行态重启王五逾期催办项目" not in feedback_text,
         "reminder_batch_history_recorded": ("app_overdue", "tbl_overdue", "催办", "请今天同步最新进展") in history_labels,
         "reminder_feedback_sanitized": (
             "项目催办" in feedback_text

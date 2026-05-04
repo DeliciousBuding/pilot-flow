@@ -2,6 +2,20 @@
 
 > 本文件只记录可复验结论和脱敏摘要，不提交真实群 ID、用户 open_id、应用 secret、message_id 或飞书文档链接。
 
+## 2026-05-05 重启后按保存负责人批量催办
+
+| 项目 | 证据 |
+| --- | --- |
+| 功能修复 | 批量催办的负责人筛选现在会把 state-only 项目中已保存的 `deliverable_assignees` 纳入候选负责人；重启后用户仍可按“李四负责的逾期项目”筛出并催办匹配项目 |
+| 适用边界 | 不恢复或持久化成员名单；筛选只使用已脱敏保存的交付物负责人显示名。registry 项目仍按成员和分工负责人筛选，state fallback 只在 registry 无匹配时启用 |
+| 状态延续 | 命中的 state-only 项目继续发送群聊催办、写公开最近进展、追加项目文档；没有 app/table 元数据时不会写多维表格流水 |
+| 本地回归 | `C:\Users\Ding\miniforge3\python.exe -m pytest` 返回 `295 passed`；`tests/test_tools.py tests/test_verify_wsl_feishu_runtime.py` 返回 `261 passed`；`git diff --check` 通过，仅有 CRLF 提示 |
+| WSL 安装态 | `setup.py --hermes-dir D:\Code\LarkProject\hermes-agent --hermes-home \\wsl.localhost\Ubuntu-24.04\home\ding\.hermes` 通过；插件和 skill 已同步到 WSL Hermes runtime profile |
+| Verifier 新字段 | `--verify-project-reminder` 返回 `reminder_batch_state_assignee_filtered=true`，同时 `reminder_batch_sent=true`、`reminder_state_only_assignees_included=true`、`reminder_feedback_sanitized=true` |
+| 基线验证 | 同轮继续通过同一 Feishu venv 下 `--send-card` 的 `card_sent=true`、`card_has_title=true`、`card_has_goal=true`、`card_has_initiator=true`、`card_has_risk=true`，以及 `--probe-llm` 的 `llm_probe_ok=true`、`llm_probe_status=200` |
+| 用户价值 | Hermes gateway 重启后，按负责人查找和批量催办不会因为成员名单脱敏丢失而失效；群聊中的后续追踪更接近真实项目监督用法 |
+| 隐私处理 | 验证只记录布尔结果和脱敏状态；不写入真实 chat_id、open_id、message_id、Feishu URL、任务 URL、token 或 app secret |
+
 ## 2026-05-05 重启后普通进展更新保留分工
 
 | 项目 | 证据 |
