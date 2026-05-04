@@ -3516,12 +3516,26 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
         if len(deliverables) > max_tasks:
             logger.warning("deliverables capped: %d -> %d tasks created", len(deliverables), created_tasks)
 
-    # 4. Send entry card (via Hermes) — interactive card with clickable links
+    # 4. Calendar/reminder hooks (best effort) before card/state so visible links are complete.
+    cal_result = _create_calendar_event(title, goal, deadline, members, chat_id)
+    if cal_result:
+        artifacts.append(cal_result)
+    reminder_job = False
+    if deadline:
+        reminder_job = _schedule_deadline_reminder(title, deadline, chat_id)
+        if reminder_job:
+            artifacts.append("截止提醒已设置")
+
+    # 5. Send entry card (via Hermes) — interactive card with clickable links
     link_lines = []
     if doc_url:
         link_lines.append(f"📄 [项目文档]({doc_url})")
     if bitable_url:
         link_lines.append(f"📊 [状态表]({bitable_url})")
+    if cal_result:
+        link_lines.append(f"📅 {cal_result}")
+    if reminder_job:
+        link_lines.append("🔔 截止提醒已设置")
     link_lines.append(f"⏰ 截止: {deadline or '待确认'}")
     risk_text = ", ".join(risks[:3])
     risk_line = f"**风险：** {risk_text}\n" if risk_text else ""
@@ -3573,11 +3587,6 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
     if sent_entry_message_id:
         artifacts.append("项目入口卡片")
 
-    # 5. Calendar event (best effort)
-    cal_result = _create_calendar_event(title, goal, deadline, members, chat_id)
-    if cal_result:
-        artifacts.append(cal_result)
-
     if not artifacts:
         return tool_error("创建失败，请检查飞书应用凭证配置。")
 
@@ -3604,13 +3613,6 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
         record_id=bitable_meta.get("record_id", "") if bitable_meta else "",
         updates=initial_updates,
     )
-
-    # Schedule deadline reminder via Hermes cron (if deadline is set)
-    reminder_job = False
-    if deadline:
-        reminder_job = _schedule_deadline_reminder(title, deadline, chat_id)
-        if reminder_job:
-            artifacts.append("截止提醒已设置")
 
     # Clean up only text-confirmation pending state. Card confirmations carry
     # their own plan snapshot, so they must not delete a newer plan in the same chat.

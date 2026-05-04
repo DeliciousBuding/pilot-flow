@@ -1867,6 +1867,53 @@ def test_project_entry_card_uses_plain_member_names_for_visible_markdown():
     assert "<at user_id=" not in markdown
 
 
+def test_project_entry_card_includes_calendar_and_reminder_resources():
+    chat_id = "oc_entry_card_resources"
+    captured_cards = []
+
+    def fake_send_card(_chat_id, card):
+        captured_cards.append(card)
+        return "om_entry_resources"
+
+    with _project_registry_lock:
+        _project_registry.clear()
+    with _plan_lock:
+        _pending_plans.clear()
+        _card_action_refs.clear()
+
+    with (
+        patch("tools._consume_plan_gate", return_value=True),
+        patch("tools._create_doc", return_value="https://example.invalid/doc"),
+        patch("tools._create_bitable", return_value={
+            "url": "https://example.invalid/base",
+            "app_token": "app1",
+            "table_id": "tbl1",
+            "record_id": "rec1",
+        }),
+        patch("tools._create_task", return_value="任务已创建"),
+        patch("tools._hermes_send_card", side_effect=fake_send_card),
+        patch("tools._create_calendar_event", return_value="日历事件: 2026-05-20；已邀请 1 位成员"),
+        patch("tools._schedule_deadline_reminder", return_value=True),
+        patch("tools._save_to_hermes_memory", return_value=True),
+    ):
+        result = json.loads(_handle_create_project_space(
+            {
+                "confirmation_text": "确认执行",
+                "title": "入口卡片资源项目",
+                "goal": "验证入口卡片展示资源",
+                "members": ["张三"],
+                "deliverables": ["验收记录"],
+                "deadline": "2026-05-20",
+            },
+            chat_id=chat_id,
+        ))
+
+    assert result["status"] == "project_space_created"
+    markdown = captured_cards[0]["elements"][0]["content"]
+    assert "日历事件: 2026-05-20；已邀请 1 位成员" in markdown
+    assert "截止提醒已设置" in markdown
+
+
 def test_project_entry_card_displays_known_risks():
     chat_id = "oc_entry_card_risk"
     captured_cards = []

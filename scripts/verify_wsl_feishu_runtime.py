@@ -569,6 +569,9 @@ def _verify_runtime_project_creation(hermes_dir: Path) -> dict[str, Any]:
                 os.environ["PILOTFLOW_STATE_PATH"] = original_state_path
 
     flight_record_text = json.dumps(data.get("flight_record", {}), ensure_ascii=False)
+    entry_card_text = ""
+    if len(sent_cards) >= 2:
+        entry_card_text = str(((sent_cards[1].get("elements") or [{}])[0].get("content")) or "")
     return {
         "project_create_gate_created": plan.get("status") == "plan_generated"
         and bool((plan.get("confirmation") or {}).get("confirm_token")),
@@ -603,7 +606,12 @@ def _verify_runtime_project_creation(hermes_dir: Path) -> dict[str, Any]:
             "2026-05-20",
             chat_id,
         )],
-        "project_create_entry_card_sent": bool(sent_cards) and len(sent_cards) >= 2,
+        "project_create_entry_card_sent": (
+            bool(sent_cards)
+            and len(sent_cards) >= 2
+            and "日历事件: 2026-05-20" in entry_card_text
+            and "截止提醒已设置" in entry_card_text
+        ),
         "project_create_state_recorded": any(
             item.get("title") == "运行态项目创建闭环项目"
             and item.get("status") == "有风险"
