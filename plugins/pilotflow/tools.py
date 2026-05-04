@@ -16,6 +16,7 @@ import hashlib
 import threading
 import time
 import uuid
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -62,6 +63,8 @@ _MAX_EDITORS = 20
 _project_registry: Dict[str, dict] = {}  # title -> {members, deadline, status, created_at, artifacts}
 _project_registry_lock = threading.Lock()
 _PROJECT_REGISTRY_MAX = 50
+_STATE_SCHEMA_VERSION = 1
+_state_file_lock = threading.RLock()
 
 
 def _env_positive_int(name: str, default: int) -> int:
@@ -761,33 +764,90 @@ def _project_resource_refs_path() -> Path:
     return state_path.with_name("pilotflow_project_refs.json")
 
 
+@contextmanager
+def _state_payload_file_lock():
+    """Hold a small lock file so state updates are serialized across processes."""
+    path = _project_state_path()
+    lock_path = path.with_name(f"{path.name}.lock")
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    with lock_path.open("a+b") as lock_file:
+        locked = False
+        if os.name == "nt":
+            import msvcrt
+            try:
+                lock_file.seek(0)
+                msvcrt.locking(lock_file.fileno(), msvcrt.LK_LOCK, 1)
+                locked = True
+            except Exception as e:
+                logger.debug("state lock skipped: %s", e)
+            try:
+                yield
+            finally:
+                if locked:
+                    lock_file.seek(0)
+                    msvcrt.locking(lock_file.fileno(), msvcrt.LK_UNLCK, 1)
+            return
+        try:
+            import fcntl
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+            locked = True
+        except Exception as e:
+            logger.debug("state lock skipped: %s", e)
+        try:
+            yield
+        finally:
+            if locked:
+                fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+
+
 def _load_state_payload() -> dict:
     """Load the full PilotFlow state payload, preserving future top-level sections."""
     path = _project_state_path()
     try:
         if not path.exists():
-            return {}
+            return {"schema_version": _STATE_SCHEMA_VERSION}
         payload = json.loads(path.read_text(encoding="utf-8"))
     except Exception as e:
         logger.debug("project state payload load skipped: %s", e)
-        return {}
+        return {"schema_version": _STATE_SCHEMA_VERSION}
     if isinstance(payload, dict):
+        payload.setdefault("schema_version", _STATE_SCHEMA_VERSION)
         return payload
     if isinstance(payload, list):
-        return {"projects": payload}
-    return {}
+        return {"schema_version": _STATE_SCHEMA_VERSION, "projects": payload}
+    return {"schema_version": _STATE_SCHEMA_VERSION}
 
 
 def _write_state_payload(payload: dict) -> bool:
     """Write the full PilotFlow state payload."""
+    with _state_file_lock:
+        with _state_payload_file_lock():
+            return _write_state_payload_unlocked(payload)
+
+
+def _write_state_payload_unlocked(payload: dict) -> bool:
+    """Write the full PilotFlow state payload while the caller owns locking."""
     path = _project_state_path()
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
+        payload = dict(payload or {})
+        payload["schema_version"] = _STATE_SCHEMA_VERSION
         path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
         return True
     except Exception as e:
         logger.debug("project state payload save skipped: %s", e)
         return False
+
+
+def _update_state_payload(mutator) -> bool:
+    """Apply a read-modify-write state update under process and file locks."""
+    with _state_file_lock:
+        with _state_payload_file_lock():
+            payload = _load_state_payload()
+            updated = mutator(payload)
+            if updated is False:
+                return False
+            return _write_state_payload_unlocked(payload)
 
 
 def _persist_card_action_ref(action_id: str, ref: dict) -> None:
@@ -1025,7 +1085,6 @@ def _save_project_state(title: str, goal: str, members: list, deliverables: list
     if not title:
         return False
     try:
-        existing = _load_project_state()
         record = {
             "title": title,
             "goal": goal or "",
@@ -1035,13 +1094,21 @@ def _save_project_state(title: str, goal: str, members: list, deliverables: list
             "updates": _clean_recent_updates(updates),
             "updated_at": int(time.time()),
         }
-        by_title = {item.get("title"): item for item in existing if item.get("title")}
-        by_title[title] = record
-        records = sorted(by_title.values(), key=lambda item: item.get("updated_at", 0), reverse=True)[:_PROJECT_REGISTRY_MAX]
-        payload = _load_state_payload()
-        payload["projects"] = records
+
+        def mutate(payload: dict) -> bool:
+            items = payload.get("projects", [])
+            existing = []
+            for item in items if isinstance(items, list) else []:
+                if isinstance(item, dict) and item.get("title"):
+                    existing.append(item)
+            by_title = {item.get("title"): item for item in existing if item.get("title")}
+            by_title[title] = record
+            records = sorted(by_title.values(), key=lambda item: item.get("updated_at", 0), reverse=True)[:_PROJECT_REGISTRY_MAX]
+            payload["projects"] = records
+            return True
+
         _save_project_resource_refs(title, artifacts)
-        return _write_state_payload(payload)
+        return _update_state_payload(mutate)
     except Exception as e:
         logger.debug("project state save skipped: %s", e)
         return False

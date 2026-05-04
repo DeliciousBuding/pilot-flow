@@ -89,6 +89,17 @@
 | WSL runtime dry-run | `verify_wsl_feishu_runtime.py --env-file /home/ding/.hermes/.env --config-file /home/ding/.hermes/config.yaml` 输出脱敏通过：`config_model=mimo-v2.5-pro`、`config_provider=vectorcontrol`、`config_has_feishu_gateway=true` |
 | 真实 Feishu 卡片验证 | WSL `verify_wsl_feishu_runtime.py --send-card` 成功：`card_sent=true`、`pending_plan_recovered=true`、`card_action_recovered=true`、`redaction_enabled=true` |
 
+## 2026-05-04 状态文件 schema 与并发写入硬化
+
+| 项目 | 证据 |
+| --- | --- |
+| 功能硬化 | 主状态文件 `pilotflow_projects.json` 写入时固定带 `schema_version=1`；旧版 list payload 会在下一次保存时兼容读取并升级为 dict payload |
+| 并发硬化 | `_save_project_state` 改为进程内锁 + `.lock` 文件保护的 read-modify-write，避免多个卡片动作、多线程或多 worker 并发保存项目时互相覆盖公共状态列表 |
+| 自动化验证 | 新增旧格式升级和 20 线程并发保存回归测试；`C:\Users\Ding\miniforge3\python.exe -m pytest` 通过，结果 `197 passed` |
+| WSL 安装验证 | `setup.py --hermes-dir D:\Code\LarkProject\hermes-agent --hermes-home \\wsl.localhost\Ubuntu-24.04\home\ding\.hermes` 通过；插件文件已同步到 WSL Hermes runtime |
+| WSL runtime dry-run | `verify_wsl_feishu_runtime.py --env-file /home/ding/.hermes/.env --config-file /home/ding/.hermes/config.yaml` 输出脱敏通过：`config_model=mimo-v2.5-pro`、`config_provider=vectorcontrol`、`config_has_feishu_gateway=true` |
+| 真实 Feishu 卡片验证 | WSL `verify_wsl_feishu_runtime.py --send-card` 成功：`card_sent=true`、`pending_plan_recovered=true`、`card_action_recovered=true`、`redaction_enabled=true` |
+
 ## 2026-05-03 状态看板场景
 
 | 项目 | 证据 |

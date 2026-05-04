@@ -678,6 +678,62 @@ def test_project_state_roundtrip_is_sanitized_and_portable(tmp_path):
     assert "secret_like" not in serialized
 
 
+def test_project_state_upgrades_legacy_list_payload_with_schema_version(tmp_path):
+    state_path = tmp_path / "pilotflow-projects.json"
+    state_path.write_text(json.dumps([
+        {
+            "title": "旧格式项目",
+            "goal": "验证旧格式兼容",
+            "deliverables": ["旧格式记录"],
+            "deadline": "2026-05-20",
+            "status": "进行中",
+        }
+    ], ensure_ascii=False), encoding="utf-8")
+
+    with patch.dict(os.environ, {"PILOTFLOW_STATE_PATH": str(state_path)}):
+        ok = _save_project_state(
+            "新格式项目",
+            "验证 schema 升级",
+            [],
+            ["升级记录"],
+            "2026-05-21",
+            "进行中",
+        )
+        projects = _load_project_state()
+
+    assert ok is True
+    assert {project["title"] for project in projects} == {"旧格式项目", "新格式项目"}
+    payload = json.loads(state_path.read_text(encoding="utf-8"))
+    assert payload["schema_version"] == 1
+    assert isinstance(payload["projects"], list)
+
+
+def test_project_state_concurrent_saves_do_not_lose_updates(tmp_path):
+    state_path = tmp_path / "pilotflow-projects.json"
+
+    def save_one(index: int) -> None:
+        with patch.dict(os.environ, {"PILOTFLOW_STATE_PATH": str(state_path)}):
+            assert _save_project_state(
+                f"并发项目{index}",
+                "验证并发保存",
+                [],
+                [f"记录{index}"],
+                "2026-05-20",
+                "进行中",
+            )
+
+    threads = [threading.Thread(target=save_one, args=(index,)) for index in range(20)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    with patch.dict(os.environ, {"PILOTFLOW_STATE_PATH": str(state_path)}):
+        projects = _load_project_state()
+
+    assert {project["title"] for project in projects} == {f"并发项目{index}" for index in range(20)}
+
+
 def test_project_state_roundtrip_keeps_sanitized_recent_updates(tmp_path):
     state_path = tmp_path / "pilotflow-projects.json"
 
