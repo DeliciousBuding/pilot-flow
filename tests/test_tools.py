@@ -850,6 +850,64 @@ def test_generate_plan_fills_missing_fields_from_raw_text_when_explicitly_allowe
     assert "**截止时间：** 2026-05-10" in card_text
 
 
+def test_generate_plan_does_not_infer_template_by_default():
+    captured_cards = []
+
+    def fake_send(chat_id, card):
+        captured_cards.append(card)
+        return "om_no_template"
+
+    with patch("tools._hermes_send_card", side_effect=fake_send):
+        result = json.loads(_handle_generate_plan(
+            {
+                "input_text": "帮我准备答辩项目",
+                "title": "答辩项目",
+                "goal": "准备答辩",
+                "members": [],
+                "deliverables": [],
+                "deadline": "",
+            },
+            chat_id="oc_no_template_infer",
+        ))
+
+    assert result["status"] == "plan_generated"
+    assert result["template"] is None
+    assert result["plan"]["deliverables"] == []
+    assert result["plan"]["deadline"] == ""
+    card_text = captured_cards[0]["elements"][0]["content"]
+    assert "PPT" not in card_text
+    assert "建议截止时间" not in card_text
+
+
+def test_generate_plan_accepts_explicit_template_key():
+    captured_cards = []
+
+    def fake_send(chat_id, card):
+        captured_cards.append(card)
+        return "om_explicit_template"
+
+    with patch("tools._hermes_send_card", side_effect=fake_send):
+        result = json.loads(_handle_generate_plan(
+            {
+                "input_text": "帮我准备答辩项目",
+                "title": "答辩项目",
+                "goal": "准备答辩",
+                "members": [],
+                "deliverables": [],
+                "deadline": "",
+                "template": "答辩",
+            },
+            chat_id="oc_explicit_template",
+        ))
+
+    assert result["status"] == "plan_generated"
+    assert result["template"] is not None
+    assert "答辩" in result["template"]
+    assert "PPT" in result["plan"]["deliverables"]
+    assert result["plan"]["deadline"]
+    assert captured_cards
+
+
 def test_generate_plan_requires_structured_fields_by_default():
     with patch("tools._hermes_send_card") as send_card:
         result = json.loads(_handle_generate_plan(
@@ -1757,6 +1815,7 @@ def test_generate_plan_uses_memory_history_when_fields_missing():
                 "members": [],
                 "deliverables": [],
                 "deadline": "",
+                "template": "活动",
             },
             chat_id="oc_history_memory",
         ))

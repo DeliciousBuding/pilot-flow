@@ -77,6 +77,18 @@
 | WSL runtime dry-run | `verify_wsl_feishu_runtime.py --env-file /home/ding/.hermes/.env --config-file /home/ding/.hermes/config.yaml` 输出脱敏通过：`config_model=mimo-v2.5-pro`、`config_provider=vectorcontrol`、`config_has_feishu_gateway=true` |
 | 真实 Feishu 卡片验证 | WSL `verify_wsl_feishu_runtime.py --send-card` 成功：`card_sent=true`、`pending_plan_recovered=true`、`card_action_recovered=true`、`redaction_enabled=true` |
 
+## 2026-05-04 Agent 主驾驶边界：项目模板显式字段门控
+
+| 项目 | 证据 |
+| --- | --- |
+| 功能硬化 | `pilotflow_generate_plan` 默认不再从 `input_text` 中的“答辩/sprint/活动/上线”等关键词自动套模板；Agent 必须显式传入 `template` 才会补全模板交付物和建议截止时间 |
+| 兼容路径 | 旧 `_detect_template` 仅在 `allow_inferred_template=true` 时启用，作为显式兼容通道，不再是默认语义来源 |
+| 真实路径兼容 | 显式 `template="答辩"` 仍会补全答辩模板；未传 `template` 时即使原文含“答辩”也不会静默补 `PPT` 或模板截止时间 |
+| 自动化验证 | `C:\Users\Ding\miniforge3\python.exe -m pytest` 通过，结果 `195 passed` |
+| WSL 安装验证 | `setup.py --hermes-dir D:\Code\LarkProject\hermes-agent --hermes-home \\wsl.localhost\Ubuntu-24.04\home\ding\.hermes` 通过；插件文件已同步到 WSL Hermes runtime |
+| WSL runtime dry-run | `verify_wsl_feishu_runtime.py --env-file /home/ding/.hermes/.env --config-file /home/ding/.hermes/config.yaml` 输出脱敏通过：`config_model=mimo-v2.5-pro`、`config_provider=vectorcontrol`、`config_has_feishu_gateway=true` |
+| 真实 Feishu 卡片验证 | WSL `verify_wsl_feishu_runtime.py --send-card` 成功：`card_sent=true`、`pending_plan_recovered=true`、`card_action_recovered=true`、`redaction_enabled=true` |
+
 ## 2026-05-03 状态看板场景
 
 | 项目 | 证据 |

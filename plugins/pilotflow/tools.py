@@ -2873,13 +2873,13 @@ PILOTFLOW_GENERATE_PLAN_SCHEMA = {
         "不要让本工具做意图识别；你需要先理解用户目的并传入结构化字段。\n\n"
         "此工具会：\n"
         "1. 设置确认门控（允许后续调用 pilotflow_create_project_space）\n"
-        "2. 检测项目模板（答辩/sprint/活动/上线）并提供建议\n"
+        "2. 在 Agent 显式传入 template 时应用项目模板（答辩/sprint/活动/上线）并提供建议\n"
         "3. 自动发送确认卡片到群聊，包含计划摘要和确认/取消按钮\n"
         "4. 把你提取的字段存入 pending plan，用户点击确认按钮即可一键创建（无需重新提取）\n\n"
         "调用时你必须从用户消息中提取并传入：title、goal、members、deliverables、deadline。\n"
         "成员只能来自用户明确提到的真实姓名、@提及或飞书可解析上下文；不确定就传空数组，禁止编造成员A/示例成员。\n"
         "提取不全也要传，能提多少传多少，剩余字段留空字符串或空数组。\n"
-        "模板会补全缺失的 deliverables 和 deadline 默认值。\n\n"
+        "如果 Agent 判断适合套用模板，必须显式传入 template；工具默认不再从 input_text 推断模板。\n\n"
         "调用后，你必须：\n"
         "- 简短回复「已生成计划，请在卡片上确认」（卡片已自动发送）\n"
         "- 等用户确认（点击按钮 / 回复「确认」「可以」「好的」「行」「ok」）\n"
@@ -2898,6 +2898,15 @@ PILOTFLOW_GENERATE_PLAN_SCHEMA = {
             "allow_inferred_fields": {
                 "type": "boolean",
                 "description": "仅当 Agent 明确决定允许工具使用旧版文本兜底解析时传 true；默认 false。",
+            },
+            "template": {
+                "type": "string",
+                "enum": ["", "答辩", "sprint", "活动", "上线"],
+                "description": "Agent 显式选择的项目模板；空字符串表示不套模板。",
+            },
+            "allow_inferred_template": {
+                "type": "boolean",
+                "description": "兼容旧链路时才设为 true，允许工具从 input_text 推断模板；默认 false。",
             },
             "members": {
                 "type": "array",
@@ -2949,6 +2958,14 @@ def _detect_template(text: str) -> Optional[dict]:
     return None
 
 
+def _template_from_key(template_key: str) -> Optional[dict]:
+    """Resolve an Agent-selected template key without parsing user text."""
+    key = str(template_key or "").strip()
+    if not key:
+        return None
+    return _TEMPLATES.get(key)
+
+
 def _handle_generate_plan(params: Dict[str, Any], **kwargs) -> str:
     """Parse user input and return a structured project plan with pre-populated scaffold."""
     chat_id = _get_chat_id(kwargs)
@@ -2957,8 +2974,11 @@ def _handle_generate_plan(params: Dict[str, Any], **kwargs) -> str:
         _set_plan_gate(chat_id)
 
     text = params.get("input_text", "")
-    template = _detect_template(text)
     allow_inferred_fields = bool(params.get("allow_inferred_fields"))
+    allow_inferred_template = bool(params.get("allow_inferred_template"))
+    template = _template_from_key(params.get("template", ""))
+    if template is None and allow_inferred_template:
+        template = _detect_template(text)
     inline_fields = _extract_inline_project_fields(text) if allow_inferred_fields else {}
     session_chat_name = _get_session_value("HERMES_SESSION_CHAT_NAME", "")
     session_user_name = _get_session_value("HERMES_SESSION_USER_NAME", "")

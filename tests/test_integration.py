@@ -94,7 +94,7 @@ def test_full_flow_create_project():
     with patch("tools._send_interactive_card_via_feishu", side_effect=_fake_send_card):
         # Step 1: User @PilotFlow with a project request
         result1 = _handle_generate_plan(
-            {"input_text": "帮我准备答辩项目空间，成员示例成员A，交付物是项目简报和任务清单，5月7日截止", "title": "答辩项目", "goal": "准备答辩", "members": ["示例成员A"], "deliverables": ["项目简报", "任务清单"], "deadline": "2026-05-07"},
+            {"input_text": "帮我准备答辩项目空间，成员示例成员A，交付物是项目简报和任务清单，5月7日截止", "title": "答辩项目", "goal": "准备答辩", "members": ["示例成员A"], "deliverables": ["项目简报", "任务清单"], "deadline": "2026-05-07", "template": "答辩"},
             chat_id=chat_id,
         )
     plan = json.loads(result1)
