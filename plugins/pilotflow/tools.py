@@ -4311,7 +4311,7 @@ def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
         sources = set()
         for project_name, project, source in candidate_projects:
             members = list(project.get("members", []))
-            assignee = members[0] if members else ""
+            assignee = _followup_assignee_from_project(project)
             task_name = _create_task(
                 f"{project_name}跟进",
                 f"项目: {project_name}",

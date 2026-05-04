@@ -267,6 +267,7 @@ def _sanitize_result(result: dict[str, Any]) -> dict[str, Any]:
         "batch_followup_doc_recorded",
         "batch_followup_history_recorded",
         "batch_followup_state_recorded",
+        "batch_followup_state_assignee_used",
         "batch_followup_feedback_sent",
         "batch_followup_used_opaque_ref",
         "dashboard_filter_sent",
@@ -2161,7 +2162,6 @@ def _verify_runtime_progress_update(hermes_dir: Path) -> dict[str, Any]:
         _project_registry,
         _project_registry_lock,
         _register_project,
-        _save_project_state,
     )
 
     chat_id = os.environ.get("PILOTFLOW_TEST_CHAT_ID", "")
@@ -2447,6 +2447,7 @@ def _verify_runtime_briefing_batch_reminder(hermes_dir: Path) -> dict[str, Any]:
         _project_registry,
         _project_registry_lock,
         _register_project,
+        _save_project_state,
     )
 
     chat_id = os.environ.get("PILOTFLOW_TEST_CHAT_ID", "")
@@ -2826,6 +2827,7 @@ def _verify_runtime_batch_followup_task(hermes_dir: Path) -> dict[str, Any]:
         _project_registry,
         _project_registry_lock,
         _register_project,
+        _save_project_state,
     )
 
     chat_id = os.environ.get("PILOTFLOW_TEST_CHAT_ID", "")
@@ -2903,6 +2905,24 @@ def _verify_runtime_batch_followup_task(hermes_dir: Path) -> dict[str, Any]:
                 chat_id=chat_id,
             ))
             state_projects = _load_project_state()
+            with _project_registry_lock:
+                _project_registry.clear()
+            os.environ["PILOTFLOW_STATE_PATH"] = str(Path(tmpdir) / "pilotflow_state_assignee.json")
+            _save_project_state(
+                "运行态重启批量分工项目",
+                "验证安装后重启批量跟进待办负责人",
+                ["张三", "李四"],
+                ["验收记录", "接口联调"],
+                overdue,
+                "进行中",
+                ["文档: https://example.invalid/doc/batch-followup-state"],
+                deliverable_assignees={"验收记录": "李四", "接口联调": "张三"},
+            )
+            state_action_id = _create_card_action_ref(chat_id, "briefing_batch_followup_task", {"filter": "overdue"})
+            state_data = json.loads(_handle_card_action(
+                {"action_value": json.dumps({"pilotflow_action_id": state_action_id}, ensure_ascii=False)},
+                chat_id=chat_id,
+            ))
         finally:
             runtime_tools._create_task = original_create_task
             runtime_tools._append_project_doc_update = original_append_doc
@@ -2923,18 +2943,19 @@ def _verify_runtime_batch_followup_task(hermes_dir: Path) -> dict[str, Any]:
     feedback_text = "\n".join(sent_messages)
     task_title = "运行态批量待办逾期项目跟进"
     task_name = f"{task_title}: https://example.invalid/task/batch-followup"
+    state_task_title = "运行态重启批量分工项目跟进"
     return {
         "batch_followup_created": data.get("status") == "briefing_batch_followup_task_created"
         and data.get("project_count") == 1,
         "batch_followup_filtered": data.get("projects") == ["运行态批量待办逾期项目"],
-        "batch_followup_task_created": created_tasks == [(
+        "batch_followup_task_created": (
             task_title,
             "项目: 运行态批量待办逾期项目",
             "张三",
             overdue,
             chat_id,
             ["张三"],
-        )],
+        ) in created_tasks,
         "batch_followup_doc_recorded": ("运行态批量待办逾期项目", "任务", task_name) in doc_labels,
         "batch_followup_history_recorded": (
             "app_batch_followup", "tbl_batch_followup", "任务", task_name
@@ -2944,6 +2965,16 @@ def _verify_runtime_batch_followup_task(hermes_dir: Path) -> dict[str, Any]:
             for item in state_updates
             if isinstance(item, dict)
         ),
+        "batch_followup_state_assignee_used": state_data.get("status") == "briefing_batch_followup_task_created"
+        and state_data.get("project_count") == 1
+        and (
+            state_task_title,
+            "项目: 运行态重启批量分工项目",
+            "李四",
+            overdue,
+            chat_id,
+            [],
+        ) in created_tasks,
         "batch_followup_feedback_sent": (
             "已为 1 个逾期项目创建跟进待办" in feedback_text
             and "运行态批量待办逾期项目" in feedback_text

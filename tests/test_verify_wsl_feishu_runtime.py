@@ -472,6 +472,7 @@ def test_verify_runtime_batch_followup_task_is_sanitized(tmp_path, monkeypatch):
     assert result["batch_followup_doc_recorded"] is True
     assert result["batch_followup_history_recorded"] is True
     assert result["batch_followup_state_recorded"] is True
+    assert result["batch_followup_state_assignee_used"] is True
     assert result["batch_followup_feedback_sent"] is True
     assert result["batch_followup_used_opaque_ref"] is True
     assert "example.invalid" not in json.dumps(result, ensure_ascii=False)
@@ -1161,6 +1162,7 @@ def test_verifier_batch_followup_task_mode_outputs_sanitized_runtime_result(tmp_
         "batch_followup_doc_recorded": True,
         "batch_followup_history_recorded": True,
         "batch_followup_state_recorded": True,
+        "batch_followup_state_assignee_used": True,
         "batch_followup_feedback_sent": True,
         "batch_followup_used_opaque_ref": True,
         "raw_chat_id": "oc_real_chat_id",
@@ -1183,6 +1185,7 @@ def test_verifier_batch_followup_task_mode_outputs_sanitized_runtime_result(tmp_
     assert output["batch_followup_doc_recorded"] is True
     assert output["batch_followup_history_recorded"] is True
     assert output["batch_followup_state_recorded"] is True
+    assert output["batch_followup_state_assignee_used"] is True
     assert output["batch_followup_feedback_sent"] is True
     assert output["batch_followup_used_opaque_ref"] is True
     assert "oc_real_chat_id" not in output_text

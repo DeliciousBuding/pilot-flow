@@ -3597,6 +3597,50 @@ def test_briefing_batch_followup_uses_state_projects_after_restart(tmp_path):
     assert "example.invalid" not in serialized
 
 
+def test_briefing_batch_followup_uses_state_deliverable_assignee_after_restart(tmp_path):
+    state_path = tmp_path / "pilotflow-projects.json"
+    with _project_registry_lock:
+        _project_registry.clear()
+    overdue = (dt.date.today() - dt.timedelta(days=1)).isoformat()
+    with patch.dict(os.environ, {"PILOTFLOW_STATE_PATH": str(state_path)}):
+        _save_project_state(
+            "重启分工批量待办项目",
+            "验证重启后批量待办负责人",
+            ["张三", "李四"],
+            ["验收记录", "接口联调"],
+            overdue,
+            "进行中",
+            ["文档: https://example.invalid/docx/doc_batch_assignee"],
+            deliverable_assignees={"验收记录": "李四", "接口联调": "张三"},
+        )
+        with (
+            patch("tools._create_task", return_value="重启分工批量待办项目跟进: https://example.invalid/task/task_assignee") as create_task,
+            patch("tools._hermes_send", return_value=True),
+            patch("tools._append_project_doc_update", return_value=True),
+            patch("tools._append_bitable_update_record", return_value=True),
+        ):
+            action_value = _opaque_card_action_value(
+                "oc_restart_batch_assignee",
+                "briefing_batch_followup_task",
+                {"filter": "overdue"},
+            )
+            result = json.loads(_handle_card_action(
+                {"action_value": action_value},
+                chat_id="oc_restart_batch_assignee",
+            ))
+
+    assert result["status"] == "briefing_batch_followup_task_created"
+    assert result["source"] == "state"
+    create_task.assert_called_once_with(
+        "重启分工批量待办项目跟进",
+        "项目: 重启分工批量待办项目",
+        "李四",
+        overdue,
+        "oc_restart_batch_assignee",
+        [],
+    )
+
+
 def test_standup_briefing_risk_button_can_create_batch_followup_tasks():
     with _project_registry_lock:
         _project_registry.clear()
