@@ -1746,6 +1746,11 @@ def _build_projectization_suggestion_card(
         suggested_project.get("risks") or signals.get("risks"),
         limit=10,
     )
+    deliverable_assignees = _clean_deliverable_assignees(
+        suggested_project.get("deliverable_assignees"),
+        deliverables,
+        members,
+    )
     action_id = _create_card_action_ref(
         chat_id,
         "suggest_project_from_signals",
@@ -1755,6 +1760,7 @@ def _build_projectization_suggestion_card(
             "goal": goal,
             "members": members,
             "deliverables": deliverables,
+            "deliverable_assignees": deliverable_assignees,
             "deadline": deadline,
             "risks": risks,
             "signals": signals,
@@ -3032,6 +3038,11 @@ PILOTFLOW_SCAN_CHAT_SIGNALS_SCHEMA = {
                     "goal": {"type": "string"},
                     "members": {"type": "array", "items": {"type": "string"}},
                     "deliverables": {"type": "array", "items": {"type": "string"}},
+                    "deliverable_assignees": {
+                        "type": "object",
+                        "additionalProperties": {"type": "string"},
+                        "description": "可选。交付物标题到负责人显示名的映射；key 必须完全匹配 deliverables，value 必须是 members 中已有成员的显示名或飞书 @ 提及。不要传 open_id、chat_id、message_id。",
+                    },
                     "deadline": {"type": "string"},
                 },
             },

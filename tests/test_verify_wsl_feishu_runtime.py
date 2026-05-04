@@ -347,6 +347,9 @@ def test_verify_runtime_projectization_suggestion_is_sanitized(tmp_path, monkeyp
     assert result["projectization_plan_card_sent"] is True
     assert result["projectization_risks_preserved"] is True
     assert result["projectization_action_items_preserved"] is True
+    assert result["projectization_assignees_preserved"] is True
+    assert result["projectization_assignees_card_shown"] is True
+    assert result["projectization_schema_assignees_exposed"] is True
     assert result["projectization_pending_recovered"] is True
     assert result["projectization_cards_sent"] is True
     assert "example.invalid" not in json.dumps(result, ensure_ascii=False)
@@ -847,6 +850,9 @@ def test_verifier_projectization_suggestion_mode_outputs_sanitized_runtime_resul
         "projectization_plan_card_sent": True,
         "projectization_risks_preserved": True,
         "projectization_action_items_preserved": True,
+        "projectization_assignees_preserved": True,
+        "projectization_assignees_card_shown": True,
+        "projectization_schema_assignees_exposed": True,
         "projectization_pending_recovered": True,
         "projectization_cards_sent": True,
         "raw_chat_id": "oc_real_chat_id",
@@ -869,6 +875,9 @@ def test_verifier_projectization_suggestion_mode_outputs_sanitized_runtime_resul
     assert output["projectization_plan_card_sent"] is True
     assert output["projectization_risks_preserved"] is True
     assert output["projectization_action_items_preserved"] is True
+    assert output["projectization_assignees_preserved"] is True
+    assert output["projectization_assignees_card_shown"] is True
+    assert output["projectization_schema_assignees_exposed"] is True
     assert output["projectization_pending_recovered"] is True
     assert output["projectization_cards_sent"] is True
     assert "oc_real_chat_id" not in output_text

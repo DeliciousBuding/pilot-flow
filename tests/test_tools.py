@@ -367,6 +367,59 @@ def test_projectization_suggestion_button_preserves_risks_in_pending_plan(monkey
     assert _pending_plans["oc_signal_risks"]["plan"]["risks"] == ["API 审批可能卡住"]
 
 
+def test_projectization_suggestion_button_preserves_deliverable_assignees(monkeypatch):
+    sent_cards = []
+
+    def fake_send_card(chat_id, card):
+        sent_cards.append({"chat_id": chat_id, "card": card})
+        return f"om_signal_assignee_{len(sent_cards)}"
+
+    monkeypatch.setattr("tools._hermes_send_card", fake_send_card)
+
+    _handle_scan_chat_signals({
+        "source_text": "目标是完成客户上线，李四整理上线清单，张三同步审批进度。",
+        "signals": {
+            "goals": ["完成客户上线"],
+            "commitments": ["李四整理上线清单", "张三同步审批进度"],
+            "risks": ["API 审批可能卡住"],
+            "action_items": ["整理上线清单", "同步审批进度"],
+            "deadlines": ["2026-05-20"],
+        },
+        "suggested_project": {
+            "title": "客户上线项目",
+            "goal": "完成客户上线",
+            "members": ["张三", "李四"],
+            "deliverables": ["整理上线清单", "同步审批进度"],
+            "deliverable_assignees": {
+                "整理上线清单": "李四",
+                "同步审批进度": "张三",
+            },
+            "deadline": "2026-05-20",
+            "risks": ["API 审批可能卡住"],
+        },
+        "should_suggest_project": True,
+    }, chat_id="oc_signal_assignees", chat_type="group")
+
+    action_id = sent_cards[0]["card"]["elements"][1]["actions"][0]["value"]["pilotflow_action_id"]
+    result = json.loads(_handle_card_action(
+        {"action_value": json.dumps({"pilotflow_action_id": action_id}, ensure_ascii=False)},
+        chat_id="oc_signal_assignees",
+        chat_type="group",
+    ))
+
+    assert result["status"] == "plan_generated"
+    assert result["plan"]["deliverable_assignees"] == {
+        "整理上线清单": "李四",
+        "同步审批进度": "张三",
+    }
+    assert _pending_plans["oc_signal_assignees"]["plan"]["deliverable_assignees"] == {
+        "整理上线清单": "李四",
+        "同步审批进度": "张三",
+    }
+    card_text = sent_cards[1]["card"]["elements"][0]["content"]
+    assert "**负责人：** 整理上线清单 → 李四；同步审批进度 → 张三" in card_text
+
+
 def test_scan_chat_signals_does_not_infer_semantics_from_source_text(monkeypatch):
     monkeypatch.setattr("tools._hermes_send_card", lambda chat_id, card: "om_signal_card")
 

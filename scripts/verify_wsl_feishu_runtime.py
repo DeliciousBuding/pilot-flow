@@ -137,6 +137,9 @@ def _sanitize_result(result: dict[str, Any]) -> dict[str, Any]:
         "projectization_plan_card_sent",
         "projectization_risks_preserved",
         "projectization_action_items_preserved",
+        "projectization_assignees_preserved",
+        "projectization_assignees_card_shown",
+        "projectization_schema_assignees_exposed",
         "projectization_pending_recovered",
         "projectization_cards_sent",
         "project_create_gate_created",
@@ -549,6 +552,7 @@ def _verify_runtime_projectization_suggestion(hermes_dir: Path) -> dict[str, Any
         _load_pending_plan,
         _pending_plans,
         _plan_lock,
+        PILOTFLOW_SCAN_CHAT_SIGNALS_SCHEMA,
     )
 
     chat_id = os.environ.get("PILOTFLOW_TEST_CHAT_ID", "")
@@ -580,8 +584,9 @@ def _verify_runtime_projectization_suggestion(hermes_dir: Path) -> dict[str, Any
                     "suggested_project": {
                         "title": "运行态项目化建议项目",
                         "goal": "本周完成客户上线",
-                        "members": ["张三"],
+                        "members": ["张三", "李四"],
                         "deliverables": ["整理上线清单", "同步审批进度"],
+                        "deliverable_assignees": {"整理上线清单": "李四", "同步审批进度": "张三"},
                         "deadline": "2026-05-20",
                         "risks": ["API 审批可能卡住"],
                     },
@@ -619,6 +624,10 @@ def _verify_runtime_projectization_suggestion(hermes_dir: Path) -> dict[str, Any
     recovered_plan = recovered_pending.get("plan") if isinstance(recovered_pending, dict) else {}
     recovered_deliverables = recovered_plan.get("deliverables") if isinstance(recovered_plan, dict) else []
     recovered_risks = recovered_plan.get("risks") if isinstance(recovered_plan, dict) else []
+    recovered_assignees = recovered_plan.get("deliverable_assignees") if isinstance(recovered_plan, dict) else {}
+    plan_card_json = json.dumps(sent_cards[1], ensure_ascii=False) if len(sent_cards) > 1 else ""
+    scan_props = PILOTFLOW_SCAN_CHAT_SIGNALS_SCHEMA.get("parameters", {}).get("properties", {})
+    suggested_props = scan_props.get("suggested_project", {}).get("properties", {})
     return {
         "projectization_suggestion_sent": (
             suggestion.get("status") == "projectization_suggested"
@@ -629,6 +638,12 @@ def _verify_runtime_projectization_suggestion(hermes_dir: Path) -> dict[str, Any
         "projectization_plan_card_sent": plan_result.get("card_sent") is True,
         "projectization_risks_preserved": recovered_risks == ["API 审批可能卡住"],
         "projectization_action_items_preserved": recovered_deliverables == ["整理上线清单", "同步审批进度"],
+        "projectization_assignees_preserved": recovered_assignees == {"整理上线清单": "李四", "同步审批进度": "张三"},
+        "projectization_assignees_card_shown": "负责人" in plan_card_json and "整理上线清单 → 李四" in plan_card_json,
+        "projectization_schema_assignees_exposed": (
+            "deliverable_assignees" in suggested_props
+            and "open_id" in str(suggested_props.get("deliverable_assignees", {}).get("description", ""))
+        ),
         "projectization_pending_recovered": bool(recovered_plan),
         "projectization_cards_sent": len(sent_cards) == 2,
     }

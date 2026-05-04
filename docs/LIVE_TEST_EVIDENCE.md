@@ -1278,12 +1278,12 @@
 | 项目 | 证据 |
 | --- | --- |
 | 运行环境 | PilotFlow 已通过 `setup.py --hermes-home <wsl-hermes-home>` 同步到 WSL Hermes runtime；安装验证返回插件、技能、Hermes config 和 Feishu display 配置均 OK |
-| 本地回归 | `C:\Users\Ding\miniforge3\python.exe -m pytest` 返回 `259 passed`；`tests/test_verify_wsl_feishu_runtime.py` 返回 `38 passed`；`git diff --check` 通过 |
-| Verifier 新模式 | `verify_wsl_feishu_runtime.py --verify-projectization-suggestion` 在已安装的 WSL Hermes runtime 插件内返回 `projectization_suggestion_sent=true`、`projectization_action_found=true`、`projectization_plan_generated=true`、`projectization_plan_card_sent=true`、`projectization_risks_preserved=true`、`projectization_action_items_preserved=true`、`projectization_pending_recovered=true`、`projectization_cards_sent=true` |
+| 本地回归 | `C:\Users\Ding\miniforge3\python.exe -m pytest` 返回 `278 passed`；`tests/test_verify_wsl_feishu_runtime.py` 返回 `45 passed`；`git diff --check` 通过，仅有 CRLF 提示 |
+| Verifier 新模式 | `/home/ding/.venvs/hermes-agent-feishu/bin/python verify_wsl_feishu_runtime.py --verify-projectization-suggestion` 在已安装的 WSL Hermes runtime 插件内返回 `lark_oapi_import_ok=true`、`projectization_suggestion_sent=true`、`projectization_action_found=true`、`projectization_plan_generated=true`、`projectization_plan_card_sent=true`、`projectization_risks_preserved=true`、`projectization_action_items_preserved=true`、`projectization_assignees_preserved=true`、`projectization_assignees_card_shown=true`、`projectization_schema_assignees_exposed=true`、`projectization_pending_recovered=true`、`projectization_cards_sent=true` |
 | Agent/工具边界 | verifier 向 `pilotflow_scan_chat_signals` 传入 Hermes 已结构化的目标、承诺、风险、行动项和项目草案；PilotFlow 只负责发送建议卡和传递结构化字段，不从原文关键词推断语义 |
 | 真实卡片路径 | 运行态会先向测试群发送“整理成项目计划”建议卡，再通过建议卡 action 进入 `pilotflow_generate_plan`，继续发送执行计划确认卡 |
-| 字段保留 | 点击建议按钮后，风险 `API 审批可能卡住` 和行动项 `整理上线清单`、`同步审批进度` 被写入 pending plan，证明从 IM 信号到项目计划链路不丢失关键信息 |
-| 基线验证 | 同轮继续通过 `--send-card` 的 `card_sent=true`、`card_has_title=true`、`card_has_goal=true`、`card_has_risk=true`，`--verify-history` 的 `history_apply_card_sent=true`，`--verify-project-creation` 的 `project_create_entry_card_sent=true`，以及 `--verify-card-command-bridge` 的 `card_command_bridge_executed=true` |
+| 字段保留 | 点击建议按钮后，风险 `API 审批可能卡住`、行动项 `整理上线清单`/`同步审批进度`、以及交付物负责人映射 `整理上线清单 -> 李四`、`同步审批进度 -> 张三` 均被写入 pending plan；确认卡同步展示负责人行，证明从 IM 信号到项目计划链路不丢失关键信息 |
+| 基线验证 | 同轮继续通过同一 Feishu venv 下 `--send-card` 的 `lark_oapi_import_ok=true`、`card_sent=true`、`card_has_title=true`、`card_has_goal=true`、`card_has_initiator=true`、`card_has_risk=true`，`--verify-health-check` 的 `health_check_ok=true`、`health_has_client=true`，以及 `--probe-llm` 的 `llm_probe_ok=true`、`llm_probe_status=200` |
 | 用户价值 | PilotFlow 不只是在用户明确说“创建项目”后执行资源创建，也能在群聊已经出现目标、承诺、风险和行动项时先冒泡项目化建议，再进入确认式项目启动流程 |
 | 隐私处理 | 证据只记录布尔结果和脱敏结论；不写入真实 chat_id、message_id、Feishu URL、用户 open_id、token 或 app secret |
 
