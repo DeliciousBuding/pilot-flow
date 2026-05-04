@@ -293,6 +293,22 @@ def test_verify_runtime_project_reminder_is_sanitized(tmp_path, monkeypatch):
     assert "example.invalid" not in json.dumps(result, ensure_ascii=False)
 
 
+def test_verify_runtime_projectization_suggestion_is_sanitized(tmp_path, monkeypatch):
+    hermes_dir, _sent_cards = _install_runtime_fixture(tmp_path, monkeypatch)
+
+    result = _MODULE._verify_runtime_projectization_suggestion(hermes_dir)
+
+    assert result["projectization_suggestion_sent"] is True
+    assert result["projectization_action_found"] is True
+    assert result["projectization_plan_generated"] is True
+    assert result["projectization_plan_card_sent"] is True
+    assert result["projectization_risks_preserved"] is True
+    assert result["projectization_action_items_preserved"] is True
+    assert result["projectization_pending_recovered"] is True
+    assert result["projectization_cards_sent"] is True
+    assert "example.invalid" not in json.dumps(result, ensure_ascii=False)
+
+
 def test_verify_runtime_briefing_batch_reminder_is_sanitized(tmp_path, monkeypatch):
     hermes_dir, _sent_cards = _install_runtime_fixture(tmp_path, monkeypatch)
 
@@ -718,6 +734,45 @@ def test_verifier_project_reminder_mode_outputs_sanitized_runtime_result(tmp_pat
     assert output["reminder_batch_filtered"] is True
     assert output["reminder_batch_history_recorded"] is True
     assert output["reminder_feedback_sanitized"] is True
+    assert "oc_real_chat_id" not in output_text
+    assert "example.invalid" not in output_text
+
+
+def test_verifier_projectization_suggestion_mode_outputs_sanitized_runtime_result(tmp_path, capsys):
+    env_file = tmp_path / ".env"
+    env_file.write_text("PILOTFLOW_TEST_CHAT_ID=oc_real_chat_id\n", encoding="utf-8")
+
+    with patch.object(_MODULE, "_verify_runtime_projectization_suggestion", return_value={
+        "projectization_suggestion_sent": True,
+        "projectization_action_found": True,
+        "projectization_plan_generated": True,
+        "projectization_plan_card_sent": True,
+        "projectization_risks_preserved": True,
+        "projectization_action_items_preserved": True,
+        "projectization_pending_recovered": True,
+        "projectization_cards_sent": True,
+        "raw_chat_id": "oc_real_chat_id",
+        "raw_doc_url": "https://example.invalid/doc/1",
+    }):
+        exit_code = _MODULE.main([
+            "--hermes-dir", str(tmp_path),
+            "--env-file", str(env_file),
+            "--verify-projectization-suggestion",
+        ])
+
+    output_text = capsys.readouterr().out
+    output = json.loads(output_text)
+    assert exit_code == 0
+    assert output["mode"] == "projectization-suggestion"
+    assert output["would_send_card"] is True
+    assert output["projectization_suggestion_sent"] is True
+    assert output["projectization_action_found"] is True
+    assert output["projectization_plan_generated"] is True
+    assert output["projectization_plan_card_sent"] is True
+    assert output["projectization_risks_preserved"] is True
+    assert output["projectization_action_items_preserved"] is True
+    assert output["projectization_pending_recovered"] is True
+    assert output["projectization_cards_sent"] is True
     assert "oc_real_chat_id" not in output_text
     assert "example.invalid" not in output_text
 

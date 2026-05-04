@@ -1217,6 +1217,20 @@
 | 用户价值 | 用户实际点击飞书卡片按钮时，PilotFlow 走的是 Hermes `/card` 桥接入口；本验证证明该入口能执行真实项目动作、更新原卡片状态并保持群聊反馈干净 |
 | 隐私处理 | 证据只记录布尔结果和脱敏结论；不写入真实 chat_id、message_id、Feishu URL、用户 open_id、token 或 app secret |
 
+## 2026-05-05 项目化建议运行态验证
+
+| 项目 | 证据 |
+| --- | --- |
+| 运行环境 | PilotFlow 已通过 `setup.py --hermes-home <wsl-hermes-home>` 同步到 WSL Hermes runtime；安装验证返回插件、技能、Hermes config 和 Feishu display 配置均 OK |
+| 本地回归 | `C:\Users\Ding\miniforge3\python.exe -m pytest` 返回 `259 passed`；`tests/test_verify_wsl_feishu_runtime.py` 返回 `38 passed`；`git diff --check` 通过 |
+| Verifier 新模式 | `verify_wsl_feishu_runtime.py --verify-projectization-suggestion` 在已安装的 WSL Hermes runtime 插件内返回 `projectization_suggestion_sent=true`、`projectization_action_found=true`、`projectization_plan_generated=true`、`projectization_plan_card_sent=true`、`projectization_risks_preserved=true`、`projectization_action_items_preserved=true`、`projectization_pending_recovered=true`、`projectization_cards_sent=true` |
+| Agent/工具边界 | verifier 向 `pilotflow_scan_chat_signals` 传入 Hermes 已结构化的目标、承诺、风险、行动项和项目草案；PilotFlow 只负责发送建议卡和传递结构化字段，不从原文关键词推断语义 |
+| 真实卡片路径 | 运行态会先向测试群发送“整理成项目计划”建议卡，再通过建议卡 action 进入 `pilotflow_generate_plan`，继续发送执行计划确认卡 |
+| 字段保留 | 点击建议按钮后，风险 `API 审批可能卡住` 和行动项 `整理上线清单`、`同步审批进度` 被写入 pending plan，证明从 IM 信号到项目计划链路不丢失关键信息 |
+| 基线验证 | 同轮继续通过 `--send-card` 的 `card_sent=true`、`card_has_title=true`、`card_has_goal=true`、`card_has_risk=true`，`--verify-history` 的 `history_apply_card_sent=true`，`--verify-project-creation` 的 `project_create_entry_card_sent=true`，以及 `--verify-card-command-bridge` 的 `card_command_bridge_executed=true` |
+| 用户价值 | PilotFlow 不只是在用户明确说“创建项目”后执行资源创建，也能在群聊已经出现目标、承诺、风险和行动项时先冒泡项目化建议，再进入确认式项目启动流程 |
+| 隐私处理 | 证据只记录布尔结果和脱敏结论；不写入真实 chat_id、message_id、Feishu URL、用户 open_id、token 或 app secret |
+
 ## 本地回归
 
 ```bash
@@ -1226,7 +1240,7 @@ C:\Users\Ding\miniforge3\python.exe -m pytest tests\test_tools.py tests\test_set
 结果：
 
 ```text
-257 passed
+259 passed
 ```
 
 ## 当前证据边界

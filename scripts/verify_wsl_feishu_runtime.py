@@ -113,6 +113,14 @@ def _sanitize_result(result: dict[str, Any]) -> dict[str, Any]:
         "history_deliverables_recovered",
         "history_pending_recovered",
         "history_card_count",
+        "projectization_suggestion_sent",
+        "projectization_action_found",
+        "projectization_plan_generated",
+        "projectization_plan_card_sent",
+        "projectization_risks_preserved",
+        "projectization_action_items_preserved",
+        "projectization_pending_recovered",
+        "projectization_cards_sent",
         "project_create_gate_created",
         "project_create_confirmed",
         "project_create_doc_created",
@@ -448,6 +456,102 @@ def _verify_runtime_history_suggestions(hermes_dir: Path) -> dict[str, Any]:
         "history_deliverables_recovered": recovered_deliverables == ["活动方案", "宣传文案"],
         "history_pending_recovered": bool(recovered_plan),
         "history_card_count": len(sent_cards),
+    }
+
+
+def _verify_runtime_projectization_suggestion(hermes_dir: Path) -> dict[str, Any]:
+    """Verify installed PilotFlow turns Hermes chat signals into a project plan card."""
+    sys.path.insert(0, str(hermes_dir))
+    import plugins.pilotflow.tools as runtime_tools  # pylint: disable=import-error
+    from plugins.pilotflow.tools import (  # pylint: disable=import-error
+        _card_action_refs,
+        _handle_card_action,
+        _handle_scan_chat_signals,
+        _load_pending_plan,
+        _pending_plans,
+        _plan_lock,
+    )
+
+    chat_id = os.environ.get("PILOTFLOW_TEST_CHAT_ID", "")
+    original_state_path = os.environ.get("PILOTFLOW_STATE_PATH")
+    original_send_card = runtime_tools._hermes_send_card
+    sent_cards: list[dict[str, Any]] = []
+
+    def tracking_send_card(target_chat_id: str, card_json: dict[str, Any]) -> bool | str:
+        sent_cards.append(card_json)
+        return original_send_card(target_chat_id, card_json)
+
+    with tempfile.TemporaryDirectory(prefix="pilotflow-projectization-verify-") as tmpdir:
+        os.environ["PILOTFLOW_STATE_PATH"] = str(Path(tmpdir) / "pilotflow_state.json")
+        with _plan_lock:
+            _pending_plans.clear()
+            _card_action_refs.clear()
+        runtime_tools._hermes_send_card = tracking_send_card
+        try:
+            suggestion = json.loads(_handle_scan_chat_signals(
+                {
+                    "source_text": "Hermes 已总结群聊：本周要完成客户上线，API 审批可能卡住，需要整理上线清单。",
+                    "signals": {
+                        "goals": ["本周完成客户上线"],
+                        "commitments": ["张三整理上线清单"],
+                        "risks": ["API 审批可能卡住"],
+                        "action_items": ["整理上线清单", "同步审批进度"],
+                        "deadlines": ["2026-05-20"],
+                    },
+                    "suggested_project": {
+                        "title": "运行态项目化建议项目",
+                        "goal": "本周完成客户上线",
+                        "members": ["张三"],
+                        "deliverables": ["整理上线清单", "同步审批进度"],
+                        "deadline": "2026-05-20",
+                        "risks": ["API 审批可能卡住"],
+                    },
+                    "should_suggest_project": True,
+                    "suggestion_reason": "聊天里已经有目标、负责人、风险和行动项，适合整理成项目。",
+                },
+                chat_id=chat_id,
+            ))
+            with _plan_lock:
+                action_id = next(
+                    (
+                        candidate
+                        for candidate, ref in _card_action_refs.items()
+                        if ref.get("action") == "suggest_project_from_signals"
+                    ),
+                    "",
+                )
+            plan_result: dict[str, Any] = {}
+            if action_id:
+                plan_result = json.loads(_handle_card_action(
+                    {"action_value": json.dumps({"pilotflow_action_id": action_id}, ensure_ascii=False)},
+                    chat_id=chat_id,
+                ))
+            recovered_pending = _load_pending_plan(chat_id) or {}
+            with _plan_lock:
+                _pending_plans.clear()
+                _card_action_refs.clear()
+        finally:
+            runtime_tools._hermes_send_card = original_send_card
+            if original_state_path is None:
+                os.environ.pop("PILOTFLOW_STATE_PATH", None)
+            else:
+                os.environ["PILOTFLOW_STATE_PATH"] = original_state_path
+
+    recovered_plan = recovered_pending.get("plan") if isinstance(recovered_pending, dict) else {}
+    recovered_deliverables = recovered_plan.get("deliverables") if isinstance(recovered_plan, dict) else []
+    recovered_risks = recovered_plan.get("risks") if isinstance(recovered_plan, dict) else []
+    return {
+        "projectization_suggestion_sent": (
+            suggestion.get("status") == "projectization_suggested"
+            and suggestion.get("card_sent") is True
+        ),
+        "projectization_action_found": bool(action_id),
+        "projectization_plan_generated": plan_result.get("status") == "plan_generated",
+        "projectization_plan_card_sent": plan_result.get("card_sent") is True,
+        "projectization_risks_preserved": recovered_risks == ["API 审批可能卡住"],
+        "projectization_action_items_preserved": recovered_deliverables == ["整理上线清单", "同步审批进度"],
+        "projectization_pending_recovered": bool(recovered_plan),
+        "projectization_cards_sent": len(sent_cards) == 2,
     }
 
 
@@ -2119,6 +2223,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--send-card", action="store_true", help="Send one real Feishu plan card.")
     parser.add_argument("--probe-llm", action="store_true", help="Probe configured OpenAI-compatible /models endpoint.")
     parser.add_argument("--verify-history", action="store_true", help="Send real cards that verify history suggestions can be applied.")
+    parser.add_argument("--verify-projectization-suggestion", action="store_true", help="Send real cards that verify chat signal projectization suggestion flow.")
     parser.add_argument("--verify-project-creation", action="store_true", help="Dry-run installed create-project resource orchestration.")
     parser.add_argument("--verify-update-task", action="store_true", help="Dry-run installed update_project task summary behavior.")
     parser.add_argument("--verify-archive-gate", action="store_true", help="Dry-run installed archive confirmation gate behavior.")
@@ -2156,13 +2261,14 @@ def main(argv: list[str] | None = None) -> int:
         else "archive-gate" if args.verify_archive_gate
         else "update-task" if args.verify_update_task
         else "project-creation" if args.verify_project_creation
+        else "projectization-suggestion" if args.verify_projectization_suggestion
         else "history" if args.verify_history
         else "send-card" if args.send_card
         else "dry-run"
     )
     output: dict[str, Any] = {
         "mode": mode,
-        "would_send_card": bool(args.send_card or args.verify_history),
+        "would_send_card": bool(args.send_card or args.verify_history or args.verify_projectization_suggestion),
         "has_chat_id": _safe_bool(env_values.get("PILOTFLOW_TEST_CHAT_ID") or os.environ.get("PILOTFLOW_TEST_CHAT_ID")),
         "has_feishu_credentials": _safe_bool(
             (env_values.get("FEISHU_APP_ID") or os.environ.get("FEISHU_APP_ID"))
@@ -2175,6 +2281,8 @@ def main(argv: list[str] | None = None) -> int:
         output.update(_send_runtime_plan_card(hermes_dir))
     if args.verify_history:
         output.update(_verify_runtime_history_suggestions(hermes_dir))
+    if args.verify_projectization_suggestion:
+        output.update(_verify_runtime_projectization_suggestion(hermes_dir))
     if args.verify_project_creation:
         output.update(_verify_runtime_project_creation(hermes_dir))
     if args.verify_update_task:
