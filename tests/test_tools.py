@@ -183,6 +183,34 @@ def test_projectization_suggestion_button_generates_pending_plan(monkeypatch):
     assert "确认执行" in followup_card
 
 
+def test_generate_plan_confirmation_card_displays_structured_risks(monkeypatch):
+    sent_cards = []
+
+    def fake_send_card(chat_id, card):
+        sent_cards.append({"chat_id": chat_id, "card": card})
+        return "om_plan_risk"
+
+    monkeypatch.setattr("tools._hermes_send_card", fake_send_card)
+
+    result = json.loads(_handle_generate_plan(
+        {
+            "input_text": "帮我准备客户上线项目",
+            "title": "客户上线项目",
+            "goal": "完成客户上线",
+            "members": [],
+            "deliverables": ["整理上线清单"],
+            "deadline": "2026-05-08",
+            "risks": ["API 审批可能卡住"],
+        },
+        chat_id="oc_plan_card_risk",
+        chat_type="group",
+    ))
+
+    assert result["status"] == "plan_generated"
+    card_text = sent_cards[0]["card"]["elements"][0]["content"]
+    assert "**风险：** API 审批可能卡住" in card_text
+
+
 def test_projectization_suggestion_button_preserves_risks_in_pending_plan(monkeypatch):
     sent_cards = []
 
@@ -1742,6 +1770,52 @@ def test_project_entry_card_uses_plain_member_names_for_visible_markdown():
     markdown = entry_card["elements"][0]["content"]
     assert "**成员：** 唐丁" in markdown
     assert "<at user_id=" not in markdown
+
+
+def test_project_entry_card_displays_known_risks():
+    chat_id = "oc_entry_card_risk"
+    captured_cards = []
+
+    def fake_send_card(_chat_id, card):
+        captured_cards.append(card)
+        return "om_entry_risk"
+
+    with _project_registry_lock:
+        _project_registry.clear()
+    with _plan_lock:
+        _pending_plans.clear()
+        _card_action_refs.clear()
+
+    with (
+        patch("tools._create_doc", return_value="https://example.invalid/doc"),
+        patch("tools._create_bitable", return_value={
+            "url": "https://example.invalid/base",
+            "app_token": "app1",
+            "table_id": "tbl1",
+            "record_id": "rec1",
+        }),
+        patch("tools._create_task", return_value="任务已创建"),
+        patch("tools._hermes_send_card", side_effect=fake_send_card),
+        patch("tools._create_calendar_event", return_value=None),
+        patch("tools._schedule_deadline_reminder", return_value=False),
+        patch("tools._save_to_hermes_memory", return_value=True),
+    ):
+        result = json.loads(_handle_create_project_space(
+            {
+                "title": "入口卡片风险项目",
+                "goal": "验证入口卡片风险展示",
+                "members": [],
+                "deliverables": ["验证记录"],
+                "deadline": "2026-05-12",
+                "risks": ["API 审批可能卡住"],
+            },
+            chat_id=chat_id,
+            chat_scope="private",
+        ))
+
+    assert result["status"] == "project_space_created"
+    markdown = captured_cards[0]["elements"][0]["content"]
+    assert "**风险：** API 审批可能卡住" in markdown
 
 
 def test_duplicate_confirmation_after_create_is_idempotent():

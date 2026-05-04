@@ -1588,6 +1588,8 @@ def _build_plan_confirmation_card(
     member_text = ", ".join(plan["members"]) if plan["members"] else "待确认"
     deliverable_text = ", ".join(plan["deliverables"]) if plan["deliverables"] else "待确认"
     deadline_text = plan["deadline"] or "待确认"
+    risk_text = ", ".join(_clean_plan_list(plan.get("risks"))[:3])
+    risk_line = f"\n**风险：** {risk_text}" if risk_text else ""
     history_text = ""
     if history_suggestions:
         history_text = "\n\n**历史建议：**\n" + "\n".join(f"- {s}" for s in history_suggestions)
@@ -1637,6 +1639,7 @@ def _build_plan_confirmation_card(
                     f"**成员：** {member_text}\n"
                     f"**交付物：** {deliverable_text}\n"
                     f"**截止时间：** {deadline_text}"
+                    f"{risk_line}"
                     f"{history_text}"
                 ),
             },
@@ -3509,6 +3512,8 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
     if bitable_url:
         link_lines.append(f"📊 [状态表]({bitable_url})")
     link_lines.append(f"⏰ 截止: {deadline or '待确认'}")
+    risk_text = ", ".join(risks[:3])
+    risk_line = f"**风险：** {risk_text}\n" if risk_text else ""
 
     status_action_id = _create_card_action_ref(chat_id, "project_status", {"title": title})
     done_action_id = _create_card_action_ref(chat_id, "mark_project_done", {"title": title})
@@ -3524,6 +3529,7 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
                 "content": (
                     f"**目标：** {goal}\n"
                     f"**成员：** {member_card_display}\n"
+                    f"{risk_line}"
                     + (f"{member_warning}\n" if member_warning else "")
                     + "\n".join(link_lines)
                 ),
