@@ -3690,32 +3690,20 @@ def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
                 return tool_error("待办创建失败，请检查飞书连接。")
             created_task_entry = f"任务: {task_name}"
             public_task_value = _public_task_update_value(task_name)
-            updates = list(project.get("updates", []))
-            if public_task_value:
-                updates.append({"action": "任务", "value": public_task_value})
-            with _project_registry_lock:
-                if project_title in _project_registry:
-                    _project_registry[project_title].setdefault("artifacts", []).append(created_task_entry)
-            _save_project_state(
-                project_title, project.get("goal", ""), members,
-                project.get("deliverables", []), project.get("deadline", ""), project.get("status", "进行中"),
-                list(project.get("artifacts", [])) + [created_task_entry],
-                updates=updates,
+            outcome = _record_action_outcome(
+                project_title, project, "任务", public_task_value,
+                artifact_to_append=created_task_entry,
+                doc_value=task_name,
+                bitable_history_value=task_name,
             )
-            doc_updated = _append_project_doc_update(project_title, project, "任务", task_name)
-            bitable_history_created = False
-            if project.get("app_token") and project.get("table_id"):
-                bitable_history_created = _append_bitable_update_record(
-                    project["app_token"], project["table_id"], "任务", task_name, project,
-                )
             _hermes_send(chat_id, f"项目「{project_title}」的跟进待办“{task_name}”已创建。")
             return tool_result({
                 "status": "project_followup_task_created",
                 "project": project_title,
                 "task_created": True,
                 "task_name": task_name,
-                "doc_updated": doc_updated,
-                "bitable_history_created": bitable_history_created,
+                "doc_updated": outcome["doc_updated"],
+                "bitable_history_created": outcome["bitable_history_created"],
                 "instructions": "已创建项目跟进待办。不要展示工具名或英文。",
             })
 
@@ -3737,26 +3725,13 @@ def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
             reminder_sent = _hermes_send(chat_id, _build_project_reminder_text(chat_id, project_title, project))
             if not reminder_sent:
                 return tool_error("项目催办提醒发送失败，请检查 Feishu 连接。")
-            updates = list(project.get("updates", []))
-            updates.append({"action": "催办", "value": "已发送催办提醒"})
-            project["updates"] = updates
-            _save_project_state(
-                project_title, project.get("goal", ""), project.get("members", []),
-                project.get("deliverables", []), project.get("deadline", ""), project.get("status", "进行中"),
-                project.get("artifacts", []), updates=updates,
-            )
-            doc_updated = _append_project_doc_update(project_title, project, "催办", "已发送催办提醒")
-            bitable_history_created = False
-            if project.get("app_token") and project.get("table_id"):
-                bitable_history_created = _append_bitable_update_record(
-                    project["app_token"], project["table_id"], "催办", "已发送催办提醒", project,
-                )
+            outcome = _record_action_outcome(project_title, project, "催办", "已发送催办提醒")
             return tool_result({
                 "status": "project_reminder_sent",
                 "project": project_title,
                 "reminder_sent": True,
-                "doc_updated": doc_updated,
-                "bitable_history_created": bitable_history_created,
+                "doc_updated": outcome["doc_updated"],
+                "bitable_history_created": outcome["bitable_history_created"],
                 "instructions": "已发送项目催办提醒。不要展示工具名或英文。",
             })
 
@@ -3772,15 +3747,8 @@ def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
             )
         doc_label = "风险解除" if pilotflow_action == "resolve_risk" else "状态"
         doc_value = "风险已解除" if pilotflow_action == "resolve_risk" else target_status
-        updates = list(project.get("updates", []))
-        updates.append({"action": doc_label, "value": doc_value})
-        project["updates"] = updates
-        _save_project_state(
-            project_title, project.get("goal", ""), project.get("members", []),
-            project.get("deliverables", []), project.get("deadline", ""), target_status,
-            project.get("artifacts", []), updates=updates,
-        )
-        doc_updated = _append_project_doc_update(project_title, project, doc_label, doc_value)
+        outcome = _record_action_outcome(project_title, project, doc_label, doc_value)
+        doc_updated = outcome["doc_updated"]
 
         suffix_parts = []
         if bitable_updated:
@@ -3894,23 +3862,12 @@ def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
             sources.add(source)
             created_entry = f"任务: {task_name}"
             public_task_value = _public_task_update_value(task_name)
-            updates = list(project.get("updates", []))
-            if public_task_value:
-                updates.append({"action": "任务", "value": public_task_value})
-            with _project_registry_lock:
-                if project_name in _project_registry:
-                    _project_registry[project_name].setdefault("artifacts", []).append(created_entry)
-            _save_project_state(
-                project_name, project.get("goal", ""), members,
-                project.get("deliverables", []), project.get("deadline", ""), project.get("status", "进行中"),
-                list(project.get("artifacts", [])) + [created_entry],
-                updates=updates,
+            _record_action_outcome(
+                project_name, project, "任务", public_task_value,
+                artifact_to_append=created_entry,
+                doc_value=task_name,
+                bitable_history_value=task_name,
             )
-            _append_project_doc_update(project_name, project, "任务", task_name)
-            if project.get("app_token") and project.get("table_id"):
-                _append_bitable_update_record(
-                    project["app_token"], project["table_id"], "任务", task_name, project,
-                )
         if not created_projects:
             return tool_error("没有可批量创建待办的匹配项目。")
         filter_label = {
@@ -3967,33 +3924,20 @@ def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
             return tool_error("待办创建失败，请检查飞书连接。")
         created_entry = f"任务: {task_name}"
         public_task_value = _public_task_update_value(task_name)
-        updates = list(project.get("updates", []))
-        if public_task_value:
-            updates.append({"action": "任务", "value": public_task_value})
-        project["updates"] = updates
-        with _project_registry_lock:
-            if project_title in _project_registry:
-                _project_registry[project_title].setdefault("artifacts", []).append(created_entry)
-        _save_project_state(
-            project_title, project.get("goal", ""), members,
-            project.get("deliverables", []), project.get("deadline", ""), project.get("status", "进行中"),
-            list(project.get("artifacts", [])) + [created_entry],
-            updates=updates,
+        outcome = _record_action_outcome(
+            project_title, project, "任务", public_task_value,
+            artifact_to_append=created_entry,
+            doc_value=task_name,
+            bitable_history_value=task_name,
         )
-        doc_updated = _append_project_doc_update(project_title, project, "任务", task_name)
-        bitable_history_created = False
-        if project.get("app_token") and project.get("table_id"):
-            bitable_history_created = _append_bitable_update_record(
-                project["app_token"], project["table_id"], "任务", task_name, project,
-            )
         _hermes_send(chat_id, f"项目「{project_title}」的跟进待办“{task_name}”已创建。")
         return tool_result({
             "status": "project_followup_task_created",
             "project": project_title,
             "task_created": True,
             "task_name": task_name,
-            "doc_updated": doc_updated,
-            "bitable_history_created": bitable_history_created,
+            "doc_updated": outcome["doc_updated"],
+            "bitable_history_created": outcome["bitable_history_created"],
             "instructions": "已创建项目跟进待办。不要展示工具名或英文。",
         })
 
@@ -4504,6 +4448,50 @@ def _append_bitable_update_record(app_token: str, table_id: str, action_label: s
         return False
 
 
+def _record_action_outcome(
+    project_title: str,
+    project: dict,
+    action_label: str,
+    public_value: str,
+    *,
+    artifact_to_append: str = "",
+    doc_value: str = "",
+    bitable_history_value: str = "",
+) -> dict:
+    """Persist a project action across public state, private refs, docs, and Bitable history."""
+    public_updates = list(project.get("updates", []))
+    if public_value:
+        public_updates.append({"action": action_label, "value": public_value})
+    project["updates"] = _clean_recent_updates(public_updates)
+
+    artifacts = list(project.get("artifacts", []))
+    if artifact_to_append:
+        artifacts.append(artifact_to_append)
+        project["artifacts"] = artifacts
+        with _project_registry_lock:
+            if project_title in _project_registry:
+                _project_registry[project_title].setdefault("artifacts", []).append(artifact_to_append)
+
+    state_updated = _save_project_state(
+        project_title, project.get("goal", ""), project.get("members", []),
+        project.get("deliverables", []), project.get("deadline", ""), project.get("status", "进行中"),
+        artifacts, updates=project.get("updates", []),
+    )
+    trace_value = doc_value or public_value
+    doc_updated = _append_project_doc_update(project_title, project, action_label, trace_value) if trace_value else False
+    bitable_history_created = False
+    if trace_value and project.get("app_token") and project.get("table_id"):
+        bitable_history_created = _append_bitable_update_record(
+            project["app_token"], project["table_id"], action_label,
+            bitable_history_value or trace_value, project,
+        )
+    return {
+        "state_updated": state_updated,
+        "doc_updated": doc_updated,
+        "bitable_history_created": bitable_history_created,
+    }
+
+
 def _update_bitable_record(app_token: str, table_id: str, record_id: str, fields: dict) -> bool:
     """Update a bitable record with new field values."""
     client = _get_client()
@@ -4612,23 +4600,13 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
 
     def send_reminder_for_project(title: str, info: dict) -> dict:
         sent = _hermes_send(chat_id, _build_project_reminder_text(chat_id, title, info)) if chat_id else False
-        state_trace = False
-        if sent:
-            updates = list(info.get("updates", []))
-            updates.append({"action": "催办", "value": "已发送催办提醒"})
-            info["updates"] = updates
-            state_trace = _save_project_state(
-                title, info.get("goal", ""), info.get("members", []),
-                info.get("deliverables", []), info.get("deadline", ""), info.get("status", "进行中"),
-                info.get("artifacts", []), updates=updates,
-            )
-        doc_trace = _append_project_doc_update(title, info, "催办", value)
-        bitable_trace = False
-        if info.get("app_token") and info.get("table_id"):
-            bitable_trace = _append_bitable_update_record(
-                info["app_token"], info["table_id"], "催办", value, info,
-            )
-        return {"sent": sent, "doc_trace": doc_trace, "bitable_trace": bitable_trace, "state_trace": state_trace}
+        outcome = _record_action_outcome(title, info, "催办", "已发送催办提醒", doc_value=value) if sent else {}
+        return {
+            "sent": sent,
+            "doc_trace": bool(outcome.get("doc_updated")),
+            "bitable_trace": bool(outcome.get("bitable_history_created")),
+            "state_trace": bool(outcome.get("state_updated")),
+        }
 
     if action == "send_reminder":
         batch_filter = _status_filter_from_query(project_name)
@@ -4753,6 +4731,10 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
     calendar_attendees_added = False
     reminder_scheduled = False
     reminder_sent = False
+    progress_state_actions = (
+        "update_deadline", "remove_member", "add_deliverable", "add_progress",
+        "add_risk", "resolve_risk", "update_status",
+    )
 
     # 1. Update in-memory registry
     if project:
@@ -4769,8 +4751,7 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
             elif action == "resolve_risk":
                 project["status"] = "进行中"
             elif action == "add_progress":
-                project.setdefault("updates", []).append({"action": action_label, "value": value})
-                project["updates"] = _clean_recent_updates(project.get("updates"))
+                pass
         else:
             with _project_registry_lock:
                 if action == "update_deadline":
@@ -4798,8 +4779,6 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
                     project["status"] = "进行中"
                     registry_updated = True
                 elif action == "add_progress":
-                    project.setdefault("updates", []).append({"action": action_label, "value": value})
-                    project["updates"] = _clean_recent_updates(project.get("updates"))
                     registry_updated = True
 
             if action == "add_deliverable" and chat_id:
@@ -4812,14 +4791,11 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
                     project.setdefault("artifacts", []).append(f"任务: {task_name}")
                     task_created = True
 
-        if action in ("update_deadline", "remove_member", "add_deliverable", "add_progress", "add_risk", "resolve_risk", "update_status"):
-            state_updated = _save_project_state(
-                project_name, project.get("goal", ""), project.get("members", []),
-                project.get("deliverables", []), project.get("deadline", ""),
-                project.get("status", "进行中"), project.get("artifacts", []),
-                updates=project.get("updates", []),
-            )
-            doc_updated = _append_project_doc_update(project_name, project, action_label, value)
+        if action in progress_state_actions:
+            outcome = _record_action_outcome(project_name, project, action_label, value)
+            state_updated = outcome["state_updated"]
+            doc_updated = outcome["doc_updated"]
+            bitable_history_created = outcome["bitable_history_created"]
 
         # 2. Update bitable record
         bitable_fields = {}
@@ -4847,7 +4823,7 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
                 project["app_token"], project["table_id"], project["record_id"],
                 bitable_fields,
             )
-        if action != "send_reminder" and project.get("app_token") and project.get("table_id"):
+        if action not in ("send_reminder", *progress_state_actions) and project.get("app_token") and project.get("table_id"):
             bitable_history_created = _append_bitable_update_record(
                 project["app_token"], project["table_id"], action_label, value, project,
             )

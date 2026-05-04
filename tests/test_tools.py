@@ -3565,6 +3565,7 @@ def test_update_project_updates_sanitized_state_after_restart(tmp_path):
     assert projects[0]["title"] == "重启更新项目"
     assert projects[0]["deadline"] == "2026-05-25"
     assert projects[0]["status"] == "进行中"
+    assert projects[0]["updates"][-1] == {"action": "截止时间", "value": "2026-05-25"}
 
 
 def test_update_project_restores_doc_resource_ref_after_restart(tmp_path):
@@ -3665,6 +3666,7 @@ def test_update_project_status_uses_sanitized_state_after_restart(tmp_path):
     assert result["project"] == "重启状态项目"
     assert result["state_updated"] is True
     assert projects[0]["status"] == "暂停"
+    assert projects[0]["updates"][-1] == {"action": "状态", "value": "暂停"}
 
 
 def test_update_project_adds_deliverable_and_creates_task():
