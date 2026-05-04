@@ -3182,7 +3182,7 @@ PILOTFLOW_CREATE_PROJECT_SPACE_SCHEMA = {
         "5. 日历事件（截止时间提醒）\n\n"
         "前置条件：群聊默认先调用 pilotflow_generate_plan 并等用户回复「确认」；私聊项目可按自治规则直接推进。\n"
         "如果是高风险动作或涉及未解析成员，仍要先问一次。\n\n"
-        "文本确认路径优先传入用户最新回复 input_text；如上层已拆出独立确认字段，也可传 confirmation_text。两者都只接受「确认」「确认执行」「可以」「好的」「行」「ok」等明确执行语义。\n"
+        "文本确认路径必须传入 confirmation_text；input_text 只用于 trace，不再作为确认语义兜底。\n"
         "用户说「确认卡片」「给我确认卡片」只表示要看卡片，不是确认执行。\n\n"
         "【输出规则 - 必须遵守】\n"
         "- 用中文回复结果摘要，直接使用返回的 display 列表逐行展示\n"
@@ -3194,7 +3194,7 @@ PILOTFLOW_CREATE_PROJECT_SPACE_SCHEMA = {
         "properties": {
             "input_text": {
                 "type": "string",
-                "description": "用户最新的原始确认文本，可用于识别是否真的在确认执行。",
+                "description": "用户原始文本，仅用于 trace；不要用它表达确认语义。",
             },
             "title": {"type": "string", "description": "项目标题（必填），如「答辩项目」。"},
             "goal": {"type": "string", "description": "项目目标（必填），一句话描述项目要达成什么。"},
@@ -3212,7 +3212,7 @@ PILOTFLOW_CREATE_PROJECT_SPACE_SCHEMA = {
             "risks": {"type": "array", "items": {"type": "string"}, "description": "已知风险，如[\"时间紧张\"]。"},
             "confirmation_text": {
                 "type": "string",
-                "description": "用户最新的独立确认回复，可选。若上层只剩原始文本，也可直接用 input_text 传入同样的确认语义，例如「确认」「确认执行」「可以」「好的」「行」「ok」。",
+                "description": "用户最新的独立确认回复；文本确认路径必须显式传入此字段，例如「确认执行」。",
             },
         },
         "required": ["title", "goal", "members", "deliverables"],
@@ -3229,11 +3229,11 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
 
     skip_gate = bool(kwargs.get("_pilotflow_gate_consumed"))
     if not skip_gate:
-        confirmation_text = params.get("confirmation_text") or params.get("input_text") or ""
+        confirmation_text = params.get("confirmation_text") or ""
         require_confirm, autonomy_mode, autonomy_reason = _needs_confirmation_for_create(chat_scope, [])
         if require_confirm:
             if not _is_execution_confirmation(confirmation_text):
-                return tool_error("请等待用户明确回复「确认执行」或点击卡片确认按钮后再创建项目。")
+                return tool_error("请等待用户明确回复「确认执行」并由 Agent 传入 confirmation_text，或点击卡片确认按钮后再创建项目。")
             if not _consume_plan_gate(chat_id):
                 recent_title = _recent_confirmed_project(chat_id)
                 if recent_title:
@@ -3275,9 +3275,9 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
     unresolved_members = _find_unresolved_members(members, chat_id)
     require_confirm, autonomy_mode, autonomy_reason = _needs_confirmation_for_create(chat_scope, unresolved_members)
     if not skip_gate and require_confirm and chat_scope.get("scope") == "private":
-        confirmation_text = params.get("confirmation_text") or params.get("input_text") or ""
+        confirmation_text = params.get("confirmation_text") or ""
         if not _is_execution_confirmation(confirmation_text):
-            return tool_error("涉及未解析成员，请先确认一次再执行。")
+            return tool_error("涉及未解析成员，请先确认一次并由 Agent 传入 confirmation_text 再执行。")
         if not _consume_plan_gate(chat_id):
             recent_title = _recent_confirmed_project(chat_id)
             if recent_title:

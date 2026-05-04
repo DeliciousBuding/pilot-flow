@@ -52,6 +52,18 @@
 | WSL runtime dry-run | `verify_wsl_feishu_runtime.py --env-file /home/ding/.hermes/.env --config-file /home/ding/.hermes/config.yaml` 输出脱敏通过：`config_model=mimo-v2.5-pro`、`config_provider=vectorcontrol`、`config_has_feishu_gateway=true` |
 | 真实 Feishu 卡片验证 | WSL `verify_wsl_feishu_runtime.py --send-card` 成功：`card_sent=true`、`pending_plan_recovered=true`、`card_action_recovered=true`、`redaction_enabled=true` |
 
+## 2026-05-04 Agent 主驾驶边界：文本确认显式字段门控
+
+| 项目 | 证据 |
+| --- | --- |
+| 功能硬化 | `pilotflow_create_project_space` 不再把 `input_text="确认执行"` 当作执行确认；群聊文本确认路径必须由 Agent 显式传入 `confirmation_text`，否则返回错误并拒绝创建项目 |
+| 真实能力保留 | `confirmation_text="确认执行"` 仍可从重启后的 pending plan 恢复项目字段、复用 idempotency key、执行创建链路，并保持重复确认幂等 |
+| 卡片路径兼容 | 卡片确认按钮仍通过 `_pilotflow_gate_consumed` 跳过文本确认关键词判断；WSL `--send-card` verifier 继续通过 |
+| 自动化验证 | `C:\Users\Ding\miniforge3\python.exe -m pytest` 通过，结果 `191 passed` |
+| WSL 安装验证 | `setup.py --hermes-dir D:\Code\LarkProject\hermes-agent --hermes-home \\wsl.localhost\Ubuntu-24.04\home\ding\.hermes` 通过；插件文件已同步到 WSL Hermes runtime |
+| WSL runtime dry-run | `verify_wsl_feishu_runtime.py --env-file /home/ding/.hermes/.env --config-file /home/ding/.hermes/config.yaml` 输出脱敏通过：`config_model=mimo-v2.5-pro`、`config_provider=vectorcontrol`、`config_has_feishu_gateway=true` |
+| 真实 Feishu 卡片验证 | WSL `verify_wsl_feishu_runtime.py --send-card` 成功：`card_sent=true`、`pending_plan_recovered=true`、`card_action_recovered=true`、`redaction_enabled=true` |
+
 ## 2026-05-03 状态看板场景
 
 | 项目 | 证据 |

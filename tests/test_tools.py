@@ -1089,7 +1089,7 @@ def test_update_autonomy_allows_regular_progress_update():
     assert "直接" in reason or "常规" in reason
 
 
-def test_create_project_accepts_raw_confirmation_text_fallback():
+def test_create_project_rejects_raw_input_text_confirmation_fallback():
     chat_id = "oc_same_turn_fallback"
     with _project_registry_lock:
         _project_registry.clear()
@@ -1127,6 +1127,59 @@ def test_create_project_accepts_raw_confirmation_text_fallback():
         result = json.loads(_handle_create_project_space(
             {
                 "input_text": "确认执行",
+                "title": "迁移验证项目",
+                "goal": "验证迁移流程",
+                "members": [],
+                "deliverables": ["迁移验证记录"],
+                "deadline": "2026-05-10",
+            },
+            chat_id=chat_id,
+        ))
+
+    assert "error" in result
+    assert "confirmation_text" in result["error"]
+    with _project_registry_lock:
+        assert "迁移验证项目" not in _project_registry
+
+
+def test_create_project_accepts_explicit_confirmation_text():
+    chat_id = "oc_explicit_confirmation"
+    with _project_registry_lock:
+        _project_registry.clear()
+    with _plan_lock:
+        _pending_plans.clear()
+        _card_action_refs.clear()
+
+    with patch("tools._hermes_send_card", return_value="om_plan"):
+        _handle_generate_plan(
+            {
+                "input_text": "帮我准备迁移验证项目，先给我确认卡片",
+                "title": "迁移验证项目",
+                "goal": "验证迁移流程",
+                "members": [],
+                "deliverables": ["迁移验证记录"],
+                "deadline": "2026-05-10",
+            },
+            chat_id=chat_id,
+        )
+
+    with (
+        patch("tools._resolve_member", return_value=None),
+        patch("tools._create_doc", return_value="https://example.invalid/doc"),
+        patch("tools._create_bitable", return_value={
+            "url": "https://example.invalid/base",
+            "app_token": "app1",
+            "table_id": "tbl1",
+            "record_id": "rec1",
+        }),
+        patch("tools._create_task", return_value="https://example.invalid/task"),
+        patch("tools._create_calendar_event", return_value=None),
+        patch("tools._schedule_deadline_reminder", return_value=False),
+        patch("tools._save_to_hermes_memory", return_value=True),
+    ):
+        result = json.loads(_handle_create_project_space(
+            {
+                "confirmation_text": "确认执行",
                 "title": "迁移验证项目",
                 "goal": "验证迁移流程",
                 "members": [],
@@ -1182,7 +1235,7 @@ def test_text_confirmation_recovers_pending_plan_after_state_reload():
         patch("tools._save_to_hermes_memory", return_value=True),
     ):
         result = json.loads(_handle_create_project_space(
-            {"input_text": "确认执行"},
+            {"confirmation_text": "确认执行"},
             chat_id=chat_id,
         ))
 
@@ -1281,7 +1334,7 @@ def test_create_project_reuses_pending_idempotency_key_in_result_and_trace():
         patch("tools._save_to_hermes_memory", return_value=True),
     ):
         result = json.loads(_handle_create_project_space(
-            {"input_text": "确认执行"},
+            {"confirmation_text": "确认执行"},
             chat_id=chat_id,
         ))
 
@@ -1328,7 +1381,7 @@ def test_create_project_falls_back_to_pending_plan_fields_when_input_text_only()
     ):
         result = json.loads(_handle_create_project_space(
             {
-                "input_text": "确认执行",
+                "confirmation_text": "确认执行",
             },
             chat_id=chat_id,
         ))
@@ -1426,11 +1479,11 @@ def test_duplicate_confirmation_after_create_is_idempotent():
         patch("tools._save_to_hermes_memory", return_value=True),
     ):
         created = json.loads(_handle_create_project_space(
-            {"input_text": "确认执行"},
+            {"confirmation_text": "确认执行"},
             chat_id=chat_id,
         ))
         duplicate = json.loads(_handle_create_project_space(
-            {"input_text": "确认执行"},
+            {"confirmation_text": "确认执行"},
             chat_id=chat_id,
         ))
 
