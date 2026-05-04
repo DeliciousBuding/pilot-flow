@@ -125,6 +125,11 @@ def _sanitize_result(result: dict[str, Any]) -> dict[str, Any]:
         "followup_task_feedback_sent",
         "followup_task_artifact_recorded",
         "followup_task_public_update_recorded",
+        "deadline_update_applied",
+        "deadline_calendar_created",
+        "deadline_attendees_added",
+        "deadline_reminder_scheduled",
+        "deadline_feedback_sent",
         "error",
     }
     return {key: result[key] for key in allowed if key in result}
@@ -592,6 +597,78 @@ def _verify_runtime_followup_task(hermes_dir: Path) -> dict[str, Any]:
     }
 
 
+def _verify_runtime_deadline_update(hermes_dir: Path) -> dict[str, Any]:
+    """Verify installed PilotFlow updates deadline calendar/reminder hooks."""
+    sys.path.insert(0, str(hermes_dir))
+    import plugins.pilotflow.tools as runtime_tools  # pylint: disable=import-error
+    from plugins.pilotflow.tools import (  # pylint: disable=import-error
+        _handle_update_project,
+        _project_registry,
+        _project_registry_lock,
+        _register_project,
+    )
+
+    chat_id = os.environ.get("PILOTFLOW_TEST_CHAT_ID", "")
+    original_calendar = runtime_tools._create_calendar_event
+    original_reminder = runtime_tools._schedule_deadline_reminder
+    original_send = runtime_tools._hermes_send
+    sent_messages: list[str] = []
+
+    def fake_calendar(*_args: Any, **_kwargs: Any) -> str:
+        return "日历事件: 2026-05-30；已邀请 1 位成员"
+
+    def fake_reminder(*_args: Any, **_kwargs: Any) -> bool:
+        return True
+
+    def fake_send(_chat_id: str, text: str) -> bool:
+        sent_messages.append(text)
+        return True
+
+    with _project_registry_lock:
+        _project_registry.clear()
+    runtime_tools._create_calendar_event = fake_calendar
+    runtime_tools._schedule_deadline_reminder = fake_reminder
+    runtime_tools._hermes_send = fake_send
+    try:
+        _register_project(
+            "运行态截止联动项目",
+            ["张三"],
+            "2026-05-20",
+            "进行中",
+            [],
+            goal="验证安装后的截止时间联动",
+            deliverables=["初始验收"],
+        )
+        data = json.loads(_handle_update_project(
+            {
+                "project_name": "运行态截止联动",
+                "action": "update_deadline",
+                "value": "2026-05-30",
+            },
+            chat_id=chat_id,
+        ))
+        with _project_registry_lock:
+            new_deadline = _project_registry["运行态截止联动项目"].get("deadline")
+    finally:
+        runtime_tools._create_calendar_event = original_calendar
+        runtime_tools._schedule_deadline_reminder = original_reminder
+        runtime_tools._hermes_send = original_send
+        with _project_registry_lock:
+            _project_registry.clear()
+
+    feedback_text = "\n".join(sent_messages)
+    return {
+        "deadline_update_applied": data.get("status") == "project_updated" and new_deadline == "2026-05-30",
+        "deadline_calendar_created": data.get("calendar_event_created") is True,
+        "deadline_attendees_added": data.get("calendar_attendees_added") is True,
+        "deadline_reminder_scheduled": data.get("reminder_scheduled") is True,
+        "deadline_feedback_sent": all(
+            marker in feedback_text
+            for marker in ("日历事件已更新", "日历参与人已邀请", "截止提醒已设置")
+        ),
+    }
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Verify PilotFlow WSL Feishu runtime.")
     parser.add_argument("--hermes-dir", required=True, help="Hermes runtime directory.")
@@ -603,6 +680,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--verify-update-task", action="store_true", help="Dry-run installed update_project task summary behavior.")
     parser.add_argument("--verify-archive-gate", action="store_true", help="Dry-run installed archive confirmation gate behavior.")
     parser.add_argument("--verify-followup-task", action="store_true", help="Dry-run installed card follow-up task behavior.")
+    parser.add_argument("--verify-deadline-update", action="store_true", help="Dry-run installed deadline calendar/reminder behavior.")
     args = parser.parse_args(argv)
 
     hermes_dir = Path(args.hermes_dir).resolve()
@@ -610,7 +688,8 @@ def main(argv: list[str] | None = None) -> int:
     config_result = _read_runtime_config(Path(args.config_file))
     import_result = _check_imports(hermes_dir)
     mode = (
-        "followup-task" if args.verify_followup_task
+        "deadline-update" if args.verify_deadline_update
+        else "followup-task" if args.verify_followup_task
         else "archive-gate" if args.verify_archive_gate
         else "update-task" if args.verify_update_task
         else "history" if args.verify_history
@@ -638,6 +717,8 @@ def main(argv: list[str] | None = None) -> int:
         output.update(_verify_runtime_archive_gate(hermes_dir))
     if args.verify_followup_task:
         output.update(_verify_runtime_followup_task(hermes_dir))
+    if args.verify_deadline_update:
+        output.update(_verify_runtime_deadline_update(hermes_dir))
     if args.probe_llm:
         output.update(_probe_llm(config_result))
     print(json.dumps(_sanitize_result(output), ensure_ascii=False, sort_keys=True))

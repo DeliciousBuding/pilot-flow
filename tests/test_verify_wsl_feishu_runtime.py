@@ -187,6 +187,19 @@ def test_verify_runtime_followup_task_is_sanitized(tmp_path, monkeypatch):
     assert "example.invalid" not in json.dumps(result, ensure_ascii=False)
 
 
+def test_verify_runtime_deadline_update_is_sanitized(tmp_path, monkeypatch):
+    hermes_dir, _sent_cards = _install_runtime_fixture(tmp_path, monkeypatch)
+
+    result = _MODULE._verify_runtime_deadline_update(hermes_dir)
+
+    assert result["deadline_update_applied"] is True
+    assert result["deadline_calendar_created"] is True
+    assert result["deadline_attendees_added"] is True
+    assert result["deadline_reminder_scheduled"] is True
+    assert result["deadline_feedback_sent"] is True
+    assert "example.invalid" not in json.dumps(result, ensure_ascii=False)
+
+
 def test_verifier_update_task_mode_outputs_sanitized_runtime_result(tmp_path, capsys):
     env_file = tmp_path / ".env"
     env_file.write_text("PILOTFLOW_TEST_CHAT_ID=oc_real_chat_id\n", encoding="utf-8")
@@ -275,6 +288,39 @@ def test_verifier_followup_task_mode_outputs_sanitized_runtime_result(tmp_path, 
     assert output["followup_task_feedback_sent"] is True
     assert output["followup_task_artifact_recorded"] is True
     assert output["followup_task_public_update_recorded"] is True
+    assert "oc_real_chat_id" not in output_text
+    assert "example.invalid" not in output_text
+
+
+def test_verifier_deadline_update_mode_outputs_sanitized_runtime_result(tmp_path, capsys):
+    env_file = tmp_path / ".env"
+    env_file.write_text("PILOTFLOW_TEST_CHAT_ID=oc_real_chat_id\n", encoding="utf-8")
+
+    with patch.object(_MODULE, "_verify_runtime_deadline_update", return_value={
+        "deadline_update_applied": True,
+        "deadline_calendar_created": True,
+        "deadline_attendees_added": True,
+        "deadline_reminder_scheduled": True,
+        "deadline_feedback_sent": True,
+        "raw_chat_id": "oc_real_chat_id",
+        "raw_calendar_url": "https://example.invalid/calendar/1",
+    }):
+        exit_code = _MODULE.main([
+            "--hermes-dir", str(tmp_path),
+            "--env-file", str(env_file),
+            "--verify-deadline-update",
+        ])
+
+    output_text = capsys.readouterr().out
+    output = json.loads(output_text)
+    assert exit_code == 0
+    assert output["mode"] == "deadline-update"
+    assert output["would_send_card"] is False
+    assert output["deadline_update_applied"] is True
+    assert output["deadline_calendar_created"] is True
+    assert output["deadline_attendees_added"] is True
+    assert output["deadline_reminder_scheduled"] is True
+    assert output["deadline_feedback_sent"] is True
     assert "oc_real_chat_id" not in output_text
     assert "example.invalid" not in output_text
 

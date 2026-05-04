@@ -1055,6 +1055,19 @@
 | 用户价值 | PilotFlow 的后续追踪能力从单元测试进入可复跑 runtime 证据：用户打开项目详情卡后，可以直接创建跟进待办，并在群里拿到明确反馈和后续看板状态 |
 | 隐私处理 | 证据只记录布尔结果和脱敏结论；不写入真实 chat_id、message_id、Feishu URL、用户 open_id、token 或 app secret |
 
+## 2026-05-05 截止时间联动运行态验证
+
+| 项目 | 证据 |
+| --- | --- |
+| 运行环境 | PilotFlow 已通过 `setup.py --hermes-home <wsl-hermes-home>` 同步到 WSL Hermes runtime；安装验证返回插件、技能、Hermes config 和 Feishu display 配置均 OK |
+| 本地回归 | `C:\Users\Ding\miniforge3\python.exe -m pytest` 返回 `233 passed`；`tests/test_verify_wsl_feishu_runtime.py` 返回 `14 passed`；`git diff --check` 通过 |
+| Verifier 新模式 | `verify_wsl_feishu_runtime.py --verify-deadline-update` 在已安装的 WSL Hermes runtime 插件内返回 `deadline_update_applied=true`、`deadline_calendar_created=true`、`deadline_attendees_added=true`、`deadline_reminder_scheduled=true`、`deadline_feedback_sent=true` |
+| 飞书联动路径 | verifier 通过生产 `pilotflow_update_project` 的 `update_deadline` 分支执行，dry-run 替换日历和 Hermes cronjob 写入，证明安装态插件会调用日历事件、成员邀请和截止提醒路径 |
+| 群反馈 | 运行态结果确认群反馈包含“日历事件已更新”“日历参与人已邀请”“截止提醒已设置”，让用户在群里能看到截止时间联动已经完成 |
+| 基线验证 | 同轮继续通过 `--probe-llm` 的 `llm_probe_ok=true`、`llm_probe_status=200`，`--send-card` 的 `card_sent=true`、`card_has_title=true`、`card_has_goal=true`、`card_has_risk=true`，`--verify-history` 的 `history_apply_card_sent=true`，`--verify-update-task` 的 `update_task_created=true`，`--verify-archive-gate` 的 `archive_gate_required=true`，以及 `--verify-followup-task` 的 `followup_task_created=true` |
+| 用户价值 | 项目截止时间变更不只是改字段，而是同步到飞书日历、项目成员邀请、Hermes 截止提醒和群通知，补强“后续追踪”的真实办公闭环 |
+| 隐私处理 | 证据只记录布尔结果和脱敏结论；不写入真实 chat_id、message_id、Feishu URL、用户 open_id、token 或 app secret |
+
 ## 本地回归
 
 ```bash
