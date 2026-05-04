@@ -81,6 +81,18 @@
 | 真实 Feishu 卡片验证 | WSL `verify_wsl_feishu_runtime.py --send-card` 成功：`card_sent=true`、`card_has_title=true`、`card_has_goal=true`、`card_has_risk=true`、`pending_plan_recovered=true`、`card_action_recovered=true`、`redaction_enabled=true` |
 | 隐私处理 | 验证只记录布尔结果和脱敏状态；不写入真实 chat_id、message_id、Feishu URL、任务 ID、confirm token、idempotency key、token 或 app secret |
 
+## 2026-05-04 初始风险最近进展追踪
+
+| 项目 | 证据 |
+| --- | --- |
+| 功能硬化 | `pilotflow_create_project_space` 创建带 `risks` 的项目时，会把最多 3 条初始风险写入 registry 和 restart-safe state 的 `updates`，作为 `action=风险` 的最近进展 |
+| 后续追踪 | 新增回归验证：带初始风险创建项目后，项目详情卡 `project_status` 会展示 `**最近进展：** API 审批可能卡住`，重启后 state 也保留该脱敏风险进展 |
+| 自动化验证 | `C:\Users\Ding\miniforge3\python.exe -m pytest` 通过，结果 `212 passed`；`git diff --check` 通过，仅有 CRLF 提示 |
+| WSL 安装验证 | `setup.py --hermes-dir D:\Code\LarkProject\hermes-agent --hermes-home \\wsl.localhost\Ubuntu-24.04\home\ding\.hermes` 通过；插件和 skill 已同步到 WSL Hermes runtime profile |
+| WSL 模型预检 | WSL `verify_wsl_feishu_runtime.py --probe-llm` 输出脱敏通过：`llm_probe_ok=true`、`llm_probe_provider=vectorcontrol`、`llm_probe_status=200` |
+| 真实 Feishu 卡片验证 | WSL `verify_wsl_feishu_runtime.py --send-card` 成功：`card_sent=true`、`card_has_title=true`、`card_has_goal=true`、`card_has_risk=true`、`pending_plan_recovered=true`、`card_action_recovered=true`、`redaction_enabled=true` |
+| 隐私处理 | 验证只记录布尔结果和脱敏状态；不写入真实 chat_id、message_id、Feishu URL、任务 ID、confirm token、idempotency key、token 或 app secret |
+
 ## 2026-05-04 卡片输入安全与 WSL 安装复验
 
 | 项目 | 证据 |

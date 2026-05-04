@@ -1905,6 +1905,67 @@ def test_create_project_with_initial_risks_is_registered_as_risk_project():
     assert "初始风险项目" in captured["card"]["elements"][0]["text"]["content"]
 
 
+def test_create_project_with_initial_risks_records_recent_update_for_detail_card():
+    chat_id = "oc_initial_risk_update"
+
+    with _project_registry_lock:
+        _project_registry.clear()
+    with _plan_lock:
+        _pending_plans.clear()
+        _card_action_refs.clear()
+
+    with (
+        patch("tools._create_doc", return_value="https://example.invalid/doc"),
+        patch("tools._create_bitable", return_value={
+            "url": "https://example.invalid/base",
+            "app_token": "app1",
+            "table_id": "tbl1",
+            "record_id": "rec1",
+        }),
+        patch("tools._create_task", return_value="任务已创建"),
+        patch("tools._hermes_send_card", return_value="om_initial_risk_update"),
+        patch("tools._create_calendar_event", return_value=None),
+        patch("tools._schedule_deadline_reminder", return_value=False),
+        patch("tools._save_to_hermes_memory", return_value=True),
+    ):
+        result = json.loads(_handle_create_project_space(
+            {
+                "title": "初始风险进展项目",
+                "goal": "验证初始风险进入详情进展",
+                "members": [],
+                "deliverables": ["验证记录"],
+                "deadline": "2026-05-12",
+                "risks": ["API 审批可能卡住"],
+            },
+            chat_id=chat_id,
+            chat_scope="private",
+        ))
+
+    assert result["status"] == "project_space_created"
+    with _project_registry_lock:
+        assert _project_registry["初始风险进展项目"]["updates"][-1] == {
+            "action": "风险",
+            "value": "API 审批可能卡住",
+        }
+    saved = _load_project_state()
+    saved_project = next(project for project in saved if project["title"] == "初始风险进展项目")
+    assert saved_project["updates"][-1] == {"action": "风险", "value": "API 审批可能卡住"}
+
+    captured = {}
+    action_value = _opaque_card_action_value("oc_initial_risk_detail", "project_status", {"title": "初始风险进展项目"})
+
+    def capture_card(_chat_id, card):
+        captured["card"] = card
+        return "om_initial_risk_detail"
+
+    with patch("tools._hermes_send_card", side_effect=capture_card):
+        detail_result = json.loads(_handle_card_action({"action_value": action_value}, chat_id="oc_initial_risk_detail"))
+
+    assert detail_result["status"] == "project_status_sent"
+    body = captured["card"]["elements"][0]["content"]
+    assert "**最近进展：** API 审批可能卡住" in body
+
+
 def test_duplicate_confirmation_after_create_is_idempotent():
     chat_id = "oc_duplicate_confirmation"
     with _project_registry_lock:

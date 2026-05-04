@@ -407,7 +407,8 @@ def _idempotent_project_cache_payload(result: dict) -> dict:
 
 def _register_project(title: str, members: list, deadline: str, status: str, artifacts: list,
                       app_token: str = "", table_id: str = "", record_id: str = "",
-                      goal: str = "", deliverables: Optional[list] = None):
+                      goal: str = "", deliverables: Optional[list] = None,
+                      updates: Optional[list] = None):
     """Register a project in the in-memory registry for query_status and update_project."""
     with _project_registry_lock:
         if len(_project_registry) >= _PROJECT_REGISTRY_MAX:
@@ -421,7 +422,7 @@ def _register_project(title: str, members: list, deadline: str, status: str, art
             "status": status,
             "created_at": time.time(),
             "artifacts": artifacts,
-            "updates": [],
+            "updates": _clean_recent_updates(updates),
             "app_token": app_token,
             "table_id": table_id,
             "record_id": record_id,
@@ -3572,6 +3573,7 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
         return tool_error("创建失败，请检查飞书应用凭证配置。")
 
     initial_status = "有风险" if risks else "进行中"
+    initial_updates = [{"action": "风险", "value": risk} for risk in risks[:3]]
 
     # Register in memory for query_status and update_project
     _register_project(
@@ -3581,6 +3583,7 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
         record_id=bitable_meta.get("record_id", "") if bitable_meta else "",
         goal=goal,
         deliverables=deliverables,
+        updates=initial_updates,
     )
 
     # Save project pattern to Hermes memory for later history-based suggestions.
@@ -3590,6 +3593,7 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
         app_token=bitable_meta.get("app_token", "") if bitable_meta else "",
         table_id=bitable_meta.get("table_id", "") if bitable_meta else "",
         record_id=bitable_meta.get("record_id", "") if bitable_meta else "",
+        updates=initial_updates,
     )
 
     # Schedule deadline reminder via Hermes cron (if deadline is set)
