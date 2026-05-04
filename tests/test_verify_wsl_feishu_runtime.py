@@ -332,6 +332,7 @@ def test_verify_runtime_health_check_is_sanitized(tmp_path, monkeypatch):
     assert result["health_has_state_path_status"] is True
     assert result["health_memory_flags_reported"] is True
     assert result["health_card_bridge_registered"] is True
+    assert result["health_skill_guidance_current"] is True
     serialized = json.dumps(result, ensure_ascii=False)
     assert "sentinel_app_id_should_not_leak" not in serialized
     assert "sentinel_secret_should_not_leak" not in serialized
@@ -820,6 +821,7 @@ def test_verifier_health_check_mode_outputs_sanitized_runtime_result(tmp_path, c
         "health_has_state_path_status": True,
         "health_memory_flags_reported": True,
         "health_card_bridge_registered": True,
+        "health_skill_guidance_current": True,
         "raw_chat_id": "oc_real_chat_id",
         "raw_secret": "real_secret",
     }):
@@ -842,6 +844,7 @@ def test_verifier_health_check_mode_outputs_sanitized_runtime_result(tmp_path, c
     assert output["health_has_state_path_status"] is True
     assert output["health_memory_flags_reported"] is True
     assert output["health_card_bridge_registered"] is True
+    assert output["health_skill_guidance_current"] is True
     assert "oc_real_chat_id" not in output_text
     assert "real_secret" not in output_text
 

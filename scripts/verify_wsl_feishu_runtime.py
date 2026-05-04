@@ -114,6 +114,7 @@ def _sanitize_result(result: dict[str, Any]) -> dict[str, Any]:
         "health_has_state_path_status",
         "health_memory_flags_reported",
         "health_card_bridge_registered",
+        "health_skill_guidance_current",
         "history_suggestion_found",
         "history_apply_action_found",
         "history_apply_card_sent",
@@ -316,6 +317,7 @@ def _verify_runtime_health_check(hermes_dir: Path) -> dict[str, Any]:
             and checks.get("memory_read") in {"开启", "关闭"}
         ),
         "health_card_bridge_registered": checks.get("card_bridge") == "已注册",
+        "health_skill_guidance_current": checks.get("skill_guidance") == "已同步",
     }
 
 

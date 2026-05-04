@@ -1244,6 +1244,19 @@
 | 用户价值 | 安装、演示或故障排查时，用户可以先让 PilotFlow 自检当前 Hermes/Feishu 运行环境，减少靠猜配置、猜日志定位问题 |
 | 隐私处理 | 证据只记录布尔结果和脱敏结论；不写入真实 chat_id、message_id、Feishu URL、用户 open_id、token 或 app secret |
 
+## 2026-05-05 Agent 指引同步运行态验证
+
+| 项目 | 证据 |
+| --- | --- |
+| 运行环境 | PilotFlow 已通过 `setup.py --hermes-home <wsl-hermes-home>` 同步到 WSL Hermes runtime；安装验证返回插件、技能、Hermes config 和 Feishu display 配置均 OK |
+| 本地回归 | `C:\Users\Ding\miniforge3\python.exe -m pytest` 返回 `262 passed`；定向 health/skill/setup/registration 测试返回 `8 passed`；`git diff --check` 通过 |
+| Agent 决策入口 | `skills/pilotflow/SKILL.md` 已从 7 个工具更新为 8 个工具，补齐 `pilotflow_health_check`，并明确 `remove_member`、`add_progress`、`add_risk`、`resolve_risk`、`send_reminder` 等真实办公动作的触发和确认边界 |
+| 安装态诊断 | `verify_wsl_feishu_runtime.py --verify-health-check` 在已安装的 WSL Hermes runtime 插件内返回 `health_skill_guidance_current=true`，同时保留 `health_check_ok=true`、`health_check_sanitized=true`、`health_card_bridge_registered=true` |
+| 防漂移测试 | `tests/test_plugin_registration.py` 会检查每个已注册 PilotFlow 工具都出现在 Hermes skill 指引中，并检查所有 update action 已写入 Agent 指引；`tests/test_setup.py` 会检查安装复制后的 skill 含有 health、催办和成员移除能力 |
+| 基线验证 | 同轮继续通过 `--probe-llm` 的 `llm_probe_ok=true`、`llm_probe_status=200`，以及 `--verify-projectization-suggestion` 的 `projectization_suggestion_sent=true`、`projectization_plan_card_sent=true`、`projectization_risks_preserved=true`、`projectization_action_items_preserved=true` |
+| 用户价值 | PilotFlow 的已安装 Agent 指引不再停留在早期基础工具面；Hermes 能在群聊中选择诊断、风险闭环、进展记录、归档、成员移除和催办等真实办公动作，而不是只会创建项目或查询状态 |
+| 隐私处理 | 证据只记录布尔结果和脱敏结论；不写入真实 chat_id、message_id、Feishu URL、用户 open_id、token 或 app secret |
+
 ## 本地回归
 
 ```bash
@@ -1253,7 +1266,7 @@ C:\Users\Ding\miniforge3\python.exe -m pytest tests\test_tools.py tests\test_set
 结果：
 
 ```text
-261 passed
+262 passed
 ```
 
 ## 当前证据边界

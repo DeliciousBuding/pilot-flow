@@ -682,6 +682,7 @@ def test_health_check_returns_sanitized_runtime_status():
     assert result["checks"]["feishu_client"] == "可用"
     assert result["checks"]["chat_context"] == "已检测"
     assert result["checks"]["state_path"] == "已配置"
+    assert result["checks"]["skill_guidance"] == "已同步"
     assert "sentinel_app_id_should_not_leak" not in raw
     assert "sentinel_secret_should_not_leak" not in raw
     assert "oc_sentinel_chat_should_not_leak" not in raw

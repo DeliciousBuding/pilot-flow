@@ -1870,6 +1870,34 @@ def _state_path_status() -> str:
     return "默认位置"
 
 
+_SKILL_REQUIRED_TERMS = (
+    "pilotflow_scan_chat_signals",
+    "pilotflow_generate_plan",
+    "pilotflow_detect_risks",
+    "pilotflow_create_project_space",
+    "pilotflow_handle_card_action",
+    "pilotflow_query_status",
+    "pilotflow_update_project",
+    "pilotflow_health_check",
+    "remove_member",
+    "add_progress",
+    "add_risk",
+    "resolve_risk",
+    "send_reminder",
+)
+
+
+def _skill_guidance_status() -> str:
+    """Check installed Hermes skill guidance without exposing local paths."""
+    skill_path = Path(__file__).resolve().parents[2] / "skills" / "pilotflow" / "SKILL.md"
+    try:
+        skill_text = skill_path.read_text(encoding="utf-8")
+    except OSError:
+        return "不可读取"
+    missing = [term for term in _SKILL_REQUIRED_TERMS if term not in skill_text]
+    return "已同步" if not missing else "缺少能力说明"
+
+
 def _handle_health_check(params: Dict[str, Any], **kwargs) -> str:
     """Return a sanitized runtime health report for PilotFlow."""
     chat_id = _get_chat_id(kwargs)
@@ -1884,6 +1912,7 @@ def _handle_health_check(params: Dict[str, Any], **kwargs) -> str:
         "memory_write": "开启" if MEMORY_ENABLED else "关闭",
         "memory_read": "开启" if MEMORY_READ_ENABLED else "关闭",
         "card_bridge": "已注册",
+        "skill_guidance": _skill_guidance_status(),
     }
     blocking = [
         name for name in ("feishu_credentials", "lark_oapi", "feishu_client")
@@ -1897,6 +1926,8 @@ def _handle_health_check(params: Dict[str, Any], **kwargs) -> str:
         suggestions.append("请安装 Feishu SDK 依赖后重启 Hermes。")
     if checks["chat_context"] == "缺失":
         suggestions.append("请从飞书群聊触发，或提供当前会话 chat 上下文。")
+    if checks["skill_guidance"] != "已同步":
+        suggestions.append("请重新运行 PilotFlow 安装脚本，同步 Hermes skill 指引。")
     if not suggestions:
         suggestions.append("核心配置可用，可以继续创建或更新项目。")
 

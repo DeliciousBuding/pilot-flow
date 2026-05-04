@@ -4,6 +4,7 @@ import json
 import os
 import sys
 import types
+from pathlib import Path
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
@@ -48,6 +49,38 @@ def test_register_exposes_expected_tools():
     assert all(call["schema"]["name"] == call["name"] for call in ctx.calls)
     assert all(call["handler"] is not None for call in ctx.calls)
     assert all(call["check_fn"] is not None for call in ctx.calls)
+
+
+def test_skill_guidance_mentions_every_registered_tool_and_action():
+    ctx = FakeContext()
+
+    pilotflow.register(ctx)
+
+    skill_text = Path(__file__).resolve().parents[1].joinpath(
+        "skills", "pilotflow", "SKILL.md"
+    ).read_text(encoding="utf-8")
+    description_text = Path(__file__).resolve().parents[1].joinpath(
+        "skills", "pilotflow", "DESCRIPTION.md"
+    ).read_text(encoding="utf-8")
+
+    for call in ctx.calls:
+        assert call["name"] in skill_text
+
+    for action in [
+        "update_deadline",
+        "add_member",
+        "remove_member",
+        "add_deliverable",
+        "add_progress",
+        "add_risk",
+        "resolve_risk",
+        "update_status",
+        "send_reminder",
+    ]:
+        assert action in skill_text
+
+    for capability in ["运行诊断", "风险闭环", "归档", "催办"]:
+        assert capability in description_text
 
 
 def test_register_exposes_card_slash_bridge():

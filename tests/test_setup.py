@@ -299,6 +299,10 @@ def test_copy_plugin_and_skills_to_hermes_layout(tmp_path):
     assert (hermes_dir / "plugins" / "pilotflow" / "plugin.yaml").exists()
     assert (hermes_dir / "skills" / "pilotflow" / "SKILL.md").exists()
     assert (hermes_dir / "skills" / "pilotflow" / "DESCRIPTION.md").exists()
+    installed_skill = (hermes_dir / "skills" / "pilotflow" / "SKILL.md").read_text(encoding="utf-8")
+    assert "pilotflow_health_check" in installed_skill
+    assert "send_reminder" in installed_skill
+    assert "remove_member" in installed_skill
     assert setup.validate_install(str(hermes_dir)) is True
 
 
