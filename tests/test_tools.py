@@ -5059,6 +5059,7 @@ def test_card_action_mark_done_uses_updated_state_project_in_doc_after_restart(t
     assert result["status"] == "project_marked_done"
     assert result["doc_updated"] is True
     assert projects[0]["status"] == "已完成"
+    assert projects[0]["updates"][-1] == {"action": "状态", "value": "已完成"}
     append_doc.assert_called_once()
     restored_project = append_doc.call_args.args[1]
     assert restored_project["status"] == "已完成"

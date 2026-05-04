@@ -3770,13 +3770,16 @@ def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
                 project["app_token"], project["table_id"], project["record_id"],
                 bitable_fields,
             )
+        doc_label = "风险解除" if pilotflow_action == "resolve_risk" else "状态"
+        doc_value = "风险已解除" if pilotflow_action == "resolve_risk" else target_status
+        updates = list(project.get("updates", []))
+        updates.append({"action": doc_label, "value": doc_value})
+        project["updates"] = updates
         _save_project_state(
             project_title, project.get("goal", ""), project.get("members", []),
             project.get("deliverables", []), project.get("deadline", ""), target_status,
-            project.get("artifacts", []), updates=project.get("updates", []),
+            project.get("artifacts", []), updates=updates,
         )
-        doc_label = "风险解除" if pilotflow_action == "resolve_risk" else "状态"
-        doc_value = "风险已解除" if pilotflow_action == "resolve_risk" else target_status
         doc_updated = _append_project_doc_update(project_title, project, doc_label, doc_value)
 
         suffix_parts = []
