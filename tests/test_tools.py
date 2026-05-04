@@ -1944,6 +1944,60 @@ def test_standup_briefing_overdue_button_sends_batch_reminders():
     append_history.assert_called_once()
 
 
+def test_briefing_batch_reminder_uses_state_projects_after_restart(tmp_path):
+    state_path = tmp_path / "pilotflow-projects.json"
+    with _project_registry_lock:
+        _project_registry.clear()
+    overdue = (dt.date.today() - dt.timedelta(days=1)).isoformat()
+    future = (dt.date.today() + dt.timedelta(days=5)).isoformat()
+    with patch.dict(os.environ, {"PILOTFLOW_STATE_PATH": str(state_path)}):
+        _save_project_state(
+            "重启逾期催办项目",
+            "验证重启后批量催办",
+            [],
+            ["验收记录"],
+            overdue,
+            "进行中",
+            ["文档: https://example.invalid/docx/doc_reminder_restart"],
+        )
+        _save_project_state(
+            "重启未逾期催办项目",
+            "验证重启后批量催办过滤",
+            [],
+            ["验收记录"],
+            future,
+            "进行中",
+            ["文档: https://example.invalid/docx/doc_reminder_future"],
+        )
+        sent_messages = []
+        with (
+            patch("tools._hermes_send", side_effect=lambda chat_id, msg: sent_messages.append((chat_id, msg)) or True),
+            patch("tools._append_project_doc_update", return_value=True) as append_doc,
+            patch("tools._append_bitable_update_record", return_value=True) as append_history,
+        ):
+            result = json.loads(_handle_card_action(
+                {"action_value": json.dumps({"pilotflow_action": "briefing_batch_reminder", "filter": "overdue", "value": "请今天同步进展"}, ensure_ascii=False)},
+                chat_id="oc_restart_batch_reminder",
+            ))
+
+    assert result["status"] == "briefing_batch_reminder_sent"
+    assert result["source"] == "state"
+    assert result["filter"] == "overdue"
+    assert result["reminder_count"] == 1
+    assert result["projects"] == ["重启逾期催办项目"]
+    assert len(sent_messages) == 1
+    assert sent_messages[0][0] == "oc_restart_batch_reminder"
+    assert "重启逾期催办项目" in sent_messages[0][1]
+    assert "相关负责人" in sent_messages[0][1]
+    assert "重启未逾期催办项目" not in sent_messages[0][1]
+    append_doc.assert_called_once()
+    restored_project = append_doc.call_args.args[1]
+    assert "文档: https://example.invalid/docx/doc_reminder_restart" in restored_project["artifacts"]
+    append_history.assert_not_called()
+    serialized = state_path.read_text(encoding="utf-8")
+    assert "example.invalid" not in serialized
+
+
 def test_card_command_briefing_batch_reminder_updates_card_after_success():
     with _project_registry_lock:
         _project_registry.clear()

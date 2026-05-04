@@ -983,6 +983,35 @@ def _load_project_resource_refs(title: str) -> list[str]:
     return _safe_resource_artifacts(refs.get("artifacts"))
 
 
+def _state_project_candidate(title: str, item: dict) -> dict:
+    """Build an execution candidate from sanitized state plus private resource refs."""
+    return {
+        "goal": item.get("goal", ""),
+        "members": [],
+        "deliverables": item.get("deliverables", []),
+        "deadline": item.get("deadline", ""),
+        "status": item.get("status", "进行中"),
+        "artifacts": _load_project_resource_refs(title),
+        "updates": item.get("updates", []),
+        "app_token": "",
+        "table_id": "",
+        "record_id": "",
+    }
+
+
+def _load_state_project_candidates(status_filter: str) -> list[tuple[str, dict, str]]:
+    """Load restart-safe project candidates for status-only batch actions."""
+    candidates: list[tuple[str, dict, str]] = []
+    for item in _load_project_state():
+        title = item.get("title") or ""
+        if not title:
+            continue
+        state_project = _state_project_candidate(title, item)
+        if _project_matches_status_filter(state_project, status_filter):
+            candidates.append((title, state_project, "state"))
+    return candidates
+
+
 def _save_project_state(title: str, goal: str, members: list, deliverables: list, deadline: str,
                         status: str, artifacts: Optional[list] = None, app_token: str = "",
                         table_id: str = "", record_id: str = "",
@@ -3829,24 +3858,7 @@ def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
                 and (not member_filters or any(member in set(_project_member_names({"detail_project": info})) for member in member_filters))
             ]
         if not candidate_projects and not member_filters:
-            for item in _load_project_state():
-                title = item.get("title") or ""
-                if not title:
-                    continue
-                state_project = {
-                    "goal": item.get("goal", ""),
-                    "members": [],
-                    "deliverables": item.get("deliverables", []),
-                    "deadline": item.get("deadline", ""),
-                    "status": item.get("status", "进行中"),
-                    "artifacts": _load_project_resource_refs(title),
-                    "updates": item.get("updates", []),
-                    "app_token": "",
-                    "table_id": "",
-                    "record_id": "",
-                }
-                if _project_matches_status_filter(state_project, status_filter):
-                    candidate_projects.append((title, state_project, "state"))
+            candidate_projects = _load_state_project_candidates(status_filter)
         created_projects: list[str] = []
         sources = set()
         for project_name, project, source in candidate_projects:
@@ -4611,16 +4623,20 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
                         continue
                     if member_filters and not any(member in set(_project_member_names(item)) for member in member_filters):
                         continue
-                    candidates.append((item["name"], item["detail_project"]))
+                    candidates.append((item["name"], item["detail_project"], "registry"))
+            if not candidates and not member_filters:
+                candidates = _load_state_project_candidates(batch_filter)
             sent_count = 0
             doc_count = 0
             bitable_count = 0
             sent_projects = []
-            for title, info in candidates:
+            sources = set()
+            for title, info, source in candidates:
                 trace = send_reminder_for_project(title, info)
                 if trace["sent"]:
                     sent_count += 1
                     sent_projects.append(title)
+                    sources.add(source)
                 if trace["doc_trace"]:
                     doc_count += 1
                 if trace["bitable_trace"]:
@@ -4633,6 +4649,7 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
                 "projects": sent_projects,
                 "doc_trace_count": doc_count,
                 "bitable_trace_count": bitable_count,
+                "source": "state" if sources == {"state"} else "registry",
                 "instructions": (
                     f"用中文回复：已发送 {sent_count} 个项目催办提醒。"
                     + ("没有匹配项目时请提示用户当前无需催办。" if sent_count == 0 else "")
