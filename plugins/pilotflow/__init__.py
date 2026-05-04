@@ -7,6 +7,7 @@ Drop this plugin into Hermes's plugins/ directory to enable.
 from __future__ import annotations
 
 from plugins.pilotflow.tools import (
+    PILOTFLOW_SCAN_CHAT_SIGNALS_SCHEMA,
     PILOTFLOW_GENERATE_PLAN_SCHEMA,
     PILOTFLOW_DETECT_RISKS_SCHEMA,
     PILOTFLOW_CREATE_PROJECT_SPACE_SCHEMA,
@@ -14,6 +15,7 @@ from plugins.pilotflow.tools import (
     PILOTFLOW_QUERY_STATUS_SCHEMA,
     PILOTFLOW_UPDATE_PROJECT_SCHEMA,
     PILOTFLOW_HEALTH_CHECK_SCHEMA,
+    _handle_scan_chat_signals,
     _handle_generate_plan,
     _handle_detect_risks,
     _handle_create_project_space,
@@ -27,6 +29,7 @@ from plugins.pilotflow.tools import (
 
 
 _TOOLS = (
+    ("pilotflow_scan_chat_signals", PILOTFLOW_SCAN_CHAT_SIGNALS_SCHEMA, _handle_scan_chat_signals, "🛰️"),
     ("pilotflow_generate_plan", PILOTFLOW_GENERATE_PLAN_SCHEMA, _handle_generate_plan, "📋"),
     ("pilotflow_detect_risks", PILOTFLOW_DETECT_RISKS_SCHEMA, _handle_detect_risks, "⚠️"),
     ("pilotflow_create_project_space", PILOTFLOW_CREATE_PROJECT_SPACE_SCHEMA, _handle_create_project_space, "🚀"),

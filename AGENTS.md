@@ -2,7 +2,7 @@
 
 ## Project
 
-PilotFlow is a Hermes Agent plugin for Feishu group chat project management. Users @PilotFlow in a group chat, describe a project, and it creates real Feishu artifacts (docs, bitable, tasks, messages).
+PilotFlow is a Hermes Agent plugin for Feishu group chat project supervision. Users @PilotFlow in a group chat, describe or discuss work, and Hermes decides whether to plan, ask follow-up questions, suggest projectization, or execute real Feishu artifacts (docs, bitable, tasks, messages).
 
 ## Structure
 
@@ -33,6 +33,15 @@ PilotFlow/
 - **Confirmation gate**: per-chat_id with TTL, prevents execution without user confirmation
 - **Card actions**: PilotFlow registers a plugin `/card` bridge for Hermes-routed Feishu button clicks; `pilotflow_handle_card_action` confirms/cancels using pending plan state
 
+## Intelligence Boundary
+
+- Hermes Agent owns semantic understanding: intent recognition, context summarization, missing-info judgment, projectization suggestions, and extraction of goals/commitments/risks/action items.
+- PilotFlow tools own execution: validation, confirmation gates, Feishu API writes, card rendering, state persistence, reminders, and safe follow-up actions.
+- Do not implement Agent behavior with keyword lists, regex intent classifiers, or hardcoded Chinese phrase matching in `plugins/pilotflow/tools.py`.
+- Keyword or regex logic is allowed only for execution-layer parsing with narrow deterministic semantics, such as ISO/Chinese date normalization, explicit project-name fuzzy lookup, Feishu mention cleanup, URL/resource extraction, and safety gates.
+- If a feature needs "understanding", expose structured schema fields and update `skills/pilotflow/SKILL.md` so Hermes supplies the semantic result. The tool should not infer meaning from raw chat text.
+- Tests for Agent-facing tools should assert structured input/output and safety behavior, not that a keyword phrase is classified as a specific intent.
+
 ## Conventions
 
 - All user-facing text in Chinese
@@ -42,7 +51,7 @@ PilotFlow/
 
 ## Testing
 
-- Local tests: `uv run --with pytest pytest -o addopts='' -q` in `PilotFlow/` (142 passing as of 2026-05-04)
+- Local tests: `C:\Users\Ding\miniforge3\python.exe -m pytest tests\test_tools.py tests\test_setup.py tests\test_plugin_registration.py -q`
 - Gateway test: `uv run hermes gateway` in hermes-agent directory
 - Direct tool test: set `PILOTFLOW_TEST_CHAT_ID` env var
 - End-to-end: @PilotFlow in Feishu group chat
@@ -57,5 +66,5 @@ PilotFlow/
 
 - Run `pytest -q` before committing.
 - Run `python setup.py --hermes-dir <hermes-agent-path>` after plugin changes.
-- In the Hermes runtime, import `plugins.pilotflow` and verify six registered tools.
+- In the Hermes runtime, import `plugins.pilotflow` and verify registered tools.
 - For release claims, separate local test evidence from real Feishu live evidence.

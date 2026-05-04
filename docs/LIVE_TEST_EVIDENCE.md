@@ -650,16 +650,29 @@
 | 用户价值 | 既保留卡片确认，也支持群里直接回复确认，减少对固定按钮路径的依赖 |
 | 隐私处理 | 真实 chat_id、open_id、message_id、文档 URL、状态表 URL、任务 ID 和 token 不写入公开仓库 |
 
+## 2026-05-04 聊天信号项目化建议卡场景
+
+| 项目 | 证据 |
+| --- | --- |
+| 运行环境 | WSL 中 Hermes gateway 已启动，PilotFlow 已通过 `setup.py --hermes-dir <hermes-agent-path>` 同步到 runtime |
+| Agent/工具边界 | Hermes 负责语义总结并传入结构化 `signals`、`suggested_project`、`should_suggest_project`；PilotFlow 工具不再从原始聊天用关键词或正则推断意图 |
+| 验证方式 | 在 WSL Hermes runtime 中直接调用已安装的 `pilotflow_scan_chat_signals`，输入 Hermes 已总结的目标、承诺、风险、行动项和建议项目草案 |
+| 工具输出 | 工具输出确认 `status=projectization_suggested`、`card_sent=true` |
+| 群聊回读 | 通过 `lark-cli im +chat-messages-list --as user` 回读真实测试群，最新消息为 `interactive` 卡片，内容只展示结构化目标、承诺、风险和行动项，没有再把整句聊天重复归类 |
+| 产品价值 | 证明 PilotFlow 可以作为飞书项目之前的群聊意图层：当聊天形成目标/承诺/风险/行动项时，先冒泡询问是否项目化，再进入现有计划确认链路 |
+| 已知边界 | 14:22 的完整 @Bot 自动调用曾暴露 Hermes 模型侧 `HTTP 401 auth_unavailable` 错误；本次验证证明 PilotFlow 执行层和飞书卡片链路可用，但完整 Agent 自动巡检仍依赖 Hermes 模型认证恢复 |
+| 隐私处理 | 真实 chat_id、open_id、message_id、Feishu URL、token 和 app secret 不写入公开仓库 |
+
 ## 本地回归
 
 ```bash
-uv run --with pytest pytest -o addopts='' -q
+C:\Users\Ding\miniforge3\python.exe -m pytest tests\test_tools.py tests\test_setup.py tests\test_plugin_registration.py -q
 ```
 
 结果：
 
 ```text
-143 passed
+153 passed
 ```
 
 ## 当前证据边界

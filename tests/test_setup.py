@@ -114,6 +114,76 @@ def test_check_env_explains_matching_lark_cli_secret_boundary(tmp_path, capsys):
     assert "do-not-print-this" not in output
 
 
+def test_check_lark_cli_alignment_reports_matching_profile(tmp_path, capsys):
+    env_file = tmp_path / ".env"
+    env_file.write_text(
+        "\n".join(
+            [
+                "OPENAI_API_KEY=sk-test",
+                "FEISHU_APP_ID=cli_testvalue",
+                "FEISHU_APP_SECRET=real-secret",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    config_file = tmp_path / "config.json"
+    config_file.write_text(
+        """
+{
+  "apps": [
+    {
+      "name": "pilotflow-contest",
+      "appId": "cli_testvalue",
+      "appSecret": {
+        "source": "keychain"
+      }
+    }
+  ]
+}
+""",
+        encoding="utf-8",
+    )
+
+    assert setup.check_lark_cli_alignment(str(env_file), lark_cli_config_file=str(config_file)) is True
+    output = capsys.readouterr().out
+    assert "lark-cli profile aligned with FEISHU_APP_ID" in output
+
+
+def test_check_lark_cli_alignment_warns_on_mismatch(tmp_path, capsys):
+    env_file = tmp_path / ".env"
+    env_file.write_text(
+        "\n".join(
+            [
+                "OPENAI_API_KEY=sk-test",
+                "FEISHU_APP_ID=cli_testvalue",
+                "FEISHU_APP_SECRET=real-secret",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    config_file = tmp_path / "config.json"
+    config_file.write_text(
+        """
+{
+  "apps": [
+    {
+      "name": "pilotflow-contest",
+      "appId": "cli_other",
+      "appSecret": {
+        "source": "keychain"
+      }
+    }
+  ]
+}
+""",
+        encoding="utf-8",
+    )
+
+    assert setup.check_lark_cli_alignment(str(env_file), lark_cli_config_file=str(config_file)) is False
+    output = capsys.readouterr().out
+    assert "No matching lark-cli profile found" in output
+
+
 def test_check_env_accepts_configured_values(tmp_path):
     env_file = tmp_path / ".env"
     env_file.write_text(

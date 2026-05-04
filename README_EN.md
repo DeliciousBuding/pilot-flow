@@ -127,12 +127,14 @@ uv run hermes gateway
 
 | Dimension | Feishu Miaoji/Projects | PilotFlow |
 | --- | --- | --- |
-| Positioning | Meeting notes / project space | Group chat project operator |
-| Entry Point | Meeting / workspace | Feishu group chat @mention |
-| Workflow | Meeting → todo / project flow | One sentence → docs + tasks + messages |
-| AI Workflow | Focused on meeting/project-space scenarios | Group-chat request, LLM tool choice, and executable project workflow |
-| Learning | Depends on built-in Feishu product behavior | Hermes memory write is implemented; memory read and automatic suggestions are next |
+| Positioning | Mature project/meeting/collaboration workspace | Project supervisor Agent in group chat, not a Feishu Projects replacement |
+| Entry Point | Workspace, project space, meeting scenarios | Natural Feishu group/private chat and @mentions |
+| Core Advantage | Complete structured project-management surface | Reads scattered chat goals, commitments, risks, and action items, then pushes them into docs, tasks, reminders, or projectization suggestions |
+| AI Workflow | Product-surface scenario enhancement | Hermes understands context and chooses the next step; PilotFlow handles confirmation gates and Feishu execution |
+| Relationship to Feishu Projects | Project system of record | Upstream intent and orchestration layer; future Feishu Projects API should become the authoritative backend |
 | Extensibility | Mostly within Feishu product surfaces | Hermes plugins/skills/cron/memory plus Feishu OpenAPI orchestration |
+
+PilotFlow should not compete by rebuilding Feishu Projects. Its advantage is the pre-project layer: before work is formalized, the Agent can read chat context, ask missing questions, suggest projectization, and write confirmed outcomes into Feishu docs, tasks, Base, calendar reminders, or eventually Feishu Projects as the system of record.
 
 ## Documentation
 

@@ -58,6 +58,7 @@ from tools import (
     _append_bitable_update_record,
     _create_calendar_event,
     _create_card_action_ref,
+    _handle_scan_chat_signals,
     _handle_card_action,
     _handle_card_command,
     _env_positive_int,
@@ -68,8 +69,117 @@ from tools import (
     _handle_health_check,
     _pending_plans,
     _card_action_refs,
+    _recent_confirmed_projects,
     _plan_lock,
+    _get_chat_scope,
+    _needs_confirmation_for_create,
+    _needs_confirmation_for_update,
 )
+
+
+def test_scan_chat_signals_suggests_projectization_card(monkeypatch):
+    sent_cards = []
+
+    def fake_send_card(chat_id, card):
+        sent_cards.append({"chat_id": chat_id, "card": card})
+        return "om_signal_card"
+
+    monkeypatch.setattr("tools._hermes_send_card", fake_send_card)
+
+    result = json.loads(_handle_scan_chat_signals({
+        "source_text": "Hermes 已总结最近群聊：真实链路验证有目标、承诺、风险和提醒。",
+        "signals": {
+            "goals": ["下周五前完成 PilotFlow 真实链路验证"],
+            "commitments": ["我来整理验证记录", "唐丁负责回滚方案"],
+            "risks": ["审批可能卡住"],
+            "action_items": ["提醒大家同步进度"],
+            "deadlines": ["2026-05-08"],
+        },
+        "suggested_project": {
+            "title": "PilotFlow 真实链路验证项目",
+            "goal": "完成 PilotFlow 真实链路验证",
+            "members": ["唐丁"],
+            "deliverables": ["验证记录", "回滚方案", "同步提醒"],
+            "deadline": "2026-05-08",
+        },
+        "should_suggest_project": True,
+        "suggestion_reason": "聊天里已经有目标、负责人、风险和后续提醒，适合整理成项目。",
+    }, chat_id="oc_signal", chat_type="group"))
+
+    assert result["status"] == "projectization_suggested"
+    assert result["signals"]["goals"]
+    assert result["signals"]["commitments"]
+    assert result["signals"]["risks"]
+    assert result["signals"]["action_items"]
+    assert result["suggestion"]["should_suggest_project"] is True
+    assert result["suggestion"]["reason"] == "聊天里已经有目标、负责人、风险和后续提醒，适合整理成项目。"
+    assert result["card_sent"] is True
+    assert sent_cards[0]["chat_id"] == "oc_signal"
+    card_json = json.dumps(sent_cards[0]["card"], ensure_ascii=False)
+    assert "要不要把它整理成项目" in card_json
+    assert "pilotflow_action_id" in card_json
+    assert "pilotflow_chat_id" not in card_json
+
+
+def test_projectization_suggestion_button_generates_pending_plan(monkeypatch):
+    sent_cards = []
+
+    def fake_send_card(chat_id, card):
+        sent_cards.append({"chat_id": chat_id, "card": card})
+        return f"om_signal_{len(sent_cards)}"
+
+    monkeypatch.setattr("tools._hermes_send_card", fake_send_card)
+
+    _handle_scan_chat_signals({
+        "source_text": "目标是本周把飞书链路验证落地。我来整理验证记录。记得提醒大家明天同步进度。",
+        "signals": {
+            "goals": ["本周把飞书链路验证落地"],
+            "commitments": ["我来整理验证记录"],
+            "risks": ["权限审批可能卡住"],
+            "action_items": ["提醒大家明天同步进度"],
+            "deadlines": [],
+        },
+        "suggested_project": {
+            "title": "飞书链路验证落地项目",
+            "goal": "本周把飞书链路验证落地",
+            "members": [],
+            "deliverables": ["整理验证记录", "提醒大家明天同步进度"],
+            "deadline": "",
+        },
+        "should_suggest_project": True,
+    }, chat_id="oc_signal_button", chat_type="group")
+
+    first_action = sent_cards[0]["card"]["elements"][1]["actions"][0]["value"]["pilotflow_action_id"]
+    result = json.loads(_handle_card_action(
+        {"action_value": json.dumps({"pilotflow_action_id": first_action}, ensure_ascii=False)},
+        chat_id="oc_signal_button",
+        chat_type="group",
+    ))
+
+    assert result["status"] == "plan_generated"
+    assert result["plan"]["goal"] == "本周把飞书链路验证落地"
+    assert "提醒大家明天同步进度" in result["plan"]["deliverables"]
+    assert _pending_plans["oc_signal_button"]["plan"]["title"]
+    assert len(sent_cards) == 2
+    followup_card = json.dumps(sent_cards[1]["card"], ensure_ascii=False)
+    assert "执行计划" in followup_card
+    assert "确认执行" in followup_card
+
+
+def test_scan_chat_signals_does_not_infer_semantics_from_source_text(monkeypatch):
+    monkeypatch.setattr("tools._hermes_send_card", lambda chat_id, card: "om_signal_card")
+
+    result = json.loads(_handle_scan_chat_signals({
+        "source_text": "目标、风险、承诺、提醒这些词都在这里，但工具不应该自己识别。",
+        "signals": {},
+        "should_suggest_project": False,
+    }, chat_id="oc_signal_split", chat_type="group"))
+
+    assert result["status"] == "signals_recorded"
+    assert result["signals"]["goals"] == []
+    assert result["signals"]["commitments"] == []
+    assert result["signals"]["risks"] == []
+    assert result["signals"]["action_items"] == []
 
 
 def test_env_positive_int_falls_back_for_invalid_values(monkeypatch):
@@ -790,6 +900,46 @@ def test_create_project_requires_separate_text_confirmation_after_plan():
         assert "迁移验证项目" not in _project_registry
 
 
+def test_chat_scope_defaults_to_group_when_unknown():
+    with patch.dict(sys.modules, {}, clear=False):
+        scope = _get_chat_scope({})
+    assert scope["scope"] == "group"
+
+
+def test_create_autonomy_allows_private_scope_without_confirmation():
+    scope = {"scope": "private"}
+    confirm, mode, reason = _needs_confirmation_for_create(scope, [])
+    assert confirm is False
+    assert mode == "auto"
+    assert "私聊" in reason or "直接" in reason
+
+
+def test_create_autonomy_requires_group_confirmation():
+    scope = {"scope": "group"}
+    confirm, mode, reason = _needs_confirmation_for_create(scope, [])
+    assert confirm is True
+    assert mode == "must_confirm"
+    assert "群聊" in reason
+
+
+def test_update_autonomy_requires_remove_member_confirmation():
+    confirm, mode, reason = _needs_confirmation_for_update(
+        "remove_member", "张三", {"members": ["张三"]}, {"scope": "private"}, "oc1"
+    )
+    assert confirm is True
+    assert mode == "must_confirm"
+    assert "移除成员" in reason
+
+
+def test_update_autonomy_allows_regular_progress_update():
+    confirm, mode, reason = _needs_confirmation_for_update(
+        "add_progress", "完成评审", {"members": ["张三"]}, {"scope": "private"}, "oc1"
+    )
+    assert confirm is False
+    assert mode == "auto"
+    assert "直接" in reason or "常规" in reason
+
+
 def test_create_project_accepts_raw_confirmation_text_fallback():
     chat_id = "oc_same_turn_fallback"
     with _project_registry_lock:
@@ -840,6 +990,155 @@ def test_create_project_accepts_raw_confirmation_text_fallback():
     assert result["status"] == "project_space_created"
     with _project_registry_lock:
         assert "迁移验证项目" in _project_registry
+
+
+def test_create_project_falls_back_to_pending_plan_fields_when_input_text_only():
+    chat_id = "oc_same_turn_pending_fields"
+    with _project_registry_lock:
+        _project_registry.clear()
+    with _plan_lock:
+        _pending_plans.clear()
+        _card_action_refs.clear()
+
+    with patch("tools._hermes_send_card", return_value="om_plan"):
+        _handle_generate_plan(
+            {
+                "input_text": "帮我准备迁移验证项目，先给我确认卡片",
+                "title": "迁移验证项目",
+                "goal": "验证迁移流程",
+                "members": ["张三", "李四"],
+                "deliverables": ["迁移验证记录"],
+                "deadline": "2026-05-10",
+            },
+            chat_id=chat_id,
+        )
+
+    with (
+        patch("tools._create_doc", return_value="https://example.invalid/doc"),
+        patch("tools._create_bitable", return_value={
+            "url": "https://example.invalid/base",
+            "app_token": "app1",
+            "table_id": "tbl1",
+            "record_id": "rec1",
+        }),
+        patch("tools._create_task", return_value="任务已创建"),
+        patch("tools._hermes_send_card", return_value=True),
+        patch("tools._create_calendar_event", return_value=None),
+        patch("tools._schedule_deadline_reminder", return_value=False),
+        patch("tools._save_to_hermes_memory", return_value=True),
+    ):
+        result = json.loads(_handle_create_project_space(
+            {
+                "input_text": "确认执行",
+            },
+            chat_id=chat_id,
+        ))
+
+    assert result["status"] == "project_space_created"
+    assert result["title"] == "迁移验证项目"
+    assert "✅ 项目空间已创建: 迁移验证项目" in result["display"]
+    assert "👥 成员: 张三, 李四" in result["display"]
+    assert "📋 任务: 迁移验证记录" in result["display"]
+    assert "⏰ 截止: 2026-05-10" in result["display"]
+
+
+def test_project_entry_card_uses_plain_member_names_for_visible_markdown():
+    chat_id = "oc_entry_card_plain_members"
+    captured_cards = []
+
+    def fake_send_card(_chat_id, card):
+        captured_cards.append(card)
+        return "om_entry"
+
+    with _project_registry_lock:
+        _project_registry.clear()
+    with _plan_lock:
+        _pending_plans.clear()
+        _card_action_refs.clear()
+
+    with (
+        patch("tools._resolve_member", return_value="ou_real_member"),
+        patch("tools._create_doc", return_value="https://example.invalid/doc"),
+        patch("tools._create_bitable", return_value={
+            "url": "https://example.invalid/base",
+            "app_token": "app1",
+            "table_id": "tbl1",
+            "record_id": "rec1",
+        }),
+        patch("tools._create_task", return_value="任务已创建"),
+        patch("tools._hermes_send_card", side_effect=fake_send_card),
+        patch("tools._create_calendar_event", return_value=None),
+        patch("tools._schedule_deadline_reminder", return_value=False),
+        patch("tools._save_to_hermes_memory", return_value=True),
+    ):
+        result = json.loads(_handle_create_project_space(
+            {
+                "title": "入口卡片成员项目",
+                "goal": "验证入口卡片成员展示",
+                "members": ["唐丁"],
+                "deliverables": ["验证记录"],
+                "deadline": "2026-05-12",
+            },
+            chat_id=chat_id,
+            chat_scope="private",
+        ))
+
+    assert result["status"] == "project_space_created"
+    entry_card = captured_cards[0]
+    markdown = entry_card["elements"][0]["content"]
+    assert "**成员：** 唐丁" in markdown
+    assert "<at user_id=" not in markdown
+
+
+def test_duplicate_confirmation_after_create_is_idempotent():
+    chat_id = "oc_duplicate_confirmation"
+    with _project_registry_lock:
+        _project_registry.clear()
+    with _plan_lock:
+        _pending_plans.clear()
+        _card_action_refs.clear()
+        _recent_confirmed_projects.clear()
+
+    with patch("tools._hermes_send_card", return_value="om_plan"):
+        _handle_generate_plan(
+            {
+                "input_text": "帮我准备迁移验证项目，先给我确认卡片",
+                "title": "迁移验证项目",
+                "goal": "验证迁移流程",
+                "members": ["张三", "李四"],
+                "deliverables": ["迁移验证记录"],
+                "deadline": "2026-05-10",
+            },
+            chat_id=chat_id,
+        )
+
+    with (
+        patch("tools._create_doc", return_value="https://example.invalid/doc"),
+        patch("tools._create_bitable", return_value={
+            "url": "https://example.invalid/base",
+            "app_token": "app1",
+            "table_id": "tbl1",
+            "record_id": "rec1",
+        }),
+        patch("tools._create_task", return_value="任务已创建"),
+        patch("tools._hermes_send_card", return_value=True),
+        patch("tools._create_calendar_event", return_value=None),
+        patch("tools._schedule_deadline_reminder", return_value=False),
+        patch("tools._save_to_hermes_memory", return_value=True),
+    ):
+        created = json.loads(_handle_create_project_space(
+            {"input_text": "确认执行"},
+            chat_id=chat_id,
+        ))
+        duplicate = json.loads(_handle_create_project_space(
+            {"input_text": "确认执行"},
+            chat_id=chat_id,
+        ))
+
+    assert created["status"] == "project_space_created"
+    assert duplicate["status"] == "duplicate_confirmation_ignored"
+    assert duplicate["title"] == "迁移验证项目"
+    assert "error" not in duplicate
 
 
 def test_create_project_rejects_non_confirming_input_text():
@@ -2865,6 +3164,10 @@ def test_create_task_binds_assignee_and_project_followers():
         )
 
     assert result == "评审清单: https://example.invalid/task/task_123"
+    assert created["task"].due == {
+        "timestamp": "1779271200000",
+        "is_all_day": False,
+    }
     members = created["task"].members
     assert [(item.id, item.type, item.role) for item in members] == [
         ("ou_zhang", "user", "assignee"),

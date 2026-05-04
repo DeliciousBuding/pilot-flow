@@ -35,6 +35,7 @@ def test_register_exposes_expected_tools():
 
     names = [call["name"] for call in ctx.calls]
     assert names == [
+        "pilotflow_scan_chat_signals",
         "pilotflow_generate_plan",
         "pilotflow_detect_risks",
         "pilotflow_create_project_space",

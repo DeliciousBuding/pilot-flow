@@ -79,6 +79,8 @@ _DASHBOARD_PAGE_SIZE = _env_positive_int("PILOTFLOW_DASHBOARD_PAGE_SIZE", 10)
 # Pending plans (populated by generate_plan, validated by create_project_space)
 _pending_plans: Dict[str, dict] = {}  # chat_id -> plan params
 _card_action_refs: Dict[str, dict] = {}  # action_id -> {chat_id, action, message_id, timestamp}
+_recent_confirmed_projects: Dict[str, dict] = {}  # chat_id -> {title, timestamp}
+_RECENT_CONFIRM_TTL = 30
 
 # lark_oapi client timeout (seconds)
 _CLIENT_TIMEOUT = 10
@@ -118,6 +120,12 @@ def _evict_caches():
         ]
         for k in expired_action_refs:
             del _card_action_refs[k]
+        expired_recent = [
+            k for k, ref in _recent_confirmed_projects.items()
+            if now - ref.get("timestamp", 0) >= _RECENT_CONFIRM_TTL
+        ]
+        for k in expired_recent:
+            del _recent_confirmed_projects[k]
         evicted_plans = len(expired_plans) + len(expired_pending)
 
     if evicted_members or evicted_plans:
@@ -213,6 +221,28 @@ def _clear_pending_plan_if_matches(chat_id: str, plan: Optional[dict]) -> None:
         if pending.get("plan") == plan:
             _pending_plans.pop(chat_id, None)
             _plan_generated.pop(chat_id, None)
+
+
+def _remember_recent_confirmed_project(chat_id: str, title: str) -> None:
+    """Remember a just-created project to make duplicated confirmations idempotent."""
+    if not chat_id or not title:
+        return
+    with _plan_lock:
+        _recent_confirmed_projects[chat_id] = {"title": title, "timestamp": time.time()}
+
+
+def _recent_confirmed_project(chat_id: str) -> Optional[str]:
+    """Return the recently created project for this chat, if still fresh."""
+    if not chat_id:
+        return None
+    with _plan_lock:
+        ref = _recent_confirmed_projects.get(chat_id)
+        if not ref:
+            return None
+        if time.time() - ref.get("timestamp", 0) >= _RECENT_CONFIRM_TTL:
+            _recent_confirmed_projects.pop(chat_id, None)
+            return None
+        return str(ref.get("title") or "") or None
 
 
 def _register_project(title: str, members: list, deadline: str, status: str, artifacts: list,
@@ -1079,6 +1109,97 @@ def _build_plan_confirmation_card(
     return card, action_ids
 
 
+def _clean_signal_list(values: Any, limit: int = 8) -> list[str]:
+    """Normalize Hermes-extracted signal fields without doing semantic detection."""
+    if not isinstance(values, list):
+        values = [values] if values else []
+    cleaned: list[str] = []
+    for value in values:
+        item = str(value).strip()
+        if item and item not in cleaned:
+            cleaned.append(item)
+        if len(cleaned) >= limit:
+            break
+    return cleaned
+
+
+def _normalize_agent_signals(signals: Any) -> dict:
+    """Accept semantic signals extracted by Hermes; never infer intent here."""
+    source = signals if isinstance(signals, dict) else {}
+    return {
+        "goals": _clean_signal_list(source.get("goals")),
+        "commitments": _clean_signal_list(source.get("commitments")),
+        "risks": _clean_signal_list(source.get("risks")),
+        "action_items": _clean_signal_list(source.get("action_items")),
+        "deadlines": _clean_signal_list(source.get("deadlines")),
+    }
+
+
+def _build_projectization_suggestion_card(
+    chat_id: str,
+    signals: dict,
+    source_text: str,
+    suggested_project: dict,
+    suggestion_reason: str,
+) -> tuple[dict, list[str]]:
+    """Build a lightweight card that lets the user convert chat signals into a project plan."""
+    title = str(suggested_project.get("title") or "聊天跟进项目").strip()[:60]
+    goal = str(suggested_project.get("goal") or (signals.get("goals") or [""])[0]).strip()
+    deliverables = _clean_signal_list(
+        suggested_project.get("deliverables") or signals.get("action_items"),
+        limit=10,
+    )
+    members = _clean_signal_list(suggested_project.get("members"), limit=20)
+    deadline = str(suggested_project.get("deadline") or (signals.get("deadlines") or [""])[0]).strip()
+    action_id = _create_card_action_ref(
+        chat_id,
+        "suggest_project_from_signals",
+        {
+            "input_text": source_text,
+            "title": title,
+            "goal": goal,
+            "members": members,
+            "deliverables": deliverables,
+            "deadline": deadline,
+            "signals": signals,
+        },
+    )
+    summary_lines = []
+    if signals.get("goals"):
+        summary_lines.append(f"**目标：** {signals['goals'][0]}")
+    if signals.get("commitments"):
+        summary_lines.append(f"**承诺：** {signals['commitments'][0]}")
+    if signals.get("risks"):
+        summary_lines.append(f"**风险：** {signals['risks'][0]}")
+    if signals.get("action_items"):
+        summary_lines.append(f"**行动项：** {signals['action_items'][0]}")
+    if suggestion_reason:
+        summary_lines.append(f"**建议原因：** {suggestion_reason}")
+    content = "\n".join(summary_lines[:4]) or "检测到聊天里出现了可跟进事项。"
+    card = {
+        "config": {"wide_screen_mode": True},
+        "header": {
+            "title": {"content": "要不要把它整理成项目？", "tag": "plain_text"},
+            "template": "turquoise",
+        },
+        "elements": [
+            {"tag": "markdown", "content": content},
+            {
+                "tag": "action",
+                "actions": [
+                    {
+                        "tag": "button",
+                        "text": {"tag": "plain_text", "content": "整理成项目计划"},
+                        "type": "primary",
+                        "value": {"pilotflow_action_id": action_id},
+                    }
+                ],
+            },
+        ],
+    }
+    return card, [action_id]
+
+
 def _schedule_deadline_reminder(title: str, deadline: str, chat_id: str) -> bool:
     """Schedule a deadline reminder via Hermes cron job."""
     try:
@@ -1260,6 +1381,81 @@ def _get_session_value(name: str, default: str = "") -> str:
         return get_session_env(name, default) or default
     except Exception:
         return default
+
+
+def _get_chat_scope(kwargs: dict) -> dict:
+    """Return the best-known chat scope for autonomy decisions.
+
+    Prefer an explicit runtime hint, then fall back to a conservative heuristic.
+    Group chat remains the default when scope is unknown so existing behavior stays safe.
+    """
+    explicit = (
+        str(kwargs.get("chat_scope", "")).strip().lower()
+        or _get_session_value("HERMES_SESSION_CHAT_SCOPE", "")
+        or os.environ.get("PILOTFLOW_CHAT_SCOPE", "")
+    ).strip().lower()
+    if explicit in ("private", "group"):
+        return {
+            "scope": explicit,
+            "source": "explicit",
+            "confidence": "high",
+        }
+
+    chat_name = _get_session_value("HERMES_SESSION_CHAT_NAME", "").strip()
+    user_name = _get_session_value("HERMES_SESSION_USER_NAME", "").strip()
+    thread_id = _get_session_value("HERMES_SESSION_THREAD_ID", "").strip()
+
+    if chat_name and user_name and chat_name == user_name:
+        return {
+            "scope": "private",
+            "source": "heuristic",
+            "confidence": "medium",
+        }
+    if chat_name and user_name and chat_name != user_name and thread_id:
+        return {
+            "scope": "group",
+            "source": "heuristic",
+            "confidence": "medium",
+        }
+    return {
+        "scope": "group",
+        "source": "default",
+        "confidence": "low",
+    }
+
+
+def _needs_confirmation_for_create(chat_scope: dict, unresolved_members: list[str]) -> tuple[bool, str, str]:
+    """Decide whether project creation must stop for a user confirmation."""
+    scope = (chat_scope or {}).get("scope", "group")
+    if scope == "group":
+        return True, "must_confirm", "群聊项目创建默认先确认，避免公开空间直接执行。"
+    if unresolved_members:
+        return True, "ask_once", "私聊场景涉及未解析成员，先确认一次再执行外联。"
+    return False, "auto", "私聊项目且无未解析成员，可直接执行。"
+
+
+def _needs_confirmation_for_update(
+    action: str,
+    value: str,
+    project: dict,
+    chat_scope: dict,
+    chat_id: str,
+) -> tuple[bool, str, str]:
+    """Decide whether a project update should pause for explicit confirmation."""
+    scope = (chat_scope or {}).get("scope", "group")
+    normalized_action = (action or "").strip()
+    if normalized_action == "remove_member":
+        return True, "must_confirm", "移除成员属于权限收缩操作，必须先确认。"
+    if normalized_action == "add_member":
+        unresolved = _find_unresolved_members([value], chat_id)
+        if unresolved:
+            return True, "ask_once", "新增未解析成员时，先确认一次再外联。"
+        return False, "auto", "新增已解析成员属于常规协作，可直接执行。"
+    if normalized_action == "send_reminder" and scope == "group":
+        return False, "auto", "群聊内催办属于常规推进动作，可直接执行。"
+    if normalized_action in ("update_deadline", "add_deliverable", "add_progress", "add_risk", "resolve_risk", "update_status"):
+        return False, "auto", "常规项目推进动作，可直接执行。"
+    return False, "auto", "默认允许执行。"
 
 
 # ---------------------------------------------------------------------------
@@ -1611,7 +1807,7 @@ def _create_task(summary: str, description: str,
                 dt = _dt.datetime.strptime(deadline, "%Y-%m-%d")
                 dt = dt.replace(hour=18, tzinfo=_dt.timezone(_dt.timedelta(hours=8)))
                 builder = builder.due({
-                    "timestamp": str(int(dt.timestamp())),
+                    "timestamp": str(int(dt.timestamp() * 1000)),
                     "is_all_day": False,
                 })
             except (ValueError, AttributeError) as e:
@@ -2172,6 +2368,96 @@ def _create_calendar_event(
 
 
 # ---------------------------------------------------------------------------
+# Tool: pilotflow_scan_chat_signals
+# ---------------------------------------------------------------------------
+
+PILOTFLOW_SCAN_CHAT_SIGNALS_SCHEMA = {
+    "name": "pilotflow_scan_chat_signals",
+    "description": (
+        "根据 Hermes Agent 已经理解和提取的聊天信号，发送“要不要整理成项目”的建议卡片。\n"
+        "注意：本工具不做自然语言意图识别，不用关键词/正则判断目标、承诺、风险或行动项。\n"
+        "你必须先阅读聊天上下文并自行总结 signals、suggested_project、should_suggest_project，再调用本工具执行卡片落地。\n"
+        "群聊里只冒泡建议，不直接创建项目；用户点击后再进入计划确认链路。\n\n"
+        "【输出规则】只用中文回复建议，不要展示工具名称或 JSON。"
+    ),
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "source_text": {"type": "string", "description": "Hermes 用来判断的聊天摘要或原文片段，仅用于后续计划上下文。"},
+            "signals": {
+                "type": "object",
+                "description": "Hermes 已提取的结构化信号；工具只展示和传递，不自行推断。",
+                "properties": {
+                    "goals": {"type": "array", "items": {"type": "string"}},
+                    "commitments": {"type": "array", "items": {"type": "string"}},
+                    "risks": {"type": "array", "items": {"type": "string"}},
+                    "action_items": {"type": "array", "items": {"type": "string"}},
+                    "deadlines": {"type": "array", "items": {"type": "string"}},
+                },
+            },
+            "suggested_project": {
+                "type": "object",
+                "description": "Hermes 建议的项目草案字段，用于用户点击后生成计划。",
+                "properties": {
+                    "title": {"type": "string"},
+                    "goal": {"type": "string"},
+                    "members": {"type": "array", "items": {"type": "string"}},
+                    "deliverables": {"type": "array", "items": {"type": "string"}},
+                    "deadline": {"type": "string"},
+                },
+            },
+            "should_suggest_project": {"type": "boolean", "description": "Hermes 判断是否应该冒泡建议项目化。"},
+            "suggestion_reason": {"type": "string", "description": "Hermes 给用户看的简短建议原因。"},
+        },
+        "required": ["signals", "should_suggest_project"],
+    },
+}
+
+
+def _handle_scan_chat_signals(params: Dict[str, Any], **kwargs) -> str:
+    """Send a projectization suggestion from Hermes-extracted PM signals."""
+    chat_id = _get_chat_id(kwargs)
+    source_text = str(params.get("source_text") or "").strip()
+    signals = _normalize_agent_signals(params.get("signals"))
+    suggested_project = params.get("suggested_project") if isinstance(params.get("suggested_project"), dict) else {}
+    should_suggest = bool(params.get("should_suggest_project"))
+    suggestion_reason = str(params.get("suggestion_reason") or "").strip()
+    card_sent = False
+
+    if chat_id and should_suggest:
+        card, action_ids = _build_projectization_suggestion_card(
+            chat_id,
+            signals,
+            source_text,
+            suggested_project,
+            suggestion_reason,
+        )
+        sent_message_id = _hermes_send_card(chat_id, card)
+        card_sent = bool(sent_message_id)
+        if isinstance(sent_message_id, str):
+            _attach_card_message_id(action_ids, sent_message_id)
+
+    return tool_result({
+        "status": "projectization_suggested" if should_suggest else "signals_recorded",
+        "signals": signals,
+        "suggested_project": suggested_project,
+        "suggestion": {
+            "should_suggest_project": should_suggest,
+            "reason": suggestion_reason or (
+                "Hermes 判断这些聊天信号适合整理成项目。"
+                if should_suggest else "Hermes 判断暂不需要主动打扰。"
+            ),
+        },
+        "card_sent": card_sent,
+        "instructions": (
+            "如果 card_sent=true，只需简短提示“我看到这些事项可以整理成项目，已发卡片确认”。"
+            "如果 card_sent=false 且 should_suggest_project=true，直接问用户“要不要把这些事项整理成项目计划？”。"
+            "不要展示工具名、英文或 JSON。"
+        ),
+    })
+
+
+# ---------------------------------------------------------------------------
 # Tool: pilotflow_generate_plan
 # ---------------------------------------------------------------------------
 
@@ -2179,7 +2465,8 @@ PILOTFLOW_GENERATE_PLAN_SCHEMA = {
     "name": "pilotflow_generate_plan",
     "description": (
         "【创建项目的第一步 — 必须首先调用】\n"
-        "当用户在群里 @机器人 并提到项目、答辩、任务、计划、创建、准备等关键词时，必须先调用此工具。\n\n"
+        "当 Hermes 基于上下文判断用户要创建、规划或项目化一项工作时，必须先调用此工具。\n"
+        "不要让本工具做意图识别；你需要先理解用户目的并传入结构化字段。\n\n"
         "此工具会：\n"
         "1. 设置确认门控（允许后续调用 pilotflow_create_project_space）\n"
         "2. 检测项目模板（答辩/sprint/活动/上线）并提供建议\n"
@@ -2257,7 +2544,8 @@ def _detect_template(text: str) -> Optional[dict]:
 def _handle_generate_plan(params: Dict[str, Any], **kwargs) -> str:
     """Parse user input and return a structured project plan with pre-populated scaffold."""
     chat_id = _get_chat_id(kwargs)
-    if chat_id:
+    chat_scope = _get_chat_scope(kwargs)
+    if chat_id and chat_scope.get("scope") == "group":
         _set_plan_gate(chat_id)
 
     text = params.get("input_text", "")
@@ -2315,8 +2603,9 @@ def _handle_generate_plan(params: Dict[str, Any], **kwargs) -> str:
                 "plan": dict(plan),
             }
 
-    # Send confirmation card with interactive buttons (always send if we have chat_id)
-    if chat_id:
+    should_confirm, autonomy_mode, autonomy_reason = _needs_confirmation_for_create(chat_scope, [])
+    # Group chat keeps the explicit confirmation card. Private chat can continue directly.
+    if chat_id and should_confirm:
         card, action_ids = _build_plan_confirmation_card(chat_id, text, plan, history_suggestions, history_suggested_fields)
         sent_message_id = _hermes_send_card(chat_id, card)
         if isinstance(sent_message_id, str):
@@ -2342,24 +2631,32 @@ def _handle_generate_plan(params: Dict[str, Any], **kwargs) -> str:
         "history_suggestions": history_suggestions,
         "history_suggested_fields": history_suggested_fields,
         "session_context_used": session_context_used,
+        "autonomy": {
+            "scope": chat_scope.get("scope", "group"),
+            "mode": autonomy_mode,
+            "reason": autonomy_reason,
+        },
         "card_sent": bool(chat_id),
         "instructions": (
             "✅ 已提取并存储项目信息（pending plan）。\n"
-            "✅ 确认卡片已自动发送到群聊（包含计划摘要、✅确认/❌取消按钮）。\n\n"
-            "【你的下一步】\n"
-            "简短回复「已生成计划，请在卡片上确认」即可，不要重复展示完整计划内容（卡片里已有）。\n\n"
-            "【用户确认路径】\n"
-            "- 路径A: 用户点击卡片 ✅ 按钮 → PilotFlow 的 /card 插件命令会自动续跑\n"
-            "- 路径B: 用户文字回复「确认」「可以」「好的」「行」「ok」\n"
-            "  → 直接调用 pilotflow_create_project_space；若只剩用户最新回复，就把原文填入 input_text，若已有结构化确认字段也可继续传 confirmation_text。\n"
-            "- 路径C: 用户点击 ❌ 或文字回复「取消」\n"
-            "  → 调用 pilotflow_handle_card_action（action=cancel_project）\n\n"
-            "【输出规则 - 必须遵守】\n"
-            "1. 绝对不要向用户展示工具名称或英文内容\n"
-            "2. 只回复中文，不要显示工具调用过程\n"
-            "3. 不要说「正在调用xxx工具」"
-            f"{history_hint}"
-            f"{template_hint}"
+            + ("✅ 确认卡片已自动发送到群聊（包含计划摘要、✅确认/❌取消按钮）。\n\n" if should_confirm and chat_id else "✅ 当前会话可直接推进，不需要先等卡片确认。\n\n")
+            + "【你的下一步】\n"
+            + ("简短回复「已生成计划，请在卡片上确认」即可，不要重复展示完整计划内容（卡片里已有）。\n\n" if should_confirm and chat_id else "可以直接继续执行，不要额外等待确认。\n\n")
+            + "【用户确认路径】\n"
+            + "- 路径A: 用户点击卡片 ✅ 按钮 → PilotFlow 的 /card 插件命令会自动续跑\n"
+            + "- 路径B: 用户文字回复「确认」「可以」「好的」「行」「ok」\n"
+            + "  → 直接调用 pilotflow_create_project_space；若只剩用户最新回复，就把原文填入 input_text，若已有结构化确认字段也可继续传 confirmation_text。\n"
+            + "- 路径C: 用户点击 ❌ 或文字回复「取消」\n"
+            + "  → 调用 pilotflow_handle_card_action（action=cancel_project）\n\n"
+            + "【自治规则】\n"
+            + f"- 当前会话模式：{chat_scope.get('scope', 'group')}（{autonomy_reason}）\n"
+            + "- 群聊默认先确认，私聊默认可直行；涉及新联系人、移除成员、公开发布、权限收缩时必须先问。\n\n"
+            + "【输出规则 - 必须遵守】\n"
+            + "1. 绝对不要向用户展示工具名称或英文内容\n"
+            + "2. 只回复中文，不要显示工具调用过程\n"
+            + "3. 不要说「正在调用xxx工具」"
+            + f"{history_hint}"
+            + f"{template_hint}"
         ),
     })
 
@@ -2424,9 +2721,9 @@ PILOTFLOW_CREATE_PROJECT_SPACE_SCHEMA = {
         "3. 飞书任务（每个交付物一个任务）\n"
         "4. 群入口消息（@成员 + 文档/表格/截止时间链接）\n"
         "5. 日历事件（截止时间提醒）\n\n"
-        "前置条件：必须先调用 pilotflow_generate_plan 并等用户回复「确认」。\n"
-        "如果用户没确认就调用，会返回错误。\n\n"
-        "文本确认路径必须传入用户最新回复 confirmation_text，且只能是「确认」「确认执行」「可以」「好的」「行」「ok」等明确执行语义。\n"
+        "前置条件：群聊默认先调用 pilotflow_generate_plan 并等用户回复「确认」；私聊项目可按自治规则直接推进。\n"
+        "如果是高风险动作或涉及未解析成员，仍要先问一次。\n\n"
+        "文本确认路径优先传入用户最新回复 input_text；如上层已拆出独立确认字段，也可传 confirmation_text。两者都只接受「确认」「确认执行」「可以」「好的」「行」「ok」等明确执行语义。\n"
         "用户说「确认卡片」「给我确认卡片」只表示要看卡片，不是确认执行。\n\n"
         "【输出规则 - 必须遵守】\n"
         "- 用中文回复结果摘要，直接使用返回的 display 列表逐行展示\n"
@@ -2456,7 +2753,7 @@ PILOTFLOW_CREATE_PROJECT_SPACE_SCHEMA = {
             "risks": {"type": "array", "items": {"type": "string"}, "description": "已知风险，如[\"时间紧张\"]。"},
             "confirmation_text": {
                 "type": "string",
-                "description": "用户最新的独立确认回复。也可改用 input_text 传入同样的确认语义，例如「确认」「确认执行」「可以」「好的」「行」「ok」。",
+                "description": "用户最新的独立确认回复，可选。若上层只剩原始文本，也可直接用 input_text 传入同样的确认语义，例如「确认」「确认执行」「可以」「好的」「行」「ok」。",
             },
         },
         "required": ["title", "goal", "members", "deliverables"],
@@ -2469,24 +2766,53 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
     chat_id = _get_chat_id(kwargs)
     if not chat_id:
         return tool_error("无法获取群聊 ID，请确认 PILOTFLOW_TEST_CHAT_ID 已配置。")
+    chat_scope = _get_chat_scope(kwargs)
 
     skip_gate = bool(kwargs.get("_pilotflow_gate_consumed"))
     if not skip_gate:
         confirmation_text = params.get("confirmation_text") or params.get("input_text") or ""
-        if not _is_execution_confirmation(confirmation_text):
-            return tool_error("请等待用户明确回复「确认执行」或点击卡片确认按钮后再创建项目。")
-        if not _consume_plan_gate(chat_id):
-            return tool_error("请先调用 pilotflow_generate_plan 生成计划，展示给用户确认后再调用此工具。")
+        require_confirm, autonomy_mode, autonomy_reason = _needs_confirmation_for_create(chat_scope, [])
+        if require_confirm:
+            if not _is_execution_confirmation(confirmation_text):
+                return tool_error("请等待用户明确回复「确认执行」或点击卡片确认按钮后再创建项目。")
+            if not _consume_plan_gate(chat_id):
+                recent_title = _recent_confirmed_project(chat_id)
+                if recent_title:
+                    return tool_result({
+                        "status": "duplicate_confirmation_ignored",
+                        "title": recent_title,
+                        "instructions": "本次确认已经处理并创建项目，不要再次回复失败信息。",
+                    })
+                return tool_error("请先调用 pilotflow_generate_plan 生成计划，展示给用户确认后再调用此工具。")
 
-    title = params.get("title", "项目")
-    goal = params.get("goal", "")
-    members = _clean_plan_list(params.get("members"))
-    deliverables = _clean_plan_list(params.get("deliverables"))
-    deadline = params.get("deadline", "")
-    risks = params.get("risks", [])
+    pending_plan = {}
+    with _plan_lock:
+        pending = dict(_pending_plans.get(chat_id, {}))
+        pending_plan = dict(pending.get("plan", {}))
+
+    title = params.get("title", "") or pending_plan.get("title") or "项目"
+    goal = params.get("goal", "") or pending_plan.get("goal", "")
+    members = _clean_plan_list(params.get("members")) or _clean_plan_list(pending_plan.get("members"))
+    deliverables = _clean_plan_list(params.get("deliverables")) or _clean_plan_list(pending_plan.get("deliverables"))
+    deadline = params.get("deadline", "") or pending_plan.get("deadline", "")
+    risks = _clean_plan_list(params.get("risks")) or _clean_plan_list(pending_plan.get("risks"))
 
     artifacts = []
     unresolved_members = _find_unresolved_members(members, chat_id)
+    require_confirm, autonomy_mode, autonomy_reason = _needs_confirmation_for_create(chat_scope, unresolved_members)
+    if not skip_gate and require_confirm and chat_scope.get("scope") == "private":
+        confirmation_text = params.get("confirmation_text") or params.get("input_text") or ""
+        if not _is_execution_confirmation(confirmation_text):
+            return tool_error("涉及未解析成员，请先确认一次再执行。")
+        if not _consume_plan_gate(chat_id):
+            recent_title = _recent_confirmed_project(chat_id)
+            if recent_title:
+                return tool_result({
+                    "status": "duplicate_confirmation_ignored",
+                    "title": recent_title,
+                    "instructions": "本次确认已经处理并创建项目，不要再次回复失败信息。",
+                })
+            return tool_error("请先调用 pilotflow_generate_plan 生成计划，展示给用户确认后再调用此工具。")
     unresolved_text = "、".join(unresolved_members)
     member_warning = (
         f"⚠️ 成员解析提醒：{unresolved_text} 未能 @，请确认这些成员已在群内。"
@@ -2496,6 +2822,9 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
     member_plain = _member_names_plain(members) if members else "待确认"
     # Use @mention format for docs and messages
     member_display = _format_members(members, chat_id) if members else "待确认"
+    # Feishu interactive-card markdown does not render raw <at user_id=...>
+    # consistently when read back, so keep entry cards human-readable.
+    member_card_display = member_plain if members else "待确认"
 
     # 1. Create doc (lark_oapi) — with @mention in content
     doc_content = f"# {title}\n\n## 目标\n{goal}\n\n"
@@ -2554,7 +2883,7 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
                 "tag": "markdown",
                 "content": (
                     f"**目标：** {goal}\n"
-                    f"**成员：** {member_display}\n"
+                    f"**成员：** {member_card_display}\n"
                     + (f"{member_warning}\n" if member_warning else "")
                     + "\n".join(link_lines)
                 ),
@@ -2623,6 +2952,7 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
     if not bool(kwargs.get("_pilotflow_plan_override")):
         with _plan_lock:
             _pending_plans.pop(chat_id, None)
+    _remember_recent_confirmed_project(chat_id, title)
 
     # Pre-formatted display lines for LLM to present directly
     display_items = [f"✅ 项目空间已创建: {title}"]
@@ -2650,10 +2980,16 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
         "artifacts": artifacts,
         "display": display_items,
         "unresolved_members": unresolved_members,
+        "autonomy": {
+            "scope": chat_scope.get("scope", "group"),
+            "mode": autonomy_mode,
+            "reason": autonomy_reason,
+        },
         "instructions": (
             "用中文回复结果摘要（不要显示工具名或英文）。\n"
             "直接使用 display 列表逐行展示，或自行组织语言。"
             + (f"\n成员解析提醒：{unresolved_text} 未能 @，请提示用户确认这些成员已在群内。" if unresolved_members else "")
+            + ("\n当前会话属于私聊自治模式，可直接推进后续跟进。" if chat_scope.get("scope") == "private" and not unresolved_members else "")
         ),
         "message": f"已创建 {len(artifacts)} 个产物: {', '.join(artifacts)}",
     })
@@ -2756,6 +3092,24 @@ def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
             "deliverables": recovered_plan.get("deliverables", []),
             "deadline": recovered_plan.get("deadline", ""),
             "risks": recovered_plan.get("risks", []),
+        }, **kwargs)
+
+    if pilotflow_action == "suggest_project_from_signals":
+        input_text = action_data.get("input_text") or ""
+        if not input_text:
+            signals = action_data.get("signals") or {}
+            input_text = "\n".join(
+                str(item)
+                for key in ("goals", "commitments", "risks", "action_items")
+                for item in signals.get(key, [])
+            )
+        return _handle_generate_plan({
+            "input_text": input_text,
+            "title": action_data.get("title", ""),
+            "goal": action_data.get("goal", ""),
+            "members": action_data.get("members", []),
+            "deliverables": action_data.get("deliverables", []),
+            "deadline": action_data.get("deadline", ""),
         }, **kwargs)
 
     if pilotflow_action == "apply_history_suggestions":
@@ -3687,6 +4041,7 @@ PILOTFLOW_UPDATE_PROJECT_SCHEMA = {
         "支持九种操作：update_deadline（改截止时间）、add_member（加成员）、remove_member（移除成员）、add_deliverable（新增交付物/任务）、add_progress（记录进展）、add_risk（上报风险/阻塞）、resolve_risk（解除风险/阻塞）、update_status（改状态）、send_reminder（发送项目催办）。\n"
         "归档项目时使用 action=update_status 且 value=已归档；归档后默认看板会隐藏该项目。\n"
         "会更新内存注册表、脱敏本地状态；可定位状态表时同步多维表格，新增交付物时会尽量创建飞书任务，催办时会发送群提醒并写入项目文档/状态表流水。\n\n"
+        "常规推进动作可直接执行；remove_member、新外联、权限收缩、公开发布先确认一次。\n\n"
         "【输出规则】只用中文回复更新结果，不要展示工具名称或英文内容。"
     ),
     "parameters": {
@@ -3699,6 +4054,7 @@ PILOTFLOW_UPDATE_PROJECT_SCHEMA = {
                 "description": "操作类型。",
             },
             "value": {"type": "string", "description": "新值（新截止时间、新成员名、要移除的成员名、新交付物/任务、新状态，或催办备注）。"},
+            "confirmation_text": {"type": "string", "description": "当动作需要确认时，用户最新的明确确认文本。"},
         },
         "required": ["project_name", "action", "value"],
     },
@@ -3711,6 +4067,7 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
     action = params.get("action", "")
     value = params.get("value", "")
     chat_id = _get_chat_id(kwargs)
+    chat_scope = _get_chat_scope(kwargs)
 
     if not project_name:
         return tool_error("请指定项目名称")
@@ -3812,6 +4169,8 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
             "table_id": "",
             "record_id": "",
         }
+
+    require_confirm, autonomy_mode, autonomy_reason = _needs_confirmation_for_update(action, value, project, chat_scope, chat_id)
 
     if action == "remove_member" and value not in project.get("members", []):
         return tool_error(f"成员「{value}」不是项目「{project_name}」的成员，无法移除。")
@@ -4003,6 +4362,11 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
         "project": project_name,
         "action": action,
         "value": value,
+        "autonomy": {
+            "scope": chat_scope.get("scope", "group"),
+            "mode": autonomy_mode if require_confirm else "auto",
+            "reason": autonomy_reason if require_confirm else "常规更新可直接执行。",
+        },
         "assignee": assignee_override,
         "risk_level": risk_level,
         "registry_updated": registry_updated,

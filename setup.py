@@ -159,6 +159,31 @@ def check_env(env_file=None, lark_cli_config_file=None):
     return True
 
 
+def check_lark_cli_alignment(env_file=None, lark_cli_config_file=None):
+    """Check whether the Hermes env app id matches the active lark-cli profile."""
+    env_file = env_file or os.path.expanduser("~/.hermes/.env")
+    if not os.path.exists(env_file):
+        return False
+
+    with open(env_file, encoding="utf-8") as f:
+        values = _parse_env(f.read())
+
+    app_id = values.get("FEISHU_APP_ID", "")
+    if not app_id:
+        return False
+
+    profile = _matching_lark_cli_profile(app_id, lark_cli_config_file)
+    if profile:
+        print(
+            "  lark-cli profile aligned with FEISHU_APP_ID "
+            f"({profile['name']}, secret source: {profile['secret_source']})"
+        )
+        return True
+
+    print("  WARNING: No matching lark-cli profile found for FEISHU_APP_ID")
+    return False
+
+
 def check_config(config_file=None):
     """Check that Hermes config has the required model and Feishu gateway sections."""
     config_file = config_file or os.path.expanduser("~/.hermes/config.yaml")
@@ -253,6 +278,7 @@ def main():
 
     print("3. Checking environment...")
     env_ok = check_env()
+    check_lark_cli_alignment()
 
     print("4. Checking Hermes config...")
     config_ok = check_config()
