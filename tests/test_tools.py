@@ -4515,8 +4515,8 @@ def test_update_project_adds_deliverable_and_creates_task():
     )
 
     with (
-        patch("tools._create_task", return_value="评审清单") as create_task,
-        patch("tools._hermes_send", return_value=True),
+        patch("tools._create_task", return_value="评审清单: https://example.invalid/task/1") as create_task,
+        patch("tools._hermes_send", return_value=True) as send,
     ):
         result = json.loads(_handle_update_project(
             {"project_name": "交付物", "action": "add_deliverable", "value": "评审清单"},
@@ -4527,13 +4527,16 @@ def test_update_project_adds_deliverable_and_creates_task():
     assert result["action"] == "add_deliverable"
     assert result["registry_updated"] is True
     assert result["task_created"] is True
+    assert result["task_name"] == "评审清单: https://example.invalid/task/1"
     create_task.assert_called_once_with(
         "评审清单", "项目: 交付物项目", "张三", "2026-05-20", "oc_deliverable", ["张三"],
     )
     with _project_registry_lock:
         project = _project_registry["交付物项目"]
         assert project["deliverables"] == ["验收记录", "评审清单"]
-        assert "任务: 评审清单" in project["artifacts"]
+        assert "任务: 评审清单: https://example.invalid/task/1" in project["artifacts"]
+    sent_text = send.call_args.args[1]
+    assert "飞书任务 → 评审清单: https://example.invalid/task/1" in sent_text
 
 
 def test_update_project_add_deliverable_assigns_named_member():

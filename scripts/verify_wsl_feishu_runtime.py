@@ -113,6 +113,10 @@ def _sanitize_result(result: dict[str, Any]) -> dict[str, Any]:
         "history_deliverables_recovered",
         "history_pending_recovered",
         "history_card_count",
+        "update_task_created",
+        "update_task_name_returned",
+        "update_task_feedback_includes_summary",
+        "update_task_artifact_recorded",
         "error",
     }
     return {key: result[key] for key in allowed if key in result}
@@ -353,6 +357,67 @@ def _verify_runtime_history_suggestions(hermes_dir: Path) -> dict[str, Any]:
     }
 
 
+def _verify_runtime_update_task_summary(hermes_dir: Path) -> dict[str, Any]:
+    """Verify installed PilotFlow exposes add-deliverable task summaries safely."""
+    sys.path.insert(0, str(hermes_dir))
+    import plugins.pilotflow.tools as runtime_tools  # pylint: disable=import-error
+    from plugins.pilotflow.tools import (  # pylint: disable=import-error
+        _handle_update_project,
+        _project_registry,
+        _project_registry_lock,
+        _register_project,
+    )
+
+    chat_id = os.environ.get("PILOTFLOW_TEST_CHAT_ID", "")
+    original_create_task = runtime_tools._create_task
+    original_send = runtime_tools._hermes_send
+    sent_messages: list[str] = []
+
+    def fake_create_task(*_args: Any, **_kwargs: Any) -> str:
+        return "运行态新增待办: https://example.invalid/task/runtime"
+
+    def fake_send(_chat_id: str, text: str) -> bool:
+        sent_messages.append(text)
+        return True
+
+    with _project_registry_lock:
+        _project_registry.clear()
+    runtime_tools._create_task = fake_create_task
+    runtime_tools._hermes_send = fake_send
+    try:
+        _register_project(
+            "运行态交付物验证项目",
+            ["张三"],
+            "2026-05-20",
+            "进行中",
+            [],
+            goal="验证安装后的更新链路",
+            deliverables=["初始验收"],
+        )
+        data = json.loads(_handle_update_project(
+            {
+                "project_name": "运行态交付物",
+                "action": "add_deliverable",
+                "value": "运行态新增待办",
+            },
+            chat_id=chat_id,
+        ))
+        with _project_registry_lock:
+            artifacts = list(_project_registry["运行态交付物验证项目"].get("artifacts", []))
+    finally:
+        runtime_tools._create_task = original_create_task
+        runtime_tools._hermes_send = original_send
+        with _project_registry_lock:
+            _project_registry.clear()
+
+    return {
+        "update_task_created": data.get("task_created") is True,
+        "update_task_name_returned": bool(data.get("task_name")),
+        "update_task_feedback_includes_summary": any("飞书任务 → 运行态新增待办" in msg for msg in sent_messages),
+        "update_task_artifact_recorded": any(item.startswith("任务: 运行态新增待办") for item in artifacts),
+    }
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Verify PilotFlow WSL Feishu runtime.")
     parser.add_argument("--hermes-dir", required=True, help="Hermes runtime directory.")
@@ -361,13 +426,14 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--send-card", action="store_true", help="Send one real Feishu plan card.")
     parser.add_argument("--probe-llm", action="store_true", help="Probe configured OpenAI-compatible /models endpoint.")
     parser.add_argument("--verify-history", action="store_true", help="Send real cards that verify history suggestions can be applied.")
+    parser.add_argument("--verify-update-task", action="store_true", help="Dry-run installed update_project task summary behavior.")
     args = parser.parse_args(argv)
 
     hermes_dir = Path(args.hermes_dir).resolve()
     env_values = _load_env(Path(args.env_file))
     config_result = _read_runtime_config(Path(args.config_file))
     import_result = _check_imports(hermes_dir)
-    mode = "history" if args.verify_history else "send-card" if args.send_card else "dry-run"
+    mode = "update-task" if args.verify_update_task else "history" if args.verify_history else "send-card" if args.send_card else "dry-run"
     output: dict[str, Any] = {
         "mode": mode,
         "would_send_card": bool(args.send_card or args.verify_history),
@@ -383,6 +449,8 @@ def main(argv: list[str] | None = None) -> int:
         output.update(_send_runtime_plan_card(hermes_dir))
     if args.verify_history:
         output.update(_verify_runtime_history_suggestions(hermes_dir))
+    if args.verify_update_task:
+        output.update(_verify_runtime_update_task_summary(hermes_dir))
     if args.probe_llm:
         output.update(_probe_llm(config_result))
     print(json.dumps(_sanitize_result(output), ensure_ascii=False, sort_keys=True))

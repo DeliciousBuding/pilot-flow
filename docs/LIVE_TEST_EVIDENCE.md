@@ -951,6 +951,20 @@
 | 用户价值 | 删除成员属于权限收缩动作，PilotFlow 现在会实际阻止 Agent 在未确认情况下修改协作关系，符合产品自治规则 |
 | 隐私处理 | 证据只记录布尔结果和脱敏结论；不写入真实 chat_id、message_id、Feishu URL、用户 open_id、token 或 app secret |
 
+## 2026-05-05 新增交付物待办摘要回传
+
+| 项目 | 证据 |
+| --- | --- |
+| 运行环境 | PilotFlow 已通过 `setup.py --hermes-home <wsl-hermes-home>` 同步到 WSL Hermes runtime；安装验证返回插件、技能、Hermes config 和 Feishu display 配置均 OK |
+| 本地回归 | `C:\Users\Ding\miniforge3\python.exe -m pytest` 返回 `221 passed`；新增交付物待办摘要和 verifier 新模式定向测试均返回通过 |
+| 功能推进 | `pilotflow_update_project` 处理 `add_deliverable` 并成功创建飞书任务后，现在会在工具结果中返回 `task_name`，让 Hermes Agent 能基于真实执行结果继续回复或追踪 |
+| 群反馈 | 回归验证确认群通知会追加 `飞书任务 → ...` 摘要，不再只显示“飞书任务已创建”，便于用户直接看到本次新增交付物对应的待办结果 |
+| 资源追踪 | 新任务仍进入项目 `artifacts`，项目详情卡和资源列表可继续回读任务入口；交付物字段、多维表格同步、项目文档留痕保持原路径 |
+| WSL 更新链路 | 新增 `verify_wsl_feishu_runtime.py --verify-update-task` dry-run 模式，在已安装的 WSL Hermes runtime 插件内验证 `update_task_created=true`、`update_task_name_returned=true`、`update_task_feedback_includes_summary=true`、`update_task_artifact_recorded=true` |
+| 基线验证 | 同轮继续通过 `--probe-llm` 的 `llm_probe_ok=true`、`llm_probe_status=200`，`--send-card` 的 `card_sent=true`、`pending_plan_recovered=true`，以及 `--verify-history` 的 `history_apply_card_sent=true`、`history_pending_recovered=true` |
+| 用户价值 | 用户在群聊里补一个交付物后，PilotFlow 不只是内部建任务，而是把真实待办结果带回群反馈和 Agent 结构化结果，办公闭环更接近“可真实使用” |
+| 隐私处理 | 证据只记录布尔结果和脱敏结论；不写入真实 chat_id、message_id、Feishu URL、用户 open_id、token 或 app secret |
+
 ## 本地回归
 
 ```bash

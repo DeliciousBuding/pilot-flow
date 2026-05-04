@@ -5040,6 +5040,7 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
     calendar_attendees_added = False
     reminder_scheduled = False
     reminder_sent = False
+    created_task_name = ""
     progress_state_actions = (
         "update_deadline", "remove_member", "add_deliverable", "add_progress",
         "add_risk", "resolve_risk", "update_status",
@@ -5099,6 +5100,7 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
                 if task_name:
                     project.setdefault("artifacts", []).append(f"任务: {task_name}")
                     task_created = True
+                    created_task_name = task_name
 
         if action in progress_state_actions:
             outcome = _record_action_outcome(project_name, project, action_label, value)
@@ -5169,6 +5171,8 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
             parts.append("✅ 状态已恢复为进行中")
         if task_created:
             parts.append("✅ 飞书任务已创建")
+            if created_task_name:
+                parts.append(f"飞书任务 → {created_task_name}")
         if doc_updated:
             parts.append("✅ 项目文档已更新")
         if permission_refreshed:
@@ -5207,6 +5211,7 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
         "bitable_updated": bitable_updated,
         "bitable_history_created": bitable_history_created,
         "task_created": task_created,
+        "task_name": created_task_name,
         "doc_updated": doc_updated,
         "permission_refreshed": permission_refreshed,
         "calendar_event_created": calendar_event_created,

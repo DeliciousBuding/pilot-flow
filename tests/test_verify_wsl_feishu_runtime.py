@@ -151,6 +151,48 @@ def test_verify_runtime_history_suggestions_applies_without_member_leak(tmp_path
     assert sent_cards
 
 
+def test_verify_runtime_update_task_summary_is_sanitized(tmp_path, monkeypatch):
+    hermes_dir, _sent_cards = _install_runtime_fixture(tmp_path, monkeypatch)
+
+    result = _MODULE._verify_runtime_update_task_summary(hermes_dir)
+
+    assert result["update_task_created"] is True
+    assert result["update_task_name_returned"] is True
+    assert result["update_task_feedback_includes_summary"] is True
+    assert result["update_task_artifact_recorded"] is True
+    assert "example.invalid" not in json.dumps(result, ensure_ascii=False)
+
+
+def test_verifier_update_task_mode_outputs_sanitized_runtime_result(tmp_path, capsys):
+    env_file = tmp_path / ".env"
+    env_file.write_text("PILOTFLOW_TEST_CHAT_ID=oc_real_chat_id\n", encoding="utf-8")
+
+    with patch.object(_MODULE, "_verify_runtime_update_task_summary", return_value={
+        "update_task_created": True,
+        "update_task_name_returned": True,
+        "update_task_feedback_includes_summary": True,
+        "update_task_artifact_recorded": True,
+        "raw_task_url": "https://example.invalid/task/1",
+    }):
+        exit_code = _MODULE.main([
+            "--hermes-dir", str(tmp_path),
+            "--env-file", str(env_file),
+            "--verify-update-task",
+        ])
+
+    output_text = capsys.readouterr().out
+    output = json.loads(output_text)
+    assert exit_code == 0
+    assert output["mode"] == "update-task"
+    assert output["would_send_card"] is False
+    assert output["update_task_created"] is True
+    assert output["update_task_name_returned"] is True
+    assert output["update_task_feedback_includes_summary"] is True
+    assert output["update_task_artifact_recorded"] is True
+    assert "oc_real_chat_id" not in output_text
+    assert "example.invalid" not in output_text
+
+
 def test_verifier_probe_llm_outputs_sanitized_success(tmp_path, capsys):
     env_file = tmp_path / ".env"
     config_file = tmp_path / "config.yaml"
