@@ -35,6 +35,39 @@ def _load_env(path: Path) -> dict[str, str]:
     return values
 
 
+def _read_runtime_config(path: Path) -> dict[str, Any]:
+    """Read the small Hermes config subset needed to prove runtime alignment."""
+    result: dict[str, Any] = {
+        "has_config_file": path.exists(),
+        "config_has_feishu_gateway": False,
+    }
+    if not path.exists():
+        return result
+
+    lines = path.read_text(encoding="utf-8").splitlines()
+    section_stack: list[tuple[int, str]] = []
+    for raw_line in lines:
+        if not raw_line.strip() or raw_line.lstrip().startswith("#") or ":" not in raw_line:
+            continue
+        indent = len(raw_line) - len(raw_line.lstrip(" "))
+        key, value = raw_line.strip().split(":", 1)
+        value = value.strip().strip('"').strip("'")
+        while section_stack and section_stack[-1][0] >= indent:
+            section_stack.pop()
+        parent_keys = [item[1] for item in section_stack]
+        if parent_keys == ["model"] and key == "default" and value:
+            result["config_model"] = value
+        elif parent_keys == ["model"] and key == "provider" and value:
+            result["config_provider"] = value
+        elif "gateway" in parent_keys and key == "default_platform" and value == "feishu":
+            result["config_has_feishu_gateway"] = True
+        elif key == "feishu" and "gateway" in parent_keys:
+            result["config_has_feishu_gateway"] = True
+        if not value:
+            section_stack.append((indent, key))
+    return result
+
+
 def _safe_bool(value: Any) -> bool:
     return bool(value)
 
@@ -47,6 +80,10 @@ def _sanitize_result(result: dict[str, Any]) -> dict[str, Any]:
         "would_send_card",
         "has_chat_id",
         "has_feishu_credentials",
+        "has_config_file",
+        "config_model",
+        "config_provider",
+        "config_has_feishu_gateway",
         "lark_oapi_import_ok",
         "pilotflow_import_ok",
         "has_confirm_token",
@@ -152,11 +189,13 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Verify PilotFlow WSL Feishu runtime.")
     parser.add_argument("--hermes-dir", required=True, help="Hermes runtime directory.")
     parser.add_argument("--env-file", default=str(Path.home() / ".hermes" / ".env"))
+    parser.add_argument("--config-file", default=str(Path.home() / ".hermes" / "config.yaml"))
     parser.add_argument("--send-card", action="store_true", help="Send one real Feishu plan card.")
     args = parser.parse_args(argv)
 
     hermes_dir = Path(args.hermes_dir).resolve()
     env_values = _load_env(Path(args.env_file))
+    config_result = _read_runtime_config(Path(args.config_file))
     import_result = _check_imports(hermes_dir)
     output: dict[str, Any] = {
         "mode": "send-card" if args.send_card else "dry-run",
@@ -166,6 +205,7 @@ def main(argv: list[str] | None = None) -> int:
             (env_values.get("FEISHU_APP_ID") or os.environ.get("FEISHU_APP_ID"))
             and (env_values.get("FEISHU_APP_SECRET") or os.environ.get("FEISHU_APP_SECRET"))
         ),
+        **config_result,
         **import_result,
     }
     if args.send_card:

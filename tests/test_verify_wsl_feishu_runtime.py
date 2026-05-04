@@ -14,6 +14,7 @@ _SPEC.loader.exec_module(_MODULE)
 
 def test_verifier_defaults_to_dry_run_and_does_not_send_card(tmp_path, capsys):
     env_file = tmp_path / ".env"
+    config_file = tmp_path / "config.yaml"
     env_file.write_text(
         "\n".join([
             "PILOTFLOW_TEST_CHAT_ID=oc_real_chat_id",
@@ -22,11 +23,22 @@ def test_verifier_defaults_to_dry_run_and_does_not_send_card(tmp_path, capsys):
         ]),
         encoding="utf-8",
     )
+    config_file.write_text(
+        "\n".join([
+            "model:",
+            "  default: mimo-v2.5-pro",
+            "  provider: vectorcontrol",
+            "gateway:",
+            "  default_platform: feishu",
+        ]),
+        encoding="utf-8",
+    )
 
     with patch.object(_MODULE, "_send_runtime_plan_card") as send_card:
         exit_code = _MODULE.main([
             "--hermes-dir", str(tmp_path),
             "--env-file", str(env_file),
+            "--config-file", str(config_file),
         ])
 
     output = json.loads(capsys.readouterr().out)
@@ -35,6 +47,10 @@ def test_verifier_defaults_to_dry_run_and_does_not_send_card(tmp_path, capsys):
     assert output["would_send_card"] is False
     assert output["has_chat_id"] is True
     assert output["has_feishu_credentials"] is True
+    assert output["has_config_file"] is True
+    assert output["config_model"] == "mimo-v2.5-pro"
+    assert output["config_provider"] == "vectorcontrol"
+    assert output["config_has_feishu_gateway"] is True
     assert "oc_real_chat_id" not in json.dumps(output)
     send_card.assert_not_called()
 

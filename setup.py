@@ -203,6 +203,118 @@ def check_config(config_file=None):
     return True
 
 
+def _yaml_key_value(raw_line):
+    """Parse one simple YAML key/value line without pulling in a YAML dependency."""
+    stripped = raw_line.strip()
+    if not stripped or stripped.startswith("#") or ":" not in stripped:
+        return None
+    key, value = stripped.split(":", 1)
+    return key.strip(), value.strip()
+
+
+def _find_yaml_section(lines, path):
+    """Find a simple indented YAML section by path and return (line_index, indent)."""
+    stack = []
+    for index, raw_line in enumerate(lines):
+        parsed = _yaml_key_value(raw_line)
+        if not parsed:
+            continue
+        indent = len(raw_line) - len(raw_line.lstrip(" "))
+        key, value = parsed
+        while stack and stack[-1][0] >= indent:
+            stack.pop()
+        current_path = [item[1] for item in stack] + [key]
+        if current_path == path:
+            return index, indent
+        if not value:
+            stack.append((indent, key))
+    return None
+
+
+def _replace_or_insert_yaml_value(lines, section_path, key, value):
+    section = _find_yaml_section(lines, section_path)
+    if not section:
+        return False
+    section_index, section_indent = section
+    child_indent = section_indent + 2
+    insert_at = section_index + 1
+    for index in range(section_index + 1, len(lines)):
+        raw_line = lines[index]
+        parsed = _yaml_key_value(raw_line)
+        if not parsed:
+            insert_at = index + 1
+            continue
+        indent = len(raw_line) - len(raw_line.lstrip(" "))
+        if indent <= section_indent:
+            break
+        if indent == child_indent:
+            insert_at = index + 1
+            child_key, _ = parsed
+            if child_key == key:
+                lines[index] = f"{' ' * child_indent}{key}: {value}"
+                return True
+    lines.insert(insert_at, f"{' ' * child_indent}{key}: {value}")
+    return True
+
+
+def _ensure_yaml_section(lines, parent_path, key):
+    section_path = [*parent_path, key]
+    existing = _find_yaml_section(lines, section_path)
+    if existing:
+        return existing
+    parent = _find_yaml_section(lines, parent_path)
+    if not parent:
+        return None
+    parent_index, parent_indent = parent
+    child_indent = parent_indent + 2
+    insert_at = parent_index + 1
+    for index in range(parent_index + 1, len(lines)):
+        raw_line = lines[index]
+        parsed = _yaml_key_value(raw_line)
+        if not parsed:
+            insert_at = index + 1
+            continue
+        indent = len(raw_line) - len(raw_line.lstrip(" "))
+        if indent <= parent_indent:
+            break
+        if indent == child_indent:
+            insert_at = index + 1
+    lines.insert(insert_at, f"{' ' * child_indent}{key}:")
+    return insert_at, child_indent
+
+
+def _has_feishu_tool_progress_off(content):
+    lines = content.splitlines()
+    stack = []
+    for raw_line in lines:
+        parsed = _yaml_key_value(raw_line)
+        if not parsed:
+            continue
+        indent = len(raw_line) - len(raw_line.lstrip(" "))
+        key, value = parsed
+        while stack and stack[-1][0] >= indent:
+            stack.pop()
+        current_path = [item[1] for item in stack] + [key]
+        if current_path == ["display", "platforms", "feishu", "tool_progress"]:
+            return value.strip('"').strip("'").lower() == "off"
+        if not value:
+            stack.append((indent, key))
+    return False
+
+
+def _merge_feishu_quiet_display(content):
+    lines = content.splitlines()
+    if not _find_yaml_section(lines, ["display"]):
+        return content.rstrip() + QUIET_DISPLAY_BLOCK
+    if not _ensure_yaml_section(lines, ["display"], "platforms"):
+        return None
+    if not _ensure_yaml_section(lines, ["display", "platforms"], "feishu"):
+        return None
+    if not _replace_or_insert_yaml_value(lines, ["display", "platforms", "feishu"], "tool_progress", "off"):
+        return None
+    return "\n".join(lines) + ("\n" if content.endswith("\n") else "")
+
+
 def ensure_feishu_quiet_display(config_file=None):
     """Ensure Feishu does not show Hermes internal tool progress in group chat."""
     config_file = config_file or os.path.expanduser("~/.hermes/config.yaml")
@@ -212,18 +324,19 @@ def ensure_feishu_quiet_display(config_file=None):
     with open(config_file, encoding="utf-8") as f:
         content = f.read()
 
-    if "tool_progress: off" in content and "feishu:" in content:
+    if _has_feishu_tool_progress_off(content):
         print("  Feishu display noise guard OK")
         return True
 
-    if "display:" in content:
-        print("  WARNING: config.yaml already has display settings")
+    merged_content = _merge_feishu_quiet_display(content)
+    if merged_content is None:
+        print("  WARNING: config.yaml display settings could not be merged safely")
         print("  Add display.platforms.feishu.tool_progress: off to hide internal tool names")
         return False
 
     backup_path = _backup_file(config_file)
-    with open(config_file, "a", encoding="utf-8") as f:
-        f.write(QUIET_DISPLAY_BLOCK)
+    with open(config_file, "w", encoding="utf-8") as f:
+        f.write(merged_content)
     print(f"  Added Feishu display noise guard (backup: {backup_path})")
     return True
 
@@ -252,9 +365,19 @@ def validate_install(hermes_dir):
     return all_ok
 
 
+def _runtime_file(hermes_home, filename):
+    """Return a runtime profile file path for env/config checks."""
+    return os.path.join(os.path.abspath(os.path.expanduser(hermes_home)), filename)
+
+
 def main():
     parser = argparse.ArgumentParser(description="Install PilotFlow plugin into hermes-agent")
     parser.add_argument("--hermes-dir", help="Path to hermes-agent directory")
+    parser.add_argument(
+        "--hermes-home",
+        default=os.path.expanduser("~/.hermes"),
+        help="Hermes runtime profile directory for .env/config checks (default: ~/.hermes)",
+    )
     args = parser.parse_args()
 
     hermes_dir = args.hermes_dir or find_hermes_dir()
@@ -264,11 +387,14 @@ def main():
         sys.exit(1)
 
     src_dir = os.path.dirname(os.path.abspath(__file__))
+    env_file = _runtime_file(args.hermes_home, ".env")
+    config_file = _runtime_file(args.hermes_home, "config.yaml")
 
     print(f"PilotFlow Setup")
     print(f"=" * 50)
     print(f"Source: {src_dir}")
     print(f"Target: {hermes_dir}")
+    print(f"Hermes home: {os.path.abspath(os.path.expanduser(args.hermes_home))}")
     print()
 
     print("1. Copying plugin...")
@@ -278,14 +404,14 @@ def main():
     copy_skills(src_dir, hermes_dir)
 
     print("3. Checking environment...")
-    env_ok = check_env()
-    check_lark_cli_alignment()
+    env_ok = check_env(env_file)
+    check_lark_cli_alignment(env_file)
 
     print("4. Checking Hermes config...")
-    config_ok = check_config()
+    config_ok = check_config(config_file)
 
     print("4b. Configuring Feishu display...")
-    ensure_feishu_quiet_display()
+    ensure_feishu_quiet_display(config_file)
 
     print("5. Validating installation...")
     install_ok = validate_install(hermes_dir)
@@ -295,10 +421,10 @@ def main():
         print("Setup complete!")
         if not env_ok:
             print("WARNING: Environment variables need configuration")
-            print("Edit ~/.hermes/.env with your Feishu credentials")
+            print(f"Edit {env_file} with your Feishu credentials")
         elif not config_ok:
             print("WARNING: Hermes config needs review")
-            print("Edit ~/.hermes/config.yaml using INSTALL.md")
+            print(f"Edit {config_file} using INSTALL.md")
         else:
             print("Run: uv run hermes gateway")
     else:

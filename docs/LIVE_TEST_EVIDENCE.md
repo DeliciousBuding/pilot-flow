@@ -697,6 +697,7 @@
 | 重启后文本确认 | 新增回归验证：生成计划后清空 `_pending_plans` 和 `_plan_generated` 模拟 gateway 重启，用户只回复 `确认执行` 仍能从状态文件恢复 pending plan，并创建文档、多维表格和待办 |
 | 重启后资源留痕 | 新增回归验证：公开项目状态文件仍不保存成员、app token、table/record id 或资源 URL；非敏感资源 URL 进入私有 `pilotflow_project_refs.json` 后，重启状态 fallback 更新项目时可恢复文档链接并继续写项目文档留痕，群里直接查询项目详情或从看板按钮查看状态也会恢复项目文档、状态表和任务入口 |
 | 统一动作流水管道 | 新增 `_record_action_outcome` 回归覆盖：催办、状态、待办、批量待办和自然语言更新统一通过同一通道写公开最近进展、私有资源 refs、项目文档留痕和多维表格流水，避免继续为每个重启动作写对称补丁 |
+| WSL profile 显式验证 | 新增安装/验证回归：`setup.py --hermes-home <runtime-profile>` 会把 `.env`、`config.yaml` 和 Feishu display 检查指向同一个 Hermes runtime profile；已验证可在 WSL runtime config 存在 `display` 配置时保守合并 `display.platforms.feishu.tool_progress: off` 并保留备份；`verify_wsl_feishu_runtime.py --config-file <runtime-config>` 输出脱敏 `config_model`、`config_provider` 和 `config_has_feishu_gateway`，避免 Windows `~/.hermes` 与 WSL `/home/ding/.hermes` 漂移造成假阳性 |
 | 重启后状态动作留痕 | 新增回归验证：Hermes gateway 重启后 registry 为空时，卡片 `mark_project_done` 从脱敏状态恢复项目并标记完成，公开状态写入 `已完成`，最近进展追加 `状态=已完成`，传给项目文档留痕的项目快照也同步为新状态，避免文档记录出现旧状态 |
 | 重启后批量催办 | 新增回归验证：Hermes gateway 重启后 registry 为空时，简报卡片的 `briefing_batch_reminder` 可从脱敏项目状态恢复逾期/近期截止/风险候选项目，发送群催办并继续写项目文档留痕；成员缺失时使用“相关负责人”，不向公开状态补写成员；公开状态追加 `已发送催办提醒` 且不保存文档 URL |
 | 重启后批量待办 | 新增回归验证：Hermes gateway 重启后 registry 为空时，简报卡片的 `briefing_batch_followup_task` 可从脱敏项目状态恢复逾期/近期截止/风险候选项目，创建跟进待办并把任务入口写入私有资源 refs；公开状态只保存任务摘要，不保存任务 URL |

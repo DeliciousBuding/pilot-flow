@@ -244,18 +244,44 @@ gateway:
     assert "tool_progress: off" not in backup_file.read_text(encoding="utf-8")
 
 
-def test_ensure_feishu_quiet_display_warns_on_existing_display(tmp_path):
+def test_ensure_feishu_quiet_display_merges_existing_display(tmp_path):
     config_file = tmp_path / "config.yaml"
     config_file.write_text(
         """
 display:
-  tool_progress: new
+  theme: compact
 """,
         encoding="utf-8",
     )
 
-    assert setup.ensure_feishu_quiet_display(str(config_file)) is False
-    assert config_file.read_text(encoding="utf-8").count("display:") == 1
+    assert setup.ensure_feishu_quiet_display(str(config_file)) is True
+    content = config_file.read_text(encoding="utf-8")
+    assert content.count("display:") == 1
+    assert "  theme: compact" in content
+    assert "      tool_progress: off" in content
+    backup_file = tmp_path / "config.yaml.pilotflow.bak"
+    assert backup_file.exists()
+    assert "tool_progress: off" not in backup_file.read_text(encoding="utf-8")
+
+
+def test_ensure_feishu_quiet_display_updates_existing_feishu_tool_progress(tmp_path):
+    config_file = tmp_path / "config.yaml"
+    config_file.write_text(
+        """
+display:
+  platforms:
+    feishu:
+      tool_progress: on
+    cli:
+      tool_progress: on
+""",
+        encoding="utf-8",
+    )
+
+    assert setup.ensure_feishu_quiet_display(str(config_file)) is True
+    content = config_file.read_text(encoding="utf-8")
+    assert "    feishu:\n      tool_progress: off" in content
+    assert "    cli:\n      tool_progress: on" in content
 
 
 def test_copy_plugin_and_skills_to_hermes_layout(tmp_path):
@@ -274,3 +300,44 @@ def test_copy_plugin_and_skills_to_hermes_layout(tmp_path):
     assert (hermes_dir / "skills" / "pilotflow" / "SKILL.md").exists()
     assert (hermes_dir / "skills" / "pilotflow" / "DESCRIPTION.md").exists()
     assert setup.validate_install(str(hermes_dir)) is True
+
+
+def test_main_uses_explicit_hermes_home_for_runtime_checks(tmp_path, monkeypatch):
+    hermes_dir = tmp_path / "hermes-agent"
+    (hermes_dir / "plugins").mkdir(parents=True)
+    (hermes_dir / "skills").mkdir()
+    hermes_home = tmp_path / "runtime-home"
+    hermes_home.mkdir()
+    calls = {}
+
+    monkeypatch.setattr(sys, "argv", [
+        "setup.py",
+        "--hermes-dir", str(hermes_dir),
+        "--hermes-home", str(hermes_home),
+    ])
+    monkeypatch.setattr(setup, "copy_plugin", lambda src, dst: None)
+    monkeypatch.setattr(setup, "copy_skills", lambda src, dst: None)
+    monkeypatch.setattr(setup, "validate_install", lambda path: True)
+
+    def fake_check_env(env_file=None, lark_cli_config_file=None):
+        calls["env_file"] = env_file
+        return True
+
+    def fake_check_config(config_file=None):
+        calls["config_file"] = config_file
+        return True
+
+    def fake_quiet_display(config_file=None):
+        calls["quiet_config_file"] = config_file
+        return True
+
+    monkeypatch.setattr(setup, "check_env", fake_check_env)
+    monkeypatch.setattr(setup, "check_lark_cli_alignment", lambda env_file=None, lark_cli_config_file=None: True)
+    monkeypatch.setattr(setup, "check_config", fake_check_config)
+    monkeypatch.setattr(setup, "ensure_feishu_quiet_display", fake_quiet_display)
+
+    setup.main()
+
+    assert calls["env_file"] == os.path.join(str(hermes_home), ".env")
+    assert calls["config_file"] == os.path.join(str(hermes_home), "config.yaml")
+    assert calls["quiet_config_file"] == os.path.join(str(hermes_home), "config.yaml")
