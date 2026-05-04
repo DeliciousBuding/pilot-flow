@@ -205,13 +205,15 @@ def _new_confirm_token() -> str:
 def _create_card_action_ref(chat_id: str, action: str, plan: Optional[dict] = None) -> str:
     """Create an opaque short-lived card action reference."""
     action_id = uuid.uuid4().hex
+    ref = {
+        "chat_id": chat_id,
+        "action": action,
+        "plan": dict(plan or {}),
+        "timestamp": time.time(),
+    }
     with _plan_lock:
-        _card_action_refs[action_id] = {
-            "chat_id": chat_id,
-            "action": action,
-            "plan": dict(plan or {}),
-            "timestamp": time.time(),
-        }
+        _card_action_refs[action_id] = ref
+    _persist_card_action_ref(action_id, ref)
     return action_id
 
 
@@ -219,25 +221,44 @@ def _resolve_card_action_ref(action_id: str, *, consume: bool = False) -> Option
     """Resolve a card action reference if it is still within the plan TTL."""
     if not action_id:
         return None
+    now = time.time()
+    resolved = None
+    delete_ids: list[str] = []
     with _plan_lock:
         ref = _card_action_refs.get(action_id)
-        if not ref:
-            return None
-        if time.time() - ref.get("timestamp", 0) >= _PLAN_GATE_TTL:
+        if isinstance(ref, dict) and now - ref.get("timestamp", 0) < _PLAN_GATE_TTL:
+            resolved = dict(ref)
+        elif ref is not None:
             _card_action_refs.pop(action_id, None)
-            return None
-        resolved = dict(ref)
-        if consume:
+            delete_ids.append(action_id)
+    if not resolved:
+        ref = _load_card_action_ref(action_id)
+        if isinstance(ref, dict) and now - ref.get("timestamp", 0) < _PLAN_GATE_TTL:
+            resolved = dict(ref)
+            with _plan_lock:
+                _card_action_refs[action_id] = dict(ref)
+        elif isinstance(ref, dict):
+            delete_ids.append(action_id)
+    if not resolved:
+        if delete_ids:
+            _delete_card_action_refs(delete_ids)
+        return None
+    if consume:
+        message_id = resolved.get("message_id")
+        with _plan_lock:
             _card_action_refs.pop(action_id, None)
-            message_id = resolved.get("message_id")
             if message_id and resolved.get("action") in ("confirm_project", "cancel_project"):
-                stale_ids = [
+                delete_ids.extend(
                     k for k, v in _card_action_refs.items()
                     if v.get("message_id") == message_id
-                ]
-                for k in stale_ids:
+                )
+                for k in delete_ids:
                     _card_action_refs.pop(k, None)
-        return resolved
+        delete_ids.append(action_id)
+        if message_id and resolved.get("action") in ("confirm_project", "cancel_project"):
+            delete_ids.extend(_card_action_ids_for_message(message_id))
+        _delete_card_action_refs(delete_ids)
+    return resolved
 
 
 def _attach_card_message_id(action_ids: list[str], message_id: str) -> None:
@@ -248,6 +269,7 @@ def _attach_card_message_id(action_ids: list[str], message_id: str) -> None:
         for action_id in action_ids:
             if action_id in _card_action_refs:
                 _card_action_refs[action_id]["message_id"] = message_id
+                _persist_card_action_ref(action_id, _card_action_refs[action_id])
 
 
 def _clear_pending_plan_if_matches(chat_id: str, plan: Optional[dict]) -> None:
@@ -745,6 +767,75 @@ def _write_state_payload(payload: dict) -> bool:
     except Exception as e:
         logger.debug("project state payload save skipped: %s", e)
         return False
+
+
+def _persist_card_action_ref(action_id: str, ref: dict) -> None:
+    """Persist a short-lived card action ref so buttons survive gateway restarts."""
+    if not action_id or not isinstance(ref, dict):
+        return
+    now = time.time()
+    cached = {
+        "chat_id": str(ref.get("chat_id", "")),
+        "action": str(ref.get("action", "")),
+        "plan": json.loads(json.dumps(ref.get("plan") or {}, ensure_ascii=False)),
+        "timestamp": float(ref.get("timestamp", now) or now),
+    }
+    if ref.get("message_id"):
+        cached["message_id"] = str(ref.get("message_id", ""))
+    payload = _load_state_payload()
+    card_actions = payload.get("card_actions")
+    if not isinstance(card_actions, dict):
+        card_actions = {}
+    card_actions[action_id] = cached
+    payload["card_actions"] = {
+        key: value
+        for key, value in card_actions.items()
+        if isinstance(value, dict) and now - value.get("timestamp", 0) < _PLAN_GATE_TTL
+    }
+    _write_state_payload(payload)
+
+
+def _load_card_action_ref(action_id: str) -> Optional[dict]:
+    """Load a persisted card action ref if present."""
+    payload = _load_state_payload()
+    card_actions = payload.get("card_actions")
+    if not isinstance(card_actions, dict):
+        return None
+    ref = card_actions.get(action_id)
+    return dict(ref) if isinstance(ref, dict) else None
+
+
+def _delete_card_action_refs(action_ids: list[str]) -> None:
+    """Delete consumed or expired card action refs from durable state."""
+    ids = {action_id for action_id in action_ids if action_id}
+    if not ids:
+        return
+    payload = _load_state_payload()
+    card_actions = payload.get("card_actions")
+    if not isinstance(card_actions, dict):
+        return
+    changed = False
+    for action_id in ids:
+        if action_id in card_actions:
+            card_actions.pop(action_id, None)
+            changed = True
+    if changed:
+        payload["card_actions"] = card_actions
+        _write_state_payload(payload)
+
+
+def _card_action_ids_for_message(message_id: str) -> list[str]:
+    """Find persisted card action refs that belong to the same Feishu card."""
+    if not message_id:
+        return []
+    payload = _load_state_payload()
+    card_actions = payload.get("card_actions")
+    if not isinstance(card_actions, dict):
+        return []
+    return [
+        action_id for action_id, ref in card_actions.items()
+        if isinstance(ref, dict) and ref.get("message_id") == message_id
+    ]
 
 
 def _save_project_state(title: str, goal: str, members: list, deliverables: list, deadline: str,

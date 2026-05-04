@@ -10,6 +10,7 @@ import time
 import threading
 import datetime as dt
 from unittest.mock import patch
+import pytest
 
 # Add plugin path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "plugins", "pilotflow"))
@@ -58,6 +59,7 @@ from tools import (
     _append_bitable_update_record,
     _create_calendar_event,
     _create_card_action_ref,
+    _attach_card_message_id,
     _plan_idempotency_key,
     _handle_scan_chat_signals,
     _handle_card_action,
@@ -76,6 +78,11 @@ from tools import (
     _needs_confirmation_for_create,
     _needs_confirmation_for_update,
 )
+
+
+@pytest.fixture(autouse=True)
+def _isolated_pilotflow_state(tmp_path, monkeypatch):
+    monkeypatch.setenv("PILOTFLOW_STATE_PATH", str(tmp_path / "pilotflow-projects.json"))
 
 
 def test_scan_chat_signals_suggests_projectization_card(monkeypatch):
@@ -3061,6 +3068,53 @@ def test_card_command_dashboard_page_updates_origin_card_after_success():
             "blue",
         )
     ]
+
+
+def test_card_action_ref_replays_after_state_reload(tmp_path):
+    state_path = tmp_path / "pilotflow-projects.json"
+    with _project_registry_lock:
+        _project_registry.clear()
+    with _plan_lock:
+        _card_action_refs.clear()
+    _register_project(
+        "重启按钮项目01", [], "2026-05-20", "进行中", [],
+        goal="验证按钮重启恢复", deliverables=["验收记录"],
+    )
+
+    with patch.dict(os.environ, {"PILOTFLOW_STATE_PATH": str(state_path)}):
+        action_id = _create_card_action_ref(
+            "oc_restart_button",
+            "dashboard_page",
+            {"query": "项目进展 第1页", "page": 1},
+        )
+        _attach_card_message_id([action_id], "om_restart_button_origin")
+        with _plan_lock:
+            _card_action_refs.clear()
+
+        marked_cards = []
+
+        def capture_mark(message_id, title, content, template):
+            marked_cards.append((message_id, title, content, template))
+            return True
+
+        with (
+            patch("tools._send_interactive_card_via_feishu", return_value="om_restart_button_next"),
+            patch("tools._mark_card_message", side_effect=capture_mark),
+        ):
+            result = _handle_card_command(f'button {{"pilotflow_action_id":"{action_id}"}}')
+
+    assert result is None
+    assert marked_cards == [
+        (
+            "om_restart_button_origin",
+            "看板已翻页",
+            "新的项目看板已发送到群聊。",
+            "blue",
+        )
+    ]
+    serialized = state_path.read_text(encoding="utf-8")
+    assert "card_actions" in serialized
+    assert action_id not in serialized
 
 
 def test_card_command_dashboard_filter_updates_origin_card_after_success():
