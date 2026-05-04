@@ -229,6 +229,19 @@ def test_verify_runtime_risk_cycle_is_sanitized(tmp_path, monkeypatch):
     assert "example.invalid" not in json.dumps(result, ensure_ascii=False)
 
 
+def test_verify_runtime_progress_update_is_sanitized(tmp_path, monkeypatch):
+    hermes_dir, _sent_cards = _install_runtime_fixture(tmp_path, monkeypatch)
+
+    result = _MODULE._verify_runtime_progress_update(hermes_dir)
+
+    assert result["progress_update_applied"] is True
+    assert result["progress_doc_updated"] is True
+    assert result["progress_history_recorded"] is True
+    assert result["progress_state_recorded"] is True
+    assert result["progress_feedback_sent"] is True
+    assert "example.invalid" not in json.dumps(result, ensure_ascii=False)
+
+
 def test_verifier_update_task_mode_outputs_sanitized_runtime_result(tmp_path, capsys):
     env_file = tmp_path / ".env"
     env_file.write_text("PILOTFLOW_TEST_CHAT_ID=oc_real_chat_id\n", encoding="utf-8")
@@ -422,6 +435,39 @@ def test_verifier_risk_cycle_mode_outputs_sanitized_runtime_result(tmp_path, cap
     assert output["risk_resolved"] is True
     assert output["risk_level_low"] is True
     assert output["risk_resolve_feedback_sent"] is True
+    assert "oc_real_chat_id" not in output_text
+    assert "example.invalid" not in output_text
+
+
+def test_verifier_progress_update_mode_outputs_sanitized_runtime_result(tmp_path, capsys):
+    env_file = tmp_path / ".env"
+    env_file.write_text("PILOTFLOW_TEST_CHAT_ID=oc_real_chat_id\n", encoding="utf-8")
+
+    with patch.object(_MODULE, "_verify_runtime_progress_update", return_value={
+        "progress_update_applied": True,
+        "progress_doc_updated": True,
+        "progress_history_recorded": True,
+        "progress_state_recorded": True,
+        "progress_feedback_sent": True,
+        "raw_chat_id": "oc_real_chat_id",
+        "raw_doc_url": "https://example.invalid/doc/1",
+    }):
+        exit_code = _MODULE.main([
+            "--hermes-dir", str(tmp_path),
+            "--env-file", str(env_file),
+            "--verify-progress-update",
+        ])
+
+    output_text = capsys.readouterr().out
+    output = json.loads(output_text)
+    assert exit_code == 0
+    assert output["mode"] == "progress-update"
+    assert output["would_send_card"] is False
+    assert output["progress_update_applied"] is True
+    assert output["progress_doc_updated"] is True
+    assert output["progress_history_recorded"] is True
+    assert output["progress_state_recorded"] is True
+    assert output["progress_feedback_sent"] is True
     assert "oc_real_chat_id" not in output_text
     assert "example.invalid" not in output_text
 

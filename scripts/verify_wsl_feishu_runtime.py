@@ -143,6 +143,11 @@ def _sanitize_result(result: dict[str, Any]) -> dict[str, Any]:
         "risk_resolved",
         "risk_level_low",
         "risk_resolve_feedback_sent",
+        "progress_update_applied",
+        "progress_doc_updated",
+        "progress_history_recorded",
+        "progress_state_recorded",
+        "progress_feedback_sent",
         "error",
     }
     return {key: result[key] for key in allowed if key in result}
@@ -862,6 +867,100 @@ def _verify_runtime_risk_cycle(hermes_dir: Path) -> dict[str, Any]:
     }
 
 
+def _verify_runtime_progress_update(hermes_dir: Path) -> dict[str, Any]:
+    """Verify installed PilotFlow records progress to doc, Base history, and state."""
+    sys.path.insert(0, str(hermes_dir))
+    import plugins.pilotflow.tools as runtime_tools  # pylint: disable=import-error
+    from plugins.pilotflow.tools import (  # pylint: disable=import-error
+        _handle_update_project,
+        _load_project_state,
+        _project_registry,
+        _project_registry_lock,
+        _register_project,
+    )
+
+    chat_id = os.environ.get("PILOTFLOW_TEST_CHAT_ID", "")
+    original_state_path = os.environ.get("PILOTFLOW_STATE_PATH")
+    original_append_doc = runtime_tools._append_project_doc_update
+    original_append_history = runtime_tools._append_bitable_update_record
+    original_send = runtime_tools._hermes_send
+    history_labels: list[str] = []
+    sent_messages: list[str] = []
+
+    def fake_append_doc(*_args: Any, **_kwargs: Any) -> bool:
+        return True
+
+    def fake_append_history(_app_token: str, _table_id: str, label: str, *_args: Any, **_kwargs: Any) -> bool:
+        history_labels.append(label)
+        return True
+
+    def fake_send(_chat_id: str, text: str) -> bool:
+        sent_messages.append(text)
+        return True
+
+    with tempfile.TemporaryDirectory(prefix="pilotflow-progress-verify-") as tmpdir:
+        os.environ["PILOTFLOW_STATE_PATH"] = str(Path(tmpdir) / "pilotflow_state.json")
+        with _project_registry_lock:
+            _project_registry.clear()
+        runtime_tools._append_project_doc_update = fake_append_doc
+        runtime_tools._append_bitable_update_record = fake_append_history
+        runtime_tools._hermes_send = fake_send
+        try:
+            _register_project(
+                "运行态进展记录项目",
+                ["张三"],
+                "2026-05-20",
+                "进行中",
+                ["文档: https://example.invalid/doc/progress"],
+                app_token="app_runtime",
+                table_id="tbl_runtime",
+                record_id="rec_runtime",
+                goal="验证安装后的进展记录链路",
+                deliverables=["初始验收"],
+            )
+            data = json.loads(_handle_update_project(
+                {
+                    "project_name": "运行态进展记录",
+                    "action": "add_progress",
+                    "value": "完成原型评审，等待业务确认",
+                },
+                chat_id=chat_id,
+            ))
+            state_projects = _load_project_state()
+        finally:
+            runtime_tools._append_project_doc_update = original_append_doc
+            runtime_tools._append_bitable_update_record = original_append_history
+            runtime_tools._hermes_send = original_send
+            with _project_registry_lock:
+                _project_registry.clear()
+            if original_state_path is None:
+                os.environ.pop("PILOTFLOW_STATE_PATH", None)
+            else:
+                os.environ["PILOTFLOW_STATE_PATH"] = original_state_path
+
+    state_updates = []
+    for item in state_projects:
+        if item.get("title") == "运行态进展记录项目":
+            state_updates = item.get("updates", [])
+            break
+    feedback_text = "\n".join(sent_messages)
+    return {
+        "progress_update_applied": data.get("status") == "project_updated" and data.get("action") == "add_progress",
+        "progress_doc_updated": data.get("doc_updated") is True,
+        "progress_history_recorded": data.get("bitable_history_created") is True and "进展" in history_labels,
+        "progress_state_recorded": any(
+            item.get("action") == "进展" and item.get("value") == "完成原型评审，等待业务确认"
+            for item in state_updates
+            if isinstance(item, dict)
+        ),
+        "progress_feedback_sent": (
+            "进展 → 完成原型评审，等待业务确认" in feedback_text
+            and "项目文档已更新" in feedback_text
+            and "状态表记录已追加" in feedback_text
+        ),
+    }
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Verify PilotFlow WSL Feishu runtime.")
     parser.add_argument("--hermes-dir", required=True, help="Hermes runtime directory.")
@@ -876,6 +975,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--verify-deadline-update", action="store_true", help="Dry-run installed deadline calendar/reminder behavior.")
     parser.add_argument("--verify-member-permissions", action="store_true", help="Dry-run installed add-member permission refresh behavior.")
     parser.add_argument("--verify-risk-cycle", action="store_true", help="Dry-run installed risk report/resolve behavior.")
+    parser.add_argument("--verify-progress-update", action="store_true", help="Dry-run installed progress recording behavior.")
     args = parser.parse_args(argv)
 
     hermes_dir = Path(args.hermes_dir).resolve()
@@ -883,7 +983,8 @@ def main(argv: list[str] | None = None) -> int:
     config_result = _read_runtime_config(Path(args.config_file))
     import_result = _check_imports(hermes_dir)
     mode = (
-        "risk-cycle" if args.verify_risk_cycle
+        "progress-update" if args.verify_progress_update
+        else "risk-cycle" if args.verify_risk_cycle
         else "member-permissions" if args.verify_member_permissions
         else "deadline-update" if args.verify_deadline_update
         else "followup-task" if args.verify_followup_task
@@ -920,6 +1021,8 @@ def main(argv: list[str] | None = None) -> int:
         output.update(_verify_runtime_member_permissions(hermes_dir))
     if args.verify_risk_cycle:
         output.update(_verify_runtime_risk_cycle(hermes_dir))
+    if args.verify_progress_update:
+        output.update(_verify_runtime_progress_update(hermes_dir))
     if args.probe_llm:
         output.update(_probe_llm(config_result))
     print(json.dumps(_sanitize_result(output), ensure_ascii=False, sort_keys=True))

@@ -1094,6 +1094,19 @@
 | 用户价值 | 群里上报风险后，PilotFlow 能把项目切入风险态并维护风险等级；风险解除后能恢复项目推进状态，补齐“发现风险 → 跟踪 → 解除”的办公闭环 |
 | 隐私处理 | 证据只记录布尔结果和脱敏结论；不写入真实 chat_id、message_id、Feishu URL、用户 open_id、token 或 app secret |
 
+## 2026-05-05 项目进展记录运行态验证
+
+| 项目 | 证据 |
+| --- | --- |
+| 运行环境 | PilotFlow 已通过 `setup.py --hermes-home <wsl-hermes-home>` 同步到 WSL Hermes runtime；安装验证返回插件、技能、Hermes config 和 Feishu display 配置均 OK |
+| 本地回归 | `C:\Users\Ding\miniforge3\python.exe -m pytest` 返回 `239 passed`；`tests/test_verify_wsl_feishu_runtime.py` 返回 `20 passed`；`git diff --check` 通过 |
+| Verifier 新模式 | `verify_wsl_feishu_runtime.py --verify-progress-update` 在已安装的 WSL Hermes runtime 插件内返回 `progress_update_applied=true`、`progress_doc_updated=true`、`progress_history_recorded=true`、`progress_state_recorded=true`、`progress_feedback_sent=true` |
+| 飞书联动路径 | verifier 通过生产 `pilotflow_update_project` 的 `add_progress` 分支执行，dry-run 替换项目文档、多维表格流水和群发送，证明安装态插件会把进展写入文档追踪、Base history、脱敏状态和群反馈 |
+| 状态留痕 | 运行态结果确认公开状态文件只记录进展摘要，不写入真实文档链接或 Feishu 原始资源 ID；重启后看板仍可回读最近进展 |
+| 基线验证 | 同轮继续通过 `--probe-llm` 的 `llm_probe_ok=true`、`llm_probe_status=200`，`--send-card` 的 `card_sent=true`、`card_has_title=true`、`card_has_goal=true`、`card_has_risk=true`，`--verify-history` 的 `history_apply_card_sent=true`，`--verify-update-task` 的 `update_task_created=true`，`--verify-archive-gate` 的 `archive_gate_required=true`，`--verify-followup-task` 的 `followup_task_created=true`，`--verify-deadline-update` 的 `deadline_update_applied=true`，`--verify-member-permissions` 的 `member_added=true`，以及 `--verify-risk-cycle` 的 `risk_reported=true` |
+| 用户价值 | 群里追加项目进展后，PilotFlow 不只是回复文本，而是把进展同步到项目文档、状态表流水、脱敏状态和群反馈，补齐日常推进记录的真实办公闭环 |
+| 隐私处理 | 证据只记录布尔结果和脱敏结论；不写入真实 chat_id、message_id、Feishu URL、用户 open_id、token 或 app secret |
+
 ## 本地回归
 
 ```bash
