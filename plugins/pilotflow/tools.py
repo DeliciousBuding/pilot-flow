@@ -12,6 +12,7 @@ import json
 import logging
 import os
 import re
+import hashlib
 import threading
 import time
 import uuid
@@ -167,6 +168,31 @@ def _consume_plan_gate(chat_id: str) -> bool:
             return False
         _plan_generated.pop(chat_id, None)
         return True
+
+
+def _plan_idempotency_key(chat_id: str, plan: dict) -> str:
+    """Derive a stable idempotency key from chat scope and business plan fields."""
+    stable_plan = {
+        "title": plan.get("title", ""),
+        "goal": plan.get("goal", ""),
+        "members": list(plan.get("members") or []),
+        "deliverables": list(plan.get("deliverables") or []),
+        "deadline": plan.get("deadline", ""),
+        "risks": list(plan.get("risks") or []),
+    }
+    payload = json.dumps(
+        {"chat_id": chat_id, "plan": stable_plan},
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    digest = hashlib.sha256(payload.encode("utf-8")).hexdigest()[:24]
+    return f"pik_{digest}"
+
+
+def _new_confirm_token() -> str:
+    """Create an opaque short-lived confirmation token for plan snapshots."""
+    return f"pct_{uuid.uuid4().hex[:24]}"
 
 
 def _create_card_action_ref(chat_id: str, action: str, plan: Optional[dict] = None) -> str:
@@ -2599,12 +2625,19 @@ def _handle_generate_plan(params: Dict[str, Any], **kwargs) -> str:
         else:
             plan["title"] = f"项目 - {datetime.date.today().isoformat()}"
 
+    idempotency_key = _plan_idempotency_key(chat_id, plan)
+    confirm_token = _new_confirm_token()
+    plan["idempotency_key"] = idempotency_key
+    plan["confirm_token"] = confirm_token
+
     # Store full pending plan for card-button-driven creation
     if chat_id:
         with _plan_lock:
             _pending_plans[chat_id] = {
                 "input": text,
                 "template": template["description"] if template else None,
+                "confirm_token": confirm_token,
+                "idempotency_key": idempotency_key,
                 "plan": dict(plan),
             }
 
@@ -2640,6 +2673,8 @@ def _handle_generate_plan(params: Dict[str, Any], **kwargs) -> str:
         required=bool(should_confirm),
         mode="card_or_text" if should_confirm else "autonomous_private",
         ttl_seconds=_PLAN_GATE_TTL if should_confirm else None,
+        confirm_token=confirm_token,
+        idempotency_key=idempotency_key,
     )
     trace.record_event("plan_generated", {
         "template": template["description"] if template else None,
@@ -2662,6 +2697,11 @@ def _handle_generate_plan(params: Dict[str, Any], **kwargs) -> str:
             "scope": chat_scope.get("scope", "group"),
             "mode": autonomy_mode,
             "reason": autonomy_reason,
+        },
+        "confirmation": {
+            "confirm_token": confirm_token,
+            "idempotency_key": idempotency_key,
+            "ttl_seconds": _PLAN_GATE_TTL if should_confirm else None,
         },
         "flight_record": flight_record,
         "card_sent": bool(sent_message_id),
@@ -2824,6 +2864,20 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
     deliverables = _clean_plan_list(params.get("deliverables")) or _clean_plan_list(pending_plan.get("deliverables"))
     deadline = params.get("deadline", "") or pending_plan.get("deadline", "")
     risks = _clean_plan_list(params.get("risks")) or _clean_plan_list(pending_plan.get("risks"))
+    idempotency_key = (
+        params.get("idempotency_key")
+        or pending.get("idempotency_key")
+        or pending_plan.get("idempotency_key")
+        or _plan_idempotency_key(chat_id, {
+            "title": title,
+            "goal": goal,
+            "members": members,
+            "deliverables": deliverables,
+            "deadline": deadline,
+            "risks": risks,
+        })
+    )
+    confirm_token = params.get("confirm_token") or pending.get("confirm_token") or pending_plan.get("confirm_token") or ""
 
     artifacts = []
     unresolved_members = _find_unresolved_members(members, chat_id)
@@ -3010,6 +3064,8 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
         mode=autonomy_mode,
         approved_by="card_or_text" if skip_gate or params.get("confirmation_text") or params.get("input_text") else "",
         ttl_seconds=_PLAN_GATE_TTL if require_confirm else None,
+        confirm_token=confirm_token,
+        idempotency_key=idempotency_key,
     )
     trace.record_tool_call(
         "feishu_doc",
@@ -3048,6 +3104,7 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
     return tool_result({
         "status": "project_space_created",
         "title": title,
+        "idempotency_key": idempotency_key,
         "artifacts": artifacts,
         "display": display_items,
         "unresolved_members": unresolved_members,

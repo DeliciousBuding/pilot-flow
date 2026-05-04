@@ -58,6 +58,7 @@ from tools import (
     _append_bitable_update_record,
     _create_calendar_event,
     _create_card_action_ref,
+    _plan_idempotency_key,
     _handle_scan_chat_signals,
     _handle_card_action,
     _handle_card_command,
@@ -893,6 +894,39 @@ def test_generate_plan_returns_redacted_flight_record():
     assert "[redacted:url]" in encoded
 
 
+def test_generate_plan_returns_confirm_token_and_idempotency_key():
+    chat_id = "oc_confirm_token"
+    with _plan_lock:
+        _pending_plans.clear()
+        _card_action_refs.clear()
+
+    with patch("tools._hermes_send_card", return_value="om_confirm_token"):
+        result = json.loads(_handle_generate_plan(
+            {
+                "input_text": "帮我准备确认协议项目",
+                "title": "确认协议项目",
+                "goal": "验证确认 token 和幂等 key",
+                "members": ["张三"],
+                "deliverables": ["验证记录"],
+                "deadline": "2026-05-10",
+            },
+            chat_id=chat_id,
+        ))
+
+    confirm_token = result["confirmation"]["confirm_token"]
+    idempotency_key = result["confirmation"]["idempotency_key"]
+    assert confirm_token.startswith("pct_")
+    assert idempotency_key == _plan_idempotency_key(chat_id, result["plan"])
+    assert result["flight_record"]["confirmation"]["confirm_token"] == confirm_token
+    assert result["flight_record"]["confirmation"]["idempotency_key"] == idempotency_key
+    with _plan_lock:
+        pending = _pending_plans[chat_id]
+        assert pending["confirm_token"] == confirm_token
+        assert pending["idempotency_key"] == idempotency_key
+        assert pending["plan"]["idempotency_key"] == idempotency_key
+        assert any(ref["plan"].get("confirm_token") == confirm_token for ref in _card_action_refs.values())
+
+
 def test_generate_plan_private_scope_returns_trace_without_card():
     with _plan_lock:
         _pending_plans.clear()
@@ -1097,6 +1131,54 @@ def test_create_project_returns_redacted_flight_record():
     assert "[redacted:message_id]" in encoded
     assert "[redacted:url]" in encoded
     assert "[redacted:app_token]" in encoded
+
+
+def test_create_project_reuses_pending_idempotency_key_in_result_and_trace():
+    chat_id = "oc_idempotency_result"
+    with _project_registry_lock:
+        _project_registry.clear()
+    with _plan_lock:
+        _pending_plans.clear()
+        _card_action_refs.clear()
+
+    with patch("tools._hermes_send_card", return_value="om_plan"):
+        plan_result = json.loads(_handle_generate_plan(
+            {
+                "input_text": "帮我准备幂等项目",
+                "title": "幂等项目",
+                "goal": "验证执行阶段复用幂等 key",
+                "members": ["张三"],
+                "deliverables": ["验证记录"],
+                "deadline": "2026-05-10",
+            },
+            chat_id=chat_id,
+        ))
+
+    expected_key = plan_result["confirmation"]["idempotency_key"]
+    with (
+        patch("tools._resolve_member", return_value="ou_real_member"),
+        patch("tools._create_doc", return_value="https://example.invalid/doc"),
+        patch("tools._create_bitable", return_value={
+            "url": "https://example.invalid/base",
+            "app_token": "app_token=real_app_token",
+            "table_id": "tbl1",
+            "record_id": "rec1",
+        }),
+        patch("tools._create_task", return_value="任务已创建"),
+        patch("tools._hermes_send_card", return_value="om_entry"),
+        patch("tools._create_calendar_event", return_value=None),
+        patch("tools._schedule_deadline_reminder", return_value=False),
+        patch("tools._save_to_hermes_memory", return_value=True),
+    ):
+        result = json.loads(_handle_create_project_space(
+            {"input_text": "确认执行"},
+            chat_id=chat_id,
+        ))
+
+    assert result["status"] == "project_space_created"
+    assert result["idempotency_key"] == expected_key
+    assert result["flight_record"]["confirmation"]["idempotency_key"] == expected_key
+    assert result["flight_record"]["confirmation"]["confirm_token"] == plan_result["confirmation"]["confirm_token"]
 
 
 def test_create_project_falls_back_to_pending_plan_fields_when_input_text_only():

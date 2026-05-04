@@ -120,12 +120,16 @@ class PilotFlowTrace:
         mode: str,
         approved_by: str = "",
         ttl_seconds: int | None = None,
+        confirm_token: str = "",
+        idempotency_key: str = "",
     ) -> None:
         self._data["confirmation"] = {
             "required": required,
             "mode": mode,
             "approved_by": approved_by,
             "ttl_seconds": ttl_seconds,
+            "confirm_token": confirm_token,
+            "idempotency_key": idempotency_key,
         }
         self._touch()
 

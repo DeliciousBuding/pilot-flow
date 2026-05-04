@@ -663,6 +663,19 @@
 | 已知边界 | 14:22 的完整 @Bot 自动调用曾暴露 Hermes 模型侧 `HTTP 401 auth_unavailable` 错误；本次验证证明 PilotFlow 执行层和飞书卡片链路可用，但完整 Agent 自动巡检仍依赖 Hermes 模型认证恢复 |
 | 隐私处理 | 真实 chat_id、open_id、message_id、Feishu URL、token 和 app secret 不写入公开仓库 |
 
+## 2026-05-04 确认 token 与幂等 key 回归
+
+| 项目 | 证据 |
+| --- | --- |
+| 运行环境 | PilotFlow 已通过 `setup.py --hermes-dir <hermes-agent-path>` 同步到 WSL Hermes runtime；Hermes 测试模型已配置为 `mimo-v2.5-pro` |
+| 本地回归 | `C:\Users\Ding\miniforge3\python.exe -m pytest tests\test_tools.py tests\test_setup.py tests\test_plugin_registration.py tests\test_trace.py -q` 返回 `160 passed` |
+| 安装验证 | `setup.py --hermes-dir <hermes-agent-path>` 返回 `OK: plugins/pilotflow/tools.py` 和 `OK: plugins/pilotflow/trace.py` |
+| Runtime 直调 | 在 WSL Hermes runtime 中加载 `.hermes/.env` 后调用已安装的 `pilotflow_generate_plan`，输出确认 `status=plan_generated`、`has_confirm_token=true`、`has_idempotency_key=true`、`trace_has_key=true`、`redaction_enabled=true` |
+| 真实链路阻塞 | WSL Hermes `.venv` 当前缺少 `lark_oapi`；`uv run` 和直接 `python3` 均输出 `lark_oapi not installed`，因此本轮确认 token 的真实 Feishu 卡片发送未完成 |
+| 定位结果 | Hermes `pyproject.toml` 已声明 `feishu` extra；尝试 `uv sync --extra feishu` 和 `uv pip install lark-oapi qrcode` 时卡在跨文件系统 `.venv` 写入阶段，已终止长时间运行的安装进程，避免留下后台阻塞 |
+| 用户价值 | 计划生成和创建执行现在都有可追踪 `confirm_token` 与稳定 `idempotency_key`，并写入 Flight Recorder；重复确认和按钮单次消费可被审计 |
+| 隐私处理 | 验证只记录布尔结果；不写入真实 chat_id、message_id、confirm token、idempotency key、Feishu URL、token 或 app secret |
+
 ## 本地回归
 
 ```bash
@@ -672,7 +685,7 @@ C:\Users\Ding\miniforge3\python.exe -m pytest tests\test_tools.py tests\test_set
 结果：
 
 ```text
-153 passed
+160 passed
 ```
 
 ## 当前证据边界
