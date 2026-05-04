@@ -11,6 +11,7 @@ import json
 import os
 import sys
 import tempfile
+from urllib import error, request
 from pathlib import Path
 from typing import Any
 
@@ -59,6 +60,10 @@ def _read_runtime_config(path: Path) -> dict[str, Any]:
             result["config_model"] = value
         elif parent_keys == ["model"] and key == "provider" and value:
             result["config_provider"] = value
+        elif len(parent_keys) == 2 and parent_keys[0] == "providers" and key in ("base_url", "key_env", "model") and value:
+            provider = parent_keys[1]
+            providers = result.setdefault("providers", {})
+            providers.setdefault(provider, {})[key] = value
         elif "gateway" in parent_keys and key == "default_platform" and value == "feishu":
             result["config_has_feishu_gateway"] = True
         elif key == "feishu" and "gateway" in parent_keys:
@@ -94,6 +99,10 @@ def _sanitize_result(result: dict[str, Any]) -> dict[str, Any]:
         "action_refs_have_token",
         "pending_plan_recovered",
         "card_action_recovered",
+        "llm_probe_ok",
+        "llm_probe_status",
+        "llm_probe_error",
+        "llm_probe_provider",
         "error",
     }
     return {key: result[key] for key in allowed if key in result}
@@ -117,6 +126,35 @@ def _check_imports(hermes_dir: Path) -> dict[str, bool]:
         "lark_oapi_import_ok": lark_ok,
         "pilotflow_import_ok": pilotflow_ok,
     }
+
+
+def _probe_llm(config: dict[str, Any]) -> dict[str, Any]:
+    """Probe OpenAI-compatible /models without exposing URL, key, or body."""
+    provider = str(config.get("config_provider") or "").strip()
+    providers = config.get("providers") if isinstance(config.get("providers"), dict) else {}
+    provider_config = providers.get(provider) if isinstance(providers.get(provider), dict) else {}
+    base_url = str(provider_config.get("base_url") or os.environ.get("OPENAI_BASE_URL") or "").rstrip("/")
+    key_env = str(provider_config.get("key_env") or "OPENAI_API_KEY")
+    api_key = os.environ.get(key_env, "")
+    result: dict[str, Any] = {
+        "llm_probe_provider": provider,
+        "llm_probe_ok": False,
+    }
+    if not base_url or not api_key:
+        result["llm_probe_error"] = "missing_config"
+        return result
+    probe_url = f"{base_url}/models"
+    req = request.Request(probe_url, headers={"Authorization": f"Bearer {api_key}"})
+    try:
+        with request.urlopen(req, timeout=10) as resp:  # noqa: S310 - operator-provided runtime endpoint
+            result["llm_probe_status"] = int(getattr(resp, "status", 0) or 0)
+            result["llm_probe_ok"] = 200 <= result["llm_probe_status"] < 300
+    except error.HTTPError as exc:
+        result["llm_probe_status"] = int(exc.code)
+        result["llm_probe_error"] = "http_error"
+    except Exception:
+        result["llm_probe_error"] = "request_error"
+    return result
 
 
 def _send_runtime_plan_card(hermes_dir: Path) -> dict[str, Any]:
@@ -191,6 +229,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--env-file", default=str(Path.home() / ".hermes" / ".env"))
     parser.add_argument("--config-file", default=str(Path.home() / ".hermes" / "config.yaml"))
     parser.add_argument("--send-card", action="store_true", help="Send one real Feishu plan card.")
+    parser.add_argument("--probe-llm", action="store_true", help="Probe configured OpenAI-compatible /models endpoint.")
     args = parser.parse_args(argv)
 
     hermes_dir = Path(args.hermes_dir).resolve()
@@ -210,6 +249,8 @@ def main(argv: list[str] | None = None) -> int:
     }
     if args.send_card:
         output.update(_send_runtime_plan_card(hermes_dir))
+    if args.probe_llm:
+        output.update(_probe_llm(config_result))
     print(json.dumps(_sanitize_result(output), ensure_ascii=False, sort_keys=True))
     return 0
 

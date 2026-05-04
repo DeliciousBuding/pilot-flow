@@ -102,6 +102,15 @@
 | WSL runtime dry-run | `verify_wsl_feishu_runtime.py --env-file /home/ding/.hermes/.env --config-file /home/ding/.hermes/config.yaml` 输出脱敏通过：`config_model=mimo-v2.5-pro`、`config_provider=vectorcontrol`、`config_has_feishu_gateway=true` |
 | 真实 Feishu 卡片验证 | WSL `verify_wsl_feishu_runtime.py --send-card` 成功：`card_sent=true`、`pending_plan_recovered=true`、`card_action_recovered=true`、`redaction_enabled=true` |
 
+## 2026-05-04 WSL 模型探针与 401 预检
+
+| 项目 | 证据 |
+| --- | --- |
+| 功能硬化 | `verify_wsl_feishu_runtime.py` 新增 `--probe-llm`，会读取 Hermes runtime `config.yaml` 中当前 provider 的 `base_url/key_env` 并探测 OpenAI-compatible `/models` |
+| 隐私处理 | 探针输出只保留 `llm_probe_ok`、`llm_probe_status`、`llm_probe_error`、`llm_probe_provider`，不打印 API key、base_url 或响应正文 |
+| 自动化验证 | 新增成功探针和 HTTP 401 探针脱敏回归测试；`C:\Users\Ding\miniforge3\python.exe -m pytest` 通过，结果 `204 passed` |
+| WSL 模型预检 | WSL `verify_wsl_feishu_runtime.py --probe-llm` 输出脱敏通过：`llm_probe_ok=true`、`llm_probe_provider=vectorcontrol`、`llm_probe_status=200` |
+
 ## 2026-05-03 状态看板场景
 
 | 项目 | 证据 |

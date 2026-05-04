@@ -180,7 +180,19 @@ cd /mnt/d/Code/LarkProject/hermes-agent
 UV_PROJECT_ENVIRONMENT=/home/$USER/.venvs/hermes-agent-feishu \
 uv run python /mnt/d/Code/LarkProject/PilotFlow/scripts/verify_wsl_feishu_runtime.py \
   --hermes-dir /mnt/d/Code/LarkProject/hermes-agent \
-  --env-file /mnt/c/Users/Ding/.hermes/.env
+  --env-file /home/$USER/.hermes/.env \
+  --config-file /home/$USER/.hermes/config.yaml
+```
+
+如果要在上场前提前排除模型侧 `401 auth_unavailable` / API key / base_url 漂移问题，加 `--probe-llm`。输出只包含状态码和 provider，不会打印 API key、base_url 或响应正文：
+
+```bash
+UV_PROJECT_ENVIRONMENT=/home/$USER/.venvs/hermes-agent-feishu \
+uv run python /mnt/d/Code/LarkProject/PilotFlow/scripts/verify_wsl_feishu_runtime.py \
+  --hermes-dir /mnt/d/Code/LarkProject/hermes-agent \
+  --env-file /home/$USER/.hermes/.env \
+  --config-file /home/$USER/.hermes/config.yaml \
+  --probe-llm
 ```
 
 确认要向测试群发送真实计划卡片时再加 `--send-card`：
@@ -189,7 +201,8 @@ uv run python /mnt/d/Code/LarkProject/PilotFlow/scripts/verify_wsl_feishu_runtim
 UV_PROJECT_ENVIRONMENT=/home/$USER/.venvs/hermes-agent-feishu \
 uv run python /mnt/d/Code/LarkProject/PilotFlow/scripts/verify_wsl_feishu_runtime.py \
   --hermes-dir /mnt/d/Code/LarkProject/hermes-agent \
-  --env-file /mnt/c/Users/Ding/.hermes/.env \
+  --env-file /home/$USER/.hermes/.env \
+  --config-file /home/$USER/.hermes/config.yaml \
   --send-card
 ```
 
@@ -239,6 +252,19 @@ ModuleNotFoundError: No module named 'lark_oapi'
 ### LLM 连接失败
 
 确认 `OPENAI_BASE_URL` 和 `OPENAI_API_KEY` 正确：
+
+优先用 runtime verifier 检查 Hermes 实际加载的 provider/model/base_url/key_env 是否可用：
+
+```bash
+UV_PROJECT_ENVIRONMENT=/home/$USER/.venvs/hermes-agent-feishu \
+uv run python /mnt/d/Code/LarkProject/PilotFlow/scripts/verify_wsl_feishu_runtime.py \
+  --hermes-dir /mnt/d/Code/LarkProject/hermes-agent \
+  --env-file /home/$USER/.hermes/.env \
+  --config-file /home/$USER/.hermes/config.yaml \
+  --probe-llm
+```
+
+如果输出 `llm_probe_ok=false` 且 `llm_probe_status=401`，说明当前 WSL Hermes profile 的模型 key/base_url/provider 不可用；先修 `~/.hermes/.env` 和 `~/.hermes/config.yaml`，不要只改 Windows 侧配置。
 
 Linux / macOS:
 
