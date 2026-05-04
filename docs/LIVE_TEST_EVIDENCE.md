@@ -2,6 +2,20 @@
 
 > 本文件只记录可复验结论和脱敏摘要，不提交真实群 ID、用户 open_id、应用 secret、message_id 或飞书文档链接。
 
+## 2026-05-05 重启后风险卡片解除闭环
+
+| 项目 | 证据 |
+| --- | --- |
+| 功能修复 | 项目详情卡/看板卡的“解除风险”动作现在对 restart-safe state-only 项目有明确落盘返回；Hermes gateway 重启后，风险项目仍可从卡片按钮恢复为进行中 |
+| 适用边界 | state-only 项目不恢复成员名单，也不写真实 Base 元数据；卡片动作只基于 opaque action ref 和脱敏项目状态执行，不从自然语言重新推断 |
+| 状态延续 | 解除风险后会写公开最近进展 `风险解除 -> 风险已解除`、更新 restart-safe state、追加项目文档；没有 app/table 元数据时不会写多维表格流水 |
+| 本地回归 | `C:\Users\Ding\miniforge3\python.exe -m pytest` 返回 `297 passed`；`tests/test_tools.py tests/test_verify_wsl_feishu_runtime.py` 返回 `263 passed` |
+| WSL 安装态 | `setup.py --hermes-dir D:\Code\LarkProject\hermes-agent --hermes-home \\wsl.localhost\Ubuntu-24.04\home\ding\.hermes` 通过；插件和 skill 已同步到 WSL Hermes runtime profile |
+| Verifier 新字段 | `--verify-risk-cycle` 返回 `risk_state_card_resolved=true`、`risk_state_card_recorded=true`、`risk_state_card_feedback_sent=true`，同时风险上报/解除、详情卡 opaque action 和状态表同步基线仍为 true |
+| 基线验证 | 同轮继续通过同一 Feishu venv 下 `--send-card` 的 `card_sent=true`、`card_has_title=true`、`card_has_goal=true`、`card_has_initiator=true`、`card_has_risk=true`，以及 `--probe-llm` 的 `llm_probe_ok=true`、`llm_probe_status=200` |
+| 用户价值 | 用户在群里从风险项目卡片继续推进时，不会因为 Hermes 重启丢失可操作性；创建、上报风险、查看详情、解除风险、状态持久化构成更完整的办公闭环 |
+| 隐私处理 | 验证只记录布尔结果和脱敏状态；不写入真实 chat_id、open_id、message_id、Feishu URL、任务 URL、token 或 app secret |
+
 ## 2026-05-05 重启后按保存负责人批量创建跟进待办
 
 | 项目 | 证据 |

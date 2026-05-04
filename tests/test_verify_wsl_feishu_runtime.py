@@ -314,6 +314,9 @@ def test_verify_runtime_risk_cycle_is_sanitized(tmp_path, monkeypatch):
     assert result["risk_resolved"] is True
     assert result["risk_level_low"] is True
     assert result["risk_resolve_feedback_sent"] is True
+    assert result["risk_state_card_resolved"] is True
+    assert result["risk_state_card_recorded"] is True
+    assert result["risk_state_card_feedback_sent"] is True
     assert result["risk_detail_reminder_action_shown"] is True
     assert result["risk_detail_reminder_opaque"] is True
     assert "example.invalid" not in json.dumps(result, ensure_ascii=False)
@@ -773,6 +776,9 @@ def test_verifier_risk_cycle_mode_outputs_sanitized_runtime_result(tmp_path, cap
         "risk_resolved": True,
         "risk_level_low": True,
         "risk_resolve_feedback_sent": True,
+        "risk_state_card_resolved": True,
+        "risk_state_card_recorded": True,
+        "risk_state_card_feedback_sent": True,
         "risk_detail_reminder_action_shown": True,
         "risk_detail_reminder_opaque": True,
         "raw_chat_id": "oc_real_chat_id",
@@ -797,6 +803,9 @@ def test_verifier_risk_cycle_mode_outputs_sanitized_runtime_result(tmp_path, cap
     assert output["risk_resolved"] is True
     assert output["risk_level_low"] is True
     assert output["risk_resolve_feedback_sent"] is True
+    assert output["risk_state_card_resolved"] is True
+    assert output["risk_state_card_recorded"] is True
+    assert output["risk_state_card_feedback_sent"] is True
     assert output["risk_detail_reminder_action_shown"] is True
     assert output["risk_detail_reminder_opaque"] is True
     assert "oc_real_chat_id" not in output_text

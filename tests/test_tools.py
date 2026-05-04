@@ -5201,6 +5201,47 @@ def test_card_action_reopens_state_project_after_restart(tmp_path):
     assert projects[0]["status"] == "进行中"
 
 
+def test_card_action_resolves_state_risk_project_after_restart(tmp_path):
+    state_path = tmp_path / "pilotflow-projects.json"
+    with _project_registry_lock:
+        _project_registry.clear()
+
+    with patch.dict(os.environ, {"PILOTFLOW_STATE_PATH": str(state_path)}):
+        assert _save_project_state(
+            "重启风险解除项目",
+            "验证重启后卡片解除风险",
+            ["张三"],
+            ["验收记录"],
+            "2026-05-20",
+            "有风险",
+            artifacts=["文档: https://example.invalid/doc/risk-state"],
+        )
+        with (
+            patch("tools._append_project_doc_update", return_value=True) as append_doc,
+            patch("tools._hermes_send", return_value=True) as send,
+        ):
+            action_value = _opaque_card_action_value(
+                "oc_resolve_state_risk",
+                "resolve_risk",
+                {"title": "重启风险解除项目"},
+            )
+            result = json.loads(_handle_card_action(
+                {"action_value": action_value},
+                chat_id="oc_resolve_state_risk",
+            ))
+        projects = _load_project_state()
+
+    assert result["status"] == "project_risk_resolved"
+    assert result["bitable_updated"] is False
+    assert result["doc_updated"] is True
+    assert result["state_updated"] is True
+    assert projects[0]["title"] == "重启风险解除项目"
+    assert projects[0]["status"] == "进行中"
+    assert projects[0]["updates"][-1] == {"action": "风险解除", "value": "风险已解除"}
+    append_doc.assert_called_once()
+    assert "风险已解除" in send.call_args.args[1]
+
+
 def test_update_project_updates_sanitized_state_after_restart(tmp_path):
     state_path = tmp_path / "pilotflow-projects.json"
     with _project_registry_lock:

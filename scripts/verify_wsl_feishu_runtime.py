@@ -221,6 +221,9 @@ def _sanitize_result(result: dict[str, Any]) -> dict[str, Any]:
         "risk_resolved",
         "risk_level_low",
         "risk_resolve_feedback_sent",
+        "risk_state_card_resolved",
+        "risk_state_card_recorded",
+        "risk_state_card_feedback_sent",
         "risk_detail_reminder_action_shown",
         "risk_detail_reminder_opaque",
         "progress_update_applied",
@@ -2038,13 +2041,16 @@ def _verify_runtime_risk_cycle(hermes_dir: Path) -> dict[str, Any]:
         _handle_update_project,
         _create_card_action_ref,
         _card_action_refs,
+        _load_project_state,
         _project_registry,
         _project_registry_lock,
         _register_project,
+        _save_project_state,
         _plan_lock,
     )
 
     chat_id = os.environ.get("PILOTFLOW_TEST_CHAT_ID", "")
+    original_state_path = os.environ.get("PILOTFLOW_STATE_PATH")
     original_append_doc = runtime_tools._append_project_doc_update
     original_append_history = runtime_tools._append_bitable_update_record
     original_update_bitable = runtime_tools._update_bitable_record
@@ -2128,12 +2134,33 @@ def _verify_runtime_risk_cycle(hermes_dir: Path) -> dict[str, Any]:
         ))
         with _project_registry_lock:
             resolved_status = _project_registry["运行态风险闭环项目"].get("status")
+        with tempfile.TemporaryDirectory() as tmpdir:
+            os.environ["PILOTFLOW_STATE_PATH"] = str(Path(tmpdir) / "pilotflow_risk_state.json")
+            _save_project_state(
+                "运行态重启风险卡片项目",
+                "验证安装后重启状态卡片解除风险",
+                ["张三"],
+                ["验收记录"],
+                "2026-05-20",
+                "有风险",
+                ["文档: https://example.invalid/doc/risk-state"],
+            )
+            state_action_id = _create_card_action_ref(chat_id, "resolve_risk", {"title": "运行态重启风险卡片项目"})
+            state_resolved = json.loads(_handle_card_action(
+                {"action_value": json.dumps({"pilotflow_action_id": state_action_id}, ensure_ascii=False)},
+                chat_id=chat_id,
+            ))
+            state_projects = _load_project_state()
     finally:
         runtime_tools._append_project_doc_update = original_append_doc
         runtime_tools._append_bitable_update_record = original_append_history
         runtime_tools._update_bitable_record = original_update_bitable
         runtime_tools._hermes_send = original_send
         runtime_tools._hermes_send_card = original_send_card
+        if original_state_path is None:
+            os.environ.pop("PILOTFLOW_STATE_PATH", None)
+        else:
+            os.environ["PILOTFLOW_STATE_PATH"] = original_state_path
         with _project_registry_lock:
             _project_registry.clear()
         with _plan_lock:
@@ -2149,6 +2176,14 @@ def _verify_runtime_risk_cycle(hermes_dir: Path) -> dict[str, Any]:
         "risk_resolved": resolved.get("status") == "project_updated" and resolved_status == "进行中",
         "risk_level_low": resolved.get("risk_level") == "低",
         "risk_resolve_feedback_sent": "风险解除 → 支付接口联调已恢复" in feedback_text and "状态已恢复为进行中" in feedback_text,
+        "risk_state_card_resolved": state_resolved.get("status") == "project_risk_resolved"
+        and state_resolved.get("state_updated") is True,
+        "risk_state_card_recorded": len(state_projects) == 1
+        and state_projects[0].get("title") == "运行态重启风险卡片项目"
+        and state_projects[0].get("status") == "进行中"
+        and {"action": "风险解除", "value": "风险已解除"} in state_projects[0].get("updates", []),
+        "risk_state_card_feedback_sent": "运行态重启风险卡片项目" in feedback_text
+        and "风险已解除" in feedback_text,
         "risk_detail_reminder_action_shown": detail.get("status") == "project_status_sent"
         and "发送提醒" in detail_card_text,
         "risk_detail_reminder_opaque": len(detail_actions) == 3

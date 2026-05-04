@@ -4234,6 +4234,8 @@ def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
             "project": project_title,
             "bitable_updated": bitable_updated,
             "doc_updated": doc_updated,
+            "state_updated": outcome["state_updated"],
+            "bitable_history_created": outcome["bitable_history_created"],
             "instructions": instruction,
         })
 
