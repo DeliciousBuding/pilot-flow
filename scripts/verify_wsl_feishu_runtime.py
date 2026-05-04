@@ -213,6 +213,8 @@ def _sanitize_result(result: dict[str, Any]) -> dict[str, Any]:
         "risk_resolved",
         "risk_level_low",
         "risk_resolve_feedback_sent",
+        "risk_detail_reminder_action_shown",
+        "risk_detail_reminder_opaque",
         "progress_update_applied",
         "progress_doc_updated",
         "progress_history_recorded",
@@ -1356,10 +1358,14 @@ def _verify_runtime_update_task_summary(hermes_dir: Path) -> dict[str, Any]:
     sys.path.insert(0, str(hermes_dir))
     import plugins.pilotflow.tools as runtime_tools  # pylint: disable=import-error
     from plugins.pilotflow.tools import (  # pylint: disable=import-error
+        _handle_card_action,
         _handle_update_project,
+        _create_card_action_ref,
+        _card_action_refs,
         _project_registry,
         _project_registry_lock,
         _register_project,
+        _plan_lock,
     )
 
     chat_id = os.environ.get("PILOTFLOW_TEST_CHAT_ID", "")
@@ -1430,10 +1436,14 @@ def _verify_runtime_archive_gate(hermes_dir: Path) -> dict[str, Any]:
     sys.path.insert(0, str(hermes_dir))
     import plugins.pilotflow.tools as runtime_tools  # pylint: disable=import-error
     from plugins.pilotflow.tools import (  # pylint: disable=import-error
+        _handle_card_action,
         _handle_update_project,
+        _create_card_action_ref,
+        _card_action_refs,
         _project_registry,
         _project_registry_lock,
         _register_project,
+        _plan_lock,
     )
 
     chat_id = os.environ.get("PILOTFLOW_TEST_CHAT_ID", "")
@@ -1862,10 +1872,14 @@ def _verify_runtime_risk_cycle(hermes_dir: Path) -> dict[str, Any]:
     sys.path.insert(0, str(hermes_dir))
     import plugins.pilotflow.tools as runtime_tools  # pylint: disable=import-error
     from plugins.pilotflow.tools import (  # pylint: disable=import-error
+        _handle_card_action,
         _handle_update_project,
+        _create_card_action_ref,
+        _card_action_refs,
         _project_registry,
         _project_registry_lock,
         _register_project,
+        _plan_lock,
     )
 
     chat_id = os.environ.get("PILOTFLOW_TEST_CHAT_ID", "")
@@ -1873,9 +1887,11 @@ def _verify_runtime_risk_cycle(hermes_dir: Path) -> dict[str, Any]:
     original_append_history = runtime_tools._append_bitable_update_record
     original_update_bitable = runtime_tools._update_bitable_record
     original_send = runtime_tools._hermes_send
+    original_send_card = runtime_tools._hermes_send_card
     bitable_updates: list[dict[str, Any]] = []
     history_labels: list[str] = []
     sent_messages: list[str] = []
+    sent_cards: list[dict[str, Any]] = []
 
     def fake_append_doc(*_args: Any, **_kwargs: Any) -> bool:
         return True
@@ -1892,12 +1908,19 @@ def _verify_runtime_risk_cycle(hermes_dir: Path) -> dict[str, Any]:
         sent_messages.append(text)
         return True
 
+    def fake_send_card(_chat_id: str, card: dict[str, Any]) -> str:
+        sent_cards.append(card)
+        return f"om_risk_detail_{len(sent_cards)}"
+
     with _project_registry_lock:
         _project_registry.clear()
+    with _plan_lock:
+        _card_action_refs.clear()
     runtime_tools._append_project_doc_update = fake_append_doc
     runtime_tools._append_bitable_update_record = fake_append_history
     runtime_tools._update_bitable_record = fake_update_bitable
     runtime_tools._hermes_send = fake_send
+    runtime_tools._hermes_send_card = fake_send_card
     try:
         _register_project(
             "运行态风险闭环项目",
@@ -1921,6 +1944,17 @@ def _verify_runtime_risk_cycle(hermes_dir: Path) -> dict[str, Any]:
         ))
         with _project_registry_lock:
             reported_status = _project_registry["运行态风险闭环项目"].get("status")
+        detail_action_id = _create_card_action_ref(chat_id, "project_status", {"title": "运行态风险闭环项目"})
+        detail = json.loads(_handle_card_action(
+            {"action_value": json.dumps({"pilotflow_action_id": detail_action_id}, ensure_ascii=False)},
+            chat_id=chat_id,
+        ))
+        detail_card_text = json.dumps(sent_cards[-1], ensure_ascii=False) if sent_cards else ""
+        with _plan_lock:
+            detail_actions = [
+                ref for ref in _card_action_refs.values()
+                if ref.get("chat_id") == chat_id and ref.get("action") in ("resolve_risk", "send_project_reminder", "create_followup_task")
+            ]
 
         resolved = json.loads(_handle_update_project(
             {
@@ -1937,8 +1971,11 @@ def _verify_runtime_risk_cycle(hermes_dir: Path) -> dict[str, Any]:
         runtime_tools._append_bitable_update_record = original_append_history
         runtime_tools._update_bitable_record = original_update_bitable
         runtime_tools._hermes_send = original_send
+        runtime_tools._hermes_send_card = original_send_card
         with _project_registry_lock:
             _project_registry.clear()
+        with _plan_lock:
+            _card_action_refs.clear()
 
     feedback_text = "\n".join(sent_messages)
     return {
@@ -1950,6 +1987,11 @@ def _verify_runtime_risk_cycle(hermes_dir: Path) -> dict[str, Any]:
         "risk_resolved": resolved.get("status") == "project_updated" and resolved_status == "进行中",
         "risk_level_low": resolved.get("risk_level") == "低",
         "risk_resolve_feedback_sent": "风险解除 → 支付接口联调已恢复" in feedback_text and "状态已恢复为进行中" in feedback_text,
+        "risk_detail_reminder_action_shown": detail.get("status") == "project_status_sent"
+        and "发送提醒" in detail_card_text,
+        "risk_detail_reminder_opaque": len(detail_actions) == 3
+        and all(ref.get("plan", {}).get("title") == "运行态风险闭环项目" for ref in detail_actions)
+        and "pilotflow_chat_id" not in detail_card_text,
     }
 
 

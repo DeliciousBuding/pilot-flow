@@ -1353,6 +1353,19 @@
 | 用户价值 | 用户复用历史项目经验时，PilotFlow 不只恢复目标、交付物、风险和成员，也能恢复“哪个交付物由谁负责”，避免项目确认前丢失团队分工 |
 | 隐私处理 | 证据只记录布尔结果和脱敏结论；不写入真实 chat_id、message_id、Feishu URL、用户 open_id、token 或 app secret |
 
+## 2026-05-05 风险详情卡催办运行态验证
+
+| 项目 | 证据 |
+| --- | --- |
+| 运行环境 | PilotFlow 已通过 `setup.py --hermes-home <wsl-hermes-home>` 同步到 WSL Hermes runtime；安装验证返回插件、技能、Hermes config 和 Feishu display 配置均 OK |
+| 本地回归 | `C:\Users\Ding\miniforge3\python.exe -m pytest` 返回 `283 passed`；`tests/test_verify_wsl_feishu_runtime.py` 返回 `45 passed`；`git diff --check` 通过，仅有 CRLF 提示 |
+| 功能硬化 | 风险项目详情卡现在除“解除风险”和“创建待办”外，也展示“发送提醒”按钮；按钮通过短期 opaque `pilotflow_action_id` 触发，不把 chat_id 或项目明文控制字段放进卡片 payload |
+| Verifier 新字段 | `verify_wsl_feishu_runtime.py --verify-risk-cycle` 在已安装的 WSL Hermes runtime 插件内返回 `risk_detail_reminder_action_shown=true`、`risk_detail_reminder_opaque=true`，并保留 `risk_reported=true`、`risk_resolved=true`、`risk_bitable_synced=true`、`risk_history_recorded=true` |
+| 飞书卡片路径 | verifier 使用生产 `_create_card_action_ref` 和 `_handle_card_action` 打开风险项目详情卡，检查风险详情卡能生成 `resolve_risk`、`send_project_reminder`、`create_followup_task` 三类动作引用 |
+| 基线验证 | 同轮继续通过同一 Feishu venv 下 `--send-card` 的 `card_sent=true`、`card_has_title=true`、`card_has_goal=true`、`card_has_initiator=true`、`card_has_risk=true`，以及 `--probe-llm` 的 `llm_probe_ok=true`、`llm_probe_status=200` |
+| 用户价值 | 群里发现风险项目后，用户不必先切换到简报或批量催办入口；在项目详情卡即可直接催办负责人、创建跟进待办或解除风险，补齐风险发现后的即时推进闭环 |
+| 隐私处理 | 证据只记录布尔结果和脱敏结论；不写入真实 chat_id、message_id、Feishu URL、用户 open_id、token 或 app secret |
+
 ## 本地回归
 
 ```bash

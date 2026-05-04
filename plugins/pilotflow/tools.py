@@ -555,10 +555,12 @@ def _project_detail_header_template(status: str) -> str:
 
 
 def _project_needs_reminder_action(project: dict) -> bool:
-    """Return true when a live project is overdue or due within 7 days."""
+    """Return true when a live project should expose a group reminder action."""
     status = project.get("status", "进行中")
     if status == "已完成" or _is_archived_status(status):
         return False
+    if status == "有风险":
+        return True
     import datetime as _dt
     try:
         deadline = _dt.date.fromisoformat(str(project.get("deadline", "")))
