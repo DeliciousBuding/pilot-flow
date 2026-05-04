@@ -965,6 +965,20 @@
 | 用户价值 | 用户在群聊里补一个交付物后，PilotFlow 不只是内部建任务，而是把真实待办结果带回群反馈和 Agent 结构化结果，办公闭环更接近“可真实使用” |
 | 隐私处理 | 证据只记录布尔结果和脱敏结论；不写入真实 chat_id、message_id、Feishu URL、用户 open_id、token 或 app secret |
 
+## 2026-05-05 重启后新增交付物继续派发待办
+
+| 项目 | 证据 |
+| --- | --- |
+| 运行环境 | PilotFlow 已通过 `setup.py --hermes-home <wsl-hermes-home>` 同步到 WSL Hermes runtime；安装验证返回插件、技能、Hermes config 和 Feishu display 配置均 OK |
+| 本地回归 | `C:\Users\Ding\miniforge3\python.exe -m pytest` 返回 `221 passed`；`add_deliverable` / 跟进待办相关定向测试返回 `10 passed` |
+| 功能修正 | `pilotflow_update_project` 在 registry 为空、只能从脱敏状态恢复项目时，处理 `add_deliverable` 也会创建飞书任务，不再只更新交付物列表 |
+| 重启可用性 | 回归验证确认重启状态 fallback 会返回 `task_created=true` 和 `task_name`，群反馈包含待办摘要，私有资源 refs 记录任务入口，项目详情卡后续仍可回读 |
+| 隐私边界 | 公开项目状态只追加 `交付物=...` 和交付物列表，不保存任务 URL；任务 URL 只进入私有资源 refs，符合重启后状态脱敏策略 |
+| WSL 更新链路 | 同轮通过 `verify_wsl_feishu_runtime.py --verify-update-task`，输出 `update_task_created=true`、`update_task_name_returned=true`、`update_task_feedback_includes_summary=true`、`update_task_artifact_recorded=true` |
+| 基线验证 | 同轮继续通过 `--probe-llm` 的 `llm_probe_ok=true`、`llm_probe_status=200`，`--send-card` 的 `card_sent=true`、`pending_plan_recovered=true`，以及 `--verify-history` 的 `history_apply_card_sent=true`、`history_pending_recovered=true` |
+| 用户价值 | Hermes gateway 重启后，用户在群里继续补任务/交付物仍会得到真实飞书待办和群反馈，项目不会因为内存 registry 丢失而降级成只改本地状态 |
+| 隐私处理 | 证据只记录布尔结果和脱敏结论；不写入真实 chat_id、message_id、Feishu URL、用户 open_id、token 或 app secret |
+
 ## 本地回归
 
 ```bash

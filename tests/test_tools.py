@@ -49,6 +49,7 @@ from tools import (
     _save_to_hermes_memory,
     _save_project_state,
     _load_project_state,
+    _load_project_resource_refs,
     _schedule_deadline_reminder,
     _clean_plan_list,
     _extract_inline_project_fields,
@@ -5456,10 +5457,14 @@ def test_update_project_appends_update_to_project_doc():
 
 def test_update_project_adds_deliverable_to_sanitized_state_after_restart(tmp_path):
     state_path = tmp_path / "pilotflow-projects.json"
+    refs_path = tmp_path / "pilotflow-project-refs.json"
     with _project_registry_lock:
         _project_registry.clear()
 
-    with patch.dict(os.environ, {"PILOTFLOW_STATE_PATH": str(state_path)}):
+    with patch.dict(os.environ, {
+        "PILOTFLOW_STATE_PATH": str(state_path),
+        "PILOTFLOW_PROJECT_REFS_PATH": str(refs_path),
+    }):
         assert _save_project_state(
             "重启交付物项目",
             "验证重启后新增交付物",
@@ -5468,18 +5473,31 @@ def test_update_project_adds_deliverable_to_sanitized_state_after_restart(tmp_pa
             "2026-05-20",
             "进行中",
         )
-        with patch("tools._hermes_send", return_value=True):
+        with (
+            patch("tools._create_task", return_value="评审清单: https://example.invalid/task/restart") as create_task,
+            patch("tools._hermes_send", return_value=True) as send,
+        ):
             result = json.loads(_handle_update_project(
                 {"project_name": "重启交付物", "action": "add_deliverable", "value": "评审清单"},
                 chat_id="oc_state_deliverable",
             ))
         projects = _load_project_state()
+        refs = _load_project_resource_refs("重启交付物项目")
 
     assert result["status"] == "project_updated"
     assert result["project"] == "重启交付物项目"
     assert result["state_updated"] is True
-    assert result["task_created"] is False
+    assert result["task_created"] is True
+    assert result["task_name"] == "评审清单: https://example.invalid/task/restart"
+    create_task.assert_called_once_with(
+        "评审清单", "项目: 重启交付物项目", "", "2026-05-20", "oc_state_deliverable", [],
+    )
     assert projects[0]["deliverables"] == ["验收记录", "评审清单"]
+    assert projects[0]["updates"][-1] == {"action": "交付物", "value": "评审清单"}
+    assert "https://example.invalid/task/restart" not in json.dumps(projects, ensure_ascii=False)
+    assert "任务: 评审清单: https://example.invalid/task/restart" in refs
+    sent_text = send.call_args.args[1]
+    assert "飞书任务 → 评审清单: https://example.invalid/task/restart" in sent_text
 
 
 def test_project_status_action_sends_interactive_detail_card():

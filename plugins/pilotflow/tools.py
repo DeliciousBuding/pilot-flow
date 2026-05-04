@@ -5054,6 +5054,15 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
             elif action == "add_deliverable":
                 if value not in project["deliverables"]:
                     project["deliverables"].append(value)
+                if chat_id:
+                    task_name = _create_task(
+                        value, f"项目: {project_name}", assignee_override,
+                        project.get("deadline", ""), chat_id, project.get("members", []),
+                    )
+                    if task_name:
+                        project.setdefault("artifacts", []).append(f"任务: {task_name}")
+                        task_created = True
+                        created_task_name = task_name
             elif action == "update_status":
                 project["status"] = value
             elif action == "add_risk":
