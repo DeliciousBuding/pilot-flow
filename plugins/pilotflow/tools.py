@@ -331,17 +331,21 @@ def _remember_idempotent_project_result(idempotency_key: str, result: dict) -> N
     cached["timestamp"] = time.time()
     with _plan_lock:
         _idempotent_project_results[idempotency_key] = cached
-    payload = _load_state_payload()
-    idempotency = payload.get("idempotency")
-    if not isinstance(idempotency, dict):
-        idempotency = {}
-    idempotency[idempotency_key] = cached
-    payload["idempotency"] = {
-        key: value
-        for key, value in idempotency.items()
-        if isinstance(value, dict) and time.time() - value.get("timestamp", 0) < _PLAN_GATE_TTL
-    }
-    _write_state_payload(payload)
+
+    def mutate(payload: dict) -> bool:
+        idempotency = payload.get("idempotency")
+        if not isinstance(idempotency, dict):
+            idempotency = {}
+        idempotency[idempotency_key] = cached
+        now = time.time()
+        payload["idempotency"] = {
+            key: value
+            for key, value in idempotency.items()
+            if isinstance(value, dict) and now - value.get("timestamp", 0) < _PLAN_GATE_TTL
+        }
+        return True
+
+    _update_state_payload(mutate)
 
 
 def _replay_idempotent_project_result(idempotency_key: str) -> Optional[dict]:
@@ -366,9 +370,15 @@ def _replay_idempotent_project_result(idempotency_key: str) -> Optional[dict]:
                 with _plan_lock:
                     _idempotent_project_results[idempotency_key] = dict(candidate)
             elif isinstance(candidate, dict):
-                idempotency.pop(idempotency_key, None)
-                payload["idempotency"] = idempotency
-                _write_state_payload(payload)
+                def mutate(payload: dict) -> bool:
+                    idempotency_payload = payload.get("idempotency")
+                    if not isinstance(idempotency_payload, dict):
+                        return False
+                    idempotency_payload.pop(idempotency_key, None)
+                    payload["idempotency"] = idempotency_payload
+                    return True
+
+                _update_state_payload(mutate)
     if not cached:
         return None
     result = {k: v for k, v in cached.items() if k != "timestamp"}

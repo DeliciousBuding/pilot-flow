@@ -74,6 +74,7 @@ from tools import (
     _card_action_refs,
     _recent_confirmed_projects,
     _plan_lock,
+    _remember_idempotent_project_result,
     _build_project_reminder_text,
     _clean_recent_updates,
     _get_chat_scope,
@@ -803,6 +804,31 @@ def test_pending_plans_concurrent_persist_do_not_lose_chats(tmp_path):
     payload = json.loads(state_path.read_text(encoding="utf-8"))
     pending_plans = payload.get("pending_plans", {})
     assert set(pending_plans) == {f"oc_concurrent_plan_{index}" for index in range(20)}
+
+
+def test_idempotency_results_concurrent_persist_do_not_lose_keys(tmp_path):
+    state_path = tmp_path / "pilotflow-projects.json"
+
+    def remember_one(index: int) -> None:
+        with patch.dict(os.environ, {"PILOTFLOW_STATE_PATH": str(state_path)}):
+            _remember_idempotent_project_result(
+                f"pik_concurrent_{index}",
+                {
+                    "status": "project_space_created",
+                    "title": f"并发幂等项目{index}",
+                    "display": [f"项目{index}"],
+                },
+            )
+
+    threads = [threading.Thread(target=remember_one, args=(index,)) for index in range(20)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    payload = json.loads(state_path.read_text(encoding="utf-8"))
+    idempotency = payload.get("idempotency", {})
+    assert set(idempotency) == {f"pik_concurrent_{index}" for index in range(20)}
 
 
 def test_project_state_roundtrip_keeps_sanitized_recent_updates(tmp_path):
