@@ -1330,55 +1330,59 @@ def test_duplicate_confirmation_after_create_is_idempotent():
     assert "error" not in duplicate
 
 
-def test_create_project_idempotency_key_prevents_duplicate_artifact_creation():
+def test_create_project_idempotency_key_prevents_duplicate_artifact_creation(tmp_path):
     chat_id = "oc_create_idempotency_cache"
     idempotency_key = "pik_same_plan"
+    state_path = tmp_path / "pilotflow-projects.json"
     with _project_registry_lock:
         _project_registry.clear()
     with _plan_lock:
         _pending_plans.clear()
         _card_action_refs.clear()
         _recent_confirmed_projects.clear()
+        from tools import _idempotent_project_results
+        _idempotent_project_results.clear()
 
-    with (
-        patch("tools._resolve_member", return_value="ou_real_member"),
-        patch("tools._create_doc", return_value="https://example.invalid/doc") as create_doc,
-        patch("tools._create_bitable", return_value={
-            "url": "https://example.invalid/base",
-            "app_token": "app1",
-            "table_id": "tbl1",
-            "record_id": "rec1",
-        }) as create_bitable,
-        patch("tools._create_task", return_value="任务已创建") as create_task,
-        patch("tools._hermes_send_card", return_value="om_entry"),
-        patch("tools._create_calendar_event", return_value=None),
-        patch("tools._schedule_deadline_reminder", return_value=False),
-        patch("tools._save_to_hermes_memory", return_value=True),
-    ):
-        first = json.loads(_handle_create_project_space(
-            {
-                "title": "幂等缓存项目",
-                "goal": "验证同一幂等 key 不重复创建",
-                "members": ["张三"],
-                "deliverables": ["验证记录"],
-                "deadline": "2026-05-10",
-                "idempotency_key": idempotency_key,
-            },
-            chat_id=chat_id,
-            chat_scope="private",
-        ))
-        second = json.loads(_handle_create_project_space(
-            {
-                "title": "幂等缓存项目",
-                "goal": "验证同一幂等 key 不重复创建",
-                "members": ["张三"],
-                "deliverables": ["验证记录"],
-                "deadline": "2026-05-10",
-                "idempotency_key": idempotency_key,
-            },
-            chat_id=chat_id,
-            chat_scope="private",
-        ))
+    with patch.dict(os.environ, {"PILOTFLOW_STATE_PATH": str(state_path)}):
+        with (
+            patch("tools._resolve_member", return_value="ou_real_member"),
+            patch("tools._create_doc", return_value="https://example.invalid/doc") as create_doc,
+            patch("tools._create_bitable", return_value={
+                "url": "https://example.invalid/base",
+                "app_token": "app1",
+                "table_id": "tbl1",
+                "record_id": "rec1",
+            }) as create_bitable,
+            patch("tools._create_task", return_value="任务已创建") as create_task,
+            patch("tools._hermes_send_card", return_value="om_entry"),
+            patch("tools._create_calendar_event", return_value=None),
+            patch("tools._schedule_deadline_reminder", return_value=False),
+            patch("tools._save_to_hermes_memory", return_value=True),
+        ):
+            first = json.loads(_handle_create_project_space(
+                {
+                    "title": "幂等缓存项目",
+                    "goal": "验证同一幂等 key 不重复创建",
+                    "members": ["张三"],
+                    "deliverables": ["验证记录"],
+                    "deadline": "2026-05-10",
+                    "idempotency_key": idempotency_key,
+                },
+                chat_id=chat_id,
+                chat_scope="private",
+            ))
+            second = json.loads(_handle_create_project_space(
+                {
+                    "title": "幂等缓存项目",
+                    "goal": "验证同一幂等 key 不重复创建",
+                    "members": ["张三"],
+                    "deliverables": ["验证记录"],
+                    "deadline": "2026-05-10",
+                    "idempotency_key": idempotency_key,
+                },
+                chat_id=chat_id,
+                chat_scope="private",
+            ))
 
     assert first["status"] == "project_space_created"
     assert second["status"] == "project_space_replayed"
@@ -1388,6 +1392,74 @@ def test_create_project_idempotency_key_prevents_duplicate_artifact_creation():
     assert create_doc.call_count == 1
     assert create_bitable.call_count == 1
     assert create_task.call_count == 1
+
+
+def test_create_project_idempotency_replays_after_state_reload(tmp_path):
+    chat_id = "oc_create_idempotency_persist"
+    idempotency_key = "pik_persisted_plan"
+    state_path = tmp_path / "pilotflow-projects.json"
+    with _project_registry_lock:
+        _project_registry.clear()
+    with _plan_lock:
+        _pending_plans.clear()
+        _card_action_refs.clear()
+        _recent_confirmed_projects.clear()
+        from tools import _idempotent_project_results
+        _idempotent_project_results.clear()
+
+    with patch.dict(os.environ, {"PILOTFLOW_STATE_PATH": str(state_path)}):
+        with (
+            patch("tools._resolve_member", return_value="ou_real_member"),
+            patch("tools._create_doc", return_value="https://example.invalid/doc") as create_doc,
+            patch("tools._create_bitable", return_value={
+                "url": "https://example.invalid/base",
+                "app_token": "app1",
+                "table_id": "tbl1",
+                "record_id": "rec1",
+            }) as create_bitable,
+            patch("tools._create_task", return_value="任务已创建") as create_task,
+            patch("tools._hermes_send_card", return_value="om_entry"),
+            patch("tools._create_calendar_event", return_value=None),
+            patch("tools._schedule_deadline_reminder", return_value=False),
+            patch("tools._save_to_hermes_memory", return_value=True),
+        ):
+            first = json.loads(_handle_create_project_space(
+                {
+                    "title": "持久幂等项目",
+                    "goal": "验证重启后幂等 replay",
+                    "members": ["张三"],
+                    "deliverables": ["验证记录"],
+                    "deadline": "2026-05-10",
+                    "idempotency_key": idempotency_key,
+                },
+                chat_id=chat_id,
+                chat_scope="private",
+            ))
+            with _plan_lock:
+                _idempotent_project_results.clear()
+            replayed = json.loads(_handle_create_project_space(
+                {
+                    "title": "持久幂等项目",
+                    "goal": "验证重启后幂等 replay",
+                    "members": ["张三"],
+                    "deliverables": ["验证记录"],
+                    "deadline": "2026-05-10",
+                    "idempotency_key": idempotency_key,
+                },
+                chat_id=chat_id,
+                chat_scope="private",
+            ))
+
+    assert first["status"] == "project_space_created"
+    assert replayed["status"] == "project_space_replayed"
+    assert replayed["display"] == first["display"]
+    assert create_doc.call_count == 1
+    assert create_bitable.call_count == 1
+    assert create_task.call_count == 1
+    serialized = state_path.read_text(encoding="utf-8")
+    assert "idempotency" in serialized
+    assert "app1" not in serialized
+    assert "ou_real_member" not in serialized
 
 
 def test_create_project_rejects_non_confirming_input_text():

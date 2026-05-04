@@ -287,26 +287,72 @@ def _remember_idempotent_project_result(idempotency_key: str, result: dict) -> N
     """Cache a successful create result so repeated execution does not duplicate Feishu artifacts."""
     if not idempotency_key:
         return
-    cached = dict(result)
+    cached = _idempotent_project_cache_payload(result)
     cached["timestamp"] = time.time()
     with _plan_lock:
         _idempotent_project_results[idempotency_key] = cached
+    payload = _load_state_payload()
+    idempotency = payload.get("idempotency")
+    if not isinstance(idempotency, dict):
+        idempotency = {}
+    idempotency[idempotency_key] = cached
+    payload["idempotency"] = {
+        key: value
+        for key, value in idempotency.items()
+        if isinstance(value, dict) and time.time() - value.get("timestamp", 0) < _PLAN_GATE_TTL
+    }
+    _write_state_payload(payload)
 
 
 def _replay_idempotent_project_result(idempotency_key: str) -> Optional[dict]:
     """Return a cached create result while it is still within the plan TTL."""
     if not idempotency_key:
         return None
+    now = time.time()
+    cached = None
     with _plan_lock:
-        cached = _idempotent_project_results.get(idempotency_key)
-        if not cached:
-            return None
-        if time.time() - cached.get("timestamp", 0) >= _PLAN_GATE_TTL:
+        candidate = _idempotent_project_results.get(idempotency_key)
+        if isinstance(candidate, dict) and now - candidate.get("timestamp", 0) < _PLAN_GATE_TTL:
+            cached = dict(candidate)
+        elif candidate is not None:
             _idempotent_project_results.pop(idempotency_key, None)
-            return None
-        result = {k: v for k, v in cached.items() if k != "timestamp"}
+    if not cached:
+        payload = _load_state_payload()
+        idempotency = payload.get("idempotency") if isinstance(payload, dict) else {}
+        if isinstance(idempotency, dict):
+            candidate = idempotency.get(idempotency_key)
+            if isinstance(candidate, dict) and now - candidate.get("timestamp", 0) < _PLAN_GATE_TTL:
+                cached = dict(candidate)
+                with _plan_lock:
+                    _idempotent_project_results[idempotency_key] = dict(candidate)
+            elif isinstance(candidate, dict):
+                idempotency.pop(idempotency_key, None)
+                payload["idempotency"] = idempotency
+                _write_state_payload(payload)
+    if not cached:
+        return None
+    result = {k: v for k, v in cached.items() if k != "timestamp"}
     result["status"] = "project_space_replayed"
     return result
+
+
+def _idempotent_project_cache_payload(result: dict) -> dict:
+    """Keep only restart-safe fields needed to replay a create result."""
+    safe = {}
+    for key in (
+        "status",
+        "title",
+        "idempotency_key",
+        "artifacts",
+        "display",
+        "unresolved_members",
+        "autonomy",
+        "instructions",
+        "message",
+    ):
+        if key in result:
+            safe[key] = result[key]
+    return json.loads(json.dumps(safe, ensure_ascii=False))
 
 
 def _register_project(title: str, members: list, deadline: str, status: str, artifacts: list,
@@ -672,6 +718,35 @@ def _project_state_path() -> Path:
     return base / "pilotflow_projects.json"
 
 
+def _load_state_payload() -> dict:
+    """Load the full PilotFlow state payload, preserving future top-level sections."""
+    path = _project_state_path()
+    try:
+        if not path.exists():
+            return {}
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except Exception as e:
+        logger.debug("project state payload load skipped: %s", e)
+        return {}
+    if isinstance(payload, dict):
+        return payload
+    if isinstance(payload, list):
+        return {"projects": payload}
+    return {}
+
+
+def _write_state_payload(payload: dict) -> bool:
+    """Write the full PilotFlow state payload."""
+    path = _project_state_path()
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        return True
+    except Exception as e:
+        logger.debug("project state payload save skipped: %s", e)
+        return False
+
+
 def _save_project_state(title: str, goal: str, members: list, deliverables: list, deadline: str,
                         status: str, artifacts: Optional[list] = None, app_token: str = "",
                         table_id: str = "", record_id: str = "",
@@ -679,7 +754,6 @@ def _save_project_state(title: str, goal: str, members: list, deliverables: list
     """Persist a sanitized project summary for restart-safe dashboards."""
     if not title:
         return False
-    path = _project_state_path()
     try:
         existing = _load_project_state()
         record = {
@@ -694,9 +768,9 @@ def _save_project_state(title: str, goal: str, members: list, deliverables: list
         by_title = {item.get("title"): item for item in existing if item.get("title")}
         by_title[title] = record
         records = sorted(by_title.values(), key=lambda item: item.get("updated_at", 0), reverse=True)[:_PROJECT_REGISTRY_MAX]
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps({"projects": records}, ensure_ascii=False, indent=2), encoding="utf-8")
-        return True
+        payload = _load_state_payload()
+        payload["projects"] = records
+        return _write_state_payload(payload)
     except Exception as e:
         logger.debug("project state save skipped: %s", e)
         return False
@@ -704,14 +778,7 @@ def _save_project_state(title: str, goal: str, members: list, deliverables: list
 
 def _load_project_state() -> list[dict]:
     """Load sanitized project summaries persisted by PilotFlow."""
-    path = _project_state_path()
-    try:
-        if not path.exists():
-            return []
-        payload = json.loads(path.read_text(encoding="utf-8"))
-    except Exception as e:
-        logger.debug("project state load skipped: %s", e)
-        return []
+    payload = _load_state_payload()
     items = payload.get("projects", payload if isinstance(payload, list) else [])
     projects = []
     for item in items if isinstance(items, list) else []:
