@@ -3737,6 +3737,14 @@ def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
             reminder_sent = _hermes_send(chat_id, _build_project_reminder_text(chat_id, project_title, project))
             if not reminder_sent:
                 return tool_error("项目催办提醒发送失败，请检查 Feishu 连接。")
+            updates = list(project.get("updates", []))
+            updates.append({"action": "催办", "value": "已发送催办提醒"})
+            project["updates"] = updates
+            _save_project_state(
+                project_title, project.get("goal", ""), project.get("members", []),
+                project.get("deliverables", []), project.get("deadline", ""), project.get("status", "进行中"),
+                project.get("artifacts", []), updates=updates,
+            )
             doc_updated = _append_project_doc_update(project_title, project, "催办", "已发送催办提醒")
             bitable_history_created = False
             if project.get("app_token") and project.get("table_id"):

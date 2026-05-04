@@ -3006,6 +3006,47 @@ def test_project_reminder_card_action_records_doc_and_bitable_history():
     assert args[3] == "已发送催办提醒"
 
 
+def test_send_project_reminder_adds_public_update_after_restart(tmp_path):
+    state_path = tmp_path / "pilotflow-projects.json"
+    with _project_registry_lock:
+        _project_registry.clear()
+    deadline = (dt.date.today() + dt.timedelta(days=2)).isoformat()
+    with patch.dict(os.environ, {"PILOTFLOW_STATE_PATH": str(state_path)}):
+        _save_project_state(
+            "重启详情催办项目",
+            "验证重启后催办进入进展",
+            [],
+            ["验收记录"],
+            deadline,
+            "进行中",
+            ["文档: https://example.invalid/docx/doc_reminder_detail_restart"],
+        )
+        sent_messages = []
+        action_value = json.dumps({"pilotflow_action": "send_project_reminder", "title": "重启详情催办项目"}, ensure_ascii=False)
+
+        with (
+            patch("tools._hermes_send", side_effect=lambda chat_id, msg: sent_messages.append((chat_id, msg)) or True),
+            patch("tools._append_project_doc_update", return_value=True) as append_doc,
+            patch("tools._append_bitable_update_record", return_value=True) as append_history,
+        ):
+            result = json.loads(_handle_card_action({"action_value": action_value}, chat_id="oc_restart_detail_reminder"))
+        projects = _load_project_state()
+
+    assert result["status"] == "project_reminder_sent"
+    assert result["doc_updated"] is True
+    assert sent_messages
+    assert sent_messages[0][0] == "oc_restart_detail_reminder"
+    assert "重启详情催办项目" in sent_messages[0][1]
+    assert "相关负责人" in sent_messages[0][1]
+    append_doc.assert_called_once()
+    restored_project = append_doc.call_args.args[1]
+    assert "文档: https://example.invalid/docx/doc_reminder_detail_restart" in restored_project["artifacts"]
+    append_history.assert_not_called()
+    assert projects[0]["updates"][-1] == {"action": "催办", "value": "已发送催办提醒"}
+    serialized = state_path.read_text(encoding="utf-8")
+    assert "example.invalid" not in serialized
+
+
 def test_update_project_send_reminder_reuses_group_reminder_trace():
     with _project_registry_lock:
         _project_registry.clear()
