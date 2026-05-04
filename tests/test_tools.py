@@ -1317,6 +1317,49 @@ def test_generate_plan_uses_session_chat_and_initiator_context():
     assert "**成员：** 王小明" in card_text
 
 
+def test_generate_plan_marks_session_initiator_context_when_members_are_explicit():
+    import types
+
+    def fake_get_session_env(name, default=""):
+        values = {
+            "HERMES_SESSION_USER_NAME": "王小明",
+        }
+        return values.get(name, default)
+
+    fake_session_context = types.ModuleType("gateway.session_context")
+    fake_session_context.get_session_env = fake_get_session_env
+    fake_gateway = types.ModuleType("gateway")
+    fake_gateway.session_context = fake_session_context
+
+    with _plan_lock:
+        _pending_plans.clear()
+        _card_action_refs.clear()
+
+    with (
+        patch.dict(sys.modules, {
+            "gateway": fake_gateway,
+            "gateway.session_context": fake_session_context,
+        }),
+        patch("tools._hermes_send_card", return_value="om_explicit_members"),
+    ):
+        result = json.loads(_handle_generate_plan(
+            {
+                "input_text": "帮我创建成员已明确的项目",
+                "title": "成员明确项目",
+                "goal": "验证发起人来源标记",
+                "members": ["张三"],
+                "deliverables": ["验证记录"],
+                "deadline": "2026-05-20",
+            },
+            chat_id="oc_session_context_explicit_members",
+        ))
+
+    assert result["plan"]["initiator"] == "王小明"
+    assert result["plan"]["members"] == ["张三"]
+    assert result["session_context_used"]["initiator"] is True
+    assert _pending_plans["oc_session_context_explicit_members"]["plan"]["initiator"] == "王小明"
+
+
 def test_generate_plan_returns_redacted_flight_record():
     with _plan_lock:
         _pending_plans.clear()

@@ -3199,6 +3199,7 @@ def _handle_generate_plan(params: Dict[str, Any], **kwargs) -> str:
 
     # Build plan from LLM-extracted fields + template defaults
     import datetime
+    explicit_initiator = _clean_initiator_name(params.get("initiator"))
     plan = {
         "title": params.get("title", "") or "",
         "goal": params.get("goal", "") or "",
@@ -3206,8 +3207,10 @@ def _handle_generate_plan(params: Dict[str, Any], **kwargs) -> str:
         "deliverables": _clean_plan_list(params.get("deliverables")) or inline_fields.get("deliverables", []),
         "deadline": params.get("deadline", "") or inline_fields.get("deadline", ""),
         "risks": _clean_plan_list(params.get("risks")),
-        "initiator": _clean_initiator_name(params.get("initiator")) or session_user_name,
+        "initiator": explicit_initiator or session_user_name,
     }
+    if not explicit_initiator and session_user_name:
+        session_context_used["initiator"] = True
     has_structured_fields = bool(
         plan["title"] or plan["goal"] or plan["members"] or plan["deliverables"] or params.get("deadline", "")
     )
@@ -3220,7 +3223,6 @@ def _handle_generate_plan(params: Dict[str, Any], **kwargs) -> str:
         })
     if not plan["members"] and session_user_name:
         plan["members"] = [session_user_name]
-        session_context_used["initiator"] = True
 
     # History is context for the Agent/user, not a silent overwrite. Templates
     # may fill generic defaults; history is shown explicitly as suggestions.

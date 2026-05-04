@@ -154,6 +154,7 @@ def _sanitize_result(result: dict[str, Any]) -> dict[str, Any]:
         "session_initiator_registry_recorded",
         "session_initiator_state_recorded",
         "session_initiator_detail_card_shown",
+        "session_initiator_context_marked_with_explicit_members",
         "collab_doc_created",
         "collab_doc_comment_created",
         "collab_doc_permission_refreshed",
@@ -971,6 +972,17 @@ def _verify_runtime_session_initiator(hermes_dir: Path) -> dict[str, Any]:
                 _project_registry.clear()
             state_projects = _load_project_state()
             _handle_query_status({"query": "运行态发起人贯穿项目进展如何"}, chat_id=chat_id)
+            explicit_members_plan = json.loads(_handle_generate_plan(
+                {
+                    "input_text": "请创建运行态发起人来源标记验证项目",
+                    "title": "运行态发起人来源标记项目",
+                    "goal": "验证成员明确时仍标记 session 发起人来源",
+                    "members": ["张三"],
+                    "deliverables": ["来源标记验收记录"],
+                    "deadline": "2026-05-21",
+                },
+                chat_id=f"{chat_id}_explicit_members",
+            ))
         finally:
             runtime_tools._create_doc = original_create_doc
             runtime_tools._create_bitable = original_create_bitable
@@ -993,7 +1005,11 @@ def _verify_runtime_session_initiator(hermes_dir: Path) -> dict[str, Any]:
             else:
                 os.environ["PILOTFLOW_STATE_PATH"] = original_state_path
 
-    detail_card_text = str(((sent_cards[-1].get("elements") or [{}])[0].get("content")) or "") if sent_cards else ""
+    sent_card_text = "\n".join(
+        str(((card.get("elements") or [{}])[0].get("content")) or "")
+        for card in sent_cards
+        if isinstance(card, dict)
+    )
     return {
         "session_initiator_plan_recorded": (
             plan.get("status") == "plan_generated"
@@ -1010,7 +1026,13 @@ def _verify_runtime_session_initiator(hermes_dir: Path) -> dict[str, Any]:
             and item.get("initiator") == "王小明"
             for item in state_projects
         ),
-        "session_initiator_detail_card_shown": "**发起人：** 王小明" in detail_card_text,
+        "session_initiator_detail_card_shown": "**发起人：** 王小明" in sent_card_text,
+        "session_initiator_context_marked_with_explicit_members": (
+            explicit_members_plan.get("status") == "plan_generated"
+            and (explicit_members_plan.get("plan") or {}).get("initiator") == "王小明"
+            and (explicit_members_plan.get("plan") or {}).get("members") == ["张三"]
+            and (explicit_members_plan.get("session_context_used") or {}).get("initiator") is True
+        ),
     }
 
 

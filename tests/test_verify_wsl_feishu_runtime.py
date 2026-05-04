@@ -180,6 +180,7 @@ def test_verify_runtime_session_initiator_is_sanitized(tmp_path, monkeypatch):
     assert result["session_initiator_registry_recorded"] is True
     assert result["session_initiator_state_recorded"] is True
     assert result["session_initiator_detail_card_shown"] is True
+    assert result["session_initiator_context_marked_with_explicit_members"] is True
     sanitized = _MODULE._sanitize_result(result)
     assert sanitized == result
     assert "example.invalid" not in json.dumps(result, ensure_ascii=False)

@@ -10,8 +10,8 @@
 | Agent 可发现性 | `pilotflow_generate_plan` 和 `pilotflow_create_project_space` 的注册 schema 都显式暴露 `initiator` 字段，技能指引要求 Hermes Agent 只传显示名、不要传 open_id/chat_id/message_id |
 | 状态贯穿 | `pilotflow_create_project_space` 会从 pending plan 或显式参数继承 `initiator`，写入 in-memory registry 和 restart-safe state；项目详情卡展示 `**发起人：** ...` |
 | 隐私边界 | 只保存显示名；伪 open_id / chat_id / message_id 形态的值会被丢弃，不把 Feishu 原始 ID 写入公开项目状态 |
-| 自动化验证 | 新增回归覆盖 plan/pending plan 的 `initiator`、schema/skill 可发现性、重启后 state 详情卡发起人展示，以及 installed-runtime verifier `--verify-session-initiator` 的 dry-run 断言 |
-| WSL 验证项 | 新 verifier 仅输出脱敏布尔结论：`session_initiator_plan_recorded`、`session_initiator_project_created`、`session_initiator_registry_recorded`、`session_initiator_state_recorded`、`session_initiator_detail_card_shown` |
+| 自动化验证 | 新增回归覆盖 plan/pending plan 的 `initiator`、schema/skill 可发现性、成员显式传入时的 session 发起人来源标记、重启后 state 详情卡发起人展示，以及 installed-runtime verifier `--verify-session-initiator` 的 dry-run 断言 |
+| WSL 验证项 | 新 verifier 仅输出脱敏布尔结论：`session_initiator_plan_recorded`、`session_initiator_project_created`、`session_initiator_registry_recorded`、`session_initiator_state_recorded`、`session_initiator_detail_card_shown`、`session_initiator_context_marked_with_explicit_members` |
 | 注册验证项 | `--verify-plugin-registration` 新增脱敏布尔结论 `registration_initiator_schema_exposed=true`，证明安装后的 Hermes plugin registry 能发现该结构化字段 |
 | 隐私处理 | 验证不打印真实 chat_id、open_id、message_id、Feishu URL、confirm token、idempotency key、token 或 app secret |
 
