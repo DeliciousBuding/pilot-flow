@@ -462,7 +462,7 @@ def _verify_runtime_project_creation(hermes_dir: Path) -> dict[str, Any]:
     created_docs: list[tuple[str, str, str]] = []
     created_bitables: list[tuple[str, str, str, list[str]]] = []
     created_tasks: list[tuple[str, str, str, str, str, list[str]]] = []
-    created_calendars: list[tuple[str, str, str]] = []
+    created_calendars: list[tuple[str, str, str, list[str], str]] = []
     scheduled_reminders: list[tuple[str, str, str]] = []
     saved_memory: list[tuple[str, str, list[str], list[str], str]] = []
     sent_cards: list[dict[str, Any]] = []
@@ -498,8 +498,14 @@ def _verify_runtime_project_creation(hermes_dir: Path) -> dict[str, Any]:
         created_tasks.append((summary, description, assignee, deadline, target_chat_id, list(members)))
         return f"{summary}: https://example.invalid/task/project-create"
 
-    def fake_create_calendar(title: str, goal: str, deadline: str, *_args: Any, **_kwargs: Any) -> str:
-        created_calendars.append((title, goal, deadline))
+    def fake_create_calendar(
+        title: str,
+        goal: str,
+        deadline: str,
+        members: list[str] | None = None,
+        target_chat_id: str = "",
+    ) -> str:
+        created_calendars.append((title, goal, deadline, list(members or []), target_chat_id))
         return f"日历事件: {deadline}"
 
     def fake_schedule_reminder(title: str, deadline: str, target_chat_id: str) -> bool:
@@ -589,6 +595,8 @@ def _verify_runtime_project_creation(hermes_dir: Path) -> dict[str, Any]:
             "运行态项目创建闭环项目",
             "验证安装后的创建项目空间闭环",
             "2026-05-20",
+            ["张三"],
+            chat_id,
         )],
         "project_create_reminder_scheduled": scheduled_reminders == [(
             "运行态项目创建闭环项目",

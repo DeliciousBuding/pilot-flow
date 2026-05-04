@@ -3574,7 +3574,7 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
         artifacts.append("项目入口卡片")
 
     # 5. Calendar event (best effort)
-    cal_result = _create_calendar_event(title, goal, deadline)
+    cal_result = _create_calendar_event(title, goal, deadline, members, chat_id)
     if cal_result:
         artifacts.append(cal_result)
 

@@ -1624,6 +1624,53 @@ def test_text_confirmation_recovers_pending_plan_after_state_reload():
     assert create_task.call_count == 1
 
 
+def test_create_project_calendar_event_invites_project_members():
+    chat_id = "oc_project_calendar_members"
+    with _project_registry_lock:
+        _project_registry.clear()
+    with _plan_lock:
+        _pending_plans.clear()
+        _card_action_refs.clear()
+    calendar_calls = []
+
+    with (
+        patch("tools._consume_plan_gate", return_value=True),
+        patch("tools._create_doc", return_value="https://example.invalid/doc"),
+        patch("tools._create_bitable", return_value={
+            "url": "https://example.invalid/base",
+            "app_token": "app1",
+            "table_id": "tbl1",
+            "record_id": "rec1",
+        }),
+        patch("tools._create_task", return_value="任务已创建"),
+        patch("tools._hermes_send_card", return_value="om_entry"),
+        patch("tools._create_calendar_event", side_effect=lambda *args: calendar_calls.append(args) or "日历事件: 2026-05-20；已邀请 2 位成员"),
+        patch("tools._schedule_deadline_reminder", return_value=True),
+        patch("tools._save_to_hermes_memory", return_value=True),
+    ):
+        result = json.loads(_handle_create_project_space(
+            {
+                "confirmation_text": "确认执行",
+                "title": "创建日历邀请项目",
+                "goal": "验证创建项目时邀请成员",
+                "members": ["张三", "李四"],
+                "deliverables": ["验收记录"],
+                "deadline": "2026-05-20",
+            },
+            chat_id=chat_id,
+        ))
+
+    assert result["status"] == "project_space_created"
+    assert calendar_calls == [(
+        "创建日历邀请项目",
+        "验证创建项目时邀请成员",
+        "2026-05-20",
+        ["张三", "李四"],
+        chat_id,
+    )]
+    assert "📅 日历提醒已创建" in result["display"]
+
+
 def test_create_project_returns_redacted_flight_record():
     chat_id = "oc_create_trace"
     with _project_registry_lock:
