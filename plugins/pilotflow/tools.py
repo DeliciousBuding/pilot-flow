@@ -201,6 +201,7 @@ def _plan_idempotency_key(chat_id: str, plan: dict) -> str:
         "goal": plan.get("goal", ""),
         "members": list(plan.get("members") or []),
         "deliverables": list(plan.get("deliverables") or []),
+        "deliverable_assignees": dict(plan.get("deliverable_assignees") or {}),
         "deadline": plan.get("deadline", ""),
         "risks": list(plan.get("risks") or []),
     }

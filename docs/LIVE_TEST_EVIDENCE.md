@@ -2,6 +2,18 @@
 
 > 本文件只记录可复验结论和脱敏摘要，不提交真实群 ID、用户 open_id、应用 secret、message_id 或飞书文档链接。
 
+## 2026-05-05 交付物负责人幂等隔离
+
+| 项目 | 证据 |
+| --- | --- |
+| 功能硬化 | `_plan_idempotency_key` 现在把 `deliverable_assignees` 纳入稳定业务计划摘要；同一项目、成员和交付物但负责人映射不同，会生成不同 `pik_*`，避免复用旧项目创建结果导致任务负责人错误 |
+| 风险修复 | 上一轮新增结构化交付物负责人后，若幂等 key 忽略负责人映射，用户调整负责人再确认可能命中旧缓存；本轮已补齐该差异 |
+| 本地回归 | 新增 assignment-sensitive idempotency 单测；`C:\Users\Ding\miniforge3\python.exe -m pytest` 返回 `277 passed`；`tests/test_verify_wsl_feishu_runtime.py` 返回 `45 passed`；`git diff --check` 通过，仅有 CRLF 提示 |
+| WSL 安装态 | `setup.py --hermes-dir D:\Code\LarkProject\hermes-agent --hermes-home \\wsl.localhost\Ubuntu-24.04\home\ding\.hermes` 通过；插件和 skill 已同步到 WSL Hermes runtime profile |
+| 运行态验证 | `--verify-project-creation` 输出脱敏通过：`project_create_idempotency_includes_assignees=true`，并继续通过 `project_create_structured_assignees_used=true`、`project_create_schema_assignees_exposed=true`、`project_create_task_created=true`、`project_create_trace_redacted=true` |
+| 基线验证 | 同轮继续通过 `--send-card` 的 `card_sent=true`、`card_has_title=true`、`card_has_goal=true`、`card_has_initiator=true`、`card_has_risk=true`，`--verify-health-check` 的 `health_check_ok=true`、`health_check_sanitized=true`、`health_card_bridge_registered=true`，以及 `--probe-llm` 的 `llm_probe_ok=true`、`llm_probe_status=200` |
+| 隐私处理 | 验证只记录布尔结果和脱敏状态；不写入真实 chat_id、open_id、message_id、Feishu URL、任务 URL、token 或 app secret |
+
 ## 2026-05-05 创建项目交付物结构化负责人
 
 | 项目 | 证据 |

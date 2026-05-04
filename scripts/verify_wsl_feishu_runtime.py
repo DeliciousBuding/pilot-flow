@@ -146,6 +146,7 @@ def _sanitize_result(result: dict[str, Any]) -> dict[str, Any]:
         "project_create_task_created",
         "project_create_structured_assignees_used",
         "project_create_schema_assignees_exposed",
+        "project_create_idempotency_includes_assignees",
         "project_create_calendar_created",
         "project_create_reminder_scheduled",
         "project_create_entry_card_sent",
@@ -642,6 +643,7 @@ def _verify_runtime_project_creation(hermes_dir: Path) -> dict[str, Any]:
         _handle_generate_plan,
         _load_project_state,
         _pending_plans,
+        _plan_idempotency_key,
         _plan_lock,
         _project_registry,
         _project_registry_lock,
@@ -780,6 +782,14 @@ def _verify_runtime_project_creation(hermes_dir: Path) -> dict[str, Any]:
         .get("parameters", {})
         .get("properties", {})
     )
+    base_key_plan = {
+        "title": "运行态项目创建闭环项目",
+        "goal": "验证安装后的创建项目空间闭环",
+        "members": ["张三", "李四"],
+        "deliverables": ["验收清单", "上线演练"],
+        "deadline": "2026-05-20",
+        "risks": ["需要确认真实资源链路"],
+    }
     return {
         "project_create_gate_created": plan.get("status") == "plan_generated"
         and bool((plan.get("confirmation") or {}).get("confirm_token")),
@@ -815,6 +825,16 @@ def _verify_runtime_project_creation(hermes_dir: Path) -> dict[str, Any]:
             and "deliverable_assignees" in create_props
             and "open_id" in str(generate_props.get("deliverable_assignees", {}).get("description", ""))
             and "open_id" in str(create_props.get("deliverable_assignees", {}).get("description", ""))
+        ),
+        "project_create_idempotency_includes_assignees": (
+            _plan_idempotency_key(chat_id, {
+                **base_key_plan,
+                "deliverable_assignees": {"验收清单": "李四", "上线演练": "张三"},
+            })
+            != _plan_idempotency_key(chat_id, {
+                **base_key_plan,
+                "deliverable_assignees": {"验收清单": "张三", "上线演练": "李四"},
+            })
         ),
         "project_create_calendar_created": created_calendars == [(
             "运行态项目创建闭环项目",

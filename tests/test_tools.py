@@ -1488,6 +1488,33 @@ def test_generate_plan_returns_confirm_token_and_idempotency_key():
         assert any(ref["plan"].get("confirm_token") == confirm_token for ref in _card_action_refs.values())
 
 
+def test_plan_idempotency_key_includes_deliverable_assignees():
+    base_plan = {
+        "title": "上线项目",
+        "goal": "完成上线",
+        "members": ["张三", "李四"],
+        "deliverables": ["整理上线清单", "完成上线演练"],
+        "deadline": "2026-05-20",
+        "risks": [],
+    }
+    zhang_plan = {
+        **base_plan,
+        "deliverable_assignees": {
+            "整理上线清单": "张三",
+            "完成上线演练": "李四",
+        },
+    }
+    li_plan = {
+        **base_plan,
+        "deliverable_assignees": {
+            "整理上线清单": "李四",
+            "完成上线演练": "张三",
+        },
+    }
+
+    assert _plan_idempotency_key("oc_assignment_key", zhang_plan) != _plan_idempotency_key("oc_assignment_key", li_plan)
+
+
 def test_generate_plan_private_scope_returns_trace_without_card():
     with _plan_lock:
         _pending_plans.clear()
