@@ -87,6 +87,11 @@ def _isolated_pilotflow_state(tmp_path, monkeypatch):
     monkeypatch.setenv("PILOTFLOW_STATE_PATH", str(tmp_path / "pilotflow-projects.json"))
 
 
+def _opaque_card_action_value(chat_id: str, action: str, plan: dict) -> str:
+    action_id = _create_card_action_ref(chat_id, action, plan)
+    return json.dumps({"pilotflow_action_id": action_id}, ensure_ascii=False)
+
+
 def test_scan_chat_signals_suggests_projectization_card(monkeypatch):
     sent_cards = []
 
@@ -2006,8 +2011,13 @@ def test_briefing_batch_reminder_uses_state_projects_after_restart(tmp_path):
             patch("tools._append_project_doc_update", return_value=True) as append_doc,
             patch("tools._append_bitable_update_record", return_value=True) as append_history,
         ):
+            action_value = _opaque_card_action_value(
+                "oc_restart_batch_reminder",
+                "briefing_batch_reminder",
+                {"filter": "overdue", "value": "请今天同步进展"},
+            )
             result = json.loads(_handle_card_action(
-                {"action_value": json.dumps({"pilotflow_action": "briefing_batch_reminder", "filter": "overdue", "value": "请今天同步进展"}, ensure_ascii=False)},
+                {"action_value": action_value},
                 chat_id="oc_restart_batch_reminder",
             ))
         projects = _load_project_state()
@@ -2279,8 +2289,13 @@ def test_briefing_batch_followup_uses_state_projects_after_restart(tmp_path):
             patch("tools._append_project_doc_update", return_value=True) as append_doc,
             patch("tools._append_bitable_update_record", return_value=True) as append_history,
         ):
+            action_value = _opaque_card_action_value(
+                "oc_restart_batch_followup",
+                "briefing_batch_followup_task",
+                {"filter": "overdue"},
+            )
             result = json.loads(_handle_card_action(
-                {"action_value": json.dumps({"pilotflow_action": "briefing_batch_followup_task", "filter": "overdue"}, ensure_ascii=False)},
+                {"action_value": action_value},
                 chat_id="oc_restart_batch_followup",
             ))
         projects = _load_project_state()
@@ -2622,7 +2637,7 @@ def test_card_action_project_status_restores_resource_refs_after_restart(tmp_pat
             ],
         )
         captured = {}
-        action_value = json.dumps({"pilotflow_action": "project_status", "title": "重启按钮详情项目"}, ensure_ascii=False)
+        action_value = _opaque_card_action_value("oc_test_card", "project_status", {"title": "重启按钮详情项目"})
 
         def capture_card(chat_id, card):
             captured["card"] = card
@@ -2987,7 +3002,7 @@ def test_project_reminder_card_action_sends_chinese_group_reminder():
         goal="验证卡片催办", deliverables=["验收记录"],
     )
     sent_messages = []
-    action_value = json.dumps({"pilotflow_action": "send_project_reminder", "title": "卡片催办项目"}, ensure_ascii=False)
+    action_value = _opaque_card_action_value("oc_reminder_action", "send_project_reminder", {"title": "卡片催办项目"})
 
     with patch("tools._hermes_send", side_effect=lambda chat_id, msg: sent_messages.append((chat_id, msg)) or True):
         result = json.loads(_handle_card_action({"action_value": action_value}, chat_id="oc_reminder_action"))
@@ -3013,7 +3028,7 @@ def test_project_reminder_card_action_records_doc_and_bitable_history():
         goal="验证催办留痕", deliverables=["验收记录"],
         app_token="app1", table_id="tbl1", record_id="rec1",
     )
-    action_value = json.dumps({"pilotflow_action": "send_project_reminder", "title": "催办留痕项目"}, ensure_ascii=False)
+    action_value = _opaque_card_action_value("oc_test_card", "send_project_reminder", {"title": "催办留痕项目"})
 
     with (
         patch("tools._hermes_send", return_value=True),
@@ -3055,7 +3070,7 @@ def test_send_project_reminder_adds_public_update_after_restart(tmp_path):
             ["文档: https://example.invalid/docx/doc_reminder_detail_restart"],
         )
         sent_messages = []
-        action_value = json.dumps({"pilotflow_action": "send_project_reminder", "title": "重启详情催办项目"}, ensure_ascii=False)
+        action_value = _opaque_card_action_value("oc_restart_detail_reminder", "send_project_reminder", {"title": "重启详情催办项目"})
 
         with (
             patch("tools._hermes_send", side_effect=lambda chat_id, msg: sent_messages.append((chat_id, msg)) or True),
@@ -3518,15 +3533,8 @@ def test_dashboard_card_action_marks_state_project_done_after_restart(tmp_path):
             "进行中",
             artifacts=["文档: https://example.invalid/doc"],
         )
-        result = json.loads(_handle_card_action(
-            {
-                "action_value": json.dumps(
-                    {"pilotflow_action": "mark_project_done", "title": "重启看板项目"},
-                    ensure_ascii=False,
-                )
-            },
-            chat_id="oc_state_done",
-        ))
+        action_value = _opaque_card_action_value("oc_state_done", "mark_project_done", {"title": "重启看板项目"})
+        result = json.loads(_handle_card_action({"action_value": action_value}, chat_id="oc_state_done"))
         projects = _load_project_state()
 
     assert result["status"] == "project_marked_done"
@@ -3550,15 +3558,8 @@ def test_card_action_reopens_state_project_after_restart(tmp_path):
             "已完成",
         )
         with patch("tools._hermes_send", return_value=True):
-            result = json.loads(_handle_card_action(
-                {
-                    "action_value": json.dumps(
-                        {"pilotflow_action": "reopen_project", "title": "重启重开项目"},
-                        ensure_ascii=False,
-                    )
-                },
-                chat_id="oc_reopen_state",
-            ))
+            action_value = _opaque_card_action_value("oc_reopen_state", "reopen_project", {"title": "重启重开项目"})
+            result = json.loads(_handle_card_action({"action_value": action_value}, chat_id="oc_reopen_state"))
         projects = _load_project_state()
 
     assert result["status"] == "project_reopened"
@@ -4510,13 +4511,13 @@ def test_card_action_resolves_risk_project():
         patch("tools._hermes_send", return_value=True) as send,
         patch("tools._save_project_state", return_value=True) as save_state,
     ):
+        action_value = _opaque_card_action_value(
+            "oc_card_resolve_risk",
+            "resolve_risk",
+            {"title": "卡片解除风险项目"},
+        )
         result = json.loads(_handle_card_action(
-            {
-                "action_value": json.dumps(
-                    {"pilotflow_action": "resolve_risk", "title": "卡片解除风险项目"},
-                    ensure_ascii=False,
-                )
-            },
+            {"action_value": action_value},
             chat_id="oc_card_resolve_risk",
         ))
 
@@ -4605,7 +4606,7 @@ def test_project_status_action_sends_interactive_detail_card():
         goal="验证详情卡", deliverables=["验收记录"],
     )
     captured = {}
-    action_value = json.dumps({"pilotflow_action": "project_status", "title": "详情卡项目"}, ensure_ascii=False)
+    action_value = _opaque_card_action_value("oc_detail", "project_status", {"title": "详情卡项目"})
 
     def capture_card(chat_id, card):
         captured["chat_id"] = chat_id
@@ -4648,7 +4649,7 @@ def test_project_detail_card_includes_registry_resource_links():
         goal="验证资源链接", deliverables=["验收记录"],
     )
     captured = {}
-    action_value = json.dumps({"pilotflow_action": "project_status", "title": "资源链接项目"}, ensure_ascii=False)
+    action_value = _opaque_card_action_value("oc_test_card", "project_status", {"title": "资源链接项目"})
 
     def capture_card(chat_id, card):
         captured["card"] = card
@@ -4688,7 +4689,7 @@ def test_project_detail_card_shows_recent_progress_updates():
 
     assert result["status"] == "project_updated"
     captured = {}
-    action_value = json.dumps({"pilotflow_action": "project_status", "title": "进展详情项目"}, ensure_ascii=False)
+    action_value = _opaque_card_action_value("oc_test_card", "project_status", {"title": "进展详情项目"})
 
     def capture_card(chat_id, card):
         captured["card"] = card
@@ -4713,7 +4714,7 @@ def test_project_detail_card_can_create_followup_task_from_action():
         app_token="app_followup_detail", table_id="tbl_followup_detail", record_id="rec_followup_detail",
     )
     captured = {}
-    action_value = json.dumps({"pilotflow_action": "project_status", "title": "待办详情项目"}, ensure_ascii=False)
+    action_value = _opaque_card_action_value("oc_followup_detail", "project_status", {"title": "待办详情项目"})
 
     def capture_card(chat_id, card):
         captured["card"] = card
@@ -4779,7 +4780,7 @@ def test_create_followup_task_adds_public_task_update_after_restart(tmp_path):
             ["文档: https://example.invalid/docx/doc_followup_restart"],
         )
         sent_messages = []
-        action_value = json.dumps({"pilotflow_action": "create_followup_task", "title": "重启详情待办项目"}, ensure_ascii=False)
+        action_value = _opaque_card_action_value("oc_restart_detail_followup", "create_followup_task", {"title": "重启详情待办项目"})
 
         with (
             patch("tools._create_task", return_value="重启详情待办项目跟进: https://example.invalid/task/task_detail_restart") as create_task,
@@ -4876,7 +4877,7 @@ def test_dashboard_followup_task_adds_public_update_after_restart(tmp_path):
             ["文档: https://example.invalid/docx/doc_dashboard_followup_restart"],
         )
         sent_messages = []
-        action_value = json.dumps({"pilotflow_action": "project_followup_task", "title": "重启看板待办项目"}, ensure_ascii=False)
+        action_value = _opaque_card_action_value("oc_restart_dashboard_followup", "project_followup_task", {"title": "重启看板待办项目"})
 
         with (
             patch("tools._create_task", return_value="重启看板待办项目跟进: https://example.invalid/task/task_dashboard_restart") as create_task,
@@ -4919,7 +4920,7 @@ def test_due_project_detail_card_offers_reminder_button_without_chat_id_payload(
         goal="验证详情催办", deliverables=["验收记录"],
     )
     captured = {}
-    action_value = json.dumps({"pilotflow_action": "project_status", "title": "详情催办项目"}, ensure_ascii=False)
+    action_value = _opaque_card_action_value("oc_detail_reminder", "project_status", {"title": "详情催办项目"})
 
     def capture_card(chat_id, card):
         captured["card"] = card
@@ -4951,7 +4952,7 @@ def test_completed_project_detail_card_offers_reopen_button():
         goal="验证详情重开", deliverables=["验收记录"],
     )
     captured = {}
-    action_value = json.dumps({"pilotflow_action": "project_status", "title": "详情重开项目"}, ensure_ascii=False)
+    action_value = _opaque_card_action_value("oc_detail_reopen", "project_status", {"title": "详情重开项目"})
 
     def capture_card(chat_id, card):
         captured["card"] = card
@@ -4987,7 +4988,11 @@ def test_project_detail_card_uses_status_colored_header():
             goal="验证详情颜色", deliverables=["验收记录"],
         )
         captured = {}
-        action_value = json.dumps({"pilotflow_action": "project_status", "title": title}, ensure_ascii=False)
+        action_value = _opaque_card_action_value(
+            f"oc_detail_color_{status}",
+            "project_status",
+            {"title": title},
+        )
 
         def capture_card(chat_id, card):
             captured["card"] = card
@@ -5009,7 +5014,7 @@ def test_project_entry_card_action_marks_project_done():
         "动作项目", ["张三"], "2026-05-10", "进行中", [],
         goal="验证入口卡片动作", deliverables=["验收记录"],
     )
-    action_value = json.dumps({"pilotflow_action": "mark_project_done", "title": "动作项目"}, ensure_ascii=False)
+    action_value = _opaque_card_action_value("oc_test_card", "mark_project_done", {"title": "动作项目"})
 
     with patch("tools._hermes_send", return_value=True):
         result = json.loads(_handle_card_action({"action_value": action_value}, chat_id="oc_action"))
@@ -5017,6 +5022,23 @@ def test_project_entry_card_action_marks_project_done():
     assert result["status"] == "project_marked_done"
     with _project_registry_lock:
         assert _project_registry["动作项目"]["status"] == "已完成"
+
+
+def test_raw_card_project_action_without_action_id_is_rejected():
+    with _project_registry_lock:
+        _project_registry.clear()
+    _register_project(
+        "裸动作项目", ["张三"], "2026-05-10", "进行中", [],
+        goal="验证裸 action 被拒绝", deliverables=["验收记录"],
+    )
+    action_value = json.dumps({"pilotflow_action": "mark_project_done", "title": "裸动作项目"}, ensure_ascii=False)
+
+    result = json.loads(_handle_card_action({"action_value": action_value}, chat_id="oc_raw_action"))
+
+    assert "error" in result
+    assert "卡片操作已过期" in result["error"]
+    with _project_registry_lock:
+        assert _project_registry["裸动作项目"]["status"] == "进行中"
 
 
 def test_project_entry_card_action_syncs_bitable_status():
@@ -5027,7 +5049,7 @@ def test_project_entry_card_action_syncs_bitable_status():
         app_token="app1", table_id="tbl1", record_id="rec1",
         goal="验证入口卡片同步状态表", deliverables=["验收记录"],
     )
-    action_value = json.dumps({"pilotflow_action": "mark_project_done", "title": "表格同步项目"}, ensure_ascii=False)
+    action_value = _opaque_card_action_value("oc_test_card", "mark_project_done", {"title": "表格同步项目"})
 
     with (
         patch("tools._hermes_send", return_value=True),
@@ -5048,7 +5070,7 @@ def test_project_entry_card_action_appends_completion_to_project_doc():
         ["文档: https://example.invalid/docx/doc_token_123"],
         goal="验证卡片完成写文档", deliverables=["验收记录"],
     )
-    action_value = json.dumps({"pilotflow_action": "mark_project_done", "title": "文档完成项目"}, ensure_ascii=False)
+    action_value = _opaque_card_action_value("oc_test_card", "mark_project_done", {"title": "文档完成项目"})
 
     with (
         patch("tools._append_project_doc_update", return_value=True) as append_doc,
@@ -5080,7 +5102,7 @@ def test_card_action_mark_done_uses_updated_state_project_in_doc_after_restart(t
             "进行中",
             ["文档: https://example.invalid/docx/doc_done_restart"],
         )
-        action_value = json.dumps({"pilotflow_action": "mark_project_done", "title": "重启完成留痕项目"}, ensure_ascii=False)
+        action_value = _opaque_card_action_value("oc_test_card", "mark_project_done", {"title": "重启完成留痕项目"})
 
         with (
             patch("tools._append_project_doc_update", return_value=True) as append_doc,
@@ -5109,7 +5131,7 @@ def test_project_entry_card_action_appends_reopen_to_project_doc():
         ["文档: https://example.invalid/docx/doc_token_456"],
         goal="验证卡片重开写文档", deliverables=["验收记录"],
     )
-    action_value = json.dumps({"pilotflow_action": "reopen_project", "title": "文档重开项目"}, ensure_ascii=False)
+    action_value = _opaque_card_action_value("oc_test_card", "reopen_project", {"title": "文档重开项目"})
 
     with (
         patch("tools._append_project_doc_update", return_value=True) as append_doc,

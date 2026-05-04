@@ -3552,15 +3552,25 @@ def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
         return tool_error("无法解析卡片按钮值")
 
     action_id = action_data.get("pilotflow_action_id", "")
+    resolved_from_action_ref = bool(kwargs.pop("_pilotflow_action_ref_resolved", False))
     if action_id:
         action_ref = _resolve_card_action_ref(action_id, consume=True)
         if not action_ref:
             return tool_error("卡片操作已过期或已处理，请重新发起操作。")
+        resolved_from_action_ref = True
         chat_id = action_ref["chat_id"]
         action_data["pilotflow_action"] = action_ref["action"]
         action_data.update(action_ref.get("plan") or {})
 
     pilotflow_action = action_data.get("pilotflow_action", "")
+    actions_requiring_ref = {
+        "project_status", "mark_project_done", "reopen_project", "resolve_risk",
+        "send_project_reminder", "create_followup_task", "project_followup_task",
+        "dashboard_page", "dashboard_filter", "briefing_batch_reminder",
+        "briefing_batch_followup_task",
+    }
+    if pilotflow_action in actions_requiring_ref and not resolved_from_action_ref:
+        return tool_error("卡片操作已过期或已处理，请重新发起操作。")
 
     recovered_plan_override = kwargs.pop("_pilotflow_plan_override", None)
     gate_consumed = bool(kwargs.get("_pilotflow_gate_consumed"))
@@ -4008,6 +4018,7 @@ def _handle_card_command(raw_args: str) -> str:
     action_kwargs = {"chat_id": chat_id}
     if action_ref:
         action_kwargs["_pilotflow_gate_consumed"] = True
+        action_kwargs["_pilotflow_action_ref_resolved"] = True
         if action_ref.get("plan"):
             action_kwargs["_pilotflow_plan_override"] = action_ref["plan"]
     result = _handle_card_action({"action_value": action_value}, **action_kwargs)

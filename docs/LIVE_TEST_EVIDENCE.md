@@ -29,6 +29,17 @@
 | WSL runtime dry-run | `verify_wsl_feishu_runtime.py --env-file /home/ding/.hermes/.env --config-file /home/ding/.hermes/config.yaml` 输出脱敏通过：`config_model=mimo-v2.5-pro`、`config_provider=vectorcontrol`、`config_has_feishu_gateway=true` |
 | 真实 Feishu 卡片验证 | WSL `verify_wsl_feishu_runtime.py --send-card` 成功：`card_sent=true`、`pending_plan_recovered=true`、`card_action_recovered=true`、`redaction_enabled=true`，输出不包含真实 chat_id、message_id、confirm token 或 idempotency key |
 
+## 2026-05-04 卡片动作 opaque ref 强制校验
+
+| 项目 | 证据 |
+| --- | --- |
+| 功能硬化 | 新增回归验证：`mark_project_done`、`reopen_project`、`resolve_risk`、`send_project_reminder`、`create_followup_task`、`project_status`、看板翻页/筛选、批量催办/待办等项目变更或查询类卡片动作必须来自短期 `pilotflow_action_id`；裸 `{"pilotflow_action":"mark_project_done"}` 会返回“卡片操作已过期或已处理”且不改变项目状态 |
+| 真实路径兼容 | `/card button {"pilotflow_action_id":"..."}` 桥接在解析并消费 action ref 后携带内部已验证标记转调 `_handle_card_action`，保持真实 Feishu 卡片按钮、重启恢复 action refs、单次消费和原卡片反馈逻辑可用 |
+| 自动化验证 | `C:\Users\Ding\miniforge3\python.exe -m pytest` 通过，结果 `189 passed` |
+| WSL 安装验证 | `setup.py --hermes-dir D:\Code\LarkProject\hermes-agent --hermes-home \\wsl.localhost\Ubuntu-24.04\home\ding\.hermes` 通过；插件文件已同步到 WSL Hermes runtime |
+| WSL runtime dry-run | `verify_wsl_feishu_runtime.py --env-file /home/ding/.hermes/.env --config-file /home/ding/.hermes/config.yaml` 输出脱敏通过：`config_model=mimo-v2.5-pro`、`config_provider=vectorcontrol`、`config_has_feishu_gateway=true` |
+| 真实 Feishu 卡片验证 | WSL `verify_wsl_feishu_runtime.py --send-card` 成功：`card_sent=true`、`pending_plan_recovered=true`、`card_action_recovered=true`、`redaction_enabled=true`，继续证明真实卡片只暴露 opaque action id 且可恢复 |
+
 ## 2026-05-03 状态看板场景
 
 | 项目 | 证据 |
