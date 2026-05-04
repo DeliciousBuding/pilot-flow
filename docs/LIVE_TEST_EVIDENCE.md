@@ -1257,6 +1257,19 @@
 | 用户价值 | PilotFlow 的已安装 Agent 指引不再停留在早期基础工具面；Hermes 能在群聊中选择诊断、风险闭环、进展记录、归档、成员移除和催办等真实办公动作，而不是只会创建项目或查询状态 |
 | 隐私处理 | 证据只记录布尔结果和脱敏结论；不写入真实 chat_id、message_id、Feishu URL、用户 open_id、token 或 app secret |
 
+## 2026-05-05 协作资源安装态验证
+
+| 项目 | 证据 |
+| --- | --- |
+| 运行环境 | PilotFlow 已通过 `setup.py --hermes-home <wsl-hermes-home>` 同步到 WSL Hermes runtime；安装验证返回插件、技能、Hermes config 和 Feishu display 配置均 OK |
+| 本地回归 | `C:\Users\Ding\miniforge3\python.exe -m pytest` 返回 `264 passed`；`tests/test_verify_wsl_feishu_runtime.py` 返回 `42 passed`；`git diff --check` 通过 |
+| Verifier 新模式 | `verify_wsl_feishu_runtime.py --verify-collaboration-resources` 在已安装的 WSL Hermes runtime 插件内返回 `collab_doc_created=true`、`collab_doc_comment_created=true`、`collab_doc_permission_refreshed=true`、`collab_task_created=true`、`collab_task_assignee_bound=true`、`collab_task_followers_bound=true`、`collab_task_collaborators_created=true`、`collab_task_url_returned=true` |
+| 文档协作 | verifier 直接调用安装态 `_create_doc`，用最小 Feishu SDK/client 捕获文档创建、正文写入、引导评论 `请补充内容`、链接权限刷新和群成员编辑权刷新路径 |
+| 任务协作 | verifier 直接调用安装态 `_create_task`，捕获负责人 assignee、项目成员 follower、v1 collaborator 补充绑定和任务 URL 回传，证明待办不是裸任务创建 |
+| 基线验证 | 同轮继续通过 `--verify-health-check` 的 `health_check_ok=true`、`health_skill_guidance_current=true`，以及 `--probe-llm` 的 `llm_probe_ok=true`、`llm_probe_status=200` |
+| 用户价值 | 项目空间创建后的文档和待办现在有可复跑安装态门禁：文档会留下协作引导并刷新权限，待办会绑定负责人和项目成员关注者，降低“创建了资源但团队无法协作/追踪”的风险 |
+| 隐私处理 | 证据只记录布尔结果和脱敏结论；不写入真实 chat_id、message_id、Feishu URL、用户 open_id、token 或 app secret |
+
 ## 本地回归
 
 ```bash
@@ -1266,7 +1279,7 @@ C:\Users\Ding\miniforge3\python.exe -m pytest tests\test_tools.py tests\test_set
 结果：
 
 ```text
-262 passed
+264 passed
 ```
 
 ## 当前证据边界

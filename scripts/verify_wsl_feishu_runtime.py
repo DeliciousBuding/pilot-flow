@@ -11,6 +11,7 @@ import json
 import os
 import sys
 import tempfile
+import types
 from urllib import error, request
 from pathlib import Path
 from typing import Any
@@ -141,6 +142,14 @@ def _sanitize_result(result: dict[str, Any]) -> dict[str, Any]:
         "project_create_state_recorded",
         "project_create_memory_saved",
         "project_create_trace_redacted",
+        "collab_doc_created",
+        "collab_doc_comment_created",
+        "collab_doc_permission_refreshed",
+        "collab_task_created",
+        "collab_task_assignee_bound",
+        "collab_task_followers_bound",
+        "collab_task_collaborators_created",
+        "collab_task_url_returned",
         "update_task_created",
         "update_task_name_returned",
         "update_task_feedback_includes_summary",
@@ -797,6 +806,228 @@ def _verify_runtime_project_creation(hermes_dir: Path) -> dict[str, Any]:
             and "example.invalid" not in flight_record_text
             and chat_id not in flight_record_text
         ),
+    }
+
+
+class _RuntimeFakeModel:
+    """Minimal lark_oapi model shim for installed-runtime verifier paths."""
+
+    def __init__(self, **kwargs: Any):
+        self.__dict__.update(kwargs)
+
+    @classmethod
+    def builder(cls):
+        return _RuntimeFakeBuilder(cls)
+
+
+class _RuntimeFakeBuilder:
+    def __init__(self, model_cls: type[_RuntimeFakeModel]):
+        self._model_cls = model_cls
+        self._values: dict[str, Any] = {}
+
+    def __getattr__(self, name: str):
+        def setter(value: Any = None, *args: Any, **kwargs: Any):
+            self._values[name] = value if not args and not kwargs else (value, args, kwargs)
+            return self
+
+        return setter
+
+    def build(self):
+        return self._model_cls(**self._values)
+
+
+def _install_runtime_collab_sdk_modules() -> dict[str, Any]:
+    """Install minimal SDK modules for doc/task collaboration verifier calls."""
+    previous = {
+        name: sys.modules.get(name)
+        for name in [
+            "lark_oapi.api.docx",
+            "lark_oapi.api.docx.v1",
+            "lark_oapi.api.drive",
+            "lark_oapi.api.drive.v1",
+            "lark_oapi.api.task",
+            "lark_oapi.api.task.v1",
+            "lark_oapi.api.task.v2",
+        ]
+    }
+    for package_name in ["docx", "drive", "task"]:
+        full_name = f"lark_oapi.api.{package_name}"
+        if full_name not in sys.modules:
+            sys.modules[full_name] = types.ModuleType(full_name)
+
+    def module_with_models(module_name: str, model_names: list[str]) -> types.ModuleType:
+        module = types.ModuleType(module_name)
+        for model_name in model_names:
+            setattr(module, model_name, type(model_name, (_RuntimeFakeModel,), {}))
+        sys.modules[module_name] = module
+        return module
+
+    module_with_models("lark_oapi.api.docx.v1", [
+        "Block",
+        "Text",
+        "TextElement",
+        "TextRun",
+        "MentionUser",
+        "Divider",
+        "CreateDocumentRequest",
+        "CreateDocumentRequestBody",
+        "CreateDocumentBlockChildrenRequest",
+        "CreateDocumentBlockChildrenRequestBody",
+    ])
+    module_with_models("lark_oapi.api.drive.v1", [
+        "CreateFileCommentRequest",
+        "FileComment",
+    ])
+    module_with_models("lark_oapi.api.task.v2", [
+        "CreateTaskRequest",
+        "InputTask",
+        "Member",
+    ])
+    module_with_models("lark_oapi.api.task.v1", [
+        "CreateTaskCollaboratorRequest",
+        "Collaborator",
+    ])
+    return previous
+
+
+def _restore_runtime_modules(previous: dict[str, Any]) -> None:
+    for name, module in previous.items():
+        if module is None:
+            sys.modules.pop(name, None)
+        else:
+            sys.modules[name] = module
+
+
+def _verify_runtime_collaboration_resources(hermes_dir: Path) -> dict[str, Any]:
+    """Verify installed doc comments and task member binding stay wired."""
+    sys.path.insert(0, str(hermes_dir))
+    import plugins.pilotflow.tools as runtime_tools  # pylint: disable=import-error
+    from plugins.pilotflow.tools import _create_doc, _create_task  # pylint: disable=import-error
+
+    previous_modules = _install_runtime_collab_sdk_modules()
+    original_client = runtime_tools._get_client
+    original_set_permission = runtime_tools._set_permission
+    original_add_editors = runtime_tools._add_editors
+    original_resolve_member = runtime_tools._resolve_member
+
+    captures: dict[str, Any] = {
+        "doc_titles": [],
+        "doc_children_count": 0,
+        "doc_comments": [],
+        "permissions": [],
+        "editors": [],
+        "task_payloads": [],
+        "task_collaborators": [],
+    }
+
+    class _Resp:
+        def __init__(self, data: Any = None):
+            self.data = data
+            self.msg = "ok"
+
+        def success(self) -> bool:
+            return True
+
+    class _DocApi:
+        def create(self, request: Any) -> _Resp:
+            captures["doc_titles"].append(getattr(request.request_body, "title", ""))
+            data = types.SimpleNamespace(document=types.SimpleNamespace(document_id="doc_collab"))
+            return _Resp(data)
+
+    class _DocChildrenApi:
+        def create(self, request: Any) -> _Resp:
+            children = getattr(request.request_body, "children", []) or []
+            captures["doc_children_count"] = len(children)
+            return _Resp()
+
+    class _CommentApi:
+        def create(self, request: Any) -> _Resp:
+            captures["doc_comments"].append({
+                "file_token": getattr(request, "file_token", ""),
+                "file_type": getattr(request, "file_type", ""),
+                "content": getattr(request.request_body, "content", ""),
+                "user_id_type": getattr(request, "user_id_type", ""),
+            })
+            return _Resp()
+
+    class _TaskApi:
+        def create(self, request: Any) -> _Resp:
+            captures["task_payloads"].append(request.request_body)
+            task = types.SimpleNamespace(guid="task_collab", url="https://example.invalid/task/collab")
+            return _Resp(types.SimpleNamespace(task=task))
+
+    class _TaskCollaboratorApi:
+        def create(self, request: Any) -> _Resp:
+            body = getattr(request, "request_body", None)
+            captures["task_collaborators"].append({
+                "task_id": getattr(request, "task_id", ""),
+                "user_id_type": getattr(request, "user_id_type", ""),
+                "id_list": list(getattr(body, "id_list", []) or []),
+            })
+            return _Resp()
+
+    client = types.SimpleNamespace(
+        docx=types.SimpleNamespace(v1=types.SimpleNamespace(
+            document=_DocApi(),
+            document_block_children=_DocChildrenApi(),
+        )),
+        drive=types.SimpleNamespace(v1=types.SimpleNamespace(
+            file_comment=_CommentApi(),
+        )),
+        task=types.SimpleNamespace(
+            v2=types.SimpleNamespace(task=_TaskApi()),
+            v1=types.SimpleNamespace(task_collaborator=_TaskCollaboratorApi()),
+        ),
+    )
+    member_map = {"张三": "ou_zhang", "李四": "ou_li", "王五": "ou_wang"}
+    try:
+        runtime_tools._get_client = lambda: client
+        runtime_tools._set_permission = lambda token, doc_type: captures["permissions"].append((token, doc_type)) or True
+        runtime_tools._add_editors = lambda token, doc_type, chat_id: captures["editors"].append((token, doc_type, chat_id)) or True
+        runtime_tools._resolve_member = lambda name, chat_id: member_map.get(name)
+
+        doc_url = _create_doc(
+            "运行态协作资源项目",
+            "# 运行态协作资源项目\n\n## 目标\n验证文档评论和权限刷新",
+            "oc_collab_runtime",
+        )
+        task_name = _create_task(
+            "协作资源验收",
+            "项目: 运行态协作资源项目",
+            "张三",
+            "2026-05-20",
+            "oc_collab_runtime",
+            ["张三", "李四", "王五"],
+        )
+    finally:
+        runtime_tools._get_client = original_client
+        runtime_tools._set_permission = original_set_permission
+        runtime_tools._add_editors = original_add_editors
+        runtime_tools._resolve_member = original_resolve_member
+        _restore_runtime_modules(previous_modules)
+
+    task_payload = captures["task_payloads"][0] if captures["task_payloads"] else None
+    task_members = list(getattr(task_payload, "members", []) or []) if task_payload else []
+    task_roles = {getattr(member, "role", "") for member in task_members}
+    task_ids = {getattr(member, "id", "") for member in task_members}
+    collaborator_ids = set(captures["task_collaborators"][0]["id_list"]) if captures["task_collaborators"] else set()
+    return {
+        "collab_doc_created": doc_url == "https://feishu.cn/docx/doc_collab" and captures["doc_children_count"] > 0,
+        "collab_doc_comment_created": captures["doc_comments"] == [{
+            "file_token": "doc_collab",
+            "file_type": "docx",
+            "content": "请补充内容",
+            "user_id_type": "open_id",
+        }],
+        "collab_doc_permission_refreshed": (
+            ("doc_collab", "docx") in captures["permissions"]
+            and ("doc_collab", "docx", "oc_collab_runtime") in captures["editors"]
+        ),
+        "collab_task_created": bool(task_payload) and "协作资源验收" in str(task_name),
+        "collab_task_assignee_bound": "assignee" in task_roles and "ou_zhang" in task_ids,
+        "collab_task_followers_bound": "follower" in task_roles and {"ou_li", "ou_wang"}.issubset(task_ids),
+        "collab_task_collaborators_created": collaborator_ids == {"ou_zhang", "ou_li", "ou_wang"},
+        "collab_task_url_returned": task_name == "协作资源验收: https://example.invalid/task/collab",
     }
 
 
@@ -2274,6 +2505,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--verify-history", action="store_true", help="Send real cards that verify history suggestions can be applied.")
     parser.add_argument("--verify-projectization-suggestion", action="store_true", help="Send real cards that verify chat signal projectization suggestion flow.")
     parser.add_argument("--verify-project-creation", action="store_true", help="Dry-run installed create-project resource orchestration.")
+    parser.add_argument("--verify-collaboration-resources", action="store_true", help="Dry-run installed doc comment and task collaborator wiring.")
     parser.add_argument("--verify-update-task", action="store_true", help="Dry-run installed update_project task summary behavior.")
     parser.add_argument("--verify-archive-gate", action="store_true", help="Dry-run installed archive confirmation gate behavior.")
     parser.add_argument("--verify-followup-task", action="store_true", help="Dry-run installed card follow-up task behavior.")
@@ -2309,6 +2541,7 @@ def main(argv: list[str] | None = None) -> int:
         else "followup-task" if args.verify_followup_task
         else "archive-gate" if args.verify_archive_gate
         else "update-task" if args.verify_update_task
+        else "collaboration-resources" if args.verify_collaboration_resources
         else "project-creation" if args.verify_project_creation
         else "projectization-suggestion" if args.verify_projectization_suggestion
         else "health-check" if args.verify_health_check
@@ -2337,6 +2570,8 @@ def main(argv: list[str] | None = None) -> int:
         output.update(_verify_runtime_projectization_suggestion(hermes_dir))
     if args.verify_project_creation:
         output.update(_verify_runtime_project_creation(hermes_dir))
+    if args.verify_collaboration_resources:
+        output.update(_verify_runtime_collaboration_resources(hermes_dir))
     if args.verify_update_task:
         output.update(_verify_runtime_update_task_summary(hermes_dir))
     if args.verify_archive_gate:

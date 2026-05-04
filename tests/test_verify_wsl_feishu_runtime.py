@@ -170,6 +170,24 @@ def test_verify_runtime_project_creation_is_sanitized(tmp_path, monkeypatch):
     assert "example.invalid" not in json.dumps(result, ensure_ascii=False)
 
 
+def test_verify_runtime_collaboration_resources_are_wired(tmp_path, monkeypatch):
+    hermes_dir, _sent_cards = _install_runtime_fixture(tmp_path, monkeypatch)
+
+    result = _MODULE._verify_runtime_collaboration_resources(hermes_dir)
+
+    assert result["collab_doc_created"] is True
+    assert result["collab_doc_comment_created"] is True
+    assert result["collab_doc_permission_refreshed"] is True
+    assert result["collab_task_created"] is True
+    assert result["collab_task_assignee_bound"] is True
+    assert result["collab_task_followers_bound"] is True
+    assert result["collab_task_collaborators_created"] is True
+    assert result["collab_task_url_returned"] is True
+    assert "oc_collab_runtime" not in json.dumps(result, ensure_ascii=False)
+    assert "ou_zhang" not in json.dumps(result, ensure_ascii=False)
+    assert "example.invalid" not in json.dumps(result, ensure_ascii=False)
+
+
 def test_verify_runtime_update_task_summary_is_sanitized(tmp_path, monkeypatch):
     hermes_dir, _sent_cards = _install_runtime_fixture(tmp_path, monkeypatch)
 
@@ -847,6 +865,47 @@ def test_verifier_health_check_mode_outputs_sanitized_runtime_result(tmp_path, c
     assert output["health_skill_guidance_current"] is True
     assert "oc_real_chat_id" not in output_text
     assert "real_secret" not in output_text
+
+
+def test_verifier_collaboration_resources_mode_outputs_sanitized_runtime_result(tmp_path, capsys):
+    env_file = tmp_path / ".env"
+    env_file.write_text("PILOTFLOW_TEST_CHAT_ID=oc_real_chat_id\n", encoding="utf-8")
+
+    with patch.object(_MODULE, "_verify_runtime_collaboration_resources", return_value={
+        "collab_doc_created": True,
+        "collab_doc_comment_created": True,
+        "collab_doc_permission_refreshed": True,
+        "collab_task_created": True,
+        "collab_task_assignee_bound": True,
+        "collab_task_followers_bound": True,
+        "collab_task_collaborators_created": True,
+        "collab_task_url_returned": True,
+        "raw_chat_id": "oc_real_chat_id",
+        "raw_open_id": "ou_real_user",
+        "raw_url": "https://example.invalid/task",
+    }):
+        exit_code = _MODULE.main([
+            "--hermes-dir", str(tmp_path),
+            "--env-file", str(env_file),
+            "--verify-collaboration-resources",
+        ])
+
+    output_text = capsys.readouterr().out
+    output = json.loads(output_text)
+    assert exit_code == 0
+    assert output["mode"] == "collaboration-resources"
+    assert output["would_send_card"] is False
+    assert output["collab_doc_created"] is True
+    assert output["collab_doc_comment_created"] is True
+    assert output["collab_doc_permission_refreshed"] is True
+    assert output["collab_task_created"] is True
+    assert output["collab_task_assignee_bound"] is True
+    assert output["collab_task_followers_bound"] is True
+    assert output["collab_task_collaborators_created"] is True
+    assert output["collab_task_url_returned"] is True
+    assert "oc_real_chat_id" not in output_text
+    assert "ou_real_user" not in output_text
+    assert "example.invalid" not in output_text
 
 
 def test_verifier_briefing_batch_reminder_mode_outputs_sanitized_runtime_result(tmp_path, capsys):
