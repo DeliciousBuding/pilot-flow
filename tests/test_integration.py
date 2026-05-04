@@ -395,7 +395,7 @@ def test_update_project_full_flow():
 
     # Add member
     result2 = json.loads(_handle_update_project(
-        {"project_name": "更新测试", "action": "add_member", "value": "李四"},
+        {"project_name": "更新测试", "action": "add_member", "value": "李四", "confirmation_text": "确认执行"},
         chat_id="oc_update",
     ))
     assert result2["registry_updated"] is True

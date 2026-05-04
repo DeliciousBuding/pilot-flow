@@ -4991,6 +4991,20 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
 
     if action == "remove_member" and value not in project.get("members", []):
         return tool_error(f"成员「{value}」不是项目「{project_name}」的成员，无法移除。")
+    if require_confirm and not _is_execution_confirmation(params.get("confirmation_text") or ""):
+        return tool_result({
+            "status": "confirmation_required",
+            "project": project_name,
+            "action": action,
+            "value": value,
+            "reason": autonomy_reason,
+            "autonomy": {
+                "scope": chat_scope.get("scope", "group"),
+                "mode": autonomy_mode,
+                "reason": autonomy_reason,
+            },
+            "instructions": "请先向用户确认该高风险项目更新；用户明确确认后再传入 confirmation_text 执行。",
+        })
 
     assignee_override = ""
     if action == "add_deliverable":

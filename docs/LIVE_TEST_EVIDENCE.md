@@ -938,6 +938,19 @@
 | 用户价值 | 避免 Agent 在群聊里把新外联/未入项目人员误当既有负责人，符合“首次外联先问一次”的协作安全边界 |
 | 隐私处理 | 证据只记录布尔结果和脱敏结论；不写入真实 chat_id、message_id、Feishu URL、用户 open_id、token 或 app secret |
 
+## 2026-05-04 成员移除确认门控落地
+
+| 项目 | 证据 |
+| --- | --- |
+| 运行环境 | PilotFlow 已通过 `setup.py --hermes-home <wsl-hermes-home>` 同步到 WSL Hermes runtime；安装验证返回插件、技能和 Feishu display 配置均 OK |
+| 本地回归 | `C:\Users\Ding\miniforge3\python.exe -m pytest` 返回 `219 passed`；成员移除门控定向测试返回通过 |
+| 功能修正 | `pilotflow_update_project` 对 `remove_member` 现在真正执行确认门控；未传入明确 `confirmation_text` 时返回 `confirmation_required`，不再只在 `autonomy` 元数据里声明必须确认 |
+| 写入保护 | 回归验证确认未确认移除成员不会更新 registry、多维表格、项目文档、流水或群通知；目标成员不存在时仍优先返回“不是项目成员”错误 |
+| 兼容路径 | 显式传入 `confirmation_text=确认执行` 后，原有成员移除链路仍会更新成员列表、负责人字段、项目文档、状态表流水和群反馈 |
+| 基线验证 | 同轮继续通过 `--probe-llm` 的 `llm_probe_ok=true`、`llm_probe_status=200`，`--send-card` 的 `card_sent=true`、`pending_plan_recovered=true`，以及 `--verify-history` 的 `history_apply_card_sent=true`、`history_pending_recovered=true` |
+| 用户价值 | 删除成员属于权限收缩动作，PilotFlow 现在会实际阻止 Agent 在未确认情况下修改协作关系，符合产品自治规则 |
+| 隐私处理 | 证据只记录布尔结果和脱敏结论；不写入真实 chat_id、message_id、Feishu URL、用户 open_id、token 或 app secret |
+
 ## 本地回归
 
 ```bash
