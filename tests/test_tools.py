@@ -3752,6 +3752,67 @@ def test_filtered_briefing_followup_can_filter_by_owner():
     assert "李四风险待办项目" not in sent_messages[0][1]
 
 
+def test_briefing_batch_followup_filters_state_projects_by_saved_assignee(tmp_path):
+    state_path = tmp_path / "pilotflow-projects.json"
+    with _project_registry_lock:
+        _project_registry.clear()
+    overdue = (dt.date.today() - dt.timedelta(days=1)).isoformat()
+    with patch.dict(os.environ, {"PILOTFLOW_STATE_PATH": str(state_path)}):
+        _save_project_state(
+            "重启李四逾期待办项目",
+            "验证重启后按保存负责人批量待办",
+            ["张三", "李四"],
+            ["验收记录", "接口联调"],
+            overdue,
+            "进行中",
+            ["文档: https://example.invalid/docx/doc_state_followup_li"],
+            deliverable_assignees={"验收记录": "李四", "接口联调": "张三"},
+        )
+        _save_project_state(
+            "重启王五逾期待办项目",
+            "验证重启后按保存负责人排除",
+            ["王五"],
+            ["验收记录"],
+            overdue,
+            "进行中",
+            ["文档: https://example.invalid/docx/doc_state_followup_wang"],
+            deliverable_assignees={"验收记录": "王五"},
+        )
+        sent_messages = []
+        with (
+            patch("tools._create_task", return_value="重启李四逾期待办项目跟进: https://example.invalid/task/state-owner-followup") as create_task,
+            patch("tools._hermes_send", side_effect=lambda chat_id, msg: sent_messages.append((chat_id, msg)) or True),
+            patch("tools._append_project_doc_update", return_value=True) as append_doc,
+            patch("tools._append_bitable_update_record", return_value=True) as append_history,
+        ):
+            action_value = _opaque_card_action_value(
+                "oc_state_owner_batch_followup",
+                "briefing_batch_followup_task",
+                {"filter": "overdue", "member_filters": ["李四"]},
+            )
+            result = json.loads(_handle_card_action(
+                {"action_value": action_value},
+                chat_id="oc_state_owner_batch_followup",
+            ))
+
+    assert result["status"] == "briefing_batch_followup_task_created"
+    assert result["source"] == "state"
+    assert result["member_filters"] == ["李四"]
+    assert result["project_count"] == 1
+    assert result["projects"] == ["重启李四逾期待办项目"]
+    create_task.assert_called_once_with(
+        "重启李四逾期待办项目跟进",
+        "项目: 重启李四逾期待办项目",
+        "李四",
+        overdue,
+        "oc_state_owner_batch_followup",
+        [],
+    )
+    assert "重启王五逾期待办项目" not in sent_messages[0][1]
+    append_doc.assert_called_once()
+    append_history.assert_not_called()
+
+
 def test_filtered_briefing_followup_button_names_current_filter():
     with _project_registry_lock:
         _project_registry.clear()

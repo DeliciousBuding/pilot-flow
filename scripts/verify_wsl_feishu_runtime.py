@@ -270,6 +270,7 @@ def _sanitize_result(result: dict[str, Any]) -> dict[str, Any]:
         "batch_followup_history_recorded",
         "batch_followup_state_recorded",
         "batch_followup_state_assignee_used",
+        "batch_followup_state_assignee_filtered",
         "batch_followup_feedback_sent",
         "batch_followup_used_opaque_ref",
         "dashboard_filter_sent",
@@ -2972,6 +2973,36 @@ def _verify_runtime_batch_followup_task(hermes_dir: Path) -> dict[str, Any]:
                 {"action_value": json.dumps({"pilotflow_action_id": state_action_id}, ensure_ascii=False)},
                 chat_id=chat_id,
             ))
+            os.environ["PILOTFLOW_STATE_PATH"] = str(Path(tmpdir) / "pilotflow_state_assignee_filter.json")
+            _save_project_state(
+                "运行态重启李四批量待办项目",
+                "验证安装后按保存负责人批量待办",
+                ["张三", "李四"],
+                ["验收记录", "接口联调"],
+                overdue,
+                "进行中",
+                ["文档: https://example.invalid/doc/batch-followup-state-owner-li"],
+                deliverable_assignees={"验收记录": "李四", "接口联调": "张三"},
+            )
+            _save_project_state(
+                "运行态重启王五批量待办项目",
+                "验证安装后按保存负责人排除",
+                ["王五"],
+                ["验收记录"],
+                overdue,
+                "进行中",
+                ["文档: https://example.invalid/doc/batch-followup-state-owner-wang"],
+                deliverable_assignees={"验收记录": "王五"},
+            )
+            state_filter_action_id = _create_card_action_ref(
+                chat_id,
+                "briefing_batch_followup_task",
+                {"filter": "overdue", "member_filters": ["李四"]},
+            )
+            state_filter_data = json.loads(_handle_card_action(
+                {"action_value": json.dumps({"pilotflow_action_id": state_filter_action_id}, ensure_ascii=False)},
+                chat_id=chat_id,
+            ))
         finally:
             runtime_tools._create_task = original_create_task
             runtime_tools._append_project_doc_update = original_append_doc
@@ -3024,6 +3055,19 @@ def _verify_runtime_batch_followup_task(hermes_dir: Path) -> dict[str, Any]:
             chat_id,
             [],
         ) in created_tasks,
+        "batch_followup_state_assignee_filtered": state_filter_data.get("status") == "briefing_batch_followup_task_created"
+        and state_filter_data.get("source") == "state"
+        and state_filter_data.get("member_filters") == ["李四"]
+        and state_filter_data.get("projects") == ["运行态重启李四批量待办项目"]
+        and (
+            "运行态重启李四批量待办项目跟进",
+            "项目: 运行态重启李四批量待办项目",
+            "李四",
+            overdue,
+            chat_id,
+            [],
+        ) in created_tasks
+        and "运行态重启王五批量待办项目" not in feedback_text,
         "batch_followup_feedback_sent": (
             "已为 1 个逾期项目创建跟进待办" in feedback_text
             and "运行态批量待办逾期项目" in feedback_text

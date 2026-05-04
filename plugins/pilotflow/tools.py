@@ -4316,8 +4316,13 @@ def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
                 }, status_filter)
                 and (not member_filters or any(member in set(_project_member_names({"detail_project": info})) for member in member_filters))
             ]
-        if not candidate_projects and not member_filters:
-            candidate_projects = _load_state_project_candidates(status_filter)
+        if not candidate_projects:
+            state_candidates = _load_state_project_candidates(status_filter)
+            candidate_projects = [
+                (title, info, source)
+                for title, info, source in state_candidates
+                if not member_filters or any(member in set(_project_member_names(info)) for member in member_filters)
+            ]
         created_projects: list[str] = []
         sources = set()
         for project_name, project, source in candidate_projects:
