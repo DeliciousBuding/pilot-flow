@@ -2,6 +2,19 @@
 
 > 本文件只记录可复验结论和脱敏摘要，不提交真实群 ID、用户 open_id、应用 secret、message_id 或飞书文档链接。
 
+## 2026-05-05 新增交付物结构化负责人
+
+| 项目 | 证据 |
+| --- | --- |
+| 功能硬化 | `pilotflow_update_project` 的 `add_deliverable` 现在支持结构化 `assignee` 字段；Agent 可把交付物标题放在 `value`、负责人显示名放在 `assignee`，不再需要把“负责人：任务”硬塞进文本字段 |
+| Agent 指引 | `skills/pilotflow/SKILL.md` 已明确：新增任务/交付物时 `value` 只填标题；用户明确指定负责人时传 `assignee`，且只传显示名或飞书 @ 提及，不传 open_id/chat_id/message_id |
+| 兼容与安全 | 旧的 `负责人：交付物` value 解析仍保留；结构化负责人必须是项目已有成员，否则拒绝并不写 registry、状态表、流水或群消息 |
+| 本地回归 | 新增结构化负责人单测；`C:\Users\Ding\miniforge3\python.exe -m pytest` 返回 `274 passed`；`tests/test_verify_wsl_feishu_runtime.py` 返回 `45 passed`；`git diff --check` 通过，仅有 CRLF 提示 |
+| WSL 安装态 | `setup.py --hermes-dir D:\Code\LarkProject\hermes-agent --hermes-home \\wsl.localhost\Ubuntu-24.04\home\ding\.hermes` 通过；插件和 skill 已同步到 WSL Hermes runtime profile |
+| 运行态验证 | `--verify-update-task` 输出脱敏通过：`update_task_created=true`、`update_task_name_returned=true`、`update_task_structured_assignee_used=true`、`update_task_schema_assignee_exposed=true`、`update_task_feedback_includes_summary=true`、`update_task_artifact_recorded=true` |
+| 基线验证 | 同轮继续通过 `--send-card` 的 `card_sent=true`、`card_has_title=true`、`card_has_goal=true`、`card_has_initiator=true`、`card_has_risk=true`，`--verify-health-check` 的 `health_check_ok=true`、`health_check_sanitized=true`、`health_card_bridge_registered=true`，以及 `--probe-llm` 的 `llm_probe_ok=true`、`llm_probe_status=200` |
+| 隐私处理 | 验证只记录布尔结果和脱敏状态；不写入真实 chat_id、open_id、message_id、Feishu URL、任务 URL、token 或 app secret |
+
 ## 2026-05-05 会话发起人元数据贯穿
 
 | 项目 | 证据 |

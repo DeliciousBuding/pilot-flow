@@ -4909,6 +4909,10 @@ PILOTFLOW_UPDATE_PROJECT_SCHEMA = {
                 "description": "操作类型。",
             },
             "value": {"type": "string", "description": "新值（新截止时间、新成员名、要移除的成员名、新交付物/任务、新状态，或催办备注）。"},
+            "assignee": {
+                "type": "string",
+                "description": "action=add_deliverable 时可选的新交付物负责人显示名。只填写项目已有成员的可见姓名或飞书 @ 提及，不要传 open_id、chat_id、message_id。",
+            },
             "filter": {
                 "type": "string",
                 "enum": ["overdue", "due_soon", "risk"],
@@ -5076,7 +5080,19 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
 
     assignee_override = ""
     if action == "add_deliverable":
-        value, assignee_override, unknown_assignee = _parse_deliverable_assignment(value, project.get("members", []))
+        structured_assignee = _clean_member_update_value(params.get("assignee") or "")
+        if structured_assignee:
+            if structured_assignee not in project.get("members", []):
+                return tool_error(
+                    f"负责人「{structured_assignee}」不是项目「{project_name}」的成员。"
+                    "请先确认是否新增成员，再为该交付物指定负责人。"
+                )
+            assignee_override = structured_assignee
+        value, parsed_assignee, unknown_assignee = _parse_deliverable_assignment(value, project.get("members", []))
+        if parsed_assignee:
+            assignee_override = parsed_assignee
+        elif structured_assignee and not unknown_assignee:
+            assignee_override = structured_assignee
         if unknown_assignee:
             return tool_error(
                 f"负责人「{unknown_assignee}」不是项目「{project_name}」的成员。"

@@ -166,6 +166,8 @@ def _sanitize_result(result: dict[str, Any]) -> dict[str, Any]:
         "collab_task_url_returned",
         "update_task_created",
         "update_task_name_returned",
+        "update_task_structured_assignee_used",
+        "update_task_schema_assignee_exposed",
         "update_task_feedback_includes_summary",
         "update_task_artifact_recorded",
         "archive_gate_required",
@@ -1277,8 +1279,10 @@ def _verify_runtime_update_task_summary(hermes_dir: Path) -> dict[str, Any]:
     original_create_task = runtime_tools._create_task
     original_send = runtime_tools._hermes_send
     sent_messages: list[str] = []
+    task_calls: list[tuple[Any, ...]] = []
 
-    def fake_create_task(*_args: Any, **_kwargs: Any) -> str:
+    def fake_create_task(*args: Any, **_kwargs: Any) -> str:
+        task_calls.append(args)
         return "运行态新增待办: https://example.invalid/task/runtime"
 
     def fake_send(_chat_id: str, text: str) -> bool:
@@ -1304,11 +1308,17 @@ def _verify_runtime_update_task_summary(hermes_dir: Path) -> dict[str, Any]:
                 "project_name": "运行态交付物",
                 "action": "add_deliverable",
                 "value": "运行态新增待办",
+                "assignee": "张三",
             },
             chat_id=chat_id,
         ))
         with _project_registry_lock:
             artifacts = list(_project_registry["运行态交付物验证项目"].get("artifacts", []))
+        schema_props = (
+            runtime_tools.PILOTFLOW_UPDATE_PROJECT_SCHEMA
+            .get("parameters", {})
+            .get("properties", {})
+        )
     finally:
         runtime_tools._create_task = original_create_task
         runtime_tools._hermes_send = original_send
@@ -1318,6 +1328,11 @@ def _verify_runtime_update_task_summary(hermes_dir: Path) -> dict[str, Any]:
     return {
         "update_task_created": data.get("task_created") is True,
         "update_task_name_returned": bool(data.get("task_name")),
+        "update_task_structured_assignee_used": bool(task_calls) and len(task_calls[0]) >= 3 and task_calls[0][2] == "张三",
+        "update_task_schema_assignee_exposed": (
+            "assignee" in schema_props
+            and "open_id" in str(schema_props.get("assignee", {}).get("description", ""))
+        ),
         "update_task_feedback_includes_summary": any("飞书任务 → 运行态新增待办" in msg for msg in sent_messages),
         "update_task_artifact_recorded": any(item.startswith("任务: 运行态新增待办") for item in artifacts),
     }

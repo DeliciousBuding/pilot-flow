@@ -78,6 +78,7 @@ def test_skill_guidance_mentions_every_registered_tool_and_action():
         "send_reminder",
     ]:
         assert action in skill_text
+    assert "assignee" in skill_text
 
     for capability in ["运行诊断", "风险闭环", "归档", "催办"]:
         assert capability in description_text

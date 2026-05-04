@@ -214,6 +214,8 @@ def test_verify_runtime_update_task_summary_is_sanitized(tmp_path, monkeypatch):
 
     assert result["update_task_created"] is True
     assert result["update_task_name_returned"] is True
+    assert result["update_task_structured_assignee_used"] is True
+    assert result["update_task_schema_assignee_exposed"] is True
     assert result["update_task_feedback_includes_summary"] is True
     assert result["update_task_artifact_recorded"] is True
     assert "example.invalid" not in json.dumps(result, ensure_ascii=False)
@@ -475,6 +477,8 @@ def test_verifier_update_task_mode_outputs_sanitized_runtime_result(tmp_path, ca
     with patch.object(_MODULE, "_verify_runtime_update_task_summary", return_value={
         "update_task_created": True,
         "update_task_name_returned": True,
+        "update_task_structured_assignee_used": True,
+        "update_task_schema_assignee_exposed": True,
         "update_task_feedback_includes_summary": True,
         "update_task_artifact_recorded": True,
         "raw_task_url": "https://example.invalid/task/1",
@@ -492,6 +496,8 @@ def test_verifier_update_task_mode_outputs_sanitized_runtime_result(tmp_path, ca
     assert output["would_send_card"] is False
     assert output["update_task_created"] is True
     assert output["update_task_name_returned"] is True
+    assert output["update_task_structured_assignee_used"] is True
+    assert output["update_task_schema_assignee_exposed"] is True
     assert output["update_task_feedback_includes_summary"] is True
     assert output["update_task_artifact_recorded"] is True
     assert "oc_real_chat_id" not in output_text

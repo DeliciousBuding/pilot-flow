@@ -303,6 +303,7 @@ def test_copy_plugin_and_skills_to_hermes_layout(tmp_path):
     assert "pilotflow_health_check" in installed_skill
     assert "send_reminder" in installed_skill
     assert "remove_member" in installed_skill
+    assert "assignee" in installed_skill
     assert setup.validate_install(str(hermes_dir)) is True
 
 

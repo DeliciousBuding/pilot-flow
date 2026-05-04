@@ -4835,6 +4835,41 @@ def test_update_project_add_deliverable_assigns_named_member():
     assert "负责人 → 李四" in send.call_args.args[1]
 
 
+def test_update_project_add_deliverable_accepts_structured_assignee():
+    with _project_registry_lock:
+        _project_registry.clear()
+    _register_project(
+        "结构化负责人交付物项目", ["张三", "李四"], "2026-05-20", "进行中", [],
+        goal="验证结构化负责人", deliverables=["验收记录"],
+    )
+
+    with (
+        patch("tools._create_task", return_value="完成接口联调") as create_task,
+        patch("tools._hermes_send", return_value=True) as send,
+    ):
+        result = json.loads(_handle_update_project(
+            {
+                "project_name": "结构化负责人",
+                "action": "add_deliverable",
+                "value": "完成接口联调",
+                "assignee": "李四",
+            },
+            chat_id="oc_structured_assignee",
+        ))
+
+    assert result["status"] == "project_updated"
+    assert result["value"] == "完成接口联调"
+    assert result["assignee"] == "李四"
+    create_task.assert_called_once_with(
+        "完成接口联调", "项目: 结构化负责人交付物项目", "李四", "2026-05-20", "oc_structured_assignee", ["张三", "李四"],
+    )
+    with _project_registry_lock:
+        project = _project_registry["结构化负责人交付物项目"]
+        assert project["deliverables"] == ["验收记录", "完成接口联调"]
+    assert "交付物 → 完成接口联调" in send.call_args.args[1]
+    assert "负责人 → 李四" in send.call_args.args[1]
+
+
 def test_update_project_add_deliverable_assigns_feishu_mentioned_member():
     with _project_registry_lock:
         _project_registry.clear()
