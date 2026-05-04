@@ -5274,6 +5274,51 @@ def test_update_project_updates_sanitized_state_after_restart(tmp_path):
     assert projects[0]["updates"][-1] == {"action": "截止时间", "value": "2026-05-25"}
 
 
+def test_update_project_deadline_hooks_run_after_state_restart(tmp_path):
+    state_path = tmp_path / "pilotflow-projects.json"
+    with _project_registry_lock:
+        _project_registry.clear()
+
+    with patch.dict(os.environ, {"PILOTFLOW_STATE_PATH": str(state_path)}):
+        assert _save_project_state(
+            "重启截止联动项目",
+            "验证重启后截止联动",
+            [],
+            ["验收记录"],
+            "2026-05-20",
+            "进行中",
+            artifacts=["文档: https://example.invalid/doc/deadline-state"],
+        )
+        with (
+            patch("tools._create_calendar_event", return_value="日历事件: 2026-05-30") as calendar,
+            patch("tools._schedule_deadline_reminder", return_value=True) as reminder,
+            patch("tools._append_project_doc_update", return_value=True) as append_doc,
+            patch("tools._hermes_send", return_value=True) as send,
+        ):
+            result = json.loads(_handle_update_project(
+                {"project_name": "重启截止联动", "action": "update_deadline", "value": "2026-05-30"},
+                chat_id="oc_state_deadline",
+            ))
+        projects = _load_project_state()
+
+    assert result["status"] == "project_updated"
+    assert result["project"] == "重启截止联动项目"
+    assert result["registry_updated"] is False
+    assert result["state_updated"] is True
+    assert result["calendar_event_created"] is True
+    assert result["reminder_scheduled"] is True
+    assert result["doc_updated"] is True
+    assert projects[0]["deadline"] == "2026-05-30"
+    assert projects[0]["updates"][-1] == {"action": "截止时间", "value": "2026-05-30"}
+    calendar.assert_called_once_with("重启截止联动项目", "验证重启后截止联动", "2026-05-30", [], "oc_state_deadline")
+    reminder.assert_called_once_with("重启截止联动项目", "2026-05-30", "oc_state_deadline")
+    append_doc.assert_called_once()
+    sent_text = send.call_args.args[1]
+    assert "截止时间 → 2026-05-30" in sent_text
+    assert "日历事件已更新" in sent_text
+    assert "截止提醒已设置" in sent_text
+
+
 def test_update_project_restores_doc_resource_ref_after_restart(tmp_path):
     state_path = tmp_path / "pilotflow-projects.json"
     with _project_registry_lock:

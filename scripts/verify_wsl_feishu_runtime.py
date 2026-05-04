@@ -199,6 +199,9 @@ def _sanitize_result(result: dict[str, Any]) -> dict[str, Any]:
         "deadline_calendar_created",
         "deadline_attendees_added",
         "deadline_reminder_scheduled",
+        "deadline_state_updated",
+        "deadline_state_hooks_ran",
+        "deadline_state_feedback_sent",
         "deadline_feedback_sent",
         "member_added",
         "member_mention_cleaned",
@@ -1773,6 +1776,7 @@ def _verify_runtime_deadline_update(hermes_dir: Path) -> dict[str, Any]:
     import plugins.pilotflow.tools as runtime_tools  # pylint: disable=import-error
     from plugins.pilotflow.tools import (  # pylint: disable=import-error
         _handle_update_project,
+        _load_project_state,
         _project_registry,
         _project_registry_lock,
         _register_project,
@@ -1780,6 +1784,7 @@ def _verify_runtime_deadline_update(hermes_dir: Path) -> dict[str, Any]:
     )
 
     chat_id = os.environ.get("PILOTFLOW_TEST_CHAT_ID", "")
+    original_state_path = os.environ.get("PILOTFLOW_STATE_PATH")
     original_calendar = runtime_tools._create_calendar_event
     original_reminder = runtime_tools._schedule_deadline_reminder
     original_send = runtime_tools._hermes_send
@@ -1820,19 +1825,56 @@ def _verify_runtime_deadline_update(hermes_dir: Path) -> dict[str, Any]:
         ))
         with _project_registry_lock:
             new_deadline = _project_registry["运行态截止联动项目"].get("deadline")
+        with tempfile.TemporaryDirectory() as tmpdir:
+            os.environ["PILOTFLOW_STATE_PATH"] = str(Path(tmpdir) / "pilotflow_deadline_state.json")
+            _save_project_state(
+                "运行态重启截止联动项目",
+                "验证安装后重启截止联动",
+                [],
+                ["验收记录"],
+                "2026-05-20",
+                "进行中",
+                ["文档: https://example.invalid/doc/deadline-state"],
+            )
+            state_data = json.loads(_handle_update_project(
+                {
+                    "project_name": "运行态重启截止联动",
+                    "action": "update_deadline",
+                    "value": "2026-06-01",
+                },
+                chat_id=chat_id,
+            ))
+            state_projects = _load_project_state()
     finally:
         runtime_tools._create_calendar_event = original_calendar
         runtime_tools._schedule_deadline_reminder = original_reminder
         runtime_tools._hermes_send = original_send
+        if original_state_path is None:
+            os.environ.pop("PILOTFLOW_STATE_PATH", None)
+        else:
+            os.environ["PILOTFLOW_STATE_PATH"] = original_state_path
         with _project_registry_lock:
             _project_registry.clear()
 
     feedback_text = "\n".join(sent_messages)
+    state_project = next(
+        (item for item in state_projects if item.get("title") == "运行态重启截止联动项目"),
+        {},
+    )
     return {
         "deadline_update_applied": data.get("status") == "project_updated" and new_deadline == "2026-05-30",
         "deadline_calendar_created": data.get("calendar_event_created") is True,
         "deadline_attendees_added": data.get("calendar_attendees_added") is True,
         "deadline_reminder_scheduled": data.get("reminder_scheduled") is True,
+        "deadline_state_updated": state_data.get("status") == "project_updated"
+        and state_data.get("state_updated") is True
+        and state_project.get("deadline") == "2026-06-01"
+        and {"action": "截止时间", "value": "2026-06-01"} in state_project.get("updates", []),
+        "deadline_state_hooks_ran": state_data.get("calendar_event_created") is True
+        and state_data.get("reminder_scheduled") is True,
+        "deadline_state_feedback_sent": "运行态重启截止联动项目" in feedback_text
+        and "截止时间 → 2026-06-01" in feedback_text
+        and "截止提醒已设置" in feedback_text,
         "deadline_feedback_sent": all(
             marker in feedback_text
             for marker in ("日历事件已更新", "日历参与人已邀请", "截止提醒已设置")

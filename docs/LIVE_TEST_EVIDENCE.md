@@ -2,6 +2,20 @@
 
 > 本文件只记录可复验结论和脱敏摘要，不提交真实群 ID、用户 open_id、应用 secret、message_id 或飞书文档链接。
 
+## 2026-05-05 重启后截止时间联动
+
+| 项目 | 证据 |
+| --- | --- |
+| 功能验证 | `pilotflow_update_project` 在 restart-safe state-only 项目上执行 `update_deadline` 时，会更新公开状态中的截止时间并记录结构化进展 |
+| 适用边界 | state-only 项目不恢复成员名单，不写真实 Base 元数据；截止时间来自 Agent 传入的结构化 `value`，工具只做执行层日期联动 |
+| 状态延续 | 截止时间更新后会写公开最近进展 `截止时间 -> ...`、更新 restart-safe state、追加项目文档，并继续触发日历事件和 Hermes 截止提醒调度 |
+| 本地回归 | `C:\Users\Ding\miniforge3\python.exe -m pytest` 返回 `299 passed`；`tests/test_tools.py tests/test_verify_wsl_feishu_runtime.py` 返回 `265 passed` |
+| WSL 安装态 | `setup.py --hermes-dir D:\Code\LarkProject\hermes-agent --hermes-home \\wsl.localhost\Ubuntu-24.04\home\ding\.hermes` 通过；插件和 skill 已同步到 WSL Hermes runtime profile |
+| Verifier 新字段 | `--verify-deadline-update` 返回 `deadline_state_updated=true`、`deadline_state_hooks_ran=true`、`deadline_state_feedback_sent=true`，同时 registry 项目的日历、参与人和提醒基线仍为 true |
+| 基线验证 | 同轮继续通过同一 Feishu venv 下 `--send-card` 的 `card_sent=true`、`card_has_title=true`、`card_has_goal=true`、`card_has_initiator=true`、`card_has_risk=true`，以及 `--probe-llm` 的 `llm_probe_ok=true`、`llm_probe_status=200` |
+| 用户价值 | Hermes gateway 重启后，用户在群里继续说“把截止时间改到某天”不会只改本地摘要；PilotFlow 仍能保持截止时间、日历和提醒调度的一致闭环 |
+| 隐私处理 | 验证只记录布尔结果和脱敏状态；不写入真实 chat_id、open_id、message_id、Feishu URL、calendar event ID、token 或 app secret |
+
 ## 2026-05-05 重启后风险上报闭环
 
 | 项目 | 证据 |
