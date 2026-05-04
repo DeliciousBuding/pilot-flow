@@ -1846,6 +1846,65 @@ def test_project_entry_card_displays_known_risks():
     assert "**风险：** API 审批可能卡住" in markdown
 
 
+def test_create_project_with_initial_risks_is_registered_as_risk_project():
+    chat_id = "oc_initial_risk_status"
+
+    with _project_registry_lock:
+        _project_registry.clear()
+    with _plan_lock:
+        _pending_plans.clear()
+        _card_action_refs.clear()
+
+    with (
+        patch("tools._create_doc", return_value="https://example.invalid/doc"),
+        patch("tools._create_bitable", return_value={
+            "url": "https://example.invalid/base",
+            "app_token": "app1",
+            "table_id": "tbl1",
+            "record_id": "rec1",
+        }),
+        patch("tools._create_task", return_value="任务已创建"),
+        patch("tools._hermes_send_card", return_value="om_initial_risk"),
+        patch("tools._create_calendar_event", return_value=None),
+        patch("tools._schedule_deadline_reminder", return_value=False),
+        patch("tools._save_to_hermes_memory", return_value=True),
+    ):
+        result = json.loads(_handle_create_project_space(
+            {
+                "title": "初始风险项目",
+                "goal": "验证初始风险状态",
+                "members": [],
+                "deliverables": ["验证记录"],
+                "deadline": "2026-05-12",
+                "risks": ["API 审批可能卡住"],
+            },
+            chat_id=chat_id,
+            chat_scope="private",
+        ))
+
+    assert result["status"] == "project_space_created"
+    with _project_registry_lock:
+        assert _project_registry["初始风险项目"]["status"] == "有风险"
+    saved = _load_project_state()
+    saved_project = next(project for project in saved if project["title"] == "初始风险项目")
+    assert saved_project["status"] == "有风险"
+
+    captured = {}
+
+    def capture_card(_chat_id, card):
+        captured["card"] = card
+        return "om_risk_dashboard"
+
+    with patch("tools._hermes_send_card", side_effect=capture_card):
+        dashboard_result = _handle_query_status(
+            {"query": "看看风险项目", "filter": "risk"},
+            chat_id="oc_initial_risk_dashboard",
+        )
+
+    assert "项目看板已发送" in dashboard_result
+    assert "初始风险项目" in captured["card"]["elements"][0]["text"]["content"]
+
+
 def test_duplicate_confirmation_after_create_is_idempotent():
     chat_id = "oc_duplicate_confirmation"
     with _project_registry_lock:

@@ -3571,9 +3571,11 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
     if not artifacts:
         return tool_error("创建失败，请检查飞书应用凭证配置。")
 
+    initial_status = "有风险" if risks else "进行中"
+
     # Register in memory for query_status and update_project
     _register_project(
-        title, members, deadline, "进行中", artifacts,
+        title, members, deadline, initial_status, artifacts,
         app_token=bitable_meta.get("app_token", "") if bitable_meta else "",
         table_id=bitable_meta.get("table_id", "") if bitable_meta else "",
         record_id=bitable_meta.get("record_id", "") if bitable_meta else "",
@@ -3584,7 +3586,7 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
     # Save project pattern to Hermes memory for later history-based suggestions.
     _save_to_hermes_memory(title, goal, members, deliverables, deadline)
     _save_project_state(
-        title, goal, members, deliverables, deadline, "进行中", artifacts,
+        title, goal, members, deliverables, deadline, initial_status, artifacts,
         app_token=bitable_meta.get("app_token", "") if bitable_meta else "",
         table_id=bitable_meta.get("table_id", "") if bitable_meta else "",
         record_id=bitable_meta.get("record_id", "") if bitable_meta else "",

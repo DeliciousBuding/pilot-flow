@@ -69,6 +69,18 @@
 | WSL 模型预检 | WSL `verify_wsl_feishu_runtime.py --probe-llm` 输出脱敏通过：`llm_probe_ok=true`、`llm_probe_provider=vectorcontrol`、`llm_probe_status=200` |
 | 真实 Feishu 卡片验证 | WSL `verify_wsl_feishu_runtime.py --send-card` 成功：`card_sent=true`、`card_has_title=true`、`card_has_goal=true`、`card_has_risk=true`、`pending_plan_recovered=true`、`card_action_recovered=true`、`redaction_enabled=true` |
 
+## 2026-05-04 初始风险项目状态一致性
+
+| 项目 | 证据 |
+| --- | --- |
+| 功能硬化 | `pilotflow_create_project_space` 创建带 `risks` 的项目时，registry 和 restart-safe state 现在初始写入 `status=有风险`，而不是固定 `进行中` |
+| 后续追踪 | 新增回归验证：带初始风险创建项目后，风险看板 `filter=risk` 能立即筛出该项目，避免文档/Base/卡片都显示风险但看板和简报漏报 |
+| 自动化验证 | `C:\Users\Ding\miniforge3\python.exe -m pytest` 通过，结果 `211 passed`；`git diff --check` 通过，仅有 CRLF 提示 |
+| WSL 安装验证 | `setup.py --hermes-dir D:\Code\LarkProject\hermes-agent --hermes-home \\wsl.localhost\Ubuntu-24.04\home\ding\.hermes` 通过；插件和 skill 已同步到 WSL Hermes runtime profile |
+| WSL 模型预检 | WSL `verify_wsl_feishu_runtime.py --probe-llm` 输出脱敏通过：`llm_probe_ok=true`、`llm_probe_provider=vectorcontrol`、`llm_probe_status=200` |
+| 真实 Feishu 卡片验证 | WSL `verify_wsl_feishu_runtime.py --send-card` 成功：`card_sent=true`、`card_has_title=true`、`card_has_goal=true`、`card_has_risk=true`、`pending_plan_recovered=true`、`card_action_recovered=true`、`redaction_enabled=true` |
+| 隐私处理 | 验证只记录布尔结果和脱敏状态；不写入真实 chat_id、message_id、Feishu URL、任务 ID、confirm token、idempotency key、token 或 app secret |
+
 ## 2026-05-04 卡片输入安全与 WSL 安装复验
 
 | 项目 | 证据 |
