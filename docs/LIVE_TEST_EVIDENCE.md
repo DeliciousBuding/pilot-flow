@@ -2,6 +2,22 @@
 
 > 本文件只记录可复验结论和脱敏摘要，不提交真实群 ID、用户 open_id、应用 secret、message_id 或飞书文档链接。
 
+## 2026-05-04 完整 @Bot 自动调用端到端场景
+
+| 项目 | 证据 |
+| --- | --- |
+| 运行环境 | 受控 WSL foreground gateway，会话明确连接 Feishu WebSocket；Hermes runtime 使用 `/home/ding/.hermes` profile |
+| 模型配置 | `hermes status` 显示 `Model: mimo-v2.5-pro`、`Provider: vectorcontrol`；WSL runtime 中 OpenAI-compatible 直接探针返回 HTTP 200 |
+| 配置修复 | 旧 caveat 的 14:22 `HTTP 401 auth_unavailable` 发生在 WSL profile 仍使用旧 `gpt-5.5` 配置时；本次将 WSL profile 切到已验证可用的 `mimo-v2.5-pro` 后复测通过 |
+| 用户入口 | 通过 `lark-cli im +messages-send --as user` 在真实 Feishu 测试群发送 `@PilotFlow 创建真实端到端验证项目 ...` |
+| Agent 处理 | gateway 日志确认收到同一 @ 消息，随后 Hermes 用 `mimo-v2.5-pro` 进入 Agent 推理，无 401 认证错误 |
+| 计划卡片 | Bot 在群内发送 `执行计划` 互动卡，卡片包含成员、交付物、截止时间和确认/取消按钮，并回复 `已生成计划，请在卡片上确认。` |
+| 确认执行 | 用户在同一群发送 `确认执行` 后，gateway 日志确认再次进入 `mimo-v2.5-pro` Agent 回合并执行 PilotFlow 创建链路 |
+| 飞书产物 | 日志确认真实创建项目文档、状态 Base、两条飞书任务、日历事件，并调度 Hermes 截止提醒 |
+| 群内结果 | Bot 返回项目创建摘要和项目入口互动卡，入口卡包含文档、状态表、成员、截止时间、查看状态和标记完成动作 |
+| 已知非阻塞告警 | 文档评论 SDK builder 字段告警、任务关注者“已是协作者”告警均不阻断文档/Base/任务/日历/提醒创建；执行后模型补充响应阶段出现一次 SSL ReadError 并自动重试成功 |
+| 隐私处理 | 真实 chat_id、open_id、message_id、文档 URL、Base URL、任务 ID、calendar event ID、token 和 app secret 不写入公开仓库 |
+
 ## 2026-05-03 状态看板场景
 
 | 项目 | 证据 |
@@ -660,7 +676,7 @@
 | 工具输出 | 工具输出确认 `status=projectization_suggested`、`card_sent=true` |
 | 群聊回读 | 通过 `lark-cli im +chat-messages-list --as user` 回读真实测试群，最新消息为 `interactive` 卡片，内容只展示结构化目标、承诺、风险和行动项，没有再把整句聊天重复归类 |
 | 产品价值 | 证明 PilotFlow 可以作为飞书项目之前的群聊意图层：当聊天形成目标/承诺/风险/行动项时，先冒泡询问是否项目化，再进入现有计划确认链路 |
-| 已知边界 | 14:22 的完整 @Bot 自动调用曾暴露 Hermes 模型侧 `HTTP 401 auth_unavailable` 错误；本次验证证明 PilotFlow 执行层和飞书卡片链路可用，但完整 Agent 自动巡检仍依赖 Hermes 模型认证恢复 |
+| 已知边界 | 14:22 的完整 @Bot 自动调用曾暴露 Hermes 模型侧 `HTTP 401 auth_unavailable` 错误；2026-05-04 20:54-20:58 已用受控 WSL gateway 和 `mimo-v2.5-pro` 复测完整 @Bot → Hermes LLM → PilotFlow → 飞书产物链路通过，旧 caveat 不再作为当前阻塞 |
 | 隐私处理 | 真实 chat_id、open_id、message_id、Feishu URL、token 和 app secret 不写入公开仓库 |
 
 ## 2026-05-04 确认 token 与幂等 key 回归
