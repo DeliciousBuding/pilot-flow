@@ -151,6 +151,25 @@ def test_verify_runtime_history_suggestions_applies_without_member_leak(tmp_path
     assert sent_cards
 
 
+def test_verify_runtime_project_creation_is_sanitized(tmp_path, monkeypatch):
+    hermes_dir, _sent_cards = _install_runtime_fixture(tmp_path, monkeypatch)
+
+    result = _MODULE._verify_runtime_project_creation(hermes_dir)
+
+    assert result["project_create_gate_created"] is True
+    assert result["project_create_confirmed"] is True
+    assert result["project_create_doc_created"] is True
+    assert result["project_create_bitable_created"] is True
+    assert result["project_create_task_created"] is True
+    assert result["project_create_calendar_created"] is True
+    assert result["project_create_reminder_scheduled"] is True
+    assert result["project_create_entry_card_sent"] is True
+    assert result["project_create_state_recorded"] is True
+    assert result["project_create_memory_saved"] is True
+    assert result["project_create_trace_redacted"] is True
+    assert "example.invalid" not in json.dumps(result, ensure_ascii=False)
+
+
 def test_verify_runtime_update_task_summary_is_sanitized(tmp_path, monkeypatch):
     hermes_dir, _sent_cards = _install_runtime_fixture(tmp_path, monkeypatch)
 
@@ -345,6 +364,51 @@ def test_verifier_update_task_mode_outputs_sanitized_runtime_result(tmp_path, ca
     assert output["update_task_name_returned"] is True
     assert output["update_task_feedback_includes_summary"] is True
     assert output["update_task_artifact_recorded"] is True
+    assert "oc_real_chat_id" not in output_text
+    assert "example.invalid" not in output_text
+
+
+def test_verifier_project_creation_mode_outputs_sanitized_runtime_result(tmp_path, capsys):
+    env_file = tmp_path / ".env"
+    env_file.write_text("PILOTFLOW_TEST_CHAT_ID=oc_real_chat_id\n", encoding="utf-8")
+
+    with patch.object(_MODULE, "_verify_runtime_project_creation", return_value={
+        "project_create_gate_created": True,
+        "project_create_confirmed": True,
+        "project_create_doc_created": True,
+        "project_create_bitable_created": True,
+        "project_create_task_created": True,
+        "project_create_calendar_created": True,
+        "project_create_reminder_scheduled": True,
+        "project_create_entry_card_sent": True,
+        "project_create_state_recorded": True,
+        "project_create_memory_saved": True,
+        "project_create_trace_redacted": True,
+        "raw_chat_id": "oc_real_chat_id",
+        "raw_doc_url": "https://example.invalid/doc/1",
+    }):
+        exit_code = _MODULE.main([
+            "--hermes-dir", str(tmp_path),
+            "--env-file", str(env_file),
+            "--verify-project-creation",
+        ])
+
+    output_text = capsys.readouterr().out
+    output = json.loads(output_text)
+    assert exit_code == 0
+    assert output["mode"] == "project-creation"
+    assert output["would_send_card"] is False
+    assert output["project_create_gate_created"] is True
+    assert output["project_create_confirmed"] is True
+    assert output["project_create_doc_created"] is True
+    assert output["project_create_bitable_created"] is True
+    assert output["project_create_task_created"] is True
+    assert output["project_create_calendar_created"] is True
+    assert output["project_create_reminder_scheduled"] is True
+    assert output["project_create_entry_card_sent"] is True
+    assert output["project_create_state_recorded"] is True
+    assert output["project_create_memory_saved"] is True
+    assert output["project_create_trace_redacted"] is True
     assert "oc_real_chat_id" not in output_text
     assert "example.invalid" not in output_text
 

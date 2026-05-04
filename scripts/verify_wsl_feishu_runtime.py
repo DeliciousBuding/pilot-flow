@@ -113,6 +113,17 @@ def _sanitize_result(result: dict[str, Any]) -> dict[str, Any]:
         "history_deliverables_recovered",
         "history_pending_recovered",
         "history_card_count",
+        "project_create_gate_created",
+        "project_create_confirmed",
+        "project_create_doc_created",
+        "project_create_bitable_created",
+        "project_create_task_created",
+        "project_create_calendar_created",
+        "project_create_reminder_scheduled",
+        "project_create_entry_card_sent",
+        "project_create_state_recorded",
+        "project_create_memory_saved",
+        "project_create_trace_redacted",
         "update_task_created",
         "update_task_name_returned",
         "update_task_feedback_includes_summary",
@@ -422,6 +433,187 @@ def _verify_runtime_history_suggestions(hermes_dir: Path) -> dict[str, Any]:
         "history_deliverables_recovered": recovered_deliverables == ["活动方案", "宣传文案"],
         "history_pending_recovered": bool(recovered_plan),
         "history_card_count": len(sent_cards),
+    }
+
+
+def _verify_runtime_project_creation(hermes_dir: Path) -> dict[str, Any]:
+    """Verify installed PilotFlow can create a project space through the real gate path."""
+    sys.path.insert(0, str(hermes_dir))
+    import plugins.pilotflow.tools as runtime_tools  # pylint: disable=import-error
+    from plugins.pilotflow.tools import (  # pylint: disable=import-error
+        _handle_create_project_space,
+        _handle_generate_plan,
+        _load_project_state,
+        _pending_plans,
+        _plan_lock,
+        _project_registry,
+        _project_registry_lock,
+    )
+
+    chat_id = os.environ.get("PILOTFLOW_TEST_CHAT_ID", "")
+    original_state_path = os.environ.get("PILOTFLOW_STATE_PATH")
+    original_create_doc = runtime_tools._create_doc
+    original_create_bitable = runtime_tools._create_bitable
+    original_create_task = runtime_tools._create_task
+    original_create_calendar = runtime_tools._create_calendar_event
+    original_schedule_reminder = runtime_tools._schedule_deadline_reminder
+    original_save_memory = runtime_tools._save_to_hermes_memory
+    original_send_card = runtime_tools._hermes_send_card
+    created_docs: list[tuple[str, str, str]] = []
+    created_bitables: list[tuple[str, str, str, list[str]]] = []
+    created_tasks: list[tuple[str, str, str, str, str, list[str]]] = []
+    created_calendars: list[tuple[str, str, str]] = []
+    scheduled_reminders: list[tuple[str, str, str]] = []
+    saved_memory: list[tuple[str, str, list[str], list[str], str]] = []
+    sent_cards: list[dict[str, Any]] = []
+
+    def fake_create_doc(title: str, markdown_content: str, target_chat_id: str) -> str:
+        created_docs.append((title, markdown_content, target_chat_id))
+        return "https://example.invalid/doc/project-create"
+
+    def fake_create_bitable(
+        title: str,
+        owner: str,
+        deadline: str,
+        risks: list,
+        target_chat_id: str,
+        deliverables: list[str] | None = None,
+    ) -> dict[str, str]:
+        created_bitables.append((title, owner, deadline, list(deliverables or [])))
+        return {
+            "url": "https://example.invalid/base/project-create",
+            "app_token": "app_project_create",
+            "table_id": "tbl_project_create",
+            "record_id": "rec_project_create",
+        }
+
+    def fake_create_task(
+        summary: str,
+        description: str,
+        assignee: str,
+        deadline: str,
+        target_chat_id: str,
+        members: list[str],
+    ) -> str:
+        created_tasks.append((summary, description, assignee, deadline, target_chat_id, list(members)))
+        return f"{summary}: https://example.invalid/task/project-create"
+
+    def fake_create_calendar(title: str, goal: str, deadline: str, *_args: Any, **_kwargs: Any) -> str:
+        created_calendars.append((title, goal, deadline))
+        return f"日历事件: {deadline}"
+
+    def fake_schedule_reminder(title: str, deadline: str, target_chat_id: str) -> bool:
+        scheduled_reminders.append((title, deadline, target_chat_id))
+        return True
+
+    def fake_save_memory(title: str, goal: str, members: list, deliverables: list, deadline: str) -> bool:
+        saved_memory.append((title, goal, list(members), list(deliverables), deadline))
+        return True
+
+    def fake_send_card(_chat_id: str, card: dict[str, Any]) -> str:
+        sent_cards.append(card)
+        return f"om_project_create_{len(sent_cards)}"
+
+    with tempfile.TemporaryDirectory(prefix="pilotflow-project-create-verify-") as tmpdir:
+        os.environ["PILOTFLOW_STATE_PATH"] = str(Path(tmpdir) / "pilotflow_state.json")
+        with _plan_lock:
+            _pending_plans.clear()
+        with _project_registry_lock:
+            _project_registry.clear()
+        runtime_tools._create_doc = fake_create_doc
+        runtime_tools._create_bitable = fake_create_bitable
+        runtime_tools._create_task = fake_create_task
+        runtime_tools._create_calendar_event = fake_create_calendar
+        runtime_tools._schedule_deadline_reminder = fake_schedule_reminder
+        runtime_tools._save_to_hermes_memory = fake_save_memory
+        runtime_tools._hermes_send_card = fake_send_card
+        try:
+            plan = json.loads(_handle_generate_plan(
+                {
+                    "input_text": "创建一个运行态项目创建闭环验证项目，负责人张三，交付验收清单，截止 2026-05-20",
+                    "title": "运行态项目创建闭环项目",
+                    "goal": "验证安装后的创建项目空间闭环",
+                    "members": ["张三"],
+                    "deliverables": ["验收清单"],
+                    "deadline": "2026-05-20",
+                    "risks": ["需要确认真实资源链路"],
+                },
+                chat_id=chat_id,
+            ))
+            data = json.loads(_handle_create_project_space(
+                {"confirmation_text": "确认执行"},
+                chat_id=chat_id,
+            ))
+            state_projects = _load_project_state()
+        finally:
+            runtime_tools._create_doc = original_create_doc
+            runtime_tools._create_bitable = original_create_bitable
+            runtime_tools._create_task = original_create_task
+            runtime_tools._create_calendar_event = original_create_calendar
+            runtime_tools._schedule_deadline_reminder = original_schedule_reminder
+            runtime_tools._save_to_hermes_memory = original_save_memory
+            runtime_tools._hermes_send_card = original_send_card
+            with _plan_lock:
+                _pending_plans.clear()
+            with _project_registry_lock:
+                _project_registry.clear()
+            if original_state_path is None:
+                os.environ.pop("PILOTFLOW_STATE_PATH", None)
+            else:
+                os.environ["PILOTFLOW_STATE_PATH"] = original_state_path
+
+    flight_record_text = json.dumps(data.get("flight_record", {}), ensure_ascii=False)
+    return {
+        "project_create_gate_created": plan.get("status") == "plan_generated"
+        and bool((plan.get("confirmation") or {}).get("confirm_token")),
+        "project_create_confirmed": data.get("status") == "project_space_created"
+        and data.get("title") == "运行态项目创建闭环项目",
+        "project_create_doc_created": created_docs
+        and created_docs[0][0] == "运行态项目创建闭环项目 - 项目简报"
+        and "验证安装后的创建项目空间闭环" in created_docs[0][1],
+        "project_create_bitable_created": created_bitables == [(
+            "运行态项目创建闭环项目",
+            "张三",
+            "2026-05-20",
+            ["验收清单"],
+        )],
+        "project_create_task_created": created_tasks == [(
+            "验收清单",
+            "项目: 运行态项目创建闭环项目",
+            "张三",
+            "2026-05-20",
+            chat_id,
+            ["张三"],
+        )],
+        "project_create_calendar_created": created_calendars == [(
+            "运行态项目创建闭环项目",
+            "验证安装后的创建项目空间闭环",
+            "2026-05-20",
+        )],
+        "project_create_reminder_scheduled": scheduled_reminders == [(
+            "运行态项目创建闭环项目",
+            "2026-05-20",
+            chat_id,
+        )],
+        "project_create_entry_card_sent": bool(sent_cards) and len(sent_cards) >= 2,
+        "project_create_state_recorded": any(
+            item.get("title") == "运行态项目创建闭环项目"
+            and item.get("status") == "有风险"
+            and item.get("deliverables") == ["验收清单"]
+            for item in state_projects
+        ),
+        "project_create_memory_saved": saved_memory == [(
+            "运行态项目创建闭环项目",
+            "验证安装后的创建项目空间闭环",
+            ["张三"],
+            ["验收清单"],
+            "2026-05-20",
+        )],
+        "project_create_trace_redacted": (
+            bool((data.get("flight_record") or {}).get("redaction", {}).get("enabled"))
+            and "example.invalid" not in flight_record_text
+            and chat_id not in flight_record_text
+        ),
     }
 
 
@@ -1637,6 +1829,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--send-card", action="store_true", help="Send one real Feishu plan card.")
     parser.add_argument("--probe-llm", action="store_true", help="Probe configured OpenAI-compatible /models endpoint.")
     parser.add_argument("--verify-history", action="store_true", help="Send real cards that verify history suggestions can be applied.")
+    parser.add_argument("--verify-project-creation", action="store_true", help="Dry-run installed create-project resource orchestration.")
     parser.add_argument("--verify-update-task", action="store_true", help="Dry-run installed update_project task summary behavior.")
     parser.add_argument("--verify-archive-gate", action="store_true", help="Dry-run installed archive confirmation gate behavior.")
     parser.add_argument("--verify-followup-task", action="store_true", help="Dry-run installed card follow-up task behavior.")
@@ -1668,6 +1861,7 @@ def main(argv: list[str] | None = None) -> int:
         else "followup-task" if args.verify_followup_task
         else "archive-gate" if args.verify_archive_gate
         else "update-task" if args.verify_update_task
+        else "project-creation" if args.verify_project_creation
         else "history" if args.verify_history
         else "send-card" if args.send_card
         else "dry-run"
@@ -1687,6 +1881,8 @@ def main(argv: list[str] | None = None) -> int:
         output.update(_send_runtime_plan_card(hermes_dir))
     if args.verify_history:
         output.update(_verify_runtime_history_suggestions(hermes_dir))
+    if args.verify_project_creation:
+        output.update(_verify_runtime_project_creation(hermes_dir))
     if args.verify_update_task:
         output.update(_verify_runtime_update_task_summary(hermes_dir))
     if args.verify_archive_gate:

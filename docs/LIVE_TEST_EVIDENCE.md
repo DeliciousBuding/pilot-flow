@@ -1174,6 +1174,20 @@
 | 用户价值 | 群聊里移除项目成员属于权限收缩动作，PilotFlow 会先要求确认；确认后才更新负责人、文档/状态表流水和群反馈，降低误删协作者造成的办公风险 |
 | 隐私处理 | 证据只记录布尔结果和脱敏结论；不写入真实 chat_id、message_id、Feishu URL、用户 open_id、token 或 app secret |
 
+## 2026-05-05 项目创建空间运行态验证
+
+| 项目 | 证据 |
+| --- | --- |
+| 运行环境 | PilotFlow 已通过 `setup.py --hermes-home <wsl-hermes-home>` 同步到 WSL Hermes runtime；安装验证返回插件、技能、Hermes config 和 Feishu display 配置均 OK |
+| 本地回归 | `C:\Users\Ding\miniforge3\python.exe -m pytest` 返回 `251 passed`；`tests/test_verify_wsl_feishu_runtime.py` 返回 `32 passed`；`git diff --check` 通过 |
+| Verifier 新模式 | `verify_wsl_feishu_runtime.py --verify-project-creation` 在已安装的 WSL Hermes runtime 插件内返回 `project_create_gate_created=true`、`project_create_confirmed=true`、`project_create_doc_created=true`、`project_create_bitable_created=true`、`project_create_task_created=true`、`project_create_calendar_created=true`、`project_create_reminder_scheduled=true`、`project_create_entry_card_sent=true`、`project_create_state_recorded=true`、`project_create_memory_saved=true`、`project_create_trace_redacted=true` |
+| 端到端创建路径 | verifier 先通过生产 `pilotflow_generate_plan` 生成确认门和确认卡，再通过生产 `pilotflow_create_project_space` 消费确认门；dry-run 替换飞书资源写入函数，但保留安装态插件的编排逻辑 |
+| 飞书资源编排 | 创建路径会调用文档、Base 状态表、飞书待办、日历事件、Hermes 截止提醒、入口卡片发送和 Hermes memory 保存，并把项目写入脱敏状态文件 |
+| 风险态与留痕 | 场景带初始风险，确认创建后项目状态记录为 `有风险`，Flight Recorder 开启脱敏，不把真实 chat_id 或资源 URL 写入 verifier 结果 |
+| 基线验证 | 同轮继续通过 `--probe-llm` 的 `llm_probe_ok=true`、`llm_probe_status=200`，`--send-card` 的 `card_sent=true`、`card_has_title=true`、`card_has_goal=true`、`card_has_risk=true`，`--verify-history` 的 `history_apply_card_sent=true`，`--verify-update-task` 的 `update_task_created=true`，`--verify-archive-gate` 的 `archive_gate_required=true`，`--verify-followup-task` 的 `followup_task_created=true`，`--verify-deadline-update` 的 `deadline_update_applied=true`，`--verify-member-permissions` 的 `member_added=true`，`--verify-member-removal` 的 `member_removed=true`，`--verify-risk-cycle` 的 `risk_reported=true`，`--verify-progress-update` 的 `progress_update_applied=true`，`--verify-project-reminder` 的 `reminder_single_sent=true`，`--verify-card-status-cycle` 的 `card_status_done_applied=true`，`--verify-batch-followup-task` 的 `batch_followup_created=true`，以及 `--verify-dashboard-navigation` 的 `dashboard_filter_sent=true` |
+| 用户价值 | 这覆盖了 PilotFlow 最核心的办公闭环：群聊任务被 Agent 结构化为计划，用户确认后一次性创建项目文档、状态表、待办、日历提醒和入口卡片，并进入后续看板/追踪状态 |
+| 隐私处理 | 证据只记录布尔结果和脱敏结论；不写入真实 chat_id、message_id、Feishu URL、用户 open_id、token 或 app secret |
+
 ## 本地回归
 
 ```bash
