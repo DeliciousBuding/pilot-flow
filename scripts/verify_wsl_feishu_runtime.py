@@ -106,6 +106,14 @@ def _sanitize_result(result: dict[str, Any]) -> dict[str, Any]:
         "llm_probe_status",
         "llm_probe_error",
         "llm_probe_provider",
+        "health_check_ok",
+        "health_check_sanitized",
+        "health_has_credentials",
+        "health_has_client",
+        "health_has_chat_context",
+        "health_has_state_path_status",
+        "health_memory_flags_reported",
+        "health_card_bridge_registered",
         "history_suggestion_found",
         "history_apply_action_found",
         "history_apply_card_sent",
@@ -271,6 +279,44 @@ def _probe_llm(config: dict[str, Any]) -> dict[str, Any]:
     except Exception:
         result["llm_probe_error"] = "request_error"
     return result
+
+
+def _verify_runtime_health_check(hermes_dir: Path) -> dict[str, Any]:
+    """Verify installed PilotFlow reports sanitized runtime health."""
+    sys.path.insert(0, str(hermes_dir))
+    from plugins.pilotflow.tools import _handle_health_check  # pylint: disable=import-error
+
+    chat_id = os.environ.get("PILOTFLOW_TEST_CHAT_ID", "")
+    raw = _handle_health_check({"include_details": True}, chat_id=chat_id)
+    data = json.loads(raw)
+    checks = data.get("checks") if isinstance(data.get("checks"), dict) else {}
+    sensitive_values = [
+        value
+        for key, value in os.environ.items()
+        if key in {
+            "FEISHU_APP_ID",
+            "FEISHU_APP_SECRET",
+            "PILOTFLOW_TEST_CHAT_ID",
+            "PILOTFLOW_STATE_PATH",
+            "HERMES_HOME",
+            "OPENAI_API_KEY",
+        }
+        and value
+    ]
+    return {
+        "health_check_ok": data.get("status") in {"ok", "warning"}
+        and data.get("summary") == "PilotFlow 运行检查完成",
+        "health_check_sanitized": all(value not in raw for value in sensitive_values),
+        "health_has_credentials": checks.get("feishu_credentials") == "已配置",
+        "health_has_client": checks.get("feishu_client") == "可用",
+        "health_has_chat_context": checks.get("chat_context") == "已检测",
+        "health_has_state_path_status": checks.get("state_path") in {"已配置", "跟随 HERMES_HOME", "默认位置"},
+        "health_memory_flags_reported": (
+            checks.get("memory_write") in {"开启", "关闭"}
+            and checks.get("memory_read") in {"开启", "关闭"}
+        ),
+        "health_card_bridge_registered": checks.get("card_bridge") == "已注册",
+    }
 
 
 def _send_runtime_plan_card(hermes_dir: Path) -> dict[str, Any]:
@@ -2222,6 +2268,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--config-file", default=str(Path.home() / ".hermes" / "config.yaml"))
     parser.add_argument("--send-card", action="store_true", help="Send one real Feishu plan card.")
     parser.add_argument("--probe-llm", action="store_true", help="Probe configured OpenAI-compatible /models endpoint.")
+    parser.add_argument("--verify-health-check", action="store_true", help="Dry-run installed PilotFlow runtime health check.")
     parser.add_argument("--verify-history", action="store_true", help="Send real cards that verify history suggestions can be applied.")
     parser.add_argument("--verify-projectization-suggestion", action="store_true", help="Send real cards that verify chat signal projectization suggestion flow.")
     parser.add_argument("--verify-project-creation", action="store_true", help="Dry-run installed create-project resource orchestration.")
@@ -2262,6 +2309,7 @@ def main(argv: list[str] | None = None) -> int:
         else "update-task" if args.verify_update_task
         else "project-creation" if args.verify_project_creation
         else "projectization-suggestion" if args.verify_projectization_suggestion
+        else "health-check" if args.verify_health_check
         else "history" if args.verify_history
         else "send-card" if args.send_card
         else "dry-run"
@@ -2279,6 +2327,8 @@ def main(argv: list[str] | None = None) -> int:
     }
     if args.send_card:
         output.update(_send_runtime_plan_card(hermes_dir))
+    if args.verify_health_check:
+        output.update(_verify_runtime_health_check(hermes_dir))
     if args.verify_history:
         output.update(_verify_runtime_history_suggestions(hermes_dir))
     if args.verify_projectization_suggestion:

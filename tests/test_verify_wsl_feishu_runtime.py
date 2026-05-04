@@ -309,6 +309,36 @@ def test_verify_runtime_projectization_suggestion_is_sanitized(tmp_path, monkeyp
     assert "example.invalid" not in json.dumps(result, ensure_ascii=False)
 
 
+def test_verify_runtime_health_check_is_sanitized(tmp_path, monkeypatch):
+    hermes_dir, _sent_cards = _install_runtime_fixture(tmp_path, monkeypatch)
+    import plugins.pilotflow.tools as runtime_tools
+
+    monkeypatch.setenv("FEISHU_APP_ID", "sentinel_app_id_should_not_leak")
+    monkeypatch.setenv("FEISHU_APP_SECRET", "sentinel_secret_should_not_leak")
+    monkeypatch.setenv("PILOTFLOW_TEST_CHAT_ID", "oc_runtime_chat_should_not_leak")
+    monkeypatch.setenv("PILOTFLOW_STATE_PATH", "sentinel_state_path_should_not_leak")
+    monkeypatch.setattr(runtime_tools, "APP_ID", "sentinel_app_id_should_not_leak")
+    monkeypatch.setattr(runtime_tools, "APP_SECRET", "sentinel_secret_should_not_leak")
+    monkeypatch.setattr(runtime_tools, "_get_client", lambda: object())
+    monkeypatch.setattr(runtime_tools, "_lark_sdk_status", lambda: "已安装")
+
+    result = _MODULE._verify_runtime_health_check(hermes_dir)
+
+    assert result["health_check_ok"] is True
+    assert result["health_check_sanitized"] is True
+    assert result["health_has_credentials"] is True
+    assert result["health_has_client"] is True
+    assert result["health_has_chat_context"] is True
+    assert result["health_has_state_path_status"] is True
+    assert result["health_memory_flags_reported"] is True
+    assert result["health_card_bridge_registered"] is True
+    serialized = json.dumps(result, ensure_ascii=False)
+    assert "sentinel_app_id_should_not_leak" not in serialized
+    assert "sentinel_secret_should_not_leak" not in serialized
+    assert "oc_runtime_chat_should_not_leak" not in serialized
+    assert "sentinel_state_path_should_not_leak" not in serialized
+
+
 def test_verify_runtime_briefing_batch_reminder_is_sanitized(tmp_path, monkeypatch):
     hermes_dir, _sent_cards = _install_runtime_fixture(tmp_path, monkeypatch)
 
@@ -775,6 +805,45 @@ def test_verifier_projectization_suggestion_mode_outputs_sanitized_runtime_resul
     assert output["projectization_cards_sent"] is True
     assert "oc_real_chat_id" not in output_text
     assert "example.invalid" not in output_text
+
+
+def test_verifier_health_check_mode_outputs_sanitized_runtime_result(tmp_path, capsys):
+    env_file = tmp_path / ".env"
+    env_file.write_text("PILOTFLOW_TEST_CHAT_ID=oc_real_chat_id\n", encoding="utf-8")
+
+    with patch.object(_MODULE, "_verify_runtime_health_check", return_value={
+        "health_check_ok": True,
+        "health_check_sanitized": True,
+        "health_has_credentials": True,
+        "health_has_client": True,
+        "health_has_chat_context": True,
+        "health_has_state_path_status": True,
+        "health_memory_flags_reported": True,
+        "health_card_bridge_registered": True,
+        "raw_chat_id": "oc_real_chat_id",
+        "raw_secret": "real_secret",
+    }):
+        exit_code = _MODULE.main([
+            "--hermes-dir", str(tmp_path),
+            "--env-file", str(env_file),
+            "--verify-health-check",
+        ])
+
+    output_text = capsys.readouterr().out
+    output = json.loads(output_text)
+    assert exit_code == 0
+    assert output["mode"] == "health-check"
+    assert output["would_send_card"] is False
+    assert output["health_check_ok"] is True
+    assert output["health_check_sanitized"] is True
+    assert output["health_has_credentials"] is True
+    assert output["health_has_client"] is True
+    assert output["health_has_chat_context"] is True
+    assert output["health_has_state_path_status"] is True
+    assert output["health_memory_flags_reported"] is True
+    assert output["health_card_bridge_registered"] is True
+    assert "oc_real_chat_id" not in output_text
+    assert "real_secret" not in output_text
 
 
 def test_verifier_briefing_batch_reminder_mode_outputs_sanitized_runtime_result(tmp_path, capsys):

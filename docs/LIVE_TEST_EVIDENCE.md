@@ -1231,6 +1231,19 @@
 | 用户价值 | PilotFlow 不只是在用户明确说“创建项目”后执行资源创建，也能在群聊已经出现目标、承诺、风险和行动项时先冒泡项目化建议，再进入确认式项目启动流程 |
 | 隐私处理 | 证据只记录布尔结果和脱敏结论；不写入真实 chat_id、message_id、Feishu URL、用户 open_id、token 或 app secret |
 
+## 2026-05-05 运行健康检查运行态验证
+
+| 项目 | 证据 |
+| --- | --- |
+| 运行环境 | PilotFlow 已通过 `setup.py --hermes-home <wsl-hermes-home>` 同步到 WSL Hermes runtime；安装验证返回插件、技能、Hermes config 和 Feishu display 配置均 OK |
+| 本地回归 | `C:\Users\Ding\miniforge3\python.exe -m pytest` 返回 `261 passed`；`tests/test_verify_wsl_feishu_runtime.py` 及 health 工具定向测试返回 `41 passed`；`git diff --check` 通过 |
+| Verifier 新模式 | `verify_wsl_feishu_runtime.py --verify-health-check` 在已安装的 WSL Hermes runtime 插件内返回 `health_check_ok=true`、`health_check_sanitized=true`、`health_has_credentials=true`、`health_has_client=true`、`health_has_chat_context=true`、`health_has_state_path_status=true`、`health_memory_flags_reported=true`、`health_card_bridge_registered=true` |
+| 安装态诊断 | verifier 直接调用安装态 `pilotflow_health_check`，确认 Feishu 凭据、Feishu client、chat 上下文、状态路径、memory 开关和 `/card` 桥接注册状态都可被工具报告 |
+| 脱敏边界 | health 结果只输出状态枚举和布尔结论，不暴露 app id、secret、chat_id、token、本地绝对路径或 message_id |
+| 基线验证 | 同轮继续通过 `--probe-llm` 的 `llm_probe_ok=true`、`llm_probe_status=200`，`--verify-projectization-suggestion` 的 `projectization_suggestion_sent=true`，以及 `--verify-card-command-bridge` 的 `card_command_bridge_executed=true` |
+| 用户价值 | 安装、演示或故障排查时，用户可以先让 PilotFlow 自检当前 Hermes/Feishu 运行环境，减少靠猜配置、猜日志定位问题 |
+| 隐私处理 | 证据只记录布尔结果和脱敏结论；不写入真实 chat_id、message_id、Feishu URL、用户 open_id、token 或 app secret |
+
 ## 本地回归
 
 ```bash
@@ -1240,7 +1253,7 @@ C:\Users\Ding\miniforge3\python.exe -m pytest tests\test_tools.py tests\test_set
 结果：
 
 ```text
-259 passed
+261 passed
 ```
 
 ## 当前证据边界
