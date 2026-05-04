@@ -8,6 +8,7 @@ import os
 import sys
 import time
 import threading
+import subprocess
 import datetime as dt
 from unittest.mock import patch
 import pytest
@@ -829,6 +830,56 @@ def test_idempotency_results_concurrent_persist_do_not_lose_keys(tmp_path):
     payload = json.loads(state_path.read_text(encoding="utf-8"))
     idempotency = payload.get("idempotency", {})
     assert set(idempotency) == {f"pik_concurrent_{index}" for index in range(20)}
+
+
+def test_project_state_multiprocess_saves_do_not_lose_updates(tmp_path):
+    state_path = tmp_path / "pilotflow-projects.json"
+    plugin_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "plugins", "pilotflow"))
+    worker_code = r"""
+import os
+import sys
+import types
+
+plugin_path, state_path, index = sys.argv[1], sys.argv[2], int(sys.argv[3])
+sys.path.insert(0, plugin_path)
+mock_registry = types.ModuleType("tools.registry")
+mock_registry.registry = types.SimpleNamespace(dispatch=lambda name, args, **kwargs: "{\"ok\": true}")
+mock_registry.tool_error = lambda msg: "{\"error\": %r}" % msg
+mock_registry.tool_result = lambda msg: msg if isinstance(msg, str) else "{}"
+sys.modules["tools.registry"] = mock_registry
+os.environ["PILOTFLOW_STATE_PATH"] = state_path
+from tools import _save_project_state
+
+ok = _save_project_state(
+    f"多进程项目{index}",
+    "验证多进程保存",
+    [],
+    [f"记录{index}"],
+    "2026-05-20",
+    "进行中",
+    artifacts=[f"文档: https://example.invalid/proc-{index}"],
+)
+raise SystemExit(0 if ok else 1)
+"""
+
+    procs = [
+        subprocess.Popen(
+            [sys.executable, "-c", worker_code, plugin_path, str(state_path), str(index)],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        for index in range(12)
+    ]
+    for proc in procs:
+        stdout, stderr = proc.communicate(timeout=10)
+        assert proc.returncode == 0, stderr or stdout
+
+    payload = json.loads(state_path.read_text(encoding="utf-8"))
+    refs_path = tmp_path / "pilotflow_project_refs.json"
+    refs = json.loads(refs_path.read_text(encoding="utf-8"))
+    assert {project["title"] for project in payload.get("projects", [])} == {f"多进程项目{index}" for index in range(12)}
+    assert set(refs) == {f"多进程项目{index}" for index in range(12)}
 
 
 def test_project_state_roundtrip_keeps_sanitized_recent_updates(tmp_path):

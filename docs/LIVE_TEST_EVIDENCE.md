@@ -97,7 +97,7 @@
 | 并发硬化 | `_save_project_state` 改为进程内锁 + `.lock` 文件保护的 read-modify-write，避免多个卡片动作、多线程或多 worker 并发保存项目时互相覆盖公共状态列表 |
 | 私有引用硬化 | `pilotflow_project_refs.json` 与公共状态共用同一个 lock，并在 `_save_project_state` 同一锁窗口内更新，避免重启后公共项目存在但文档/Base/任务链接引用丢失 |
 | 恢复状态硬化 | `card_actions`、`pending_plans` 和 `idempotency` 持久化改为同一 lock 内 read-modify-write，避免并发卡片创建、多群同时生成计划或重复确认缓存写入时丢失重启恢复入口 |
-| 自动化验证 | 新增旧格式升级、20 线程公共状态保存、20 线程私有 refs 保存、20 线程卡片 action refs、20 线程 pending plans、20 线程 idempotency 回归测试；`C:\Users\Ding\miniforge3\python.exe -m pytest` 通过，结果 `201 passed` |
+| 自动化验证 | 新增旧格式升级、20 线程公共状态保存、20 线程私有 refs 保存、20 线程卡片 action refs、20 线程 pending plans、20 线程 idempotency、12 进程公共状态 + 私有 refs 保存回归测试；`C:\Users\Ding\miniforge3\python.exe -m pytest` 通过，结果 `202 passed` |
 | WSL 安装验证 | `setup.py --hermes-dir D:\Code\LarkProject\hermes-agent --hermes-home \\wsl.localhost\Ubuntu-24.04\home\ding\.hermes` 通过；插件文件已同步到 WSL Hermes runtime |
 | WSL runtime dry-run | `verify_wsl_feishu_runtime.py --env-file /home/ding/.hermes/.env --config-file /home/ding/.hermes/config.yaml` 输出脱敏通过：`config_model=mimo-v2.5-pro`、`config_provider=vectorcontrol`、`config_has_feishu_gateway=true` |
 | 真实 Feishu 卡片验证 | WSL `verify_wsl_feishu_runtime.py --send-card` 成功：`card_sent=true`、`pending_plan_recovered=true`、`card_action_recovered=true`、`redaction_enabled=true` |
