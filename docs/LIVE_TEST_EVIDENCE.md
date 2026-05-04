@@ -12,6 +12,7 @@
 | 用户入口 | 通过 `lark-cli im +messages-send --as user` 在真实 Feishu 测试群发送 `@PilotFlow 创建真实端到端验证项目 ...` |
 | Agent 处理 | gateway 日志确认收到同一 @ 消息，随后 Hermes 用 `mimo-v2.5-pro` 进入 Agent 推理，无 401 认证错误 |
 | 计划卡片 | Bot 在群内发送 `执行计划` 互动卡，卡片包含成员、交付物、截止时间和确认/取消按钮，并回复 `已生成计划，请在卡片上确认。` |
+| 卡片内容验证 | 后续 WSL verifier 同步覆盖 `card_has_title=true`、`card_has_goal=true`、`card_has_risk=true`，证明真实发送的计划确认卡不仅发出，而且标题、目标和风险字段完整 |
 | 确认执行 | 用户在同一群发送 `确认执行` 后，gateway 日志确认再次进入 `mimo-v2.5-pro` Agent 回合并执行 PilotFlow 创建链路 |
 | 飞书产物 | 日志确认真实创建项目文档、状态 Base、两条飞书任务、日历事件，并调度 Hermes 截止提醒 |
 | 群内结果 | Bot 返回项目创建摘要和项目入口互动卡，入口卡包含文档、状态表、成员、截止时间、查看状态和标记完成动作 |
