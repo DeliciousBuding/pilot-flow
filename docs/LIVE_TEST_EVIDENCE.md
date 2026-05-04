@@ -1068,6 +1068,19 @@
 | 用户价值 | 项目截止时间变更不只是改字段，而是同步到飞书日历、项目成员邀请、Hermes 截止提醒和群通知，补强“后续追踪”的真实办公闭环 |
 | 隐私处理 | 证据只记录布尔结果和脱敏结论；不写入真实 chat_id、message_id、Feishu URL、用户 open_id、token 或 app secret |
 
+## 2026-05-05 新增成员权限联动运行态验证
+
+| 项目 | 证据 |
+| --- | --- |
+| 运行环境 | PilotFlow 已通过 `setup.py --hermes-home <wsl-hermes-home>` 同步到 WSL Hermes runtime；安装验证返回插件、技能、Hermes config 和 Feishu display 配置均 OK |
+| 本地回归 | `C:\Users\Ding\miniforge3\python.exe -m pytest` 返回 `235 passed`；`tests/test_verify_wsl_feishu_runtime.py` 返回 `16 passed`；`git diff --check` 通过 |
+| Verifier 新模式 | `verify_wsl_feishu_runtime.py --verify-member-permissions` 在已安装的 WSL Hermes runtime 插件内返回 `member_added=true`、`member_mention_cleaned=true`、`member_permissions_refreshed=true`、`member_bitable_owner_synced=true`、`member_feedback_sent=true` |
+| 飞书联动路径 | verifier 通过生产 `pilotflow_update_project` 的 `add_member` 分支执行，dry-run 替换权限刷新、Base 更新和群发送，证明安装态插件会刷新项目文档/状态表权限并同步负责人字段 |
+| @ 提及清理 | 运行态输入使用 Feishu `<at user_id=...>王五</at>` 形式，输出确认工具结果和群反馈只保留纯姓名/可展示 @，不把原始 open_id markup 写入结果 |
+| 基线验证 | 同轮继续通过 `--probe-llm` 的 `llm_probe_ok=true`、`llm_probe_status=200`，`--send-card` 的 `card_sent=true`、`card_has_title=true`、`card_has_goal=true`、`card_has_risk=true`，`--verify-history` 的 `history_apply_card_sent=true`，`--verify-update-task` 的 `update_task_created=true`，`--verify-archive-gate` 的 `archive_gate_required=true`，`--verify-followup-task` 的 `followup_task_created=true`，以及 `--verify-deadline-update` 的 `deadline_update_applied=true` |
+| 用户价值 | 群聊里新增协作者不只是改成员列表，而是同步资源权限、状态表负责人和群反馈，降低项目资源对新增成员不可见的真实办公风险 |
+| 隐私处理 | 证据只记录布尔结果和脱敏结论；不写入真实 chat_id、message_id、Feishu URL、用户 open_id、token 或 app secret |
+
 ## 本地回归
 
 ```bash
