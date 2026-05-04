@@ -156,6 +156,13 @@ def _sanitize_result(result: dict[str, Any]) -> dict[str, Any]:
         "reminder_batch_filtered",
         "reminder_batch_history_recorded",
         "reminder_feedback_sanitized",
+        "card_status_done_applied",
+        "card_status_reopen_applied",
+        "card_status_bitable_synced",
+        "card_status_doc_recorded",
+        "card_status_state_recorded",
+        "card_status_feedback_sent",
+        "card_status_used_opaque_refs",
         "error",
     }
     return {key: result[key] for key in allowed if key in result}
@@ -1109,6 +1116,126 @@ def _verify_runtime_project_reminder(hermes_dir: Path) -> dict[str, Any]:
     }
 
 
+def _verify_runtime_card_status_cycle(hermes_dir: Path) -> dict[str, Any]:
+    """Verify installed PilotFlow can complete and reopen projects from card actions."""
+    sys.path.insert(0, str(hermes_dir))
+    import plugins.pilotflow.tools as runtime_tools  # pylint: disable=import-error
+    from plugins.pilotflow.tools import (  # pylint: disable=import-error
+        _create_card_action_ref,
+        _handle_card_action,
+        _load_project_state,
+        _project_registry,
+        _project_registry_lock,
+        _register_project,
+    )
+
+    chat_id = os.environ.get("PILOTFLOW_TEST_CHAT_ID", "")
+    original_state_path = os.environ.get("PILOTFLOW_STATE_PATH")
+    original_append_doc = runtime_tools._append_project_doc_update
+    original_append_history = runtime_tools._append_bitable_update_record
+    original_update_bitable = runtime_tools._update_bitable_record
+    original_send = runtime_tools._hermes_send
+    bitable_updates: list[dict[str, Any]] = []
+    doc_labels: list[tuple[str, str, str]] = []
+    history_labels: list[tuple[str, str, str, str]] = []
+    sent_messages: list[str] = []
+
+    def fake_update_bitable(_app_token: str, _table_id: str, _record_id: str, fields: dict) -> bool:
+        bitable_updates.append(dict(fields))
+        return True
+
+    def fake_append_doc(title: str, _project: dict, label: str, value: str, *_args: Any, **_kwargs: Any) -> bool:
+        doc_labels.append((title, label, value))
+        return True
+
+    def fake_append_history(app_token: str, table_id: str, label: str, value: str, *_args: Any, **_kwargs: Any) -> bool:
+        history_labels.append((app_token, table_id, label, value))
+        return True
+
+    def fake_send(_chat_id: str, text: str) -> bool:
+        sent_messages.append(text)
+        return True
+
+    with tempfile.TemporaryDirectory(prefix="pilotflow-card-status-verify-") as tmpdir:
+        os.environ["PILOTFLOW_STATE_PATH"] = str(Path(tmpdir) / "pilotflow_state.json")
+        with _project_registry_lock:
+            _project_registry.clear()
+        runtime_tools._append_project_doc_update = fake_append_doc
+        runtime_tools._append_bitable_update_record = fake_append_history
+        runtime_tools._update_bitable_record = fake_update_bitable
+        runtime_tools._hermes_send = fake_send
+        try:
+            _register_project(
+                "运行态卡片状态项目",
+                ["张三"],
+                "2026-05-30",
+                "进行中",
+                ["文档: https://example.invalid/doc/card-status"],
+                app_token="app_card_status",
+                table_id="tbl_card_status",
+                record_id="rec_card_status",
+                goal="验证安装后的卡片状态闭环",
+                deliverables=["初始验收"],
+            )
+            done_action_id = _create_card_action_ref(chat_id, "mark_project_done", {"title": "运行态卡片状态项目"})
+            done = json.loads(_handle_card_action(
+                {"action_value": json.dumps({"pilotflow_action_id": done_action_id}, ensure_ascii=False)},
+                chat_id=chat_id,
+            ))
+            with _project_registry_lock:
+                done_status = _project_registry["运行态卡片状态项目"].get("status")
+
+            reopen_action_id = _create_card_action_ref(chat_id, "reopen_project", {"title": "运行态卡片状态项目"})
+            reopened = json.loads(_handle_card_action(
+                {"action_value": json.dumps({"pilotflow_action_id": reopen_action_id}, ensure_ascii=False)},
+                chat_id=chat_id,
+            ))
+            with _project_registry_lock:
+                reopened_status = _project_registry["运行态卡片状态项目"].get("status")
+            state_projects = _load_project_state()
+        finally:
+            runtime_tools._append_project_doc_update = original_append_doc
+            runtime_tools._append_bitable_update_record = original_append_history
+            runtime_tools._update_bitable_record = original_update_bitable
+            runtime_tools._hermes_send = original_send
+            with _project_registry_lock:
+                _project_registry.clear()
+            if original_state_path is None:
+                os.environ.pop("PILOTFLOW_STATE_PATH", None)
+            else:
+                os.environ["PILOTFLOW_STATE_PATH"] = original_state_path
+
+    state_updates: list[dict[str, Any]] = []
+    for item in state_projects:
+        if item.get("title") == "运行态卡片状态项目":
+            state_updates = item.get("updates", [])
+            break
+    feedback_text = "\n".join(sent_messages)
+    return {
+        "card_status_done_applied": done.get("status") == "project_marked_done" and done_status == "已完成",
+        "card_status_reopen_applied": reopened.get("status") == "project_reopened" and reopened_status == "进行中",
+        "card_status_bitable_synced": {"状态": "已完成"} in bitable_updates and {"状态": "进行中"} in bitable_updates,
+        "card_status_doc_recorded": (
+            ("运行态卡片状态项目", "状态", "已完成") in doc_labels
+            and ("运行态卡片状态项目", "状态", "进行中") in doc_labels
+            and ("app_card_status", "tbl_card_status", "状态", "已完成") in history_labels
+            and ("app_card_status", "tbl_card_status", "状态", "进行中") in history_labels
+        ),
+        "card_status_state_recorded": any(
+            item.get("action") == "状态" and item.get("value") == "进行中"
+            for item in state_updates
+            if isinstance(item, dict)
+        ),
+        "card_status_feedback_sent": (
+            "已标记为完成" in feedback_text
+            and "已重新打开" in feedback_text
+            and "状态表已同步" in feedback_text
+            and "项目文档已更新" in feedback_text
+        ),
+        "card_status_used_opaque_refs": bool(done_action_id and reopen_action_id),
+    }
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Verify PilotFlow WSL Feishu runtime.")
     parser.add_argument("--hermes-dir", required=True, help="Hermes runtime directory.")
@@ -1125,6 +1252,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--verify-risk-cycle", action="store_true", help="Dry-run installed risk report/resolve behavior.")
     parser.add_argument("--verify-progress-update", action="store_true", help="Dry-run installed progress recording behavior.")
     parser.add_argument("--verify-project-reminder", action="store_true", help="Dry-run installed single/batch project reminder behavior.")
+    parser.add_argument("--verify-card-status-cycle", action="store_true", help="Dry-run installed card complete/reopen behavior.")
     args = parser.parse_args(argv)
 
     hermes_dir = Path(args.hermes_dir).resolve()
@@ -1132,7 +1260,8 @@ def main(argv: list[str] | None = None) -> int:
     config_result = _read_runtime_config(Path(args.config_file))
     import_result = _check_imports(hermes_dir)
     mode = (
-        "project-reminder" if args.verify_project_reminder
+        "card-status-cycle" if args.verify_card_status_cycle
+        else "project-reminder" if args.verify_project_reminder
         else "progress-update" if args.verify_progress_update
         else "risk-cycle" if args.verify_risk_cycle
         else "member-permissions" if args.verify_member_permissions
@@ -1175,6 +1304,8 @@ def main(argv: list[str] | None = None) -> int:
         output.update(_verify_runtime_progress_update(hermes_dir))
     if args.verify_project_reminder:
         output.update(_verify_runtime_project_reminder(hermes_dir))
+    if args.verify_card_status_cycle:
+        output.update(_verify_runtime_card_status_cycle(hermes_dir))
     if args.probe_llm:
         output.update(_probe_llm(config_result))
     print(json.dumps(_sanitize_result(output), ensure_ascii=False, sort_keys=True))

@@ -258,6 +258,21 @@ def test_verify_runtime_project_reminder_is_sanitized(tmp_path, monkeypatch):
     assert "example.invalid" not in json.dumps(result, ensure_ascii=False)
 
 
+def test_verify_runtime_card_status_cycle_is_sanitized(tmp_path, monkeypatch):
+    hermes_dir, _sent_cards = _install_runtime_fixture(tmp_path, monkeypatch)
+
+    result = _MODULE._verify_runtime_card_status_cycle(hermes_dir)
+
+    assert result["card_status_done_applied"] is True
+    assert result["card_status_reopen_applied"] is True
+    assert result["card_status_bitable_synced"] is True
+    assert result["card_status_doc_recorded"] is True
+    assert result["card_status_state_recorded"] is True
+    assert result["card_status_feedback_sent"] is True
+    assert result["card_status_used_opaque_refs"] is True
+    assert "example.invalid" not in json.dumps(result, ensure_ascii=False)
+
+
 def test_verifier_update_task_mode_outputs_sanitized_runtime_result(tmp_path, capsys):
     env_file = tmp_path / ".env"
     env_file.write_text("PILOTFLOW_TEST_CHAT_ID=oc_real_chat_id\n", encoding="utf-8")
@@ -523,6 +538,43 @@ def test_verifier_project_reminder_mode_outputs_sanitized_runtime_result(tmp_pat
     assert output["reminder_batch_filtered"] is True
     assert output["reminder_batch_history_recorded"] is True
     assert output["reminder_feedback_sanitized"] is True
+    assert "oc_real_chat_id" not in output_text
+    assert "example.invalid" not in output_text
+
+
+def test_verifier_card_status_cycle_mode_outputs_sanitized_runtime_result(tmp_path, capsys):
+    env_file = tmp_path / ".env"
+    env_file.write_text("PILOTFLOW_TEST_CHAT_ID=oc_real_chat_id\n", encoding="utf-8")
+
+    with patch.object(_MODULE, "_verify_runtime_card_status_cycle", return_value={
+        "card_status_done_applied": True,
+        "card_status_reopen_applied": True,
+        "card_status_bitable_synced": True,
+        "card_status_doc_recorded": True,
+        "card_status_state_recorded": True,
+        "card_status_feedback_sent": True,
+        "card_status_used_opaque_refs": True,
+        "raw_chat_id": "oc_real_chat_id",
+        "raw_doc_url": "https://example.invalid/doc/1",
+    }):
+        exit_code = _MODULE.main([
+            "--hermes-dir", str(tmp_path),
+            "--env-file", str(env_file),
+            "--verify-card-status-cycle",
+        ])
+
+    output_text = capsys.readouterr().out
+    output = json.loads(output_text)
+    assert exit_code == 0
+    assert output["mode"] == "card-status-cycle"
+    assert output["would_send_card"] is False
+    assert output["card_status_done_applied"] is True
+    assert output["card_status_reopen_applied"] is True
+    assert output["card_status_bitable_synced"] is True
+    assert output["card_status_doc_recorded"] is True
+    assert output["card_status_state_recorded"] is True
+    assert output["card_status_feedback_sent"] is True
+    assert output["card_status_used_opaque_refs"] is True
     assert "oc_real_chat_id" not in output_text
     assert "example.invalid" not in output_text
 

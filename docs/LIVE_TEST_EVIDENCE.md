@@ -1120,6 +1120,19 @@
 | 用户价值 | 用户在群里要求催办项目时，PilotFlow 能直接发送中文群提醒并保留可追踪流水；当 Agent 明确传入筛选条件时，也能批量催办逾期项目，补齐“发现逾期 → 催办 → 留痕”的办公闭环 |
 | 隐私处理 | 证据只记录布尔结果和脱敏结论；不写入真实 chat_id、message_id、Feishu URL、用户 open_id、token 或 app secret |
 
+## 2026-05-05 卡片状态闭环运行态验证
+
+| 项目 | 证据 |
+| --- | --- |
+| 运行环境 | PilotFlow 已通过 `setup.py --hermes-home <wsl-hermes-home>` 同步到 WSL Hermes runtime；安装验证返回插件、技能、Hermes config 和 Feishu display 配置均 OK |
+| 本地回归 | `C:\Users\Ding\miniforge3\python.exe -m pytest` 返回 `243 passed`；`tests/test_verify_wsl_feishu_runtime.py` 返回 `24 passed`；`git diff --check` 通过 |
+| Verifier 新模式 | `verify_wsl_feishu_runtime.py --verify-card-status-cycle` 在已安装的 WSL Hermes runtime 插件内返回 `card_status_done_applied=true`、`card_status_reopen_applied=true`、`card_status_bitable_synced=true`、`card_status_doc_recorded=true`、`card_status_state_recorded=true`、`card_status_feedback_sent=true`、`card_status_used_opaque_refs=true` |
+| 卡片动作路径 | verifier 使用生产 `_create_card_action_ref` 生成 opaque action，再通过 `_handle_card_action` 执行 `mark_project_done` 和 `reopen_project`，覆盖“项目卡片按钮 → 状态变更 → 群反馈”的真实插件路径 |
+| 状态同步 | 完成和重开都会同步状态表 `状态` 字段、追加项目文档与 Base 流水，并把最新状态写入脱敏状态文件，保证重启后看板仍能回读 |
+| 基线验证 | 同轮继续通过 `--probe-llm` 的 `llm_probe_ok=true`、`llm_probe_status=200`，`--send-card` 的 `card_sent=true`、`card_has_title=true`、`card_has_goal=true`、`card_has_risk=true`，`--verify-history` 的 `history_apply_card_sent=true`，`--verify-update-task` 的 `update_task_created=true`，`--verify-archive-gate` 的 `archive_gate_required=true`，`--verify-followup-task` 的 `followup_task_created=true`，`--verify-deadline-update` 的 `deadline_update_applied=true`，`--verify-member-permissions` 的 `member_added=true`，`--verify-risk-cycle` 的 `risk_reported=true`，`--verify-progress-update` 的 `progress_update_applied=true`，以及 `--verify-project-reminder` 的 `reminder_single_sent=true` |
+| 用户价值 | 用户不需要重新描述项目，只要点击卡片即可完成或重新打开项目；PilotFlow 会同步群反馈、状态表、文档流水和重启状态，补齐项目生命周期的关键交互闭环 |
+| 隐私处理 | 证据只记录布尔结果和脱敏结论；不写入真实 chat_id、message_id、Feishu URL、用户 open_id、token 或 app secret |
+
 ## 本地回归
 
 ```bash
