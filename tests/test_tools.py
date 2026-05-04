@@ -6206,6 +6206,34 @@ def test_project_status_action_sends_interactive_detail_card():
     assert "pilotflow_chat_id" not in actions[0]["actions"][0]["value"]
 
 
+def test_project_detail_card_displays_deliverable_assignees():
+    with _project_registry_lock:
+        _project_registry.clear()
+    with _plan_lock:
+        _card_action_refs.clear()
+    _register_project(
+        "详情分工项目", ["张三", "李四"], "2026-05-20", "进行中", [],
+        goal="验证详情分工",
+        deliverables=["整理上线清单", "同步审批进度"],
+        deliverable_assignees={"整理上线清单": "李四", "同步审批进度": "张三"},
+    )
+    captured = {}
+    action_value = _opaque_card_action_value("oc_detail_assignees", "project_status", {"title": "详情分工项目"})
+
+    def capture_card(chat_id, card):
+        captured["card"] = card
+        return "om_detail_assignees"
+
+    with patch("tools._hermes_send_card", side_effect=capture_card):
+        result = json.loads(_handle_card_action({"action_value": action_value}, chat_id="oc_detail_assignees"))
+
+    assert result["status"] == "project_status_sent"
+    body = captured["card"]["elements"][0]["content"]
+    assert "**负责人：** 整理上线清单 → 李四；同步审批进度 → 张三" in body
+    assert "open_id" not in body
+    assert "pilotflow_chat_id" not in json.dumps(captured["card"], ensure_ascii=False)
+
+
 def test_project_detail_card_includes_registry_resource_links():
     with _project_registry_lock:
         _project_registry.clear()

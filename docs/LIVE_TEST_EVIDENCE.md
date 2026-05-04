@@ -1366,6 +1366,19 @@
 | 用户价值 | 群里发现风险项目后，用户不必先切换到简报或批量催办入口；在项目详情卡即可直接催办负责人、创建跟进待办或解除风险，补齐风险发现后的即时推进闭环 |
 | 隐私处理 | 证据只记录布尔结果和脱敏结论；不写入真实 chat_id、message_id、Feishu URL、用户 open_id、token 或 app secret |
 
+## 2026-05-05 项目详情卡分工可见性运行态验证
+
+| 项目 | 证据 |
+| --- | --- |
+| 运行环境 | PilotFlow 已通过 `setup.py --hermes-home <wsl-hermes-home>` 同步到 WSL Hermes runtime；安装验证返回插件、技能、Hermes config 和 Feishu display 配置均 OK |
+| 本地回归 | `C:\Users\Ding\miniforge3\python.exe -m pytest` 返回 `284 passed`；`tests/test_verify_wsl_feishu_runtime.py` 返回 `45 passed`；`git diff --check` 通过，仅有 CRLF 提示 |
+| 功能硬化 | 项目详情卡现在展示结构化交付物负责人映射，例如 `验收清单 → 李四；上线演练 → 张三`；该字段来自创建计划/registry 中已清洗的 `deliverable_assignees`，不从详情查询文本重新推断 |
+| Verifier 新字段 | `verify_wsl_feishu_runtime.py --verify-project-creation` 在已安装的 WSL Hermes runtime 插件内返回 `project_create_detail_assignees_shown=true`，并保留 `project_create_structured_assignees_used=true`、`project_create_memory_assignees_saved=true`、`project_create_entry_card_sent=true` |
+| 飞书卡片路径 | verifier 走生产 `pilotflow_generate_plan` → `pilotflow_create_project_space` → `_create_card_action_ref(project_status)` → `_handle_card_action`，覆盖创建项目后再打开详情卡的真实插件路径 |
+| 基线验证 | 同轮继续通过同一 Feishu venv 下 `--send-card` 的 `card_sent=true`、`card_has_title=true`、`card_has_goal=true`、`card_has_initiator=true`、`card_has_risk=true`，以及 `--probe-llm` 的 `llm_probe_ok=true`、`llm_probe_status=200` |
+| 用户价值 | 项目创建后，群成员查看项目详情时能直接看到每个交付物的负责人安排，不需要回翻确认卡或项目文档，后续催办、跟进待办和风险处理更可执行 |
+| 隐私处理 | 证据只记录布尔结果和脱敏结论；不写入真实 chat_id、message_id、Feishu URL、用户 open_id、token 或 app secret |
+
 ## 本地回归
 
 ```bash

@@ -575,7 +575,15 @@ def _build_project_detail_card(chat_id: str, title: str, project: dict) -> tuple
     member_text = "、".join(project.get("members", [])) or "待确认"
     initiator_text = _clean_initiator_name(project.get("initiator"))
     initiator_line = f"**发起人：** {initiator_text}\n" if initiator_text else ""
-    deliverable_text = "、".join(project.get("deliverables", [])) or "待确认"
+    deliverables = list(project.get("deliverables", []))
+    deliverable_text = "、".join(deliverables) or "待确认"
+    assignees = _clean_deliverable_assignees(
+        project.get("deliverable_assignees"),
+        deliverables,
+        list(project.get("members", [])),
+    )
+    assignee_items = [f"{deliverable} → {assignee}" for deliverable, assignee in assignees.items()]
+    assignee_line = f"\n**负责人：** {'；'.join(assignee_items)}" if assignee_items else ""
     deadline = project.get("deadline") or "待确认"
     countdown = _deadline_countdown(deadline)
     deadline_line = deadline + (f"（{countdown}）" if countdown else "")
@@ -653,6 +661,7 @@ def _build_project_detail_card(chat_id: str, title: str, project: dict) -> tuple
                     f"**成员：** {member_text}\n"
                     f"**交付物：** {deliverable_text}\n"
                     f"**截止：** {deadline_line}"
+                    f"{assignee_line}"
                     f"{update_text}"
                     f"{resource_text}"
                 ),

@@ -152,6 +152,7 @@ def _sanitize_result(result: dict[str, Any]) -> dict[str, Any]:
         "project_create_structured_assignees_used",
         "project_create_schema_assignees_exposed",
         "project_create_idempotency_includes_assignees",
+        "project_create_detail_assignees_shown",
         "project_create_memory_assignees_saved",
         "project_create_calendar_created",
         "project_create_reminder_scheduled",
@@ -671,6 +672,9 @@ def _verify_runtime_project_creation(hermes_dir: Path) -> dict[str, Any]:
     sys.path.insert(0, str(hermes_dir))
     import plugins.pilotflow.tools as runtime_tools  # pylint: disable=import-error
     from plugins.pilotflow.tools import (  # pylint: disable=import-error
+        _card_action_refs,
+        _create_card_action_ref,
+        _handle_card_action,
         _handle_create_project_space,
         _handle_generate_plan,
         _load_project_state,
@@ -762,6 +766,7 @@ def _verify_runtime_project_creation(hermes_dir: Path) -> dict[str, Any]:
         os.environ["PILOTFLOW_STATE_PATH"] = str(Path(tmpdir) / "pilotflow_state.json")
         with _plan_lock:
             _pending_plans.clear()
+            _card_action_refs.clear()
         with _project_registry_lock:
             _project_registry.clear()
         runtime_tools._create_doc = fake_create_doc
@@ -789,6 +794,15 @@ def _verify_runtime_project_creation(hermes_dir: Path) -> dict[str, Any]:
                 {"confirmation_text": "确认执行"},
                 chat_id=chat_id,
             ))
+            detail_action_id = _create_card_action_ref(
+                chat_id,
+                "project_status",
+                {"title": "运行态项目创建闭环项目"},
+            )
+            detail = json.loads(_handle_card_action(
+                {"action_value": json.dumps({"pilotflow_action_id": detail_action_id}, ensure_ascii=False)},
+                chat_id=chat_id,
+            ))
             state_projects = _load_project_state()
         finally:
             runtime_tools._create_doc = original_create_doc
@@ -800,6 +814,7 @@ def _verify_runtime_project_creation(hermes_dir: Path) -> dict[str, Any]:
             runtime_tools._hermes_send_card = original_send_card
             with _plan_lock:
                 _pending_plans.clear()
+                _card_action_refs.clear()
             with _project_registry_lock:
                 _project_registry.clear()
             if original_state_path is None:
@@ -811,6 +826,9 @@ def _verify_runtime_project_creation(hermes_dir: Path) -> dict[str, Any]:
     entry_card_text = ""
     if len(sent_cards) >= 2:
         entry_card_text = str(((sent_cards[1].get("elements") or [{}])[0].get("content")) or "")
+    detail_card_text = ""
+    if len(sent_cards) >= 3:
+        detail_card_text = str(((sent_cards[-1].get("elements") or [{}])[0].get("content")) or "")
     generate_props = (
         runtime_tools.PILOTFLOW_GENERATE_PLAN_SCHEMA
         .get("parameters", {})
@@ -875,6 +893,11 @@ def _verify_runtime_project_creation(hermes_dir: Path) -> dict[str, Any]:
                 "deliverable_assignees": {"验收清单": "张三", "上线演练": "李四"},
             })
         ),
+        "project_create_detail_assignees_shown": detail.get("status") == "project_status_sent"
+        and "负责人" in detail_card_text
+        and "验收清单 → 李四" in detail_card_text
+        and "上线演练 → 张三" in detail_card_text
+        and "pilotflow_chat_id" not in json.dumps(sent_cards[-1] if sent_cards else {}, ensure_ascii=False),
         "project_create_calendar_created": created_calendars == [(
             "运行态项目创建闭环项目",
             "验证安装后的创建项目空间闭环",
