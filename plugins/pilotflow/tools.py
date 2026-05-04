@@ -755,6 +755,12 @@ def _project_state_path() -> Path:
     return base / "pilotflow_projects.json"
 
 
+def _project_resource_refs_path() -> Path:
+    """Return the private resource refs path next to the public state file."""
+    state_path = _project_state_path()
+    return state_path.with_name("pilotflow_project_refs.json")
+
+
 def _load_state_payload() -> dict:
     """Load the full PilotFlow state payload, preserving future top-level sections."""
     path = _project_state_path()
@@ -913,6 +919,62 @@ def _delete_pending_plan(chat_id: str) -> None:
     _write_state_payload(payload)
 
 
+def _safe_resource_artifacts(artifacts: Optional[list]) -> list[str]:
+    """Keep user-visible Feishu resource links without internal write identifiers."""
+    safe = []
+    for item in artifacts or []:
+        text = str(item)
+        if not text.startswith(("文档: ", "多维表格: ", "任务: ")):
+            continue
+        if not re.search(r"https?://", text):
+            continue
+        if any(marker in text.lower() for marker in ("app_token=", "secret", "authorization=", "ticket=")):
+            continue
+        safe.append(text)
+    return safe[:20]
+
+
+def _save_project_resource_refs(title: str, artifacts: Optional[list]) -> None:
+    """Persist non-secret resource links separately from the public project summary."""
+    refs = _safe_resource_artifacts(artifacts)
+    path = _project_resource_refs_path()
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+    except Exception:
+        payload = {}
+    if not isinstance(payload, dict):
+        payload = {}
+    if refs:
+        payload[title] = {
+            "artifacts": refs,
+            "updated_at": int(time.time()),
+        }
+    else:
+        payload.pop(title, None)
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    except Exception as e:
+        logger.debug("project resource refs save skipped: %s", e)
+
+
+def _load_project_resource_refs(title: str) -> list[str]:
+    """Load persisted non-secret resource links for a project."""
+    if not title:
+        return []
+    path = _project_resource_refs_path()
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+    except Exception:
+        return []
+    if not isinstance(payload, dict):
+        return []
+    refs = payload.get(title)
+    if not isinstance(refs, dict):
+        return []
+    return _safe_resource_artifacts(refs.get("artifacts"))
+
+
 def _save_project_state(title: str, goal: str, members: list, deliverables: list, deadline: str,
                         status: str, artifacts: Optional[list] = None, app_token: str = "",
                         table_id: str = "", record_id: str = "",
@@ -936,6 +998,7 @@ def _save_project_state(title: str, goal: str, members: list, deliverables: list
         records = sorted(by_title.values(), key=lambda item: item.get("updated_at", 0), reverse=True)[:_PROJECT_REGISTRY_MAX]
         payload = _load_state_payload()
         payload["projects"] = records
+        _save_project_resource_refs(title, artifacts)
         return _write_state_payload(payload)
     except Exception as e:
         logger.debug("project state save skipped: %s", e)
@@ -4567,7 +4630,7 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
             "deliverables": state_project.get("deliverables", []),
             "deadline": state_project.get("deadline", ""),
             "status": state_project.get("status", "进行中"),
-            "artifacts": [],
+            "artifacts": _load_project_resource_refs(state_project.get("title", project_name)),
             "updates": state_project.get("updates", []),
             "app_token": "",
             "table_id": "",
@@ -4674,8 +4737,7 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
                 project.get("status", "进行中"), project.get("artifacts", []),
                 updates=project.get("updates", []),
             )
-            if not state_project:
-                doc_updated = _append_project_doc_update(project_name, project, action_label, value)
+            doc_updated = _append_project_doc_update(project_name, project, action_label, value)
 
         # 2. Update bitable record
         bitable_fields = {}

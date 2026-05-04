@@ -3359,6 +3359,50 @@ def test_update_project_updates_sanitized_state_after_restart(tmp_path):
     assert projects[0]["status"] == "进行中"
 
 
+def test_update_project_restores_doc_resource_ref_after_restart(tmp_path):
+    state_path = tmp_path / "pilotflow-projects.json"
+    with _project_registry_lock:
+        _project_registry.clear()
+
+    with patch.dict(os.environ, {"PILOTFLOW_STATE_PATH": str(state_path)}):
+        assert _save_project_state(
+            "重启文档留痕项目",
+            "验证重启后继续写文档",
+            ["张三"],
+            ["验收记录"],
+            "2026-05-20",
+            "进行中",
+            artifacts=[
+                "文档: https://example.invalid/docx/doc_token_123",
+                "多维表格: https://example.invalid/base/base_token_123",
+            ],
+            app_token="app_secret_like",
+            table_id="tbl_secret_like",
+            record_id="rec_secret_like",
+        )
+        with (
+            patch("tools._append_project_doc_update", return_value=True) as append_doc,
+            patch("tools._hermes_send", return_value=True),
+        ):
+            result = json.loads(_handle_update_project(
+                {"project_name": "重启文档留痕", "action": "add_progress", "value": "完成重启后同步验证"},
+                chat_id="oc_state_doc_trace",
+            ))
+        projects = _load_project_state()
+
+    assert result["status"] == "project_updated"
+    assert result["registry_updated"] is False
+    assert result["doc_updated"] is True
+    append_doc.assert_called_once()
+    restored_project = append_doc.call_args.args[1]
+    assert "文档: https://example.invalid/docx/doc_token_123" in restored_project["artifacts"]
+    assert "多维表格: https://example.invalid/base/base_token_123" in restored_project["artifacts"]
+    assert projects[0]["title"] == "重启文档留痕项目"
+    serialized = state_path.read_text(encoding="utf-8")
+    assert "secret_like" not in serialized
+    assert "张三" not in serialized
+
+
 def test_update_project_adds_progress_to_sanitized_state_after_restart(tmp_path):
     state_path = tmp_path / "pilotflow-projects.json"
     with _project_registry_lock:
