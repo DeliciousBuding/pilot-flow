@@ -1449,6 +1449,15 @@ def test_update_autonomy_requires_remove_member_confirmation():
     assert "移除成员" in reason
 
 
+def test_update_autonomy_requires_archive_confirmation():
+    confirm, mode, reason = _needs_confirmation_for_update(
+        "update_status", "已归档", {"members": ["张三"]}, {"scope": "private"}, "oc1"
+    )
+    assert confirm is True
+    assert mode == "must_confirm"
+    assert "归档" in reason
+
+
 def test_update_autonomy_allows_regular_progress_update():
     confirm, mode, reason = _needs_confirmation_for_update(
         "add_progress", "完成评审", {"members": ["张三"]}, {"scope": "private"}, "oc1"
@@ -4933,9 +4942,9 @@ def test_update_project_remove_member_requires_explicit_confirmation_without_wri
     )
 
     with (
-        patch("tools._update_bitable_record") as update_bitable,
-        patch("tools._append_project_doc_update") as append_doc,
-        patch("tools._append_bitable_update_record") as append_history,
+        patch("tools._update_bitable_record", return_value=True) as update_bitable,
+        patch("tools._append_project_doc_update", return_value=True) as append_doc,
+        patch("tools._append_bitable_update_record", return_value=True) as append_history,
         patch("tools._hermes_send") as send,
     ):
         result = json.loads(_handle_update_project(
@@ -4952,6 +4961,71 @@ def test_update_project_remove_member_requires_explicit_confirmation_without_wri
     send.assert_not_called()
     with _project_registry_lock:
         assert _project_registry["确认移除成员项目"]["members"] == ["张三", "李四"]
+
+
+def test_update_project_archive_requires_explicit_confirmation_without_writes():
+    with _project_registry_lock:
+        _project_registry.clear()
+    _register_project(
+        "确认归档项目", ["张三"], "2026-05-20", "进行中", [],
+        app_token="app1", table_id="tbl1", record_id="rec1",
+        goal="验证归档确认", deliverables=["验收记录"],
+    )
+
+    with (
+        patch("tools._update_bitable_record", return_value=True) as update_bitable,
+        patch("tools._append_project_doc_update", return_value=True) as append_doc,
+        patch("tools._append_bitable_update_record", return_value=True) as append_history,
+        patch("tools._hermes_send") as send,
+    ):
+        result = json.loads(_handle_update_project(
+            {"project_name": "确认归档", "action": "update_status", "value": "已归档"},
+            chat_id="oc_archive_gate",
+        ))
+
+    assert result["status"] == "confirmation_required"
+    assert result["action"] == "update_status"
+    assert "归档" in result["reason"]
+    update_bitable.assert_not_called()
+    append_doc.assert_not_called()
+    append_history.assert_not_called()
+    send.assert_not_called()
+    with _project_registry_lock:
+        assert _project_registry["确认归档项目"]["status"] == "进行中"
+
+
+def test_update_project_archive_allows_explicit_confirmation():
+    with _project_registry_lock:
+        _project_registry.clear()
+    _register_project(
+        "确认后归档项目", ["张三"], "2026-05-20", "进行中", [],
+        app_token="app1", table_id="tbl1", record_id="rec1",
+        goal="验证确认后归档", deliverables=["验收记录"],
+    )
+
+    with (
+        patch("tools._update_bitable_record", return_value=True) as update_bitable,
+        patch("tools._append_bitable_update_record", return_value=True) as append_history,
+        patch("tools._hermes_send", return_value=True) as send,
+    ):
+        result = json.loads(_handle_update_project(
+            {
+                "project_name": "确认后归档",
+                "action": "update_status",
+                "value": "已归档",
+                "confirmation_text": "确认执行",
+            },
+            chat_id="oc_archive_confirmed",
+        ))
+
+    assert result["status"] == "project_updated"
+    assert result["autonomy"]["mode"] == "must_confirm"
+    assert result["bitable_updated"] is True
+    update_bitable.assert_called_once()
+    append_history.assert_called_once()
+    assert "状态表已同步" in send.call_args.args[1]
+    with _project_registry_lock:
+        assert _project_registry["确认后归档项目"]["status"] == "已归档"
 
 
 def test_update_project_remove_member_rejects_unknown_member_without_writes():

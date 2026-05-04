@@ -1004,6 +1004,19 @@
 | 用户价值 | PilotFlow 的语义理解职责更明确地回到 Hermes Agent；工具层只保留可测试的 legacy escape hatch，不再鼓励生产链路依赖关键词兜底 |
 | 隐私处理 | 证据只记录布尔结果和脱敏结论；不写入真实 chat_id、message_id、Feishu URL、用户 open_id、token 或 app secret |
 
+## 2026-05-05 项目归档确认门控
+
+| 项目 | 证据 |
+| --- | --- |
+| 运行环境 | PilotFlow 已通过 `setup.py --hermes-home <wsl-hermes-home>` 同步到 WSL Hermes runtime；安装验证返回插件、技能、Hermes config 和 Feishu display 配置均 OK |
+| 本地回归 | `C:\Users\Ding\miniforge3\python.exe -m pytest` 返回 `227 passed`；新增归档确认门控定向测试返回通过 |
+| 功能修正 | `pilotflow_update_project` 处理 `update_status=已归档` 时会返回 `confirmation_required`，因为归档会从默认看板隐藏项目，属于撤销/隐藏已有协作内容 |
+| 写入保护 | 回归验证确认未确认归档不会更新 registry、多维表格、项目文档、流水或群通知，项目状态保持 `进行中` |
+| 兼容路径 | 显式传入 `confirmation_text=确认执行` 后，归档仍会更新状态、多维表格和动作流水，并向群里反馈状态表同步结果 |
+| 基线验证 | 同轮继续通过 `--probe-llm` 的 `llm_probe_ok=true`、`llm_probe_status=200`，`--send-card` 的 `card_sent=true`、`card_has_title=true`、`card_has_goal=true`、`card_has_risk=true`，`--verify-history` 的 `history_apply_card_sent=true`，以及 `--verify-update-task` 的 `update_task_created=true` |
+| 用户价值 | 删除成员之外，另一个真实 destructive update 也进入统一确认门控；Agent 不能在未确认时把项目从日常看板隐藏 |
+| 隐私处理 | 证据只记录布尔结果和脱敏结论；不写入真实 chat_id、message_id、Feishu URL、用户 open_id、token 或 app secret |
+
 ## 本地回归
 
 ```bash

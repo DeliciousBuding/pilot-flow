@@ -2003,6 +2003,8 @@ def _needs_confirmation_for_update(
     normalized_action = (action or "").strip()
     if normalized_action == "remove_member":
         return True, "must_confirm", "移除成员属于权限收缩操作，必须先确认。"
+    if normalized_action == "update_status" and str(value or "").strip() == "已归档":
+        return True, "must_confirm", "归档项目会从默认看板隐藏，属于撤销/隐藏已有协作内容，必须先确认。"
     if normalized_action == "add_member":
         unresolved = _find_unresolved_members([value], chat_id)
         if unresolved:
