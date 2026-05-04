@@ -1189,6 +1189,20 @@
 | 用户价值 | 这覆盖了 PilotFlow 最核心的办公闭环：群聊任务被 Agent 结构化为计划，用户确认后一次性创建项目文档、状态表、待办、日历提醒和入口卡片，并进入后续看板/追踪状态 |
 | 隐私处理 | 证据只记录布尔结果和脱敏结论；不写入真实 chat_id、message_id、Feishu URL、用户 open_id、token 或 app secret |
 
+## 2026-05-05 简报批量催办运行态验证
+
+| 项目 | 证据 |
+| --- | --- |
+| 运行环境 | PilotFlow 已通过 `setup.py --hermes-home <wsl-hermes-home>` 同步到 WSL Hermes runtime；安装验证返回插件、技能、Hermes config 和 Feishu display 配置均 OK |
+| 本地回归 | `C:\Users\Ding\miniforge3\python.exe -m pytest` 返回 `255 passed`；`tests/test_verify_wsl_feishu_runtime.py` 返回 `34 passed`；`git diff --check` 通过 |
+| Verifier 新模式 | `verify_wsl_feishu_runtime.py --verify-briefing-batch-reminder` 在已安装的 WSL Hermes runtime 插件内返回 `briefing_batch_reminder_sent=true`、`briefing_batch_reminder_filtered=true`、`briefing_batch_reminder_doc_recorded=true`、`briefing_batch_reminder_history_recorded=true`、`briefing_batch_reminder_state_recorded=true`、`briefing_batch_reminder_feedback_sent=true`、`briefing_batch_reminder_used_opaque_ref=true` |
+| 卡片动作路径 | verifier 使用生产 `_create_card_action_ref` 生成 opaque action，再通过 `_handle_card_action` 执行 `briefing_batch_reminder`，覆盖“项目简报卡片按钮 → 按筛选批量催办 → 群反馈”的真实插件路径 |
+| 批量筛选 | 运行态场景同时注册逾期和未到期项目，显式 `filter=overdue` 后只催办逾期项目，不向未到期项目发送提醒 |
+| 留痕闭环 | 命中项目会追加项目文档、Base 流水和脱敏状态更新；群反馈不包含 Feishu URL、open_id markup 或真实 chat_id |
+| 基线验证 | 同轮继续通过 `--probe-llm` 的 `llm_probe_ok=true`、`llm_probe_status=200`，`--send-card` 的 `card_sent=true`、`card_has_title=true`、`card_has_goal=true`、`card_has_risk=true`，`--verify-history` 的 `history_apply_card_sent=true`，`--verify-project-creation` 的 `project_create_entry_card_sent=true`，`--verify-project-reminder` 的 `reminder_single_sent=true`，`--verify-card-status-cycle` 的 `card_status_done_applied=true`，`--verify-batch-followup-task` 的 `batch_followup_created=true`，以及 `--verify-dashboard-navigation` 的 `dashboard_filter_sent=true` |
+| 用户价值 | 站会/日报简报发现逾期项目后，用户可以直接点卡片批量催办；PilotFlow 自动筛选项目、发送群提醒并同步文档/状态表/状态文件，补齐简报后的团队级推进动作 |
+| 隐私处理 | 证据只记录布尔结果和脱敏结论；不写入真实 chat_id、message_id、Feishu URL、用户 open_id、token 或 app secret |
+
 ## 本地回归
 
 ```bash
@@ -1198,7 +1212,7 @@ C:\Users\Ding\miniforge3\python.exe -m pytest tests\test_tools.py tests\test_set
 结果：
 
 ```text
-167 passed
+255 passed
 ```
 
 ## 当前证据边界
