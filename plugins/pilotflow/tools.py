@@ -3963,6 +3963,11 @@ def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
         if not task_name:
             return tool_error("待办创建失败，请检查飞书连接。")
         created_entry = f"任务: {task_name}"
+        public_task_value = _public_task_update_value(task_name)
+        updates = list(project.get("updates", []))
+        if public_task_value:
+            updates.append({"action": "任务", "value": public_task_value})
+        project["updates"] = updates
         with _project_registry_lock:
             if project_title in _project_registry:
                 _project_registry[project_title].setdefault("artifacts", []).append(created_entry)
@@ -3970,7 +3975,7 @@ def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
             project_title, project.get("goal", ""), members,
             project.get("deliverables", []), project.get("deadline", ""), project.get("status", "进行中"),
             list(project.get("artifacts", [])) + [created_entry],
-            updates=project.get("updates", []),
+            updates=updates,
         )
         doc_updated = _append_project_doc_update(project_title, project, "任务", task_name)
         bitable_history_created = False
