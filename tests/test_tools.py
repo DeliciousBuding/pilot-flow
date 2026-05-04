@@ -4602,6 +4602,37 @@ def test_update_project_add_deliverable_assigns_feishu_mentioned_member():
     assert "负责人 → 李四" in sent_text
 
 
+def test_update_project_add_deliverable_rejects_non_project_assignee_without_writes():
+    with _project_registry_lock:
+        _project_registry.clear()
+    _register_project(
+        "外部负责人交付物项目", ["张三"], "2026-05-20", "进行中", [],
+        goal="验证外部负责人保护", deliverables=["验收记录"],
+    )
+
+    with (
+        patch("tools._create_task") as create_task,
+        patch("tools._update_bitable_record") as update_bitable,
+        patch("tools._append_bitable_update_record") as append_history,
+        patch("tools._hermes_send") as send,
+    ):
+        result = json.loads(_handle_update_project(
+            {"project_name": "外部负责人", "action": "add_deliverable", "value": "王五：完成接口联调"},
+            chat_id="oc_external_assignee",
+        ))
+
+    assert "error" in result
+    assert "王五" in result["error"]
+    assert "先确认是否新增成员" in result["error"]
+    create_task.assert_not_called()
+    update_bitable.assert_not_called()
+    append_history.assert_not_called()
+    send.assert_not_called()
+    with _project_registry_lock:
+        project = _project_registry["外部负责人交付物项目"]
+        assert project["deliverables"] == ["验收记录"]
+
+
 def test_create_task_binds_assignee_and_project_followers():
     import types
 

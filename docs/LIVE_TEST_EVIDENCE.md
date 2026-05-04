@@ -925,6 +925,19 @@
 | 用户价值 | Agent 可把历史项目模式作为上下文建议交付物，而不是硬编码模板；用户点击“采用历史建议”后，即使 gateway 重启也能继续确认创建 |
 | 隐私处理 | 证据只记录布尔结果和脱敏结论；不写入真实 chat_id、message_id、Feishu URL、confirm token、idempotency key、token 或 app secret |
 
+## 2026-05-04 外部负责人交付物防误派
+
+| 项目 | 证据 |
+| --- | --- |
+| 运行环境 | PilotFlow 已通过 `setup.py --hermes-home <wsl-hermes-home>` 同步到 WSL Hermes runtime；安装验证返回插件、技能和 Feishu display 配置均 OK |
+| 本地回归 | `C:\Users\Ding\miniforge3\python.exe -m pytest` 返回 `218 passed`；指定负责人交付物定向测试返回 `3 passed` |
+| 功能修正 | `pilotflow_update_project` 处理 `add_deliverable` 时，若用户写 `姓名：交付物` 且该姓名不是当前项目成员，会返回明确错误并提示先确认是否新增成员 |
+| 写入保护 | 回归验证确认非项目成员负责人不会触发 `_create_task`、多维表格更新、流水追加或群通知，也不会把整句 `姓名：交付物` 误写为交付物标题 |
+| 兼容路径 | 已有成员负责人和 Feishu `<at user_id=...>姓名</at>：交付物` 仍可正常解析，任务会派给指定成员并继续绑定项目成员关注者 |
+| 基线验证 | 同轮继续通过 `--probe-llm` 的 `llm_probe_ok=true`、`llm_probe_status=200`，`--send-card` 的 `card_sent=true`、`pending_plan_recovered=true`，以及 `--verify-history` 的 `history_apply_card_sent=true`、`history_pending_recovered=true` |
+| 用户价值 | 避免 Agent 在群聊里把新外联/未入项目人员误当既有负责人，符合“首次外联先问一次”的协作安全边界 |
+| 隐私处理 | 证据只记录布尔结果和脱敏结论；不写入真实 chat_id、message_id、Feishu URL、用户 open_id、token 或 app secret |
+
 ## 本地回归
 
 ```bash

@@ -4795,20 +4795,22 @@ def _risk_level_from_text(text: str) -> str:
     return "中"
 
 
-def _parse_deliverable_assignment(value: str, members: list[str]) -> tuple[str, str]:
-    """Parse 'member: deliverable' only when the prefix is a known project member."""
+def _parse_deliverable_assignment(value: str, members: list[str]) -> tuple[str, str, str]:
+    """Parse 'member: deliverable' and report unknown assignees explicitly."""
     text = str(value or "").strip()
     match = re.match(r"^\s*([^:：]+)\s*[:：]\s*(.+)$", text)
     if not match:
-        return text, ""
+        return text, "", ""
     assignee = match.group(1).strip()
     at_match = _AT_PATTERN.fullmatch(assignee)
     if at_match:
         assignee = at_match.group(2).strip()
     deliverable = match.group(2).strip()
     if assignee and deliverable and assignee in set(members or []):
-        return deliverable, assignee
-    return text, ""
+        return deliverable, assignee, ""
+    if assignee and deliverable:
+        return deliverable, "", assignee
+    return text, "", ""
 
 
 def _clean_member_update_value(value: str) -> str:
@@ -4992,7 +4994,12 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
 
     assignee_override = ""
     if action == "add_deliverable":
-        value, assignee_override = _parse_deliverable_assignment(value, project.get("members", []))
+        value, assignee_override, unknown_assignee = _parse_deliverable_assignment(value, project.get("members", []))
+        if unknown_assignee:
+            return tool_error(
+                f"负责人「{unknown_assignee}」不是项目「{project_name}」的成员。"
+                "请先确认是否新增成员，再为该交付物指定负责人。"
+            )
 
     action_labels = {
         "update_deadline": "截止时间",
