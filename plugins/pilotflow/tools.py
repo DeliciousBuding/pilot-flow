@@ -900,17 +900,20 @@ def _persist_card_action_ref(action_id: str, ref: dict) -> None:
     }
     if ref.get("message_id"):
         cached["message_id"] = str(ref.get("message_id", ""))
-    payload = _load_state_payload()
-    card_actions = payload.get("card_actions")
-    if not isinstance(card_actions, dict):
-        card_actions = {}
-    card_actions[action_id] = cached
-    payload["card_actions"] = {
-        key: value
-        for key, value in card_actions.items()
-        if isinstance(value, dict) and now - value.get("timestamp", 0) < _PLAN_GATE_TTL
-    }
-    _write_state_payload(payload)
+
+    def mutate(payload: dict) -> bool:
+        card_actions = payload.get("card_actions")
+        if not isinstance(card_actions, dict):
+            card_actions = {}
+        card_actions[action_id] = cached
+        payload["card_actions"] = {
+            key: value
+            for key, value in card_actions.items()
+            if isinstance(value, dict) and now - value.get("timestamp", 0) < _PLAN_GATE_TTL
+        }
+        return True
+
+    _update_state_payload(mutate)
 
 
 def _load_card_action_ref(action_id: str) -> Optional[dict]:
@@ -928,18 +931,22 @@ def _delete_card_action_refs(action_ids: list[str]) -> None:
     ids = {action_id for action_id in action_ids if action_id}
     if not ids:
         return
-    payload = _load_state_payload()
-    card_actions = payload.get("card_actions")
-    if not isinstance(card_actions, dict):
-        return
-    changed = False
-    for action_id in ids:
-        if action_id in card_actions:
-            card_actions.pop(action_id, None)
-            changed = True
-    if changed:
+
+    def mutate(payload: dict) -> bool:
+        card_actions = payload.get("card_actions")
+        if not isinstance(card_actions, dict):
+            return False
+        changed = False
+        for action_id in ids:
+            if action_id in card_actions:
+                card_actions.pop(action_id, None)
+                changed = True
+        if not changed:
+            return False
         payload["card_actions"] = card_actions
-        _write_state_payload(payload)
+        return True
+
+    _update_state_payload(mutate)
 
 
 def _card_action_ids_for_message(message_id: str) -> list[str]:
@@ -961,22 +968,26 @@ def _persist_pending_plan(chat_id: str, pending: Optional[dict], timestamp: Opti
     if not chat_id:
         return
     now = time.time()
-    payload = _load_state_payload()
-    pending_plans = payload.get("pending_plans")
-    if not isinstance(pending_plans, dict):
-        pending_plans = {}
-    existing = pending_plans.get(chat_id) if isinstance(pending_plans.get(chat_id), dict) else {}
-    if pending is None:
-        pending = existing or {}
-    cached = json.loads(json.dumps(dict(pending), ensure_ascii=False))
-    cached["timestamp"] = float(timestamp or cached.get("timestamp", now) or now)
-    pending_plans[chat_id] = cached
-    payload["pending_plans"] = {
-        key: value
-        for key, value in pending_plans.items()
-        if isinstance(value, dict) and now - value.get("timestamp", 0) < _PLAN_GATE_TTL
-    }
-    _write_state_payload(payload)
+
+    def mutate(payload: dict) -> bool:
+        pending_plans = payload.get("pending_plans")
+        if not isinstance(pending_plans, dict):
+            pending_plans = {}
+        existing = pending_plans.get(chat_id) if isinstance(pending_plans.get(chat_id), dict) else {}
+        cached_pending = existing or {}
+        if pending is not None:
+            cached_pending = pending
+        cached = json.loads(json.dumps(dict(cached_pending), ensure_ascii=False))
+        cached["timestamp"] = float(timestamp or cached.get("timestamp", now) or now)
+        pending_plans[chat_id] = cached
+        payload["pending_plans"] = {
+            key: value
+            for key, value in pending_plans.items()
+            if isinstance(value, dict) and now - value.get("timestamp", 0) < _PLAN_GATE_TTL
+        }
+        return True
+
+    _update_state_payload(mutate)
 
 
 def _load_pending_plan(chat_id: str) -> Optional[dict]:
@@ -1007,13 +1018,16 @@ def _delete_pending_plan(chat_id: str) -> None:
     """Delete a pending plan from durable state."""
     if not chat_id:
         return
-    payload = _load_state_payload()
-    pending_plans = payload.get("pending_plans")
-    if not isinstance(pending_plans, dict) or chat_id not in pending_plans:
-        return
-    pending_plans.pop(chat_id, None)
-    payload["pending_plans"] = pending_plans
-    _write_state_payload(payload)
+
+    def mutate(payload: dict) -> bool:
+        pending_plans = payload.get("pending_plans")
+        if not isinstance(pending_plans, dict) or chat_id not in pending_plans:
+            return False
+        pending_plans.pop(chat_id, None)
+        payload["pending_plans"] = pending_plans
+        return True
+
+    _update_state_payload(mutate)
 
 
 def _safe_resource_artifacts(artifacts: Optional[list]) -> list[str]:

@@ -762,6 +762,49 @@ def test_project_resource_refs_concurrent_saves_do_not_lose_links(tmp_path):
         assert payload[f"并发引用项目{index}"]["artifacts"] == [f"文档: https://example.invalid/doc-{index}"]
 
 
+def test_card_action_refs_concurrent_persist_do_not_lose_actions(tmp_path):
+    state_path = tmp_path / "pilotflow-projects.json"
+    with _plan_lock:
+        _card_action_refs.clear()
+
+    def create_one(index: int) -> None:
+        with patch.dict(os.environ, {"PILOTFLOW_STATE_PATH": str(state_path)}):
+            _create_card_action_ref(
+                f"oc_concurrent_action_{index}",
+                "project_status",
+                {"title": f"并发按钮项目{index}"},
+            )
+
+    threads = [threading.Thread(target=create_one, args=(index,)) for index in range(20)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    payload = json.loads(state_path.read_text(encoding="utf-8"))
+    card_actions = payload.get("card_actions", {})
+    assert len(card_actions) == 20
+    assert {ref["chat_id"] for ref in card_actions.values()} == {f"oc_concurrent_action_{index}" for index in range(20)}
+
+
+def test_pending_plans_concurrent_persist_do_not_lose_chats(tmp_path):
+    state_path = tmp_path / "pilotflow-projects.json"
+
+    def persist_one(index: int) -> None:
+        with patch.dict(os.environ, {"PILOTFLOW_STATE_PATH": str(state_path)}):
+            _set_plan_gate(f"oc_concurrent_plan_{index}")
+
+    threads = [threading.Thread(target=persist_one, args=(index,)) for index in range(20)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    payload = json.loads(state_path.read_text(encoding="utf-8"))
+    pending_plans = payload.get("pending_plans", {})
+    assert set(pending_plans) == {f"oc_concurrent_plan_{index}" for index in range(20)}
+
+
 def test_project_state_roundtrip_keeps_sanitized_recent_updates(tmp_path):
     state_path = tmp_path / "pilotflow-projects.json"
 
