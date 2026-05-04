@@ -674,6 +674,7 @@
 | 真实链路修复 | WSL Hermes `.venv` 曾缺少 `lark_oapi`，且在 `/mnt/d` 仓库内执行 `uv sync --extra feishu` 会卡在跨文件系统 `.venv` 写入阶段；改用 `UV_PROJECT_ENVIRONMENT=/home/ding/.venvs/hermes-agent-feishu UV_LINK_MODE=copy uv sync --extra feishu` 后 3.26 秒完成安装，`lark-oapi==1.5.3` 可用 |
 | 真实卡片发送 | 在同一 WSL ext4 venv 中调用已安装的 `pilotflow_generate_plan`，输出确认 `card_sent=true`、`has_confirm_token=true`、`has_idempotency_key=true`、`trace_has_key=true`、`action_ref_count=2`、`action_refs_have_token=true` |
 | 可复现验证入口 | 新增 `scripts/verify_wsl_feishu_runtime.py`；默认 dry-run 输出 `lark_oapi_import_ok=true`、`pilotflow_import_ok=true` 且 `would_send_card=false`，显式加 `--send-card` 后输出 `card_sent=true` |
+| 执行级幂等 | 新增回归验证：同一 `idempotency_key` 第二次调用 `pilotflow_create_project_space` 返回 `project_space_replayed`，且 `_create_doc`、`_create_bitable`、`_create_task` 都只调用 1 次 |
 | 用户价值 | 计划生成和创建执行现在都有可追踪 `confirm_token` 与稳定 `idempotency_key`，并写入 Flight Recorder；重复确认和按钮单次消费可被审计 |
 | 隐私处理 | 验证只记录布尔结果；不写入真实 chat_id、message_id、confirm token、idempotency key、Feishu URL、token 或 app secret |
 
@@ -686,7 +687,7 @@ C:\Users\Ding\miniforge3\python.exe -m pytest tests\test_tools.py tests\test_set
 结果：
 
 ```text
-162 passed
+163 passed
 ```
 
 ## 当前证据边界

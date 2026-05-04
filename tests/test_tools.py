@@ -1330,6 +1330,66 @@ def test_duplicate_confirmation_after_create_is_idempotent():
     assert "error" not in duplicate
 
 
+def test_create_project_idempotency_key_prevents_duplicate_artifact_creation():
+    chat_id = "oc_create_idempotency_cache"
+    idempotency_key = "pik_same_plan"
+    with _project_registry_lock:
+        _project_registry.clear()
+    with _plan_lock:
+        _pending_plans.clear()
+        _card_action_refs.clear()
+        _recent_confirmed_projects.clear()
+
+    with (
+        patch("tools._resolve_member", return_value="ou_real_member"),
+        patch("tools._create_doc", return_value="https://example.invalid/doc") as create_doc,
+        patch("tools._create_bitable", return_value={
+            "url": "https://example.invalid/base",
+            "app_token": "app1",
+            "table_id": "tbl1",
+            "record_id": "rec1",
+        }) as create_bitable,
+        patch("tools._create_task", return_value="任务已创建") as create_task,
+        patch("tools._hermes_send_card", return_value="om_entry"),
+        patch("tools._create_calendar_event", return_value=None),
+        patch("tools._schedule_deadline_reminder", return_value=False),
+        patch("tools._save_to_hermes_memory", return_value=True),
+    ):
+        first = json.loads(_handle_create_project_space(
+            {
+                "title": "幂等缓存项目",
+                "goal": "验证同一幂等 key 不重复创建",
+                "members": ["张三"],
+                "deliverables": ["验证记录"],
+                "deadline": "2026-05-10",
+                "idempotency_key": idempotency_key,
+            },
+            chat_id=chat_id,
+            chat_scope="private",
+        ))
+        second = json.loads(_handle_create_project_space(
+            {
+                "title": "幂等缓存项目",
+                "goal": "验证同一幂等 key 不重复创建",
+                "members": ["张三"],
+                "deliverables": ["验证记录"],
+                "deadline": "2026-05-10",
+                "idempotency_key": idempotency_key,
+            },
+            chat_id=chat_id,
+            chat_scope="private",
+        ))
+
+    assert first["status"] == "project_space_created"
+    assert second["status"] == "project_space_replayed"
+    assert second["idempotency_key"] == idempotency_key
+    assert second["title"] == "幂等缓存项目"
+    assert second["display"] == first["display"]
+    assert create_doc.call_count == 1
+    assert create_bitable.call_count == 1
+    assert create_task.call_count == 1
+
+
 def test_create_project_rejects_non_confirming_input_text():
     chat_id = "oc_same_turn_reject"
     with _project_registry_lock:

@@ -86,6 +86,7 @@ _DASHBOARD_PAGE_SIZE = _env_positive_int("PILOTFLOW_DASHBOARD_PAGE_SIZE", 10)
 _pending_plans: Dict[str, dict] = {}  # chat_id -> plan params
 _card_action_refs: Dict[str, dict] = {}  # action_id -> {chat_id, action, message_id, timestamp}
 _recent_confirmed_projects: Dict[str, dict] = {}  # chat_id -> {title, timestamp}
+_idempotent_project_results: Dict[str, dict] = {}  # idempotency_key -> successful create result
 _RECENT_CONFIRM_TTL = 30
 
 # lark_oapi client timeout (seconds)
@@ -132,6 +133,12 @@ def _evict_caches():
         ]
         for k in expired_recent:
             del _recent_confirmed_projects[k]
+        expired_idempotent = [
+            k for k, ref in _idempotent_project_results.items()
+            if now - ref.get("timestamp", 0) >= _PLAN_GATE_TTL
+        ]
+        for k in expired_idempotent:
+            del _idempotent_project_results[k]
         evicted_plans = len(expired_plans) + len(expired_pending)
 
     if evicted_members or evicted_plans:
@@ -274,6 +281,32 @@ def _recent_confirmed_project(chat_id: str) -> Optional[str]:
             _recent_confirmed_projects.pop(chat_id, None)
             return None
         return str(ref.get("title") or "") or None
+
+
+def _remember_idempotent_project_result(idempotency_key: str, result: dict) -> None:
+    """Cache a successful create result so repeated execution does not duplicate Feishu artifacts."""
+    if not idempotency_key:
+        return
+    cached = dict(result)
+    cached["timestamp"] = time.time()
+    with _plan_lock:
+        _idempotent_project_results[idempotency_key] = cached
+
+
+def _replay_idempotent_project_result(idempotency_key: str) -> Optional[dict]:
+    """Return a cached create result while it is still within the plan TTL."""
+    if not idempotency_key:
+        return None
+    with _plan_lock:
+        cached = _idempotent_project_results.get(idempotency_key)
+        if not cached:
+            return None
+        if time.time() - cached.get("timestamp", 0) >= _PLAN_GATE_TTL:
+            _idempotent_project_results.pop(idempotency_key, None)
+            return None
+        result = {k: v for k, v in cached.items() if k != "timestamp"}
+    result["status"] = "project_space_replayed"
+    return result
 
 
 def _register_project(title: str, members: list, deadline: str, status: str, artifacts: list,
@@ -2878,6 +2911,9 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
         })
     )
     confirm_token = params.get("confirm_token") or pending.get("confirm_token") or pending_plan.get("confirm_token") or ""
+    replayed = _replay_idempotent_project_result(idempotency_key)
+    if replayed:
+        return tool_result(replayed)
 
     artifacts = []
     unresolved_members = _find_unresolved_members(members, chat_id)
@@ -3101,7 +3137,7 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
     flight_record = trace.to_dict()
     flight_record["markdown"] = trace.to_markdown()
 
-    return tool_result({
+    result_payload = {
         "status": "project_space_created",
         "title": title,
         "idempotency_key": idempotency_key,
@@ -3121,7 +3157,9 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
             + ("\n当前会话属于私聊自治模式，可直接推进后续跟进。" if chat_scope.get("scope") == "private" and not unresolved_members else "")
         ),
         "message": f"已创建 {len(artifacts)} 个产物: {', '.join(artifacts)}",
-    })
+    }
+    _remember_idempotent_project_result(idempotency_key, result_payload)
+    return tool_result(result_payload)
 
 
 # ---------------------------------------------------------------------------
