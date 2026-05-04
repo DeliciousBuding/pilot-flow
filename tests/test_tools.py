@@ -2218,7 +2218,7 @@ def test_filtered_briefing_reminder_button_uses_current_filter():
         return "om_briefing_risk_reminder"
 
     with patch("tools._send_interactive_card_via_feishu", side_effect=capture_card):
-        _handle_query_status({"query": "风险项目简报"}, chat_id="oc_briefing_risk_reminder")
+        _handle_query_status({"query": "风险项目简报", "filter": "risk"}, chat_id="oc_briefing_risk_reminder")
 
     button_texts = [
         button["text"]["content"]
@@ -2418,7 +2418,7 @@ def test_standup_briefing_risk_button_can_create_batch_followup_tasks():
         return "om_briefing_risk_followup"
 
     with patch("tools._send_interactive_card_via_feishu", side_effect=capture_card):
-        _handle_query_status({"query": "风险项目简报"}, chat_id="oc_briefing_risk_followup")
+        _handle_query_status({"query": "风险项目简报", "filter": "risk"}, chat_id="oc_briefing_risk_followup")
 
     with _plan_lock:
         followup_action_id = next(
@@ -2473,7 +2473,10 @@ def test_filtered_briefing_followup_can_filter_by_owner():
     )
 
     with patch("tools._send_interactive_card_via_feishu", return_value="om_owner_risk_followup"):
-        _handle_query_status({"query": "张三负责的风险项目简报"}, chat_id="oc_owner_risk_followup")
+        _handle_query_status(
+            {"query": "张三负责的风险项目简报", "filter": "risk", "member_filters": ["张三"]},
+            chat_id="oc_owner_risk_followup",
+        )
 
     with _plan_lock:
         followup_action_id = next(
@@ -2519,7 +2522,7 @@ def test_filtered_briefing_followup_button_names_current_filter():
         return "om_briefing_due_soon_followup"
 
     with patch("tools._send_interactive_card_via_feishu", side_effect=capture_card):
-        _handle_query_status({"query": "近期截止项目简报"}, chat_id="oc_briefing_due_soon_followup")
+        _handle_query_status({"query": "近期截止项目简报", "filter": "due_soon"}, chat_id="oc_briefing_due_soon_followup")
 
     button_texts = [
         button["text"]["content"]
@@ -2741,7 +2744,7 @@ def test_query_status_filters_active_projects():
         return True
 
     with patch("tools._send_interactive_card_via_feishu", side_effect=capture_card):
-        result = _handle_query_status({"query": "还有哪些未完成项目"}, chat_id="oc_filter_active")
+        result = _handle_query_status({"query": "还有哪些未完成项目", "filter": "active"}, chat_id="oc_filter_active")
 
     assert "项目看板已发送" in result
     content = json.dumps(captured["card"], ensure_ascii=False)
@@ -2767,7 +2770,10 @@ def test_query_status_filters_projects_by_member_name():
         return True
 
     with patch("tools._send_interactive_card_via_feishu", side_effect=capture_card):
-        result = _handle_query_status({"query": "张三负责哪些项目"}, chat_id="oc_member_filter")
+        result = _handle_query_status(
+            {"query": "张三负责哪些项目", "member_filters": ["张三"]},
+            chat_id="oc_member_filter",
+        )
 
     assert "项目看板已发送" in result
     content = json.dumps(captured["card"], ensure_ascii=False)
@@ -2794,7 +2800,10 @@ def test_query_status_filters_projects_by_mentioned_member_without_raw_at_markup
 
     query = '<at user_id="ou_runtime_member">王五</at> 负责哪些项目'
     with patch("tools._send_interactive_card_via_feishu", side_effect=capture_card):
-        result = _handle_query_status({"query": query}, chat_id="oc_mention_member_filter")
+        result = _handle_query_status(
+            {"query": query, "member_filters": ["王五"]},
+            chat_id="oc_mention_member_filter",
+        )
 
     assert "项目看板已发送" in result
     content = json.dumps(captured["card"], ensure_ascii=False)
@@ -2823,8 +2832,8 @@ def test_query_status_hides_archived_projects_by_default_and_shows_when_requeste
 
     with patch("tools._send_interactive_card_via_feishu", side_effect=capture_card):
         default_result = _handle_query_status({"query": "项目进展"}, chat_id="oc_archive_default")
-        all_result = _handle_query_status({"query": "显示所有项目"}, chat_id="oc_archive_all")
-        archived_result = _handle_query_status({"query": "看看归档项目"}, chat_id="oc_archive_only")
+        all_result = _handle_query_status({"query": "显示所有项目", "filter": "all"}, chat_id="oc_archive_all")
+        archived_result = _handle_query_status({"query": "看看归档项目", "filter": "archived"}, chat_id="oc_archive_only")
 
     assert "项目看板已发送" in default_result
     default_content = json.dumps(captured_cards[0], ensure_ascii=False)
@@ -2860,7 +2869,7 @@ def test_query_status_filters_risk_projects():
         return True
 
     with patch("tools._send_interactive_card_via_feishu", side_effect=capture_card):
-        result = _handle_query_status({"query": "看看风险项目"}, chat_id="oc_risk_filter")
+        result = _handle_query_status({"query": "看看风险项目", "filter": "risk"}, chat_id="oc_risk_filter")
 
     assert "项目看板已发送" in result
     content = json.dumps(captured["card"], ensure_ascii=False)
@@ -2893,7 +2902,7 @@ def test_query_status_filters_overdue_projects_with_red_dashboard():
         return True
 
     with patch("tools._send_interactive_card_via_feishu", side_effect=capture_card):
-        result = _handle_query_status({"query": "看看逾期项目"}, chat_id="oc_overdue_filter")
+        result = _handle_query_status({"query": "看看逾期项目", "filter": "overdue"}, chat_id="oc_overdue_filter")
 
     assert "项目看板已发送" in result
     assert captured["card"]["header"]["template"] == "red"
@@ -2932,7 +2941,7 @@ def test_query_status_filters_due_soon_projects_with_yellow_dashboard():
         return True
 
     with patch("tools._send_interactive_card_via_feishu", side_effect=capture_card):
-        result = _handle_query_status({"query": "看看近期截止"}, chat_id="oc_due_soon_filter")
+        result = _handle_query_status({"query": "看看近期截止", "filter": "due_soon"}, chat_id="oc_due_soon_filter")
 
     assert "项目看板已发送" in result
     assert captured["card"]["header"]["template"] == "yellow"
@@ -2940,6 +2949,32 @@ def test_query_status_filters_due_soon_projects_with_yellow_dashboard():
     assert "快到期项目" in content
     assert "稍后到期项目" not in content
     assert "已经逾期项目" not in content
+
+
+def test_query_status_does_not_infer_filter_from_query_by_default():
+    with _project_registry_lock:
+        _project_registry.clear()
+    _register_project(
+        "默认正常项目", [], "2026-05-20", "进行中", [],
+        goal="验证默认不推断", deliverables=["验收记录"],
+    )
+    _register_project(
+        "默认风险项目", [], "2026-05-20", "有风险", [],
+        goal="验证默认不推断", deliverables=["验收记录"],
+    )
+    captured = {}
+
+    def capture_card(chat_id, card):
+        captured["card"] = card
+        return True
+
+    with patch("tools._send_interactive_card_via_feishu", side_effect=capture_card):
+        result = _handle_query_status({"query": "看看风险项目"}, chat_id="oc_no_infer_query_filter")
+
+    assert "项目看板已发送" in result
+    content = json.dumps(captured["card"], ensure_ascii=False)
+    assert "默认正常项目" in content
+    assert "默认风险项目" in content
 
 
 def test_deadline_dashboard_offers_reminder_button_without_chat_id_payload():
@@ -2959,7 +2994,7 @@ def test_deadline_dashboard_offers_reminder_button_without_chat_id_payload():
         return True
 
     with patch("tools._send_interactive_card_via_feishu", side_effect=capture_card):
-        result = _handle_query_status({"query": "看看逾期项目"}, chat_id="oc_reminder_button")
+        result = _handle_query_status({"query": "看看逾期项目", "filter": "overdue"}, chat_id="oc_reminder_button")
 
     assert "项目看板已发送" in result
     actions = [element for element in captured["card"]["elements"] if element.get("tag") == "action"]
@@ -2995,7 +3030,10 @@ def test_filtered_briefing_dashboard_buttons_keep_owner_scope():
         return f"mid-{len(captured_cards)}"
 
     with patch("tools._send_interactive_card_via_feishu", side_effect=capture_card):
-        _handle_query_status({"query": "张三负责的逾期项目简报"}, chat_id="oc_owner_scope_dashboard")
+        _handle_query_status(
+            {"query": "张三负责的逾期项目简报", "filter": "overdue", "member_filters": ["张三"]},
+            chat_id="oc_owner_scope_dashboard",
+        )
 
     actions = [element for element in captured_cards[0]["elements"] if element.get("tag") == "action"]
     assert actions
@@ -3043,7 +3081,10 @@ def test_dashboard_filter_button_keeps_owner_scope_when_clicked_from_owner_brief
         return f"mid-{len(captured_cards)}"
 
     with patch("tools._send_interactive_card_via_feishu", side_effect=capture_card):
-        _handle_query_status({"query": "张三负责的风险项目简报"}, chat_id="oc_owner_dashboard_filter")
+        _handle_query_status(
+            {"query": "张三负责的风险项目简报", "filter": "risk", "member_filters": ["张三"]},
+            chat_id="oc_owner_dashboard_filter",
+        )
 
     with _plan_lock:
         filter_action_id = next(
@@ -3238,7 +3279,7 @@ def test_update_project_send_reminder_can_batch_overdue_projects():
         patch("tools._append_bitable_update_record", return_value=True) as append_history,
     ):
         result = json.loads(_handle_update_project(
-            {"project_name": "逾期项目", "action": "send_reminder", "value": "请今天同步进展"},
+            {"project_name": "逾期项目", "action": "send_reminder", "value": "请今天同步进展", "filter": "overdue"},
             chat_id="oc_batch_overdue_reminder",
         ))
 
@@ -3278,7 +3319,13 @@ def test_update_project_batch_reminder_can_filter_overdue_by_owner():
         patch("tools._append_bitable_update_record", return_value=True) as append_history,
     ):
         result = json.loads(_handle_update_project(
-            {"project_name": "张三负责的逾期项目", "action": "send_reminder", "value": "请今天同步进展"},
+            {
+                "project_name": "张三负责的逾期项目",
+                "action": "send_reminder",
+                "value": "请今天同步进展",
+                "filter": "overdue",
+                "member_filters": ["张三"],
+            },
             chat_id="oc_batch_owner_reminder",
         ))
 
@@ -3294,6 +3341,28 @@ def test_update_project_batch_reminder_can_filter_overdue_by_owner():
     assert append_doc.call_args.args[0] == "张三逾期催办项目"
     append_history.assert_called_once()
     assert append_history.call_args.args[:4] == ("app_zhang", "tbl_zhang", "催办", "请今天同步进展")
+
+
+def test_update_project_send_reminder_does_not_infer_batch_filter_by_default():
+    with _project_registry_lock:
+        _project_registry.clear()
+    overdue = (dt.date.today() - dt.timedelta(days=1)).isoformat()
+    _register_project(
+        "默认批量延误条目", ["张三"], overdue, "进行中", ["文档: https://example.invalid/doc-default-batch"],
+        goal="验证默认不批量推断", deliverables=["验收记录"],
+        app_token="app_default_batch", table_id="tbl_default_batch", record_id="rec_default_batch",
+    )
+    sent_messages = []
+
+    with patch("tools._hermes_send", side_effect=lambda chat_id, msg: sent_messages.append((chat_id, msg)) or True):
+        result = json.loads(_handle_update_project(
+            {"project_name": "逾期项目", "action": "send_reminder", "value": "请今天同步进展"},
+            chat_id="oc_no_infer_batch_reminder",
+        ))
+
+    assert "error" in result
+    assert "未找到" in result["error"]
+    assert not sent_messages
 
 
 def test_risk_project_dashboard_offers_resolve_risk_button():
@@ -3312,7 +3381,7 @@ def test_risk_project_dashboard_offers_resolve_risk_button():
         return True
 
     with patch("tools._send_interactive_card_via_feishu", side_effect=capture_card):
-        result = _handle_query_status({"query": "看看风险项目"}, chat_id="oc_risk_button")
+            result = _handle_query_status({"query": "看看风险项目", "filter": "risk"}, chat_id="oc_risk_button")
 
     assert "项目看板已发送" in result
     actions = [
@@ -3545,7 +3614,7 @@ def test_query_status_completed_filter_shows_empty_match_state():
         return True
 
     with patch("tools._send_interactive_card_via_feishu", side_effect=capture_card):
-        result = _handle_query_status({"query": "看看已完成项目"}, chat_id="oc_filter_done")
+            result = _handle_query_status({"query": "看看已完成项目", "filter": "completed"}, chat_id="oc_filter_done")
 
     assert "项目看板已发送" in result
     content = json.dumps(captured["card"], ensure_ascii=False)
@@ -3570,7 +3639,7 @@ def test_completed_project_dashboard_offers_reopen_button():
         return True
 
     with patch("tools._send_interactive_card_via_feishu", side_effect=capture_card):
-        result = _handle_query_status({"query": "看看已完成项目"}, chat_id="oc_reopen_dashboard")
+            result = _handle_query_status({"query": "看看已完成项目", "filter": "completed"}, chat_id="oc_reopen_dashboard")
 
     assert "项目看板已发送" in result
     actions = [
@@ -4892,7 +4961,7 @@ def test_dashboard_followup_task_reports_doc_and_bitable_traces():
     )
 
     with patch("tools._send_interactive_card_via_feishu", return_value="om_dashboard_followup"):
-        _handle_query_status({"query": "逾期项目"}, chat_id="oc_dashboard_followup")
+        _handle_query_status({"query": "逾期项目", "filter": "overdue"}, chat_id="oc_dashboard_followup")
 
     with _plan_lock:
         task_action_id = next(

@@ -3810,7 +3810,11 @@ def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
 
     if pilotflow_action == "dashboard_page":
         page_query = action_data.get("query") or _dashboard_query_for_page("项目进展", action_data.get("page", 1))
-        sent_result = _handle_query_status({"query": page_query}, chat_id=chat_id)
+        sent_result = _handle_query_status({
+            "query": page_query,
+            "filter": action_data.get("filter") or "",
+            "member_filters": action_data.get("member_filters", []),
+        }, chat_id=chat_id)
         if isinstance(sent_result, str) and "项目看板已发送" in sent_result:
             return tool_result({
                 "status": "dashboard_page_sent",
@@ -3824,7 +3828,11 @@ def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
         member_filters = [str(member).strip() for member in action_data.get("member_filters", []) if str(member).strip()]
         if member_filters:
             filter_query = f"{'、'.join(member_filters)}负责的{filter_query}"
-        sent_result = _handle_query_status({"query": filter_query}, chat_id=chat_id)
+        sent_result = _handle_query_status({
+            "query": filter_query,
+            "filter": action_data.get("filter") or "",
+            "member_filters": member_filters,
+        }, chat_id=chat_id)
         if isinstance(sent_result, str) and "项目看板已发送" in sent_result:
             return tool_result({
                 "status": "dashboard_filter_sent",
@@ -3845,7 +3853,13 @@ def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
         if member_filters:
             filter_query = f"{'、'.join(member_filters)}负责的{filter_query}"
         sent_result = _handle_update_project(
-            {"project_name": filter_query, "action": "send_reminder", "value": value},
+            {
+                "project_name": filter_query,
+                "action": "send_reminder",
+                "value": value,
+                "filter": status_filter,
+                "member_filters": member_filters,
+            },
             chat_id=chat_id,
         )
         try:
@@ -4179,7 +4193,21 @@ PILOTFLOW_QUERY_STATUS_SCHEMA = {
     "parameters": {
         "type": "object",
         "properties": {
-            "query": {"type": "string", "description": "用户的查询内容。"},
+            "query": {"type": "string", "description": "用户的查询内容，仅用于展示和详情项目名称匹配，不作为状态/负责人筛选语义来源。"},
+            "filter": {
+                "type": "string",
+                "enum": ["", "all", "archived", "risk", "overdue", "due_soon", "active", "completed"],
+                "description": "Agent 显式识别出的看板筛选条件；不要依赖工具从 query 推断。",
+            },
+            "member_filters": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "Agent 显式识别出的负责人/成员筛选条件。",
+            },
+            "allow_inferred_filters": {
+                "type": "boolean",
+                "description": "兼容旧链路时才设为 true，允许工具从 query 推断 filter/member_filters；默认 false。",
+            },
         },
         "required": ["query"],
     },
@@ -4190,7 +4218,12 @@ def _handle_query_status(params: Dict[str, Any], **kwargs) -> str:
     """Query project status and send a dashboard card."""
     query = params.get("query", "")
     chat_id = _get_chat_id(kwargs)
-    status_filter = _status_filter_from_query(query)
+    allow_inferred_filters = bool(params.get("allow_inferred_filters"))
+    explicit_filter = str(params.get("filter") or "").strip()
+    allowed_filters = {"", "all", "archived", "risk", "overdue", "due_soon", "active", "completed"}
+    status_filter = explicit_filter if explicit_filter in allowed_filters else ""
+    if not status_filter and allow_inferred_filters:
+        status_filter = _status_filter_from_query(query)
 
     projects = []
 
@@ -4297,7 +4330,13 @@ def _handle_query_status(params: Dict[str, Any], **kwargs) -> str:
 
     # Build dashboard card
     had_projects_before_filter = bool(projects)
-    member_filters = _member_filters_from_query(query, projects)
+    member_filters = [
+        str(member).strip()
+        for member in params.get("member_filters", [])
+        if str(member).strip()
+    ]
+    if not member_filters and allow_inferred_filters:
+        member_filters = _member_filters_from_query(query, projects)
     projects = [p for p in projects if _project_matches_status_filter(p, status_filter)]
     if member_filters:
         projects = [
@@ -4602,13 +4641,27 @@ PILOTFLOW_UPDATE_PROJECT_SCHEMA = {
     "parameters": {
         "type": "object",
         "properties": {
-            "project_name": {"type": "string", "description": "项目名称。"},
+            "project_name": {"type": "string", "description": "项目名称。批量催办时仍可填写展示文本，但必须另传 filter。"},
             "action": {
                 "type": "string",
                 "enum": ["update_deadline", "add_member", "remove_member", "add_deliverable", "add_progress", "add_risk", "resolve_risk", "update_status", "send_reminder"],
                 "description": "操作类型。",
             },
             "value": {"type": "string", "description": "新值（新截止时间、新成员名、要移除的成员名、新交付物/任务、新状态，或催办备注）。"},
+            "filter": {
+                "type": "string",
+                "enum": ["overdue", "due_soon", "risk"],
+                "description": "send_reminder 批量催办时 Agent 显式传入的筛选条件；工具默认不再从 project_name 推断。",
+            },
+            "member_filters": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "send_reminder 批量催办时 Agent 显式传入的负责人/成员筛选条件。",
+            },
+            "allow_inferred_filters": {
+                "type": "boolean",
+                "description": "兼容旧链路时才设为 true，允许工具从 project_name 推断批量 filter/member_filters；默认 false。",
+            },
             "confirmation_text": {"type": "string", "description": "当动作需要确认时，用户最新的明确确认文本。"},
         },
         "required": ["project_name", "action", "value"],
@@ -4642,7 +4695,11 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
         }
 
     if action == "send_reminder":
-        batch_filter = _status_filter_from_query(project_name)
+        allow_inferred_filters = bool(params.get("allow_inferred_filters"))
+        explicit_filter = str(params.get("filter") or "").strip()
+        batch_filter = explicit_filter if explicit_filter in ("overdue", "due_soon", "risk") else ""
+        if not batch_filter and allow_inferred_filters:
+            batch_filter = _status_filter_from_query(project_name)
         if batch_filter in ("overdue", "due_soon", "risk"):
             with _project_registry_lock:
                 candidate_projects = [
@@ -4655,7 +4712,13 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
                     }
                     for title, info in _project_registry.items()
                 ]
-                member_filters = _member_filters_from_query(project_name, candidate_projects)
+                member_filters = [
+                    str(member).strip()
+                    for member in params.get("member_filters", [])
+                    if str(member).strip()
+                ]
+                if not member_filters and allow_inferred_filters:
+                    member_filters = _member_filters_from_query(project_name, candidate_projects)
                 candidates = []
                 for item in candidate_projects:
                     if not _project_matches_status_filter({

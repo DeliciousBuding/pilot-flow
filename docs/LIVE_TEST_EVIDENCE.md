@@ -64,6 +64,19 @@
 | WSL runtime dry-run | `verify_wsl_feishu_runtime.py --env-file /home/ding/.hermes/.env --config-file /home/ding/.hermes/config.yaml` 输出脱敏通过：`config_model=mimo-v2.5-pro`、`config_provider=vectorcontrol`、`config_has_feishu_gateway=true` |
 | 真实 Feishu 卡片验证 | WSL `verify_wsl_feishu_runtime.py --send-card` 成功：`card_sent=true`、`pending_plan_recovered=true`、`card_action_recovered=true`、`redaction_enabled=true` |
 
+## 2026-05-04 Agent 主驾驶边界：看板筛选显式字段门控
+
+| 项目 | 证据 |
+| --- | --- |
+| 功能硬化 | `pilotflow_query_status` 默认不再从 `query` 推断 `risk/overdue/due_soon/active/completed` 或负责人筛选；Agent 必须显式传入 `filter` 和 `member_filters`，否则只按默认看板展示 |
+| 批量催办硬化 | `pilotflow_update_project action=send_reminder` 默认不再从 `project_name="逾期项目"`、`"张三负责的逾期项目"` 推断批量催办范围；批量路径必须显式传入 `filter` 和 `member_filters` |
+| 兼容路径 | 旧 `_status_filter_from_query` / `_member_filters_from_query` 仅在 `allow_inferred_filters=true` 时启用，作为显式兼容通道，不再是默认语义来源 |
+| 卡片路径兼容 | 看板筛选、分页、简报批量催办、简报批量待办等卡片 action 继续通过 opaque `pilotflow_action_id` 携带结构化 `filter/member_filters`，不依赖 query 重新解析 |
+| 自动化验证 | `C:\Users\Ding\miniforge3\python.exe -m pytest` 通过，结果 `193 passed` |
+| WSL 安装验证 | `setup.py --hermes-dir D:\Code\LarkProject\hermes-agent --hermes-home \\wsl.localhost\Ubuntu-24.04\home\ding\.hermes` 通过；插件文件已同步到 WSL Hermes runtime |
+| WSL runtime dry-run | `verify_wsl_feishu_runtime.py --env-file /home/ding/.hermes/.env --config-file /home/ding/.hermes/config.yaml` 输出脱敏通过：`config_model=mimo-v2.5-pro`、`config_provider=vectorcontrol`、`config_has_feishu_gateway=true` |
+| 真实 Feishu 卡片验证 | WSL `verify_wsl_feishu_runtime.py --send-card` 成功：`card_sent=true`、`pending_plan_recovered=true`、`card_action_recovered=true`、`redaction_enabled=true` |
+
 ## 2026-05-03 状态看板场景
 
 | 项目 | 证据 |
