@@ -242,6 +242,22 @@ def test_verify_runtime_progress_update_is_sanitized(tmp_path, monkeypatch):
     assert "example.invalid" not in json.dumps(result, ensure_ascii=False)
 
 
+def test_verify_runtime_project_reminder_is_sanitized(tmp_path, monkeypatch):
+    hermes_dir, _sent_cards = _install_runtime_fixture(tmp_path, monkeypatch)
+
+    result = _MODULE._verify_runtime_project_reminder(hermes_dir)
+
+    assert result["reminder_single_sent"] is True
+    assert result["reminder_single_doc_updated"] is True
+    assert result["reminder_single_history_recorded"] is True
+    assert result["reminder_single_state_recorded"] is True
+    assert result["reminder_batch_sent"] is True
+    assert result["reminder_batch_filtered"] is True
+    assert result["reminder_batch_history_recorded"] is True
+    assert result["reminder_feedback_sanitized"] is True
+    assert "example.invalid" not in json.dumps(result, ensure_ascii=False)
+
+
 def test_verifier_update_task_mode_outputs_sanitized_runtime_result(tmp_path, capsys):
     env_file = tmp_path / ".env"
     env_file.write_text("PILOTFLOW_TEST_CHAT_ID=oc_real_chat_id\n", encoding="utf-8")
@@ -468,6 +484,45 @@ def test_verifier_progress_update_mode_outputs_sanitized_runtime_result(tmp_path
     assert output["progress_history_recorded"] is True
     assert output["progress_state_recorded"] is True
     assert output["progress_feedback_sent"] is True
+    assert "oc_real_chat_id" not in output_text
+    assert "example.invalid" not in output_text
+
+
+def test_verifier_project_reminder_mode_outputs_sanitized_runtime_result(tmp_path, capsys):
+    env_file = tmp_path / ".env"
+    env_file.write_text("PILOTFLOW_TEST_CHAT_ID=oc_real_chat_id\n", encoding="utf-8")
+
+    with patch.object(_MODULE, "_verify_runtime_project_reminder", return_value={
+        "reminder_single_sent": True,
+        "reminder_single_doc_updated": True,
+        "reminder_single_history_recorded": True,
+        "reminder_single_state_recorded": True,
+        "reminder_batch_sent": True,
+        "reminder_batch_filtered": True,
+        "reminder_batch_history_recorded": True,
+        "reminder_feedback_sanitized": True,
+        "raw_chat_id": "oc_real_chat_id",
+        "raw_doc_url": "https://example.invalid/doc/1",
+    }):
+        exit_code = _MODULE.main([
+            "--hermes-dir", str(tmp_path),
+            "--env-file", str(env_file),
+            "--verify-project-reminder",
+        ])
+
+    output_text = capsys.readouterr().out
+    output = json.loads(output_text)
+    assert exit_code == 0
+    assert output["mode"] == "project-reminder"
+    assert output["would_send_card"] is False
+    assert output["reminder_single_sent"] is True
+    assert output["reminder_single_doc_updated"] is True
+    assert output["reminder_single_history_recorded"] is True
+    assert output["reminder_single_state_recorded"] is True
+    assert output["reminder_batch_sent"] is True
+    assert output["reminder_batch_filtered"] is True
+    assert output["reminder_batch_history_recorded"] is True
+    assert output["reminder_feedback_sanitized"] is True
     assert "oc_real_chat_id" not in output_text
     assert "example.invalid" not in output_text
 

@@ -1107,6 +1107,19 @@
 | 用户价值 | 群里追加项目进展后，PilotFlow 不只是回复文本，而是把进展同步到项目文档、状态表流水、脱敏状态和群反馈，补齐日常推进记录的真实办公闭环 |
 | 隐私处理 | 证据只记录布尔结果和脱敏结论；不写入真实 chat_id、message_id、Feishu URL、用户 open_id、token 或 app secret |
 
+## 2026-05-05 项目催办运行态验证
+
+| 项目 | 证据 |
+| --- | --- |
+| 运行环境 | PilotFlow 已通过 `setup.py --hermes-home <wsl-hermes-home>` 同步到 WSL Hermes runtime；安装验证返回插件、技能、Hermes config 和 Feishu display 配置均 OK |
+| 本地回归 | `C:\Users\Ding\miniforge3\python.exe -m pytest` 返回 `241 passed`；`tests/test_verify_wsl_feishu_runtime.py` 返回 `22 passed`；`git diff --check` 通过 |
+| Verifier 新模式 | `verify_wsl_feishu_runtime.py --verify-project-reminder` 在已安装的 WSL Hermes runtime 插件内返回 `reminder_single_sent=true`、`reminder_single_doc_updated=true`、`reminder_single_history_recorded=true`、`reminder_single_state_recorded=true`、`reminder_batch_sent=true`、`reminder_batch_filtered=true`、`reminder_batch_history_recorded=true`、`reminder_feedback_sanitized=true` |
+| 单项目催办路径 | verifier 通过生产 `pilotflow_update_project` 的 `send_reminder` 分支执行单项目催办，dry-run 替换 Hermes 群发送、项目文档和 Base 流水，证明安装态插件能把“请同步进展”类办公催办写入群反馈、项目文档、状态表流水和脱敏状态 |
+| 批量催办路径 | 同一 verifier 再显式传入 `filter=overdue` 执行批量逾期催办，确认只命中逾期项目，不催办未到期项目，并为命中项目追加 Base 流水 |
+| 基线验证 | 同轮继续通过 `--probe-llm` 的 `llm_probe_ok=true`、`llm_probe_status=200`，`--send-card` 的 `card_sent=true`、`card_has_title=true`、`card_has_goal=true`、`card_has_risk=true`，`--verify-history` 的 `history_apply_card_sent=true`，`--verify-update-task` 的 `update_task_created=true`，`--verify-archive-gate` 的 `archive_gate_required=true`，`--verify-followup-task` 的 `followup_task_created=true`，`--verify-deadline-update` 的 `deadline_update_applied=true`，`--verify-member-permissions` 的 `member_added=true`，`--verify-risk-cycle` 的 `risk_reported=true`，以及 `--verify-progress-update` 的 `progress_update_applied=true` |
+| 用户价值 | 用户在群里要求催办项目时，PilotFlow 能直接发送中文群提醒并保留可追踪流水；当 Agent 明确传入筛选条件时，也能批量催办逾期项目，补齐“发现逾期 → 催办 → 留痕”的办公闭环 |
+| 隐私处理 | 证据只记录布尔结果和脱敏结论；不写入真实 chat_id、message_id、Feishu URL、用户 open_id、token 或 app secret |
+
 ## 本地回归
 
 ```bash

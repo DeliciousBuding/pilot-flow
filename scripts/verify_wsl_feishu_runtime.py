@@ -148,6 +148,14 @@ def _sanitize_result(result: dict[str, Any]) -> dict[str, Any]:
         "progress_history_recorded",
         "progress_state_recorded",
         "progress_feedback_sent",
+        "reminder_single_sent",
+        "reminder_single_doc_updated",
+        "reminder_single_history_recorded",
+        "reminder_single_state_recorded",
+        "reminder_batch_sent",
+        "reminder_batch_filtered",
+        "reminder_batch_history_recorded",
+        "reminder_feedback_sanitized",
         "error",
     }
     return {key: result[key] for key in allowed if key in result}
@@ -961,6 +969,146 @@ def _verify_runtime_progress_update(hermes_dir: Path) -> dict[str, Any]:
     }
 
 
+def _verify_runtime_project_reminder(hermes_dir: Path) -> dict[str, Any]:
+    """Verify installed PilotFlow sends project reminders with doc/Base/state traces."""
+    sys.path.insert(0, str(hermes_dir))
+    import datetime as dt
+    import plugins.pilotflow.tools as runtime_tools  # pylint: disable=import-error
+    from plugins.pilotflow.tools import (  # pylint: disable=import-error
+        _handle_update_project,
+        _load_project_state,
+        _project_registry,
+        _project_registry_lock,
+        _register_project,
+    )
+
+    chat_id = os.environ.get("PILOTFLOW_TEST_CHAT_ID", "")
+    original_state_path = os.environ.get("PILOTFLOW_STATE_PATH")
+    original_append_doc = runtime_tools._append_project_doc_update
+    original_append_history = runtime_tools._append_bitable_update_record
+    original_send = runtime_tools._hermes_send
+    doc_labels: list[tuple[str, str, str]] = []
+    history_labels: list[tuple[str, str, str, str]] = []
+    sent_messages: list[str] = []
+
+    def fake_append_doc(title: str, _project: dict, label: str, value: str, *_args: Any, **_kwargs: Any) -> bool:
+        doc_labels.append((title, label, value))
+        return True
+
+    def fake_append_history(app_token: str, table_id: str, label: str, value: str, *_args: Any, **_kwargs: Any) -> bool:
+        history_labels.append((app_token, table_id, label, value))
+        return True
+
+    def fake_send(_chat_id: str, text: str) -> bool:
+        sent_messages.append(text)
+        return True
+
+    with tempfile.TemporaryDirectory(prefix="pilotflow-reminder-verify-") as tmpdir:
+        os.environ["PILOTFLOW_STATE_PATH"] = str(Path(tmpdir) / "pilotflow_state.json")
+        with _project_registry_lock:
+            _project_registry.clear()
+        runtime_tools._append_project_doc_update = fake_append_doc
+        runtime_tools._append_bitable_update_record = fake_append_history
+        runtime_tools._hermes_send = fake_send
+        try:
+            overdue = (dt.date.today() - dt.timedelta(days=1)).isoformat()
+            future = (dt.date.today() + dt.timedelta(days=10)).isoformat()
+            _register_project(
+                "运行态单项目催办项目",
+                ["张三"],
+                future,
+                "进行中",
+                ["文档: https://example.invalid/doc/reminder-single"],
+                app_token="app_single",
+                table_id="tbl_single",
+                record_id="rec_single",
+                goal="验证安装后的单项目催办",
+                deliverables=["初始验收"],
+            )
+            _register_project(
+                "运行态批量逾期催办项目",
+                ["李四"],
+                overdue,
+                "进行中",
+                ["文档: https://example.invalid/doc/reminder-overdue"],
+                app_token="app_overdue",
+                table_id="tbl_overdue",
+                record_id="rec_overdue",
+                goal="验证安装后的批量催办",
+                deliverables=["初始验收"],
+            )
+            _register_project(
+                "运行态批量未到期项目",
+                ["王五"],
+                future,
+                "进行中",
+                ["文档: https://example.invalid/doc/reminder-future"],
+                app_token="app_future",
+                table_id="tbl_future",
+                record_id="rec_future",
+                goal="验证安装后的批量催办过滤",
+                deliverables=["初始验收"],
+            )
+            single = json.loads(_handle_update_project(
+                {
+                    "project_name": "运行态单项目催办",
+                    "action": "send_reminder",
+                    "value": "请今天同步最新进展",
+                },
+                chat_id=chat_id,
+            ))
+            batch = json.loads(_handle_update_project(
+                {
+                    "project_name": "逾期项目",
+                    "action": "send_reminder",
+                    "value": "请今天同步最新进展",
+                    "filter": "overdue",
+                },
+                chat_id=chat_id,
+            ))
+            state_projects = _load_project_state()
+        finally:
+            runtime_tools._append_project_doc_update = original_append_doc
+            runtime_tools._append_bitable_update_record = original_append_history
+            runtime_tools._hermes_send = original_send
+            with _project_registry_lock:
+                _project_registry.clear()
+            if original_state_path is None:
+                os.environ.pop("PILOTFLOW_STATE_PATH", None)
+            else:
+                os.environ["PILOTFLOW_STATE_PATH"] = original_state_path
+
+    state_updates: list[dict[str, Any]] = []
+    for item in state_projects:
+        if item.get("title") == "运行态单项目催办项目":
+            state_updates = item.get("updates", [])
+            break
+    feedback_text = "\n".join(sent_messages)
+    return {
+        "reminder_single_sent": single.get("status") == "project_updated" and single.get("reminder_sent") is True,
+        "reminder_single_doc_updated": single.get("doc_updated") is True
+        and ("运行态单项目催办项目", "催办", "请今天同步最新进展") in doc_labels,
+        "reminder_single_history_recorded": single.get("bitable_history_created") is True
+        and ("app_single", "tbl_single", "催办", "请今天同步最新进展") in history_labels,
+        "reminder_single_state_recorded": any(
+            item.get("action") == "催办" and item.get("value") == "已发送催办提醒"
+            for item in state_updates
+            if isinstance(item, dict)
+        ),
+        "reminder_batch_sent": batch.get("status") == "project_reminders_sent" and batch.get("reminder_count") == 1,
+        "reminder_batch_filtered": batch.get("projects") == ["运行态批量逾期催办项目"],
+        "reminder_batch_history_recorded": ("app_overdue", "tbl_overdue", "催办", "请今天同步最新进展") in history_labels,
+        "reminder_feedback_sanitized": (
+            "项目催办" in feedback_text
+            and "运行态单项目催办项目" in feedback_text
+            and "运行态批量逾期催办项目" in feedback_text
+            and "运行态批量未到期项目" not in feedback_text
+            and "example.invalid" not in feedback_text
+            and "<at user_id" not in feedback_text
+        ),
+    }
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Verify PilotFlow WSL Feishu runtime.")
     parser.add_argument("--hermes-dir", required=True, help="Hermes runtime directory.")
@@ -976,6 +1124,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--verify-member-permissions", action="store_true", help="Dry-run installed add-member permission refresh behavior.")
     parser.add_argument("--verify-risk-cycle", action="store_true", help="Dry-run installed risk report/resolve behavior.")
     parser.add_argument("--verify-progress-update", action="store_true", help="Dry-run installed progress recording behavior.")
+    parser.add_argument("--verify-project-reminder", action="store_true", help="Dry-run installed single/batch project reminder behavior.")
     args = parser.parse_args(argv)
 
     hermes_dir = Path(args.hermes_dir).resolve()
@@ -983,7 +1132,8 @@ def main(argv: list[str] | None = None) -> int:
     config_result = _read_runtime_config(Path(args.config_file))
     import_result = _check_imports(hermes_dir)
     mode = (
-        "progress-update" if args.verify_progress_update
+        "project-reminder" if args.verify_project_reminder
+        else "progress-update" if args.verify_progress_update
         else "risk-cycle" if args.verify_risk_cycle
         else "member-permissions" if args.verify_member_permissions
         else "deadline-update" if args.verify_deadline_update
@@ -1023,6 +1173,8 @@ def main(argv: list[str] | None = None) -> int:
         output.update(_verify_runtime_risk_cycle(hermes_dir))
     if args.verify_progress_update:
         output.update(_verify_runtime_progress_update(hermes_dir))
+    if args.verify_project_reminder:
+        output.update(_verify_runtime_project_reminder(hermes_dir))
     if args.probe_llm:
         output.update(_probe_llm(config_result))
     print(json.dumps(_sanitize_result(output), ensure_ascii=False, sort_keys=True))
