@@ -147,34 +147,48 @@ def _evict_caches():
 
 def _check_plan_gate(chat_id: str) -> bool:
     """Check if a plan was generated for this chat_id within TTL."""
+    now = time.time()
     with _plan_lock:
         ts = _plan_generated.get(chat_id)
-        if ts and time.time() - ts < _PLAN_GATE_TTL:
+        if ts and now - ts < _PLAN_GATE_TTL:
             return True
-        return False
+    pending = _load_pending_plan(chat_id)
+    return bool(pending and now - pending.get("timestamp", 0) < _PLAN_GATE_TTL)
 
 
 def _set_plan_gate(chat_id: str):
     """Mark plan as generated for this chat_id."""
+    ts = time.time()
     with _plan_lock:
-        _plan_generated[chat_id] = time.time()
+        _plan_generated[chat_id] = ts
+    _persist_pending_plan(chat_id, None, ts)
 
 
 def _clear_plan_gate(chat_id: str):
     """Clear the plan gate for this chat_id after execution."""
     with _plan_lock:
         _plan_generated.pop(chat_id, None)
+    _delete_pending_plan(chat_id)
 
 
 def _consume_plan_gate(chat_id: str) -> bool:
     """Atomically consume the text-confirmation gate for a chat."""
+    now = time.time()
+    consumed = False
     with _plan_lock:
         ts = _plan_generated.get(chat_id)
-        if not ts or time.time() - ts >= _PLAN_GATE_TTL:
+        if ts and now - ts < _PLAN_GATE_TTL:
+            consumed = True
+        elif ts:
             _plan_generated.pop(chat_id, None)
-            return False
         _plan_generated.pop(chat_id, None)
+    if consumed:
         return True
+    pending = _load_pending_plan(chat_id)
+    if pending and now - pending.get("timestamp", 0) < _PLAN_GATE_TTL:
+        return True
+    _delete_pending_plan(chat_id)
+    return False
 
 
 def _plan_idempotency_key(chat_id: str, plan: dict) -> str:
@@ -281,6 +295,7 @@ def _clear_pending_plan_if_matches(chat_id: str, plan: Optional[dict]) -> None:
         if pending.get("plan") == plan:
             _pending_plans.pop(chat_id, None)
             _plan_generated.pop(chat_id, None)
+            _delete_pending_plan(chat_id)
 
 
 def _remember_recent_confirmed_project(chat_id: str, title: str) -> None:
@@ -836,6 +851,66 @@ def _card_action_ids_for_message(message_id: str) -> list[str]:
         action_id for action_id, ref in card_actions.items()
         if isinstance(ref, dict) and ref.get("message_id") == message_id
     ]
+
+
+def _persist_pending_plan(chat_id: str, pending: Optional[dict], timestamp: Optional[float] = None) -> None:
+    """Persist a short-lived pending plan for text confirmation after restart."""
+    if not chat_id:
+        return
+    now = time.time()
+    payload = _load_state_payload()
+    pending_plans = payload.get("pending_plans")
+    if not isinstance(pending_plans, dict):
+        pending_plans = {}
+    existing = pending_plans.get(chat_id) if isinstance(pending_plans.get(chat_id), dict) else {}
+    if pending is None:
+        pending = existing or {}
+    cached = json.loads(json.dumps(dict(pending), ensure_ascii=False))
+    cached["timestamp"] = float(timestamp or cached.get("timestamp", now) or now)
+    pending_plans[chat_id] = cached
+    payload["pending_plans"] = {
+        key: value
+        for key, value in pending_plans.items()
+        if isinstance(value, dict) and now - value.get("timestamp", 0) < _PLAN_GATE_TTL
+    }
+    _write_state_payload(payload)
+
+
+def _load_pending_plan(chat_id: str) -> Optional[dict]:
+    """Load a pending plan from memory or durable state."""
+    if not chat_id:
+        return None
+    with _plan_lock:
+        pending = _pending_plans.get(chat_id)
+        if isinstance(pending, dict) and pending:
+            return dict(pending)
+    payload = _load_state_payload()
+    pending_plans = payload.get("pending_plans")
+    if not isinstance(pending_plans, dict):
+        return None
+    pending = pending_plans.get(chat_id)
+    if not isinstance(pending, dict):
+        return None
+    if time.time() - pending.get("timestamp", 0) >= _PLAN_GATE_TTL:
+        _delete_pending_plan(chat_id)
+        return None
+    with _plan_lock:
+        _pending_plans[chat_id] = dict(pending)
+        _plan_generated[chat_id] = float(pending.get("timestamp", time.time()) or time.time())
+    return dict(pending)
+
+
+def _delete_pending_plan(chat_id: str) -> None:
+    """Delete a pending plan from durable state."""
+    if not chat_id:
+        return
+    payload = _load_state_payload()
+    pending_plans = payload.get("pending_plans")
+    if not isinstance(pending_plans, dict) or chat_id not in pending_plans:
+        return
+    pending_plans.pop(chat_id, None)
+    payload["pending_plans"] = pending_plans
+    _write_state_payload(payload)
 
 
 def _save_project_state(title: str, goal: str, members: list, deliverables: list, deadline: str,
@@ -2823,14 +2898,17 @@ def _handle_generate_plan(params: Dict[str, Any], **kwargs) -> str:
 
     # Store full pending plan for card-button-driven creation
     if chat_id:
+        pending = {
+            "input": text,
+            "template": template["description"] if template else None,
+            "confirm_token": confirm_token,
+            "idempotency_key": idempotency_key,
+            "plan": dict(plan),
+            "timestamp": time.time(),
+        }
         with _plan_lock:
-            _pending_plans[chat_id] = {
-                "input": text,
-                "template": template["description"] if template else None,
-                "confirm_token": confirm_token,
-                "idempotency_key": idempotency_key,
-                "plan": dict(plan),
-            }
+            _pending_plans[chat_id] = pending
+        _persist_pending_plan(chat_id, pending)
 
     should_confirm, autonomy_mode, autonomy_reason = _needs_confirmation_for_create(chat_scope, [])
     # Group chat keeps the explicit confirmation card. Private chat can continue directly.
@@ -3044,10 +3122,8 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
                     })
                 return tool_error("请先调用 pilotflow_generate_plan 生成计划，展示给用户确认后再调用此工具。")
 
-    pending_plan = {}
-    with _plan_lock:
-        pending = dict(_pending_plans.get(chat_id, {}))
-        pending_plan = dict(pending.get("plan", {}))
+    pending = _load_pending_plan(chat_id) or {}
+    pending_plan = dict(pending.get("plan", {}))
 
     title = params.get("title", "") or pending_plan.get("title") or "项目"
     goal = params.get("goal", "") or pending_plan.get("goal", "")
@@ -3228,6 +3304,7 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
     if not bool(kwargs.get("_pilotflow_plan_override")):
         with _plan_lock:
             _pending_plans.pop(chat_id, None)
+        _delete_pending_plan(chat_id)
     _remember_recent_confirmed_project(chat_id, title)
 
     # Pre-formatted display lines for LLM to present directly
@@ -3386,6 +3463,7 @@ def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
             _clear_plan_gate(chat_id)
             with _plan_lock:
                 _pending_plans.pop(chat_id, None)
+            _delete_pending_plan(chat_id)
         _hermes_send(chat_id, "已取消本次项目创建。")
         return tool_result({
             "status": "cancelled",
@@ -3401,8 +3479,7 @@ def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
         if recovered_plan_override:
             recovered_plan = dict(recovered_plan_override)
         else:
-            with _plan_lock:
-                pending = _pending_plans.get(chat_id, {})
+            pending = _load_pending_plan(chat_id) or {}
             recovered_plan = pending.get("plan", {})
         if not recovered_plan.get("title"):
             return tool_error("无法恢复项目信息，请重新用 pilotflow_generate_plan 生成计划。")
@@ -3450,7 +3527,9 @@ def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
                 elif field == "deadline" and not pending_plan.get(field):
                     pending_plan[field] = value
             pending["plan"] = pending_plan
+            pending["timestamp"] = time.time()
             _pending_plans[chat_id] = pending
+        _persist_pending_plan(chat_id, pending)
         updated_card, action_ids = _build_plan_confirmation_card(chat_id, "", pending_plan, [], {})
         sent_message_id = _hermes_send_card(chat_id, updated_card)
         if isinstance(sent_message_id, str):

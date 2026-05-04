@@ -678,6 +678,7 @@
 | 重启后幂等回放 | 新增回归验证：首次创建成功后清空内存幂等缓存，再用同一 `idempotency_key` 调用创建工具，仍从状态文件返回 `project_space_replayed`，且不会重复创建文档、多维表格或待办 |
 | 状态脱敏 | 幂等回放状态只持久化可展示回放字段；测试确认状态文件包含 `idempotency`，但不包含 Feishu `app_token` 或用户 `open_id` |
 | 重启后卡片按钮 | 新增回归验证：卡片 action ref 写入状态文件，清空内存模拟 gateway 重启后，点击同一 `pilotflow_action_id` 仍能执行看板翻页并更新原卡片；消费后状态文件不再保留该 action id |
+| 重启后文本确认 | 新增回归验证：生成计划后清空 `_pending_plans` 和 `_plan_generated` 模拟 gateway 重启，用户只回复 `确认执行` 仍能从状态文件恢复 pending plan，并创建文档、多维表格和待办 |
 | 用户价值 | 计划生成和创建执行现在都有可追踪 `confirm_token` 与稳定 `idempotency_key`，并写入 Flight Recorder；重复确认和按钮单次消费可被审计 |
 | 隐私处理 | 验证只记录布尔结果；不写入真实 chat_id、message_id、confirm token、idempotency key、Feishu URL、token 或 app secret |
 
@@ -690,7 +691,7 @@ C:\Users\Ding\miniforge3\python.exe -m pytest tests\test_tools.py tests\test_set
 结果：
 
 ```text
-165 passed
+166 passed
 ```
 
 ## 当前证据边界

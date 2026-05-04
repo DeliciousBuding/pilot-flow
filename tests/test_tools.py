@@ -1090,6 +1090,58 @@ def test_create_project_accepts_raw_confirmation_text_fallback():
         assert "迁移验证项目" in _project_registry
 
 
+def test_text_confirmation_recovers_pending_plan_after_state_reload():
+    chat_id = "oc_text_confirm_restart"
+    with _project_registry_lock:
+        _project_registry.clear()
+    with _plan_lock:
+        _pending_plans.clear()
+        _card_action_refs.clear()
+
+    with patch("tools._hermes_send_card", return_value="om_plan_restart"):
+        _handle_generate_plan(
+            {
+                "input_text": "帮我准备重启确认项目，先给我确认卡片",
+                "title": "重启确认项目",
+                "goal": "验证文本确认重启恢复",
+                "members": ["张三"],
+                "deliverables": ["恢复验证记录"],
+                "deadline": "2026-05-10",
+            },
+            chat_id=chat_id,
+        )
+    with _plan_lock:
+        _pending_plans.clear()
+        from tools import _plan_generated
+        _plan_generated.clear()
+
+    with (
+        patch("tools._resolve_member", return_value="ou_real_member"),
+        patch("tools._create_doc", return_value="https://example.invalid/doc") as create_doc,
+        patch("tools._create_bitable", return_value={
+            "url": "https://example.invalid/base",
+            "app_token": "app1",
+            "table_id": "tbl1",
+            "record_id": "rec1",
+        }) as create_bitable,
+        patch("tools._create_task", return_value="任务已创建") as create_task,
+        patch("tools._hermes_send_card", return_value=True),
+        patch("tools._create_calendar_event", return_value=None),
+        patch("tools._schedule_deadline_reminder", return_value=False),
+        patch("tools._save_to_hermes_memory", return_value=True),
+    ):
+        result = json.loads(_handle_create_project_space(
+            {"input_text": "确认执行"},
+            chat_id=chat_id,
+        ))
+
+    assert result["status"] == "project_space_created"
+    assert result["title"] == "重启确认项目"
+    assert create_doc.call_count == 1
+    assert create_bitable.call_count == 1
+    assert create_task.call_count == 1
+
+
 def test_create_project_returns_redacted_flight_record():
     chat_id = "oc_create_trace"
     with _project_registry_lock:
