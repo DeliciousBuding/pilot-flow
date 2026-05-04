@@ -1270,6 +1270,19 @@
 | 用户价值 | 项目空间创建后的文档和待办现在有可复跑安装态门禁：文档会留下协作引导并刷新权限，待办会绑定负责人和项目成员关注者，降低“创建了资源但团队无法协作/追踪”的风险 |
 | 隐私处理 | 证据只记录布尔结果和脱敏结论；不写入真实 chat_id、message_id、Feishu URL、用户 open_id、token 或 app secret |
 
+## 2026-05-05 Hermes 注册面安装态验证
+
+| 项目 | 证据 |
+| --- | --- |
+| 运行环境 | PilotFlow 已通过 `setup.py --hermes-home <wsl-hermes-home>` 同步到 WSL Hermes runtime；安装验证返回插件、技能、Hermes config 和 Feishu display 配置均 OK |
+| 本地回归 | `C:\Users\Ding\miniforge3\python.exe -m pytest` 返回 `266 passed`；`tests/test_verify_wsl_feishu_runtime.py` 返回 `44 passed`；`git diff --check` 通过 |
+| Verifier 新模式 | `verify_wsl_feishu_runtime.py --verify-plugin-registration` 在已安装的 WSL Hermes runtime 插件内返回 `registration_tools_exposed=true`、`registration_expected_tool_count=true`、`registration_schemas_match_names=true`、`registration_check_fns_present=true`、`registration_handlers_present=true`、`registration_card_command_exposed=true` |
+| Hermes 工具入口 | verifier 在 WSL runtime 中导入已安装 `plugins.pilotflow`，用 fake Hermes context 调用 `register(ctx)`，确认 8 个 PilotFlow 工具按顺序注册、schema name 与 tool name 一致，并且每个工具都有 handler 和 check_fn |
+| 卡片命令入口 | 同一 verifier 确认 `/card` command 已注册，handler 可调用，`args_hint` 保留 `pilotflow_action`，避免插件复制成功但 Hermes 实际无法路由飞书卡片点击 |
+| 基线验证 | 同轮继续通过 `--verify-health-check` 的 `health_check_ok=true`、`health_skill_guidance_current=true`，以及 `--probe-llm` 的 `llm_probe_ok=true`、`llm_probe_status=200` |
+| 用户价值 | 安装验证不再只检查文件存在；现在能证明 Hermes runtime 会看到 PilotFlow 的工具和卡片回调入口，降低“装上了但 Agent 无法调用”的发布风险 |
+| 隐私处理 | 证据只记录布尔结果和脱敏结论；不写入真实 chat_id、message_id、Feishu URL、用户 open_id、token 或 app secret |
+
 ## 本地回归
 
 ```bash
@@ -1279,7 +1292,7 @@ C:\Users\Ding\miniforge3\python.exe -m pytest tests\test_tools.py tests\test_set
 结果：
 
 ```text
-264 passed
+266 passed
 ```
 
 ## 当前证据边界

@@ -358,6 +358,19 @@ def test_verify_runtime_health_check_is_sanitized(tmp_path, monkeypatch):
     assert "sentinel_state_path_should_not_leak" not in serialized
 
 
+def test_verify_runtime_plugin_registration_exposes_tools_and_card_command(tmp_path, monkeypatch):
+    hermes_dir, _sent_cards = _install_runtime_fixture(tmp_path, monkeypatch)
+
+    result = _MODULE._verify_runtime_plugin_registration(hermes_dir)
+
+    assert result["registration_tools_exposed"] is True
+    assert result["registration_expected_tool_count"] is True
+    assert result["registration_schemas_match_names"] is True
+    assert result["registration_check_fns_present"] is True
+    assert result["registration_card_command_exposed"] is True
+    assert result["registration_handlers_present"] is True
+
+
 def test_verify_runtime_briefing_batch_reminder_is_sanitized(tmp_path, monkeypatch):
     hermes_dir, _sent_cards = _install_runtime_fixture(tmp_path, monkeypatch)
 
@@ -865,6 +878,39 @@ def test_verifier_health_check_mode_outputs_sanitized_runtime_result(tmp_path, c
     assert output["health_skill_guidance_current"] is True
     assert "oc_real_chat_id" not in output_text
     assert "real_secret" not in output_text
+
+
+def test_verifier_plugin_registration_mode_outputs_runtime_result(tmp_path, capsys):
+    env_file = tmp_path / ".env"
+    env_file.write_text("PILOTFLOW_TEST_CHAT_ID=oc_real_chat_id\n", encoding="utf-8")
+
+    with patch.object(_MODULE, "_verify_runtime_plugin_registration", return_value={
+        "registration_tools_exposed": True,
+        "registration_expected_tool_count": True,
+        "registration_schemas_match_names": True,
+        "registration_check_fns_present": True,
+        "registration_card_command_exposed": True,
+        "registration_handlers_present": True,
+        "raw_chat_id": "oc_real_chat_id",
+    }):
+        exit_code = _MODULE.main([
+            "--hermes-dir", str(tmp_path),
+            "--env-file", str(env_file),
+            "--verify-plugin-registration",
+        ])
+
+    output_text = capsys.readouterr().out
+    output = json.loads(output_text)
+    assert exit_code == 0
+    assert output["mode"] == "plugin-registration"
+    assert output["would_send_card"] is False
+    assert output["registration_tools_exposed"] is True
+    assert output["registration_expected_tool_count"] is True
+    assert output["registration_schemas_match_names"] is True
+    assert output["registration_check_fns_present"] is True
+    assert output["registration_card_command_exposed"] is True
+    assert output["registration_handlers_present"] is True
+    assert "oc_real_chat_id" not in output_text
 
 
 def test_verifier_collaboration_resources_mode_outputs_sanitized_runtime_result(tmp_path, capsys):

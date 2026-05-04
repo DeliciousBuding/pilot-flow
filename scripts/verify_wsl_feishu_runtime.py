@@ -116,6 +116,12 @@ def _sanitize_result(result: dict[str, Any]) -> dict[str, Any]:
         "health_memory_flags_reported",
         "health_card_bridge_registered",
         "health_skill_guidance_current",
+        "registration_tools_exposed",
+        "registration_expected_tool_count",
+        "registration_schemas_match_names",
+        "registration_check_fns_present",
+        "registration_card_command_exposed",
+        "registration_handlers_present",
         "history_suggestion_found",
         "history_apply_action_found",
         "history_apply_card_sent",
@@ -806,6 +812,52 @@ def _verify_runtime_project_creation(hermes_dir: Path) -> dict[str, Any]:
             and "example.invalid" not in flight_record_text
             and chat_id not in flight_record_text
         ),
+    }
+
+
+def _verify_runtime_plugin_registration(hermes_dir: Path) -> dict[str, Any]:
+    """Verify installed PilotFlow exposes the expected Hermes tools and command."""
+    sys.path.insert(0, str(hermes_dir))
+    import plugins.pilotflow as runtime_plugin  # pylint: disable=import-error
+
+    expected_tools = [
+        "pilotflow_scan_chat_signals",
+        "pilotflow_generate_plan",
+        "pilotflow_detect_risks",
+        "pilotflow_create_project_space",
+        "pilotflow_handle_card_action",
+        "pilotflow_query_status",
+        "pilotflow_update_project",
+        "pilotflow_health_check",
+    ]
+
+    class RuntimeRegistrationContext:
+        def __init__(self) -> None:
+            self.tools: list[dict[str, Any]] = []
+            self.commands: list[dict[str, Any]] = []
+
+        def register_tool(self, **kwargs: Any) -> None:
+            self.tools.append(kwargs)
+
+        def register_command(self, **kwargs: Any) -> None:
+            self.commands.append(kwargs)
+
+    ctx = RuntimeRegistrationContext()
+    runtime_plugin.register(ctx)
+    tool_names = [item.get("name") for item in ctx.tools]
+    card_commands = [item for item in ctx.commands if item.get("name") == "card"]
+    return {
+        "registration_tools_exposed": tool_names == expected_tools,
+        "registration_expected_tool_count": len(tool_names) == len(expected_tools),
+        "registration_schemas_match_names": all(
+            (item.get("schema") or {}).get("name") == item.get("name")
+            for item in ctx.tools
+        ),
+        "registration_check_fns_present": all(callable(item.get("check_fn")) for item in ctx.tools),
+        "registration_card_command_exposed": bool(card_commands)
+        and callable(card_commands[0].get("handler"))
+        and "pilotflow_action" in str(card_commands[0].get("args_hint", "")),
+        "registration_handlers_present": all(callable(item.get("handler")) for item in ctx.tools),
     }
 
 
@@ -2502,6 +2554,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--send-card", action="store_true", help="Send one real Feishu plan card.")
     parser.add_argument("--probe-llm", action="store_true", help="Probe configured OpenAI-compatible /models endpoint.")
     parser.add_argument("--verify-health-check", action="store_true", help="Dry-run installed PilotFlow runtime health check.")
+    parser.add_argument("--verify-plugin-registration", action="store_true", help="Dry-run installed PilotFlow Hermes tool/command registration.")
     parser.add_argument("--verify-history", action="store_true", help="Send real cards that verify history suggestions can be applied.")
     parser.add_argument("--verify-projectization-suggestion", action="store_true", help="Send real cards that verify chat signal projectization suggestion flow.")
     parser.add_argument("--verify-project-creation", action="store_true", help="Dry-run installed create-project resource orchestration.")
@@ -2544,6 +2597,7 @@ def main(argv: list[str] | None = None) -> int:
         else "collaboration-resources" if args.verify_collaboration_resources
         else "project-creation" if args.verify_project_creation
         else "projectization-suggestion" if args.verify_projectization_suggestion
+        else "plugin-registration" if args.verify_plugin_registration
         else "health-check" if args.verify_health_check
         else "history" if args.verify_history
         else "send-card" if args.send_card
@@ -2564,6 +2618,8 @@ def main(argv: list[str] | None = None) -> int:
         output.update(_send_runtime_plan_card(hermes_dir))
     if args.verify_health_check:
         output.update(_verify_runtime_health_check(hermes_dir))
+    if args.verify_plugin_registration:
+        output.update(_verify_runtime_plugin_registration(hermes_dir))
     if args.verify_history:
         output.update(_verify_runtime_history_suggestions(hermes_dir))
     if args.verify_projectization_suggestion:
