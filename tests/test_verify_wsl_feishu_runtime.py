@@ -52,6 +52,8 @@ def test_verifier_send_card_mode_outputs_sanitized_runtime_result(tmp_path, caps
         "redaction_enabled": True,
         "action_ref_count": 2,
         "action_refs_have_token": True,
+        "pending_plan_recovered": True,
+        "card_action_recovered": True,
         "raw_chat_id": "oc_real_chat_id",
     }):
         exit_code = _MODULE.main([
@@ -67,4 +69,6 @@ def test_verifier_send_card_mode_outputs_sanitized_runtime_result(tmp_path, caps
     assert output["card_sent"] is True
     assert output["has_confirm_token"] is True
     assert output["action_ref_count"] == 2
+    assert output["pending_plan_recovered"] is True
+    assert output["card_action_recovered"] is True
     assert "oc_real_chat_id" not in output_text

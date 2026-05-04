@@ -10,6 +10,7 @@ import argparse
 import json
 import os
 import sys
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -54,6 +55,8 @@ def _sanitize_result(result: dict[str, Any]) -> dict[str, Any]:
         "redaction_enabled",
         "action_ref_count",
         "action_refs_have_token",
+        "pending_plan_recovered",
+        "card_action_recovered",
         "error",
     }
     return {key: result[key] for key in allowed if key in result}
@@ -83,29 +86,51 @@ def _send_runtime_plan_card(hermes_dir: Path) -> dict[str, Any]:
     sys.path.insert(0, str(hermes_dir))
     from plugins.pilotflow.tools import (  # pylint: disable=import-error
         _card_action_refs,
+        _check_plan_gate,
+        _create_card_action_ref,
         _handle_generate_plan,
+        _load_pending_plan,
         _pending_plans,
         _plan_lock,
+        _resolve_card_action_ref,
     )
 
     chat_id = os.environ.get("PILOTFLOW_TEST_CHAT_ID", "")
-    with _plan_lock:
-        _pending_plans.clear()
-        _card_action_refs.clear()
-    raw = _handle_generate_plan(
-        {
-            "input_text": "PilotFlow runtime verifier: send one confirmation card only",
-            "title": "确认幂等验证项目",
-            "goal": "验证真实 Feishu 卡片发送后返回 confirm token 和 idempotency key",
-            "members": [],
-            "deliverables": ["验证记录"],
-            "deadline": "2026-05-10",
-        },
-        chat_id=chat_id,
-    )
-    data = json.loads(raw)
-    with _plan_lock:
-        action_refs = list(_card_action_refs.values())
+    original_state_path = os.environ.get("PILOTFLOW_STATE_PATH")
+    with tempfile.TemporaryDirectory(prefix="pilotflow-runtime-verify-") as tmpdir:
+        os.environ["PILOTFLOW_STATE_PATH"] = str(Path(tmpdir) / "pilotflow_state.json")
+        with _plan_lock:
+            _pending_plans.clear()
+            _card_action_refs.clear()
+        raw = _handle_generate_plan(
+            {
+                "input_text": "PilotFlow runtime verifier: send one confirmation card only",
+                "title": "确认幂等验证项目",
+                "goal": "验证真实 Feishu 卡片发送后返回 confirm token 和 idempotency key",
+                "members": [],
+                "deliverables": ["验证记录"],
+                "deadline": "2026-05-10",
+            },
+            chat_id=chat_id,
+        )
+        data = json.loads(raw)
+        with _plan_lock:
+            action_refs = list(_card_action_refs.values())
+            _pending_plans.clear()
+            _card_action_refs.clear()
+        pending_plan_recovered = _check_plan_gate(chat_id) and bool((_load_pending_plan(chat_id) or {}).get("plan"))
+        restart_action_id = _create_card_action_ref(
+            chat_id,
+            "dashboard_page",
+            {"query": "项目进展 第1页", "page": 1},
+        )
+        with _plan_lock:
+            _card_action_refs.clear()
+        card_action_recovered = bool(_resolve_card_action_ref(restart_action_id))
+    if original_state_path is None:
+        os.environ.pop("PILOTFLOW_STATE_PATH", None)
+    else:
+        os.environ["PILOTFLOW_STATE_PATH"] = original_state_path
     return {
         "status": data.get("status"),
         "card_sent": _safe_bool(data.get("card_sent")),
@@ -118,6 +143,8 @@ def _send_runtime_plan_card(hermes_dir: Path) -> dict[str, Any]:
             _safe_bool((ref.get("plan") or {}).get("confirm_token"))
             for ref in action_refs
         ),
+        "pending_plan_recovered": pending_plan_recovered,
+        "card_action_recovered": card_action_recovered,
     }
 
 

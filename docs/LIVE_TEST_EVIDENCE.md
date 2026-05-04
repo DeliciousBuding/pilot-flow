@@ -673,7 +673,7 @@
 | Runtime 直调 | 在 WSL Hermes runtime 中加载 `.hermes/.env` 后调用已安装的 `pilotflow_generate_plan`，输出确认 `status=plan_generated`、`has_confirm_token=true`、`has_idempotency_key=true`、`trace_has_key=true`、`redaction_enabled=true` |
 | 真实链路修复 | WSL Hermes `.venv` 曾缺少 `lark_oapi`，且在 `/mnt/d` 仓库内执行 `uv sync --extra feishu` 会卡在跨文件系统 `.venv` 写入阶段；改用 `UV_PROJECT_ENVIRONMENT=/home/ding/.venvs/hermes-agent-feishu UV_LINK_MODE=copy uv sync --extra feishu` 后 3.26 秒完成安装，`lark-oapi==1.5.3` 可用 |
 | 真实卡片发送 | 在同一 WSL ext4 venv 中调用已安装的 `pilotflow_generate_plan`，输出确认 `card_sent=true`、`has_confirm_token=true`、`has_idempotency_key=true`、`trace_has_key=true`、`action_ref_count=2`、`action_refs_have_token=true` |
-| 可复现验证入口 | 新增 `scripts/verify_wsl_feishu_runtime.py`；默认 dry-run 输出 `lark_oapi_import_ok=true`、`pilotflow_import_ok=true` 且 `would_send_card=false`，显式加 `--send-card` 后输出 `card_sent=true` |
+| 可复现验证入口 | `scripts/verify_wsl_feishu_runtime.py` 默认 dry-run 输出 `lark_oapi_import_ok=true`、`pilotflow_import_ok=true` 且 `would_send_card=false`；显式加 `--send-card` 后输出 `card_sent=true`、`pending_plan_recovered=true`、`card_action_recovered=true` |
 | 执行级幂等 | 新增回归验证：同一 `idempotency_key` 第二次调用 `pilotflow_create_project_space` 返回 `project_space_replayed`，且 `_create_doc`、`_create_bitable`、`_create_task` 都只调用 1 次 |
 | 重启后幂等回放 | 新增回归验证：首次创建成功后清空内存幂等缓存，再用同一 `idempotency_key` 调用创建工具，仍从状态文件返回 `project_space_replayed`，且不会重复创建文档、多维表格或待办 |
 | 状态脱敏 | 幂等回放状态只持久化可展示回放字段；测试确认状态文件包含 `idempotency`，但不包含 Feishu `app_token` 或用户 `open_id` |
