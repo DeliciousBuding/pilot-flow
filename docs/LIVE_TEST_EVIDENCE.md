@@ -2,6 +2,20 @@
 
 > 本文件只记录可复验结论和脱敏摘要，不提交真实群 ID、用户 open_id、应用 secret、message_id 或飞书文档链接。
 
+## 2026-05-05 澄清后确认创建闭环
+
+| 项目 | 证据 |
+| --- | --- |
+| 功能验证 | 群聊信息不足请求先触发澄清；用户补齐结构化字段后生成确认卡；点击确认卡后进入项目空间创建路径 |
+| 适用边界 | Verifier 使用安装态插件和真实卡片发送路径验证确认卡，但资源创建阶段使用脱敏 stub，避免在公共 evidence 中写入真实文档/Base/待办 URL |
+| 状态延续 | 同一 chat_id 下从澄清、补齐、确认到创建会保留正确 pending plan，并在确认后写入项目 state 和 registry |
+| 本地回归 | `C:\Users\Ding\miniforge3\python.exe -m pytest` 返回 `303 passed`；`tests/test_tools.py tests/test_verify_wsl_feishu_runtime.py` 返回 `269 passed` |
+| WSL 安装态 | `setup.py --hermes-dir D:\Code\LarkProject\hermes-agent --hermes-home \\wsl.localhost\Ubuntu-24.04\home\ding\.hermes` 通过；插件和 skill 已同步到 WSL Hermes runtime profile |
+| Verifier 新字段 | `--verify-projectization-suggestion` 返回 `projectization_clarification_confirm_created=true`、`projectization_clarification_confirm_resources=true`、`projectization_clarification_confirm_state=true`，并保留澄清/补齐/确认卡基线 |
+| 基线验证 | 同轮继续通过同一 Feishu venv 下 `--send-card` 的 `card_sent=true`、`card_has_title=true`、`card_has_goal=true`、`card_has_initiator=true`、`card_has_risk=true`，以及 `--probe-llm` 的 `llm_probe_ok=true`、`llm_probe_status=200` |
+| 用户价值 | 用户先模糊提出办公任务，再补齐字段并点击确认后，PilotFlow 能走到实际项目资源创建入口，不只是停在澄清或确认卡 |
+| 隐私处理 | 验证只记录布尔结果和脱敏状态；不写入真实 chat_id、open_id、message_id、Feishu URL、token 或 app secret |
+
 ## 2026-05-05 澄清后补齐字段进入确认卡
 
 | 项目 | 证据 |

@@ -151,6 +151,9 @@ def _sanitize_result(result: dict[str, Any]) -> dict[str, Any]:
         "projectization_clarification_followup_plan_sent",
         "projectization_clarification_followup_pending",
         "projectization_clarification_followup_gate",
+        "projectization_clarification_confirm_created",
+        "projectization_clarification_confirm_resources",
+        "projectization_clarification_confirm_state",
         "project_create_gate_created",
         "project_create_confirmed",
         "project_create_doc_created",
@@ -611,6 +614,7 @@ def _verify_runtime_projectization_suggestion(hermes_dir: Path) -> dict[str, Any
         _handle_scan_chat_signals,
         _check_plan_gate,
         _load_pending_plan,
+        _load_project_state,
         _pending_plans,
         _plan_lock,
         PILOTFLOW_SCAN_CHAT_SIGNALS_SCHEMA,
@@ -620,8 +624,16 @@ def _verify_runtime_projectization_suggestion(hermes_dir: Path) -> dict[str, Any
     original_state_path = os.environ.get("PILOTFLOW_STATE_PATH")
     original_send_card = runtime_tools._hermes_send_card
     original_send = runtime_tools._hermes_send
+    original_create_doc = runtime_tools._create_doc
+    original_create_bitable = runtime_tools._create_bitable
+    original_create_task = runtime_tools._create_task
+    original_calendar = runtime_tools._create_calendar_event
+    original_reminder = runtime_tools._schedule_deadline_reminder
+    original_memory = runtime_tools._save_to_hermes_memory
+    original_resolve_member = runtime_tools._resolve_member
     sent_cards: list[dict[str, Any]] = []
     sent_messages: list[str] = []
+    created_resources: list[str] = []
 
     def tracking_send_card(target_chat_id: str, card_json: dict[str, Any]) -> bool | str:
         sent_cards.append(card_json)
@@ -631,6 +643,23 @@ def _verify_runtime_projectization_suggestion(hermes_dir: Path) -> dict[str, Any
         sent_messages.append(text)
         return True
 
+    def fake_create_doc(*_args: Any, **_kwargs: Any) -> str:
+        created_resources.append("doc")
+        return "https://example.invalid/doc/clarification-confirm"
+
+    def fake_create_bitable(*_args: Any, **_kwargs: Any) -> dict[str, str]:
+        created_resources.append("bitable")
+        return {
+            "url": "https://example.invalid/base/clarification-confirm",
+            "app_token": "app_clarification_confirm",
+            "table_id": "tbl_clarification_confirm",
+            "record_id": "rec_clarification_confirm",
+        }
+
+    def fake_create_task(*_args: Any, **_kwargs: Any) -> str:
+        created_resources.append("task")
+        return "https://example.invalid/task/clarification-confirm"
+
     with tempfile.TemporaryDirectory(prefix="pilotflow-projectization-verify-") as tmpdir:
         os.environ["PILOTFLOW_STATE_PATH"] = str(Path(tmpdir) / "pilotflow_state.json")
         with _plan_lock:
@@ -638,6 +667,13 @@ def _verify_runtime_projectization_suggestion(hermes_dir: Path) -> dict[str, Any
             _card_action_refs.clear()
         runtime_tools._hermes_send_card = tracking_send_card
         runtime_tools._hermes_send = tracking_send
+        runtime_tools._create_doc = fake_create_doc
+        runtime_tools._create_bitable = fake_create_bitable
+        runtime_tools._create_task = fake_create_task
+        runtime_tools._create_calendar_event = lambda *_args, **_kwargs: None
+        runtime_tools._schedule_deadline_reminder = lambda *_args, **_kwargs: False
+        runtime_tools._save_to_hermes_memory = lambda *_args, **_kwargs: True
+        runtime_tools._resolve_member = lambda *_args, **_kwargs: None
         try:
             suggestion = json.loads(_handle_scan_chat_signals(
                 {
@@ -709,9 +745,32 @@ def _verify_runtime_projectization_suggestion(hermes_dir: Path) -> dict[str, Any
             ))
             clarification_followup_pending = _load_pending_plan(chat_id) or {}
             clarification_followup_gate_active = _check_plan_gate(chat_id)
+            sent_cards_after_followup = len(sent_cards)
+            with _plan_lock:
+                confirm_action_id = next(
+                    (
+                        candidate
+                        for candidate, ref in _card_action_refs.items()
+                        if ref.get("chat_id") == chat_id and ref.get("action") == "confirm_project"
+                    ),
+                    "",
+                )
+            clarification_confirm = json.loads(_handle_card_action(
+                {"action_value": json.dumps({"pilotflow_action_id": confirm_action_id}, ensure_ascii=False)},
+                chat_id=chat_id,
+                chat_type="group",
+            )) if confirm_action_id else {}
+            state_projects = _load_project_state()
         finally:
             runtime_tools._hermes_send_card = original_send_card
             runtime_tools._hermes_send = original_send
+            runtime_tools._create_doc = original_create_doc
+            runtime_tools._create_bitable = original_create_bitable
+            runtime_tools._create_task = original_create_task
+            runtime_tools._create_calendar_event = original_calendar
+            runtime_tools._schedule_deadline_reminder = original_reminder
+            runtime_tools._save_to_hermes_memory = original_memory
+            runtime_tools._resolve_member = original_resolve_member
             if original_state_path is None:
                 os.environ.pop("PILOTFLOW_STATE_PATH", None)
             else:
@@ -753,12 +812,22 @@ def _verify_runtime_projectization_suggestion(hermes_dir: Path) -> dict[str, Any
         "projectization_clarification_followup_plan_sent": (
             followup.get("status") == "plan_generated"
             and followup.get("card_sent") is True
-            and len(sent_cards) == sent_cards_before_clarification + 1
+            and sent_cards_after_followup == sent_cards_before_clarification + 1
         ),
         "projectization_clarification_followup_pending": (
             clarification_followup_pending.get("plan", {}).get("title") == "运行态澄清后项目"
         ),
         "projectization_clarification_followup_gate": clarification_followup_gate_active is True,
+        "projectization_clarification_confirm_created": (
+            clarification_confirm.get("status") == "project_space_created"
+            and clarification_confirm.get("title") == "运行态澄清后项目"
+        ),
+        "projectization_clarification_confirm_resources": {"doc", "bitable", "task"}.issubset(set(created_resources)),
+        "projectization_clarification_confirm_state": any(
+            project.get("title") == "运行态澄清后项目"
+            for project in state_projects
+            if isinstance(project, dict)
+        ),
     }
 
 

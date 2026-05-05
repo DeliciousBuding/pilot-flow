@@ -1521,6 +1521,82 @@ def test_generate_plan_accepts_structured_followup_after_clarification(monkeypat
     }]
 
 
+def test_confirm_card_creates_project_after_clarification_followup(monkeypatch):
+    chat_id = "oc_clarify_followup_confirm"
+    sent_messages = []
+
+    def fake_send(_chat_id, text):
+        sent_messages.append(text)
+        return True
+
+    with _project_registry_lock:
+        _project_registry.clear()
+    with _plan_lock:
+        _pending_plans.clear()
+        _card_action_refs.clear()
+    _clear_plan_gate(chat_id)
+
+    with (
+        patch("tools._hermes_send", side_effect=fake_send),
+        patch("tools._send_interactive_card_via_feishu", return_value=True),
+    ):
+        clarification = json.loads(_handle_generate_plan(
+            {"input_text": "帮我推进客户上线"},
+            chat_id=chat_id,
+            chat_type="group",
+        ))
+        followup = json.loads(_handle_generate_plan(
+            {
+                "input_text": "项目名称是客户上线推进，目标是完成上线准备，交付物包括上线清单，截止时间是2026-05-20",
+                "title": "客户上线推进",
+                "goal": "完成上线准备",
+                "members": ["张三"],
+                "deliverables": ["上线清单"],
+                "deadline": "2026-05-20",
+            },
+            chat_id=chat_id,
+            chat_type="group",
+        ))
+
+    with _plan_lock:
+        action_id = next(
+            key for key, ref in _card_action_refs.items()
+            if ref["chat_id"] == chat_id and ref["action"] == "confirm_project"
+        )
+
+    with (
+        patch("tools._resolve_member", return_value=None),
+        patch("tools._create_doc", return_value="https://example.invalid/doc") as create_doc,
+        patch("tools._create_bitable", return_value={
+            "url": "https://example.invalid/base",
+            "app_token": "app1",
+            "table_id": "tbl1",
+            "record_id": "rec1",
+        }) as create_bitable,
+        patch("tools._create_task", return_value="https://example.invalid/task") as create_task,
+        patch("tools._send_interactive_card_via_feishu", return_value=True),
+        patch("tools._create_calendar_event", return_value=None),
+        patch("tools._schedule_deadline_reminder", return_value=False),
+        patch("tools._save_to_hermes_memory", return_value=True),
+    ):
+        result = json.loads(_handle_card_action(
+            {"action_value": json.dumps({"pilotflow_action_id": action_id}, ensure_ascii=False)},
+            chat_id=chat_id,
+            chat_type="group",
+        ))
+
+    assert clarification["status"] == "needs_clarification"
+    assert followup["status"] == "plan_generated"
+    assert result["status"] == "project_space_created"
+    assert result["title"] == "客户上线推进"
+    create_doc.assert_called_once()
+    create_bitable.assert_called_once()
+    create_task.assert_called_once()
+    with _project_registry_lock:
+        assert _project_registry["客户上线推进"]["status"] == "进行中"
+    assert any("我需要再确认几个字段" in text for text in sent_messages)
+
+
 def test_generate_plan_uses_session_chat_and_initiator_context():
     import datetime
     import types
