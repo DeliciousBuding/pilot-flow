@@ -1,24 +1,20 @@
 <div align="center">
 
+# ✈️ PilotFlow
+## 飞书群里的 AI 项目运行官
+
+让群聊的每一句讨论，都能变成可追踪的项目进程。
+
+[English](README_EN.md) &nbsp;·&nbsp; [快速开始](#快速开始) &nbsp;·&nbsp; [使用指南](docs/USER_GUIDE.md)
+
 <img src="https://img.shields.io/badge/version-1.12.0-blue?style=flat-square" alt="version">
 <img src="https://img.shields.io/badge/python-3.12+-informational?style=flat-square&logo=python" alt="python">
 <img src="https://img.shields.io/badge/license-MIT-lightgrey?style=flat-square" alt="license">
 
-# ✈️ PilotFlow
-
-### 飞书群里的 AI 项目运行官
-
-<br>
-
-[English](README_EN.md) &nbsp;·&nbsp; [快速开始](#快速开始) &nbsp;·&nbsp; [使用指南](docs/USER_GUIDE.md)
-
 </div>
 
-<br>
 
----
-
-## 你不用离开飞书群，就能跑完一个项目。
+## 你不用离开飞书群，就能跑完一个项目
 
 群里讨论散落的目标、承诺、风险、行动项——PilotFlow 自动识别，先发卡片确认，确认后一键创建飞书文档、多维表格、任务、日历、提醒和权限。从 IM 聊天到飞书产物，一条链路闭环。
 
