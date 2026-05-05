@@ -637,6 +637,10 @@ def _build_project_detail_card(chat_id: str, title: str, project: dict) -> tuple
             task_name, sep, task_url = task_info.partition(": ")
             if sep and task_url.startswith(("http://", "https://")):
                 resource_lines.append(f"[任务：{task_name}]({task_url.strip()})")
+        elif text.startswith("日历事件: "):
+            resource_lines.append(f"日历: {text}")
+        elif text == "截止提醒已设置":
+            resource_lines.append("截止提醒已设置")
     resource_text = f"\n**资源：** {' | '.join(resource_lines)}" if resource_lines else ""
     recent_updates = [
         str(item.get("value", "")).strip() if isinstance(item, dict) else str(item).strip()

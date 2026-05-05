@@ -173,6 +173,7 @@ def test_verify_runtime_project_creation_is_sanitized(tmp_path, monkeypatch):
     assert result["project_create_schema_assignees_exposed"] is True
     assert result["project_create_idempotency_includes_assignees"] is True
     assert result["project_create_detail_assignees_shown"] is True
+    assert result["project_create_detail_calendar_reminder_shown"] is True
     assert result["project_create_entry_initiator_shown"] is True
     assert result["project_create_entry_deliverables_shown"] is True
     assert result["project_create_entry_assignees_shown"] is True
@@ -602,6 +603,7 @@ def test_verifier_project_creation_mode_outputs_sanitized_runtime_result(tmp_pat
         "project_create_schema_assignees_exposed": True,
         "project_create_idempotency_includes_assignees": True,
         "project_create_detail_assignees_shown": True,
+        "project_create_detail_calendar_reminder_shown": True,
         "project_create_entry_initiator_shown": True,
         "project_create_entry_deliverables_shown": True,
         "project_create_entry_assignees_shown": True,
@@ -638,6 +640,7 @@ def test_verifier_project_creation_mode_outputs_sanitized_runtime_result(tmp_pat
     assert output["project_create_schema_assignees_exposed"] is True
     assert output["project_create_idempotency_includes_assignees"] is True
     assert output["project_create_detail_assignees_shown"] is True
+    assert output["project_create_detail_calendar_reminder_shown"] is True
     assert output["project_create_entry_initiator_shown"] is True
     assert output["project_create_entry_deliverables_shown"] is True
     assert output["project_create_entry_assignees_shown"] is True

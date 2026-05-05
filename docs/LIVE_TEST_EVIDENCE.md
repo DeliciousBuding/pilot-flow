@@ -1844,6 +1844,18 @@
 | 用户价值 | 用户打开项目简报文档后即可进入状态表、待办和日历等后续执行资源，不必只依赖群入口卡片或回翻机器人消息 |
 | 隐私处理 | 证据只记录布尔结果和脱敏结论；不写入真实会话标识、消息标识、Feishu URL、用户原始标识或凭证 |
 
+## 2026-05-05 项目详情卡日历与提醒资源可见性运行态验证
+
+| 项目 | 证据 |
+| --- | --- |
+| 运行环境 | PilotFlow 已通过 `setup.py --hermes-home <wsl-hermes-home>` 同步到 WSL Hermes runtime；安装验证返回插件、技能、Hermes config 和 Feishu display 配置均 OK |
+| 本地回归 | `C:\Users\Ding\miniforge3\python.exe -m pytest` 返回 `318 passed`；详情卡资源渲染和项目创建 verifier 相关测试返回 `3 passed` |
+| 功能硬化 | 项目详情卡的 `资源` 区现在不只展示项目文档、状态表和任务，也会展示创建路径保存的日历事件摘要与截止提醒状态 |
+| Verifier 新字段 | `verify_wsl_feishu_runtime.py --verify-project-creation` 在已安装的 WSL Hermes runtime 插件内返回 `project_create_detail_calendar_reminder_shown=true`，并保留 `project_create_entry_card_sent=true`、`project_create_calendar_created=true`、`project_create_reminder_scheduled=true` |
+| 基线验证 | 同轮继续通过同一 Feishu venv 下 `--send-card` 的 `card_sent=true`、`card_has_initiator=true`、`pending_plan_recovered=true`，以及 `--probe-llm` 的 `llm_probe_ok=true`、`llm_probe_status=200` |
+| 用户价值 | 用户从入口卡点击 `查看状态` 后，详情卡仍能看到日历和截止提醒，不会因为离开入口卡而丢失后续时间管理入口 |
+| 隐私处理 | 证据只记录布尔结果和脱敏结论；不写入真实会话标识、消息标识、Feishu URL、用户原始标识或凭证 |
+
 ## 本地回归
 
 ```bash
