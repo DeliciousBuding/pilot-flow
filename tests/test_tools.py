@@ -5301,6 +5301,45 @@ def test_card_command_dashboard_page_updates_origin_card_after_success():
     ]
 
 
+def test_direct_card_action_retryable_failure_keeps_action_ref_for_dashboard_page():
+    with _project_registry_lock:
+        _project_registry.clear()
+    with _plan_lock:
+        _card_action_refs.clear()
+    for i in range(1, 13):
+        _register_project(
+            f"直调分页重试项目{i:02d}", [], "2026-05-20", "进行中", [],
+            goal="验证分页失败后可重试", deliverables=["验收记录"],
+        )
+    action_id = _create_card_action_ref(
+        "oc_direct_retry_page",
+        "dashboard_page",
+        {"query": "项目进展 第2页", "page": 2},
+    )
+
+    send_attempts = []
+
+    def fail_then_send_card(chat_id, card):
+        send_attempts.append((chat_id, card))
+        return "om_retry_page" if len(send_attempts) > 1 else None
+
+    with patch("tools._send_interactive_card_via_feishu", side_effect=fail_then_send_card):
+        first = json.loads(_handle_card_action(
+            {"action_value": json.dumps({"pilotflow_action_id": action_id}, ensure_ascii=False)},
+            chat_id="ignored_chat",
+        ))
+        second = json.loads(_handle_card_action(
+            {"action_value": json.dumps({"pilotflow_action_id": action_id}, ensure_ascii=False)},
+            chat_id="ignored_chat",
+        ))
+
+    assert "项目看板已生成" in first["error"]
+    assert second["status"] == "dashboard_page_sent"
+    assert len(send_attempts) == 2
+    with _plan_lock:
+        assert action_id not in _card_action_refs
+
+
 def test_card_action_ref_replays_after_state_reload(tmp_path):
     state_path = tmp_path / "pilotflow-projects.json"
     with _project_registry_lock:
@@ -5386,6 +5425,44 @@ def test_card_command_dashboard_filter_updates_origin_card_after_success():
             "blue",
         )
     ]
+
+
+def test_direct_card_action_retryable_failure_keeps_action_ref_for_dashboard_filter():
+    with _project_registry_lock:
+        _project_registry.clear()
+    with _plan_lock:
+        _card_action_refs.clear()
+    _register_project(
+        "直调筛选重试项目", [], "2026-05-20", "有风险", [],
+        goal="验证筛选失败后可重试", deliverables=["验收记录"],
+    )
+    action_id = _create_card_action_ref(
+        "oc_direct_retry_filter",
+        "dashboard_filter",
+        {"query": "看看风险项目", "filter": "risk"},
+    )
+
+    send_attempts = []
+
+    def fail_then_send_card(chat_id, card):
+        send_attempts.append((chat_id, card))
+        return "om_retry_filter" if len(send_attempts) > 1 else None
+
+    with patch("tools._send_interactive_card_via_feishu", side_effect=fail_then_send_card):
+        first = json.loads(_handle_card_action(
+            {"action_value": json.dumps({"pilotflow_action_id": action_id}, ensure_ascii=False)},
+            chat_id="ignored_chat",
+        ))
+        second = json.loads(_handle_card_action(
+            {"action_value": json.dumps({"pilotflow_action_id": action_id}, ensure_ascii=False)},
+            chat_id="ignored_chat",
+        ))
+
+    assert "项目看板已生成" in first["error"]
+    assert second["status"] == "dashboard_filter_sent"
+    assert len(send_attempts) == 2
+    with _plan_lock:
+        assert action_id not in _card_action_refs
 
 
 def test_query_status_completed_filter_shows_empty_match_state():

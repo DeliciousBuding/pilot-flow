@@ -4046,6 +4046,20 @@ def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
             _restore_card_action_ref(action_id, action_ref)
         return tool_error(message)
 
+    def retryable_dashboard_send_error(sent_result: Any) -> Optional[str]:
+        if not isinstance(sent_result, str):
+            return None
+        message = sent_result
+        try:
+            parsed = json.loads(sent_result)
+        except (TypeError, json.JSONDecodeError):
+            parsed = None
+        if isinstance(parsed, dict):
+            message = str(parsed.get("error") or sent_result)
+        if "项目看板已生成" in message and "发送到群聊失败" in message:
+            return retryable_tool_error(message)
+        return None
+
     if pilotflow_action == "cancel_project":
         if not gate_consumed:
             _clear_plan_gate(chat_id)
@@ -4289,6 +4303,9 @@ def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
                 "query": page_query,
                 "instructions": "已发送项目看板分页。不要展示工具名或英文。",
             })
+        retryable_error = retryable_dashboard_send_error(sent_result)
+        if retryable_error:
+            return retryable_error
         return sent_result
 
     if pilotflow_action == "dashboard_filter":
@@ -4307,6 +4324,9 @@ def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
                 "query": filter_query,
                 "instructions": "已发送筛选后的项目看板。不要展示工具名或英文。",
             })
+        retryable_error = retryable_dashboard_send_error(sent_result)
+        if retryable_error:
+            return retryable_error
         return sent_result
 
     if pilotflow_action == "briefing_batch_reminder":

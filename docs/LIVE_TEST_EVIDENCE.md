@@ -14,6 +14,19 @@
 | 用户价值 | 飞书 API、任务服务或网络短暂失败时，用户不用重新生成项目详情卡；修复后重新点击同一按钮即可继续推进真实办公动作 |
 | 隐私处理 | 验证只记录布尔结果和脱敏状态；不写入真实 chat_id、open_id、message_id、Feishu URL、token 或 app secret |
 
+## 2026-05-05 看板分页/筛选发卡失败后可重试
+
+| 项目 | 证据 |
+| --- | --- |
+| 功能验证 | `dashboard_page` 和 `dashboard_filter` 通过 opaque action ref 触发时，如果看板内容已生成但 Feishu interactive card 发送失败，不会永久消费按钮引用；Feishu 发卡恢复后同一 action id 可再次发送分页/筛选看板 |
+| 适用边界 | 只对 `_handle_query_status` 返回的“项目看板已生成，但发送到群聊失败”执行层错误恢复 action ref；成功发卡仍保持单次消费，普通参数/未知动作错误不改为可重试 |
+| 状态安全 | 第一次失败不标记原卡片为成功、不清除 action ref；第二次成功后发送新看板卡并消费 action ref，保持防重复边界 |
+| 本地回归 | `C:\Users\Ding\miniforge3\python.exe -m pytest tests\test_tools.py::test_direct_card_action_retryable_failure_keeps_action_ref_for_dashboard_page tests\test_tools.py::test_direct_card_action_retryable_failure_keeps_action_ref_for_dashboard_filter -q` 返回 `2 passed`；`C:\Users\Ding\miniforge3\python.exe -m pytest` 返回 `314 passed` |
+| WSL 安装态 | `setup.py --hermes-dir D:\Code\LarkProject\hermes-agent --hermes-home \\wsl.localhost\Ubuntu-24.04\home\ding\.hermes` 通过；插件和 skill 已同步到 WSL Hermes runtime profile |
+| Verifier 结果 | `--verify-dashboard-navigation` 返回 `dashboard_page_sent=true`、`dashboard_filter_sent=true`、`dashboard_used_opaque_refs=true`、`dashboard_cards_sent=true`；同轮 `--send-card` 返回 `card_sent=true`，`--probe-llm` 返回 `llm_probe_ok=true`、`llm_probe_status=200` |
+| 用户价值 | 用户在项目看板里翻页或切换筛选时，如果 Feishu 临时发卡失败，不需要重新发起查询或重新生成看板；同一按钮可在故障恢复后继续导航 |
+| 隐私处理 | 验证只记录布尔结果和脱敏状态；不写入真实 chat_id、open_id、message_id、Feishu URL、token 或 app secret |
+
 ## 2026-05-05 批量催办发送失败后可重试
 
 | 项目 | 证据 |
