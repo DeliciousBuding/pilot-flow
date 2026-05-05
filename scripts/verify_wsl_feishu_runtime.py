@@ -174,6 +174,7 @@ def _sanitize_result(result: dict[str, Any]) -> dict[str, Any]:
         "project_create_idempotency_includes_assignees",
         "project_create_detail_assignees_shown",
         "project_create_entry_initiator_shown",
+        "project_create_entry_deliverables_shown",
         "project_create_entry_assignees_shown",
         "project_create_memory_assignees_saved",
         "project_create_calendar_created",
@@ -1358,6 +1359,7 @@ def _verify_runtime_project_creation(hermes_dir: Path) -> dict[str, Any]:
         and "上线演练 → 张三" in detail_card_text
         and "pilotflow_chat_id" not in json.dumps(sent_cards[-1] if sent_cards else {}, ensure_ascii=False),
         "project_create_entry_initiator_shown": "**发起人：** 王小明" in entry_card_text,
+        "project_create_entry_deliverables_shown": "**交付物：** 验收清单, 上线演练" in entry_card_text,
         "project_create_entry_assignees_shown": "负责人" in entry_card_text
         and "验收清单 → 李四" in entry_card_text
         and "上线演练 → 张三" in entry_card_text,

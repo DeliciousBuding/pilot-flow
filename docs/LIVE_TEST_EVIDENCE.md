@@ -1808,6 +1808,18 @@
 | 用户价值 | 项目真实创建后，群成员在第一张入口卡即可看到每个交付物由谁负责，不需要再打开详情卡或回翻执行计划确认卡确认分工 |
 | 隐私处理 | 证据只记录布尔结果和脱敏结论；不写入真实 chat_id、message_id、Feishu URL、用户 open_id、token 或 app secret |
 
+## 2026-05-05 项目入口卡交付物可见性运行态验证
+
+| 项目 | 证据 |
+| --- | --- |
+| 运行环境 | PilotFlow 已通过 `setup.py --hermes-home <wsl-hermes-home>` 同步到 WSL Hermes runtime；安装验证返回插件、技能、Hermes config 和 Feishu display 配置均 OK |
+| 本地回归 | `C:\Users\Ding\miniforge3\python.exe -m pytest` 返回 `317 passed`；相关入口卡/项目创建测试返回 `7 passed` |
+| 功能硬化 | 项目创建后的群入口卡现在直接展示交付物列表，例如 `验收清单, 上线演练`；该字段来自结构化计划中的 `deliverables`，不从自然语言重新推断 |
+| Verifier 新字段 | `verify_wsl_feishu_runtime.py --verify-project-creation` 在已安装的 WSL Hermes runtime 插件内返回 `project_create_entry_deliverables_shown=true`，并保留 `project_create_entry_assignees_shown=true`、`project_create_entry_initiator_shown=true`、`project_create_entry_card_sent=true` |
+| 基线验证 | 同轮继续通过同一 Feishu venv 下 `--send-card` 的 `card_sent=true`、`card_has_initiator=true`、`pending_plan_recovered=true`，以及 `--probe-llm` 的 `llm_probe_ok=true`、`llm_probe_status=200` |
+| 用户价值 | 项目真实创建后，群成员在第一张入口卡即可看到项目要交付什么，不需要打开详情卡或文档才能确认产出范围 |
+| 隐私处理 | 证据只记录布尔结果和脱敏结论；不写入真实 chat_id、message_id、Feishu URL、用户 open_id、token 或 app secret |
+
 ## 本地回归
 
 ```bash

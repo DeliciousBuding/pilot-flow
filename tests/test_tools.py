@@ -2430,6 +2430,7 @@ def test_project_entry_card_uses_plain_member_names_for_visible_markdown():
     markdown = entry_card["elements"][0]["content"]
     assert "**发起人：** 王小明" in markdown
     assert "**成员：** 唐丁, 李四" in markdown
+    assert "**交付物：** 验证记录, 上线演练" in markdown
     assert "**负责人：** 验证记录 → 唐丁；上线演练 → 李四" in markdown
     assert "<at user_id=" not in markdown
 
