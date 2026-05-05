@@ -2,6 +2,23 @@
 
 > 本文件只记录可复验结论和脱敏摘要，不提交真实群 ID、用户 open_id、应用 secret、message_id 或飞书文档链接。
 
+## 2026-05-05 Killer Demo：群聊自然讨论 → 主动冒泡项目化
+
+PilotFlow 最不可替代的能力：**用户没 @ 任何人，在群里自然讨论，PilotFlow 自己跳出来问"要不要整理成项目？"** 飞书项目 / OpenClaw / Aily 均无此能力。
+
+| 项目 | 证据 |
+| --- | --- |
+| 前置条件 | 目标群 `require_mention: false`；Hermes gateway + `mimo-v2.5-pro` |
+| 触发方式 | 用户自然发言：`下周五前要完成真实链路验证，API 审批可能卡住，记得整理上线清单`（无 @，无 Bot 前缀） |
+| Agent 行为 | Hermes 收到普通群消息 → 推理上下文 → 提取 goal / risk / action_item → 主动调用 `pilotflow_scan_chat_signals` 传入结构化 signals + `should_suggest_project=true` |
+| 工具行为 | PilotFlow 不重复做语义识别 → 构建"要不要整理成项目？"卡片 → Feishu IM API 直发到群 |
+| 卡片交互 | 卡片展示识别到的目标/风险/行动项 + "整理成项目计划"按钮 → 用户点击 → `pilotflow_generate_plan` → 确认 → 文档/Base/任务/日历/入口卡全程 |
+| 为什么别人做不到 | OpenClaw 建议不接入群聊；Aily 是固定场景增强；飞书项目被动管理。PilotFlow 是唯一**群聊里主动发现、主动建议、确认后一键写飞书**的 Agent |
+| 订阅配置 | `pilotflow_subscribe_chat` 工具生成 per-group config 片段，用户粘贴到 `~/.hermes/config.yaml` 后重启 gateway |
+| 本地回归 | `pytest tests -q` 328 passed；`--verify-projectization-suggestion` 返回 `projectization_plan_card_sent=true` |
+| 隐私处理 | 真实 chat_id / open_id / message_id / 飞书 URL / token 不写入公开仓库 |
+
+
 ## 2026-05-05 看板分页 page 必须显式传（R-20260505-1230 P1-4）
 
 | 项目 | 证据 |
