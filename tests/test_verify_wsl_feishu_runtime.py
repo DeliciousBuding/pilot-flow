@@ -393,6 +393,7 @@ def test_verify_runtime_projectization_suggestion_is_sanitized(tmp_path, monkeyp
     assert result["projectization_clarification_confirm_resources"] is True
     assert result["projectization_clarification_confirm_state"] is True
     assert result["projectization_clarification_confirm_one_shot"] is True
+    assert result["projectization_confirm_retryable_failure"] is True
     assert result["projectization_history_apply_retryable_failure"] is True
     assert result["projectization_raw_action_rejected"] is True
     assert result["projectization_raw_history_rejected"] is True
@@ -975,6 +976,7 @@ def test_verifier_projectization_suggestion_mode_outputs_sanitized_runtime_resul
         "projectization_clarification_confirm_resources": True,
         "projectization_clarification_confirm_state": True,
         "projectization_clarification_confirm_one_shot": True,
+        "projectization_confirm_retryable_failure": True,
         "projectization_history_apply_retryable_failure": True,
         "projectization_raw_action_rejected": True,
         "projectization_raw_history_rejected": True,
@@ -1016,6 +1018,7 @@ def test_verifier_projectization_suggestion_mode_outputs_sanitized_runtime_resul
     assert output["projectization_clarification_confirm_resources"] is True
     assert output["projectization_clarification_confirm_state"] is True
     assert output["projectization_clarification_confirm_one_shot"] is True
+    assert output["projectization_confirm_retryable_failure"] is True
     assert output["projectization_history_apply_retryable_failure"] is True
     assert output["projectization_raw_action_rejected"] is True
     assert output["projectization_raw_history_rejected"] is True

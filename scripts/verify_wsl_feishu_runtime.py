@@ -156,6 +156,7 @@ def _sanitize_result(result: dict[str, Any]) -> dict[str, Any]:
         "projectization_clarification_confirm_resources",
         "projectization_clarification_confirm_state",
         "projectization_clarification_confirm_one_shot",
+        "projectization_confirm_retryable_failure",
         "projectization_history_apply_retryable_failure",
         "projectization_raw_action_rejected",
         "projectization_raw_history_rejected",
@@ -865,6 +866,7 @@ def _verify_runtime_projectization_suggestion(hermes_dir: Path) -> dict[str, Any
                 chat_id=chat_id,
                 chat_type="group",
             )) if confirm_action_id else {}
+            resource_count_after_duplicate = len(created_resources)
             state_projects = _load_project_state()
             with _plan_lock:
                 _pending_plans["oc_projectization_history_retry"] = {
@@ -911,6 +913,73 @@ def _verify_runtime_projectization_suggestion(hermes_dir: Path) -> dict[str, Any
             ))
             with _plan_lock:
                 history_retry_ref_consumed = history_retry_action_id not in _card_action_refs
+            with _plan_lock:
+                _pending_plans["oc_projectization_confirm_retry"] = {
+                    "plan": {
+                        "title": "运行态确认重试项目",
+                        "goal": "验证确认建项失败重试",
+                        "members": ["张三"],
+                        "deliverables": ["验收记录"],
+                        "deadline": "2026-05-20",
+                        "risks": [],
+                    },
+                    "timestamp": time.time(),
+                }
+            confirm_retry_action_id = runtime_tools._create_card_action_ref(
+                "oc_projectization_confirm_retry",
+                "confirm_project",
+                {},
+            )
+            runtime_tools._set_plan_gate("oc_projectization_confirm_retry")
+            create_doc_attempts = 0
+
+            def fail_then_create_doc(*_args: Any, **_kwargs: Any) -> str | None:
+                nonlocal create_doc_attempts
+                create_doc_attempts += 1
+                if create_doc_attempts == 1:
+                    return None
+                created_resources.append("doc")
+                return "https://example.invalid/doc/confirm-retry"
+
+            def fail_once_create_bitable(*_args: Any, **_kwargs: Any) -> dict[str, str] | None:
+                if create_doc_attempts == 1:
+                    return None
+                created_resources.append("bitable")
+                return {
+                    "url": "https://example.invalid/base/confirm-retry",
+                    "app_token": "app_confirm_retry",
+                    "table_id": "tbl_confirm_retry",
+                    "record_id": "rec_confirm_retry",
+                }
+
+            def fail_once_create_task(*_args: Any, **_kwargs: Any) -> str | None:
+                if create_doc_attempts == 1:
+                    return None
+                created_resources.append("task")
+                return "https://example.invalid/task/confirm-retry"
+
+            def fail_once_send_entry_card(_target_chat_id: str, card_json: dict[str, Any]) -> bool | str:
+                sent_cards.append(card_json)
+                return False if create_doc_attempts == 1 else "om_projectization_confirm_retry"
+
+            runtime_tools._create_doc = fail_then_create_doc
+            runtime_tools._create_bitable = fail_once_create_bitable
+            runtime_tools._create_task = fail_once_create_task
+            runtime_tools._hermes_send_card = fail_once_send_entry_card
+            confirm_retry_first = json.loads(_handle_card_action(
+                {"action_value": json.dumps({"pilotflow_action_id": confirm_retry_action_id}, ensure_ascii=False)},
+                chat_id="oc_projectization_confirm_retry",
+                chat_type="group",
+            ))
+            with _plan_lock:
+                confirm_retry_ref_restored = confirm_retry_action_id in _card_action_refs
+            confirm_retry_second = json.loads(_handle_card_action(
+                {"action_value": json.dumps({"pilotflow_action_id": confirm_retry_action_id}, ensure_ascii=False)},
+                chat_id="oc_projectization_confirm_retry",
+                chat_type="group",
+            ))
+            with _plan_lock:
+                confirm_retry_ref_consumed = confirm_retry_action_id not in _card_action_refs
         finally:
             runtime_tools._hermes_send_card = original_send_card
             runtime_tools._hermes_send = original_send
@@ -980,7 +1049,16 @@ def _verify_runtime_projectization_suggestion(hermes_dir: Path) -> dict[str, Any
         ),
         "projectization_clarification_confirm_one_shot": (
             "error" in clarification_duplicate
-            and resource_count_after_confirm == len(created_resources)
+            and resource_count_after_confirm == resource_count_after_duplicate
+        ),
+        "projectization_confirm_retryable_failure": (
+            "error" in confirm_retry_first
+            and "创建失败" in str(confirm_retry_first.get("error", ""))
+            and confirm_retry_ref_restored is True
+            and confirm_retry_second.get("status") == "project_space_created"
+            and confirm_retry_second.get("title") == "运行态确认重试项目"
+            and confirm_retry_ref_consumed is True
+            and create_doc_attempts == 2
         ),
         "projectization_history_apply_retryable_failure": (
             "error" in history_retry_first
