@@ -491,6 +491,7 @@ def test_verify_runtime_card_command_bridge_is_sanitized(tmp_path, monkeypatch):
     assert result["card_command_confirm_origin_artifacts_listed"] is True
     assert result["card_command_confirm_initiator_preserved"] is True
     assert result["card_command_bridge_retryable_failure"] is True
+    assert result["card_command_bridge_retryable_origin_hint"] is True
     assert result["card_command_bridge_feedback_sanitized"] is True
     assert "example.invalid" not in json.dumps(result, ensure_ascii=False)
 
@@ -1242,6 +1243,7 @@ def test_verifier_card_command_bridge_mode_outputs_sanitized_runtime_result(tmp_
         "card_command_confirm_origin_artifacts_listed": True,
         "card_command_confirm_initiator_preserved": True,
         "card_command_bridge_retryable_failure": True,
+        "card_command_bridge_retryable_origin_hint": True,
         "card_command_bridge_feedback_sanitized": True,
         "raw_chat_id": "oc_real_chat_id",
         "raw_doc_url": "https://example.invalid/doc/1",
@@ -1270,6 +1272,7 @@ def test_verifier_card_command_bridge_mode_outputs_sanitized_runtime_result(tmp_
     assert output["card_command_confirm_origin_artifacts_listed"] is True
     assert output["card_command_confirm_initiator_preserved"] is True
     assert output["card_command_bridge_retryable_failure"] is True
+    assert output["card_command_bridge_retryable_origin_hint"] is True
     assert output["card_command_bridge_feedback_sanitized"] is True
     assert "oc_real_chat_id" not in output_text
     assert "example.invalid" not in output_text

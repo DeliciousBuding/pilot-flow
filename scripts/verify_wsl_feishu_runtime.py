@@ -303,6 +303,7 @@ def _sanitize_result(result: dict[str, Any]) -> dict[str, Any]:
         "card_command_confirm_origin_artifacts_listed",
         "card_command_confirm_initiator_preserved",
         "card_command_bridge_retryable_failure",
+        "card_command_bridge_retryable_origin_hint",
         "card_command_bridge_feedback_sanitized",
         "card_status_done_applied",
         "card_status_reopen_applied",
@@ -3656,6 +3657,15 @@ def _verify_runtime_card_command_bridge(hermes_dir: Path) -> dict[str, Any]:
             and second_retry is None
             and retry_ref_consumed
             and len(retry_tasks) == 2
+        ),
+        "card_command_bridge_retryable_origin_hint": any(
+            msg_ref == "om_runtime_card_command_retry"
+            and title == "操作失败"
+            and "待办创建失败，请检查飞书连接。" in content
+            and "已保留按钮状态" in content
+            and "再次点击重试" in content
+            and template == "red"
+            for msg_ref, title, content, template in marked_cards
         ),
         "card_command_bridge_feedback_sanitized": (
             "example.invalid" not in marked_text

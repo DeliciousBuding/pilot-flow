@@ -4628,7 +4628,9 @@ def _handle_card_command(raw_args: str) -> str:
         if action_ref:
             _restore_card_action_ref(action_id, action_ref)
         if action_id and message_id:
-            _mark_card_message(message_id, "操作失败", error_text, "red")
+            msg_ref = action_ref.get("message" + "_id", "") if action_ref else ""
+            retry_hint = "\n\n本次操作未完成，已保留按钮状态；修复连接后可再次点击重试。"
+            _mark_card_message(msg_ref, "操作失败", f"{error_text}{retry_hint}", "red")
         return error_text
     if data.get("status") == "cancelled":
         if action_ref:

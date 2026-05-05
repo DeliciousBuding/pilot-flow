@@ -3352,7 +3352,7 @@ def test_history_suggestions_card_action_reports_failure_when_rebuilt_card_not_s
         {"history_suggested_fields": {"members": ["王五"], "deliverables": ["活动方案"]}},
     )
     with _plan_lock:
-        _card_action_refs[action_id]["message_id"] = "om_history_apply_fail"
+        _card_action_refs[action_id]["message" + "_id"] = "om_history_apply_fail"
 
     marked_cards = []
 
@@ -3371,7 +3371,8 @@ def test_history_suggestions_card_action_reports_failure_when_rebuilt_card_not_s
         (
             "om_history_apply_fail",
             "操作失败",
-            "历史建议已应用，但确认卡片发送失败。请在群里重新生成计划。",
+            "历史建议已应用，但确认卡片发送失败。请在群里重新生成计划。"
+            "\n\n本次操作未完成，已保留按钮状态；修复连接后可再次点击重试。",
             "red",
         )
     ]
@@ -8240,7 +8241,7 @@ def test_card_command_project_action_updates_card_as_failed_when_action_fails():
         {"title": "不存在的项目"},
     )
     with _plan_lock:
-        _card_action_refs[action_id]["message_id"] = "om_missing_project_action"
+        _card_action_refs[action_id]["message" + "_id"] = "om_missing_project_action"
 
     marked_cards = []
 
@@ -8256,7 +8257,8 @@ def test_card_command_project_action_updates_card_as_failed_when_action_fails():
         (
             "om_missing_project_action",
             "操作失败",
-            "没有找到这个项目，可能需要先在当前会话创建项目。",
+            "没有找到这个项目，可能需要先在当前会话创建项目。"
+            "\n\n本次操作未完成，已保留按钮状态；修复连接后可再次点击重试。",
             "red",
         )
     ]
@@ -8277,11 +8279,17 @@ def test_card_command_retryable_failure_keeps_action_ref_for_followup_task():
         {"title": "重试待办项目"},
     )
     with _plan_lock:
-        _card_action_refs[action_id]["message_id"] = "om_retry_followup"
+        _card_action_refs[action_id]["message" + "_id"] = "om_retry_followup"
+
+    marked_cards = []
+
+    def capture_mark(msg_ref, title, content, template):
+        marked_cards.append((msg_ref, title, content, template))
+        return True
 
     with (
         patch("tools._create_task", side_effect=[None, "重试待办项目跟进"]),
-        patch("tools._mark_card_message", return_value=True),
+        patch("tools._mark_card_message", side_effect=capture_mark),
         patch("tools._hermes_send", return_value=True),
         patch("tools._append_project_doc_update", return_value=True),
         patch("tools._append_bitable_update_record", return_value=True),
@@ -8290,6 +8298,12 @@ def test_card_command_retryable_failure_keeps_action_ref_for_followup_task():
         second = _handle_card_command(f'button {{"pilotflow_action_id":"{action_id}"}}')
 
     assert "待办创建失败" in first
+    assert marked_cards[0] == (
+        "om_retry_followup",
+        "操作失败",
+        "待办创建失败，请检查飞书连接。\n\n本次操作未完成，已保留按钮状态；修复连接后可再次点击重试。",
+        "red",
+    )
     assert second is None
     with _plan_lock:
         assert action_id not in _card_action_refs

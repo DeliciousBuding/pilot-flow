@@ -1951,6 +1951,17 @@
 | 用户价值 | 用户从入口卡或看板进入项目详情后，即使只看原卡反馈，也能知道新详情卡不是空确认，而是包含可继续操作的资源入口和最近进展 |
 | 隐私处理 | 证据只记录布尔结果和脱敏结论；不写入真实会话标识、消息标识、Feishu URL、用户原始标识或凭证 |
 
+## 2026-05-05 卡片桥接失败原卡重试提示运行态验证
+
+| 项目 | 证据 |
+| --- | --- |
+| 本地回归 | `C:\Users\Ding\miniforge3\python.exe -m pytest -q` 返回 `321 passed`；卡片桥接失败原卡重试提示和 card-command bridge verifier 相关 targeted tests 返回 `3 passed` |
+| 功能硬化 | 当卡片按钮触发的飞书动作遇到临时失败时，原卡片失败反馈现在说明按钮状态已保留，修复连接后可再次点击重试 |
+| Verifier 新字段 | `verify_wsl_feishu_runtime.py --verify-card-command-bridge` 在已安装的 WSL Hermes runtime 插件内返回 `card_command_bridge_retryable_origin_hint=true`，并保留 `card_command_bridge_retryable_failure=true`、`card_command_bridge_executed=true`、`card_command_confirm_project_created=true` |
+| 基线验证 | 同轮继续通过同一 Feishu venv 下 `--send-card` 的 `card_sent=true`、`card_has_initiator=true`、`pending_plan_recovered=true`，以及 `--probe-llm` 的 `llm_probe_ok=true`、`llm_probe_status=200` |
+| 用户价值 | 用户点击卡片按钮遇到临时 Feishu 连接或资源创建失败时，不会误以为按钮已失效或需要重新发起完整流程，可在故障恢复后继续同一办公动作 |
+| 隐私处理 | 证据只记录布尔结果和脱敏结论；不写入真实会话标识、消息标识、Feishu URL、用户原始标识或凭证 |
+
 ## 本地回归
 
 ```bash
