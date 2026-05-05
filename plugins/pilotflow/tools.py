@@ -4388,7 +4388,7 @@ def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
                 bitable_history_value=task_name,
             )
         if not created_projects:
-            return tool_error("没有可批量创建待办的匹配项目。")
+            return retryable_tool_error("没有可批量创建待办的匹配项目。")
         filter_label = {
             "overdue": "逾期项目",
             "due_soon": "近期截止项目",

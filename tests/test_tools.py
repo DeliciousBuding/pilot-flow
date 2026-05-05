@@ -3690,6 +3690,46 @@ def test_standup_briefing_overdue_button_can_create_batch_followup_tasks():
     append_history.assert_called_once()
 
 
+def test_direct_card_action_retryable_failure_keeps_action_ref_for_briefing_batch_followup():
+    with _project_registry_lock:
+        _project_registry.clear()
+    with _plan_lock:
+        _card_action_refs.clear()
+    overdue = (dt.date.today() - dt.timedelta(days=1)).isoformat()
+    _register_project(
+        "直调批量重试待办项目", ["张三"], overdue, "进行中", [],
+        goal="验证批量待办失败后可重试", deliverables=["验收记录"],
+    )
+    action_id = _create_card_action_ref(
+        "oc_direct_retry_batch_followup",
+        "briefing_batch_followup_task",
+        {"filter": "overdue"},
+    )
+
+    sent_messages = []
+    with (
+        patch("tools._create_task", side_effect=[None, "直调批量重试待办项目跟进"]),
+        patch("tools._hermes_send", side_effect=lambda chat_id, msg: sent_messages.append((chat_id, msg)) or True),
+        patch("tools._append_project_doc_update", return_value=True),
+        patch("tools._append_bitable_update_record", return_value=True),
+    ):
+        first = json.loads(_handle_card_action(
+            {"action_value": json.dumps({"pilotflow_action_id": action_id}, ensure_ascii=False)},
+            chat_id="ignored_chat",
+        ))
+        second = json.loads(_handle_card_action(
+            {"action_value": json.dumps({"pilotflow_action_id": action_id}, ensure_ascii=False)},
+            chat_id="ignored_chat",
+        ))
+
+    assert "没有可批量创建待办" in first["error"]
+    assert second["status"] == "briefing_batch_followup_task_created"
+    assert second["projects"] == ["直调批量重试待办项目"]
+    assert sent_messages
+    with _plan_lock:
+        assert action_id not in _card_action_refs
+
+
 def test_briefing_batch_followup_uses_state_projects_after_restart(tmp_path):
     state_path = tmp_path / "pilotflow-projects.json"
     with _project_registry_lock:

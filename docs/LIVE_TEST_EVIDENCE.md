@@ -14,6 +14,19 @@
 | 用户价值 | 飞书 API、任务服务或网络短暂失败时，用户不用重新生成项目详情卡；修复后重新点击同一按钮即可继续推进真实办公动作 |
 | 隐私处理 | 验证只记录布尔结果和脱敏状态；不写入真实 chat_id、open_id、message_id、Feishu URL、token 或 app secret |
 
+## 2026-05-05 批量跟进待办失败后可重试
+
+| 项目 | 证据 |
+| --- | --- |
+| 功能验证 | 站会简报/项目看板里的 `briefing_batch_followup_task` 通过 opaque action ref 触发时，如果批量待办创建阶段临时失败，不会永久消费按钮引用；服务恢复后同一 action id 可再次执行并创建跟进待办 |
+| 适用边界 | 只把“匹配项目存在但实际待办创建失败导致没有创建结果”的执行层失败视为可重试；非法筛选条件仍保持普通错误，避免把用户输入错误伪装成可重试故障 |
+| 状态安全 | 第一次失败不发送批量成功反馈、不写入文档/Base/state 留痕、不清除 action ref；第二次成功后才发送群消息、记录待办留痕并消费 action ref |
+| 本地回归 | `C:\Users\Ding\miniforge3\python.exe -m pytest tests\test_tools.py::test_direct_card_action_retryable_failure_keeps_action_ref_for_briefing_batch_followup -q` 返回 `1 passed`；`C:\Users\Ding\miniforge3\python.exe -m pytest` 返回 `311 passed` |
+| WSL 安装态 | `setup.py --hermes-dir D:\Code\LarkProject\hermes-agent --hermes-home \\wsl.localhost\Ubuntu-24.04\home\ding\.hermes` 通过；插件和 skill 已同步到 WSL Hermes runtime profile |
+| Verifier 结果 | `--verify-batch-followup-task` 返回 `batch_followup_created=true`、`batch_followup_task_created=true`、`batch_followup_used_opaque_ref=true`、`batch_followup_doc_recorded=true`、`batch_followup_history_recorded=true`、`batch_followup_state_recorded=true`；同轮 `--send-card` 返回 `card_sent=true`，`--probe-llm` 返回 `llm_probe_ok=true`、`llm_probe_status=200` |
+| 用户价值 | 站会简报一键批量派发待办遇到临时任务服务/飞书 API 故障时，用户不用重新生成简报卡；同一按钮可在故障恢复后继续完成真实办公动作 |
+| 隐私处理 | 验证只记录布尔结果和脱敏状态；不写入真实 chat_id、open_id、message_id、Feishu URL、token 或 app secret |
+
 ## 2026-05-05 直调卡片动作失败后可重试
 
 | 项目 | 证据 |
