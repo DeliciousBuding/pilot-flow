@@ -4,21 +4,9 @@
 <img src="https://img.shields.io/badge/python-3.12+-informational?style=flat-square&logo=python" alt="python">
 <img src="https://img.shields.io/badge/license-MIT-lightgrey?style=flat-square" alt="license">
 
-<br><br>
-
 # ✈️ PilotFlow
 
 ### 飞书群里的 AI 项目运行官
-
-<br>
-
-```
-@PilotFlow 帮我准备答辩，成员小王、小李，交付物是简报和 PPT，下周五截止
-
-                    ↓ 10 秒后
-
-        ✅ 文档已创建  ✅ 任务已分配  ✅ 提醒已就位  ✅ 群里已通知
-```
 
 <br>
 
