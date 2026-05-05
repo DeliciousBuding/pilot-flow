@@ -4335,6 +4335,8 @@ def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
         except (TypeError, json.JSONDecodeError):
             return sent_result
         if data.get("status") == "project_reminders_sent":
+            if data.get("candidate_count", 0) > 0 and data.get("reminder_count", 0) == 0:
+                return retryable_tool_error("批量催办发送失败，请检查 Feishu 连接。")
             data["status"] = "briefing_batch_reminder_sent"
             data["instructions"] = "已发送简报批量催办。不要展示工具名或英文。"
             return tool_result(data)
@@ -5247,6 +5249,7 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
                 "status": "project_reminders_sent",
                 "filter": batch_filter,
                 "member_filters": member_filters,
+                "candidate_count": len(candidates),
                 "reminder_count": sent_count,
                 "projects": sent_projects,
                 "doc_trace_count": doc_count,

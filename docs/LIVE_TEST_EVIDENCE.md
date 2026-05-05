@@ -14,6 +14,19 @@
 | 用户价值 | 飞书 API、任务服务或网络短暂失败时，用户不用重新生成项目详情卡；修复后重新点击同一按钮即可继续推进真实办公动作 |
 | 隐私处理 | 验证只记录布尔结果和脱敏状态；不写入真实 chat_id、open_id、message_id、Feishu URL、token 或 app secret |
 
+## 2026-05-05 批量催办发送失败后可重试
+
+| 项目 | 证据 |
+| --- | --- |
+| 功能验证 | 站会简报/项目看板里的 `briefing_batch_reminder` 通过 opaque action ref 触发时，如果存在匹配项目但群聊催办发送全部失败，不会永久消费按钮引用；Feishu 发送恢复后同一 action id 可再次执行 |
+| 适用边界 | `_handle_update_project` 批量催办结果现在带 `candidate_count`，卡片层只在 `candidate_count>0` 且 `reminder_count=0` 时判断为执行层发送失败并恢复 action ref；真正没有匹配项目仍保持“无需催办”的成功语义 |
+| 状态安全 | 第一次失败不发送成功反馈、不写入文档/Base/state 催办留痕、不清除 action ref；第二次成功后才发送群消息、记录催办留痕并消费 action ref |
+| 本地回归 | `C:\Users\Ding\miniforge3\python.exe -m pytest tests\test_tools.py::test_direct_card_action_retryable_failure_keeps_action_ref_for_briefing_batch_reminder -q` 返回 `1 passed`；`C:\Users\Ding\miniforge3\python.exe -m pytest` 返回 `312 passed` |
+| WSL 安装态 | `setup.py --hermes-dir D:\Code\LarkProject\hermes-agent --hermes-home \\wsl.localhost\Ubuntu-24.04\home\ding\.hermes` 通过；插件和 skill 已同步到 WSL Hermes runtime profile |
+| Verifier 结果 | `--verify-briefing-batch-reminder` 返回 `briefing_batch_reminder_sent=true`、`briefing_batch_reminder_used_opaque_ref=true`、`briefing_batch_reminder_doc_recorded=true`、`briefing_batch_reminder_history_recorded=true`、`briefing_batch_reminder_state_recorded=true`；同轮 `--send-card` 返回 `card_sent=true`，`--probe-llm` 返回 `llm_probe_ok=true`、`llm_probe_status=200` |
+| 用户价值 | 站会简报一键催办遇到临时 Feishu 发送故障时，用户不用重新生成简报卡；同一按钮可在故障恢复后继续完成批量通知分发 |
+| 隐私处理 | 验证只记录布尔结果和脱敏状态；不写入真实 chat_id、open_id、message_id、Feishu URL、token 或 app secret |
+
 ## 2026-05-05 批量跟进待办失败后可重试
 
 | 项目 | 证据 |
