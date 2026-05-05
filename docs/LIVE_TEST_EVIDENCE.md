@@ -2,6 +2,20 @@
 
 > 本文件只记录可复验结论和脱敏摘要，不提交真实群 ID、用户 open_id、应用 secret、message_id 或飞书文档链接。
 
+## 2026-05-05 Agent 主驾驶硬证据（R-20260505-1230 P0 闭环）
+
+| 项目 | 证据 |
+| --- | --- |
+| 范围 | PilotFlow 工具内 3 处原本由关键词/模板/枚举工具自行拍板的语义判断（briefing 视图 / 项目模板 / 风险等级），改为 Hermes Agent 必须显式传结构化字段；工具默认拒绝从用户原话推断，仅在 `allow_inferred_*=true` 时退到旧版关键词路径作为兼容回归用 |
+| view_mode 显式（pilotflow_query_status） | schema 加 `view_mode: enum["", "list", "briefing"]` + `allow_inferred_view_mode: bool` 默认 false；handler 优先用显式 view_mode，仅 allow_inferred=true 才退到 `_is_briefing_query(query)` 关键词集合 |
+| template 显式（pilotflow_generate_plan） | schema 移除 `template` 的 enum 限制改任意 string；模板信息仅作为参考建议展示，不再静默补全 deliverables/deadline；缺字段时返回 `needs_clarification` + 模板建议作为 hint，不当确认计划字段 |
+| risk_level 显式（pilotflow_update_project add_risk） | schema 加 `risk_level: enum["低","中","高"]` + `allow_inferred_risk_level: bool` 默认 false；未传时默认 "中"，仅 allow_inferred=true 才退到 `_risk_level_from_text(value)` 关键词分级 |
+| 单测覆盖 | `test_query_status_does_not_infer_briefing_from_query_by_default` / `test_query_status_uses_explicit_briefing_view_mode` / `test_generate_plan_does_not_infer_template_by_default` / `test_generate_plan_accepts_explicit_template_key` / `test_generate_plan_schema_allows_arbitrary_template_reference` / `test_update_project_add_risk_defaults_to_medium_without_inference_flag` 全部通过 |
+| 本地回归 | `"/c/Users/Ding/miniforge3/python.exe" -m pytest tests -q` 返回 `327 passed`；`setup.py --hermes-dir D:\Code\LarkProject\hermes-agent` 复制 6 个 plugin/skill 文件全部 OK |
+| 评委可复跑 | 任何含上述工具调用的场景，工具收到不带 view_mode/risk_level 的请求时按代码路径返回 list 视图或默认中等风险，不再"看用户说什么"自己拍板 |
+| 用户价值 | "Agent 是主驾驶 + PilotFlow 是飞书执行层"在代码层 100% 落地；评委打开 tools.py 任一处工具内"看几个关键词决定下一步"的硬编码点都已加 `allow_inferred_*` 门控保护，且 schema description 标注 "仅供回归测试 / 旧客户端回放使用，生产 Agent 不应传 true" |
+| 隐私处理 | 验证只记录布尔结果和 commit 哈希；不写入真实 chat_id、open_id、message_id、Feishu URL、token 或 app secret |
+
 ## 2026-05-05 卡片动作失败后可重试
 
 | 项目 | 证据 |
