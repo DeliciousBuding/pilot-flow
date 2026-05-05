@@ -2078,6 +2078,7 @@ def test_create_project_accepts_explicit_confirmation_text():
 def test_create_project_uses_structured_deliverable_assignees():
     chat_id = "oc_create_assignments"
     created_tasks = []
+    created_docs = []
     with _project_registry_lock:
         _project_registry.clear()
     with _plan_lock:
@@ -2096,10 +2097,15 @@ def test_create_project_uses_structured_deliverable_assignees():
                     "整理上线清单": "李四",
                     "完成上线演练": "张三",
                 },
+                "initiator": "王小明",
                 "deadline": "2026-05-20",
             },
             chat_id=chat_id,
         )
+
+    def fake_create_doc(title, content, target_chat_id):
+        created_docs.append((title, content, target_chat_id))
+        return "https://example.invalid/doc"
 
     def fake_create_task(summary, description, assignee, deadline, target_chat_id, members):
         created_tasks.append((summary, description, assignee, deadline, target_chat_id, list(members)))
@@ -2107,7 +2113,7 @@ def test_create_project_uses_structured_deliverable_assignees():
 
     with (
         patch("tools._resolve_member", return_value="ou_member"),
-        patch("tools._create_doc", return_value="https://example.invalid/doc"),
+        patch("tools._create_doc", side_effect=fake_create_doc),
         patch("tools._create_bitable", return_value={
             "url": "https://example.invalid/base",
             "app_token": "app1",
@@ -2126,6 +2132,9 @@ def test_create_project_uses_structured_deliverable_assignees():
         ))
 
     assert result["status"] == "project_space_created"
+    assert created_docs
+    assert "## 发起人\n王小明" in created_docs[0][1]
+    assert "## 负责人\n- 整理上线清单 → 李四\n- 完成上线演练 → 张三" in created_docs[0][1]
     assert created_tasks == [
         ("整理上线清单", "项目: 上线项目", "李四", "2026-05-20", chat_id, ["张三", "李四"]),
         ("完成上线演练", "项目: 上线项目", "张三", "2026-05-20", chat_id, ["张三", "李四"]),

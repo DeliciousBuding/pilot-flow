@@ -167,6 +167,8 @@ def _sanitize_result(result: dict[str, Any]) -> dict[str, Any]:
         "project_create_gate_created",
         "project_create_confirmed",
         "project_create_doc_created",
+        "project_create_doc_initiator_shown",
+        "project_create_doc_assignees_shown",
         "project_create_bitable_created",
         "project_create_task_created",
         "project_create_structured_assignees_used",
@@ -1315,6 +1317,10 @@ def _verify_runtime_project_creation(hermes_dir: Path) -> dict[str, Any]:
         "project_create_doc_created": created_docs
         and created_docs[0][0] == "运行态项目创建闭环项目 - 项目简报"
         and "验证安装后的创建项目空间闭环" in created_docs[0][1],
+        "project_create_doc_initiator_shown": bool(created_docs)
+        and "## 发起人\n王小明" in created_docs[0][1],
+        "project_create_doc_assignees_shown": bool(created_docs)
+        and "## 负责人\n- 验收清单 → 李四\n- 上线演练 → 张三" in created_docs[0][1],
         "project_create_bitable_created": created_bitables == [(
             "运行态项目创建闭环项目",
             "张三, 李四",

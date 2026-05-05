@@ -3737,12 +3737,19 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
 
     # 1. Create doc (lark_oapi) — with @mention in content
     doc_content = f"# {title}\n\n## 目标\n{goal}\n\n"
+    if initiator:
+        doc_content += f"## 发起人\n{initiator}\n\n"
     if members:
         doc_content += f"## 成员\n{member_display}\n\n"
     if member_warning:
         doc_content += f"## 成员解析提醒\n{member_warning}\n\n"
     if deliverables:
         doc_content += "## 交付物\n" + "\n".join(f"- {d}" for d in deliverables) + "\n\n"
+    if deliverable_assignees:
+        doc_content += "## 负责人\n" + "\n".join(
+            f"- {deliverable} → {assignee}"
+            for deliverable, assignee in deliverable_assignees.items()
+        ) + "\n\n"
     if deadline:
         doc_content += f"## 截止时间\n{deadline}\n\n"
     if risks:

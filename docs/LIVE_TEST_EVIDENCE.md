@@ -1361,7 +1361,7 @@
 | 兼容路径 | 已有成员负责人和 Feishu `<at user_id=...>姓名</at>：交付物` 仍可正常解析，任务会派给指定成员并继续绑定项目成员关注者 |
 | 基线验证 | 同轮继续通过 `--probe-llm` 的 `llm_probe_ok=true`、`llm_probe_status=200`，`--send-card` 的 `card_sent=true`、`pending_plan_recovered=true`，以及 `--verify-history` 的 `history_apply_card_sent=true`、`history_pending_recovered=true` |
 | 用户价值 | 避免 Agent 在群聊里把新外联/未入项目人员误当既有负责人，符合“首次外联先问一次”的协作安全边界 |
-| 隐私处理 | 证据只记录布尔结果和脱敏结论；不写入真实 chat_id、message_id、Feishu URL、用户 open_id、token 或 app secret |
+| 隐私处理 | 证据只记录布尔结果和脱敏结论；不写入真实会话标识、消息标识、Feishu URL、用户原始标识或凭证 |
 
 ## 2026-05-04 成员移除确认门控落地
 
@@ -1819,6 +1819,18 @@
 | 基线验证 | 同轮继续通过同一 Feishu venv 下 `--send-card` 的 `card_sent=true`、`card_has_initiator=true`、`pending_plan_recovered=true`，以及 `--probe-llm` 的 `llm_probe_ok=true`、`llm_probe_status=200` |
 | 用户价值 | 项目真实创建后，群成员在第一张入口卡即可看到项目要交付什么，不需要打开详情卡或文档才能确认产出范围 |
 | 隐私处理 | 证据只记录布尔结果和脱敏结论；不写入真实 chat_id、message_id、Feishu URL、用户 open_id、token 或 app secret |
+
+## 2026-05-05 项目文档发起人与分工可见性运行态验证
+
+| 项目 | 证据 |
+| --- | --- |
+| 运行环境 | PilotFlow 已通过 `setup.py --hermes-home <wsl-hermes-home>` 同步到 WSL Hermes runtime；安装验证返回插件、技能、Hermes config 和 Feishu display 配置均 OK |
+| 本地回归 | `C:\Users\Ding\miniforge3\python.exe -m pytest` 返回 `317 passed`；相关项目创建文档/verifier 测试返回 `3 passed` |
+| 功能硬化 | 项目创建时生成的飞书项目简报文档现在展示 `发起人` 段落，并在 `负责人` 段落写入结构化交付物负责人映射，例如 `验收清单 → 李四`、`上线演练 → 张三`；内容来自已清洗的计划字段，不从自然语言重新推断 |
+| Verifier 新字段 | `verify_wsl_feishu_runtime.py --verify-project-creation` 在已安装的 WSL Hermes runtime 插件内返回 `project_create_doc_initiator_shown=true`、`project_create_doc_assignees_shown=true`，并保留 `project_create_doc_created=true`、`project_create_entry_initiator_shown=true`、`project_create_entry_assignees_shown=true`、`project_create_entry_deliverables_shown=true` |
+| 基线验证 | 同轮继续通过同一 Feishu venv 下 `--send-card` 的 `card_sent=true`、`card_has_initiator=true`、`pending_plan_recovered=true`，以及 `--probe-llm` 的 `llm_probe_ok=true`、`llm_probe_status=200` |
+| 用户价值 | 项目创建后，打开项目简报文档即可看到谁发起项目、每个交付物由谁负责，避免文档正文与群入口卡、项目状态之间的信息不一致 |
+| 隐私处理 | 证据只记录布尔结果和脱敏结论；不写入真实会话标识、消息标识、Feishu URL、用户原始标识或凭证 |
 
 ## 本地回归
 
