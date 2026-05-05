@@ -48,7 +48,6 @@ skills/pilotflow/
 - [产品规格](docs/PRODUCT_SPEC.md)
 - [架构设计](docs/ARCHITECTURE.md)
 - [创新点](docs/INNOVATION.md)
-- [开发进度](PERSONAL_PROGRESS.md)
 
 ## 问题反馈
 
