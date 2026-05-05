@@ -4006,6 +4006,7 @@ def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
 
     pilotflow_action = action_data.get("pilotflow_action", "")
     actions_requiring_ref = {
+        "suggest_project_from_signals", "apply_history_suggestions",
         "project_status", "mark_project_done", "reopen_project", "resolve_risk",
         "send_project_reminder", "create_followup_task", "project_followup_task",
         "dashboard_page", "dashboard_filter", "briefing_batch_reminder",

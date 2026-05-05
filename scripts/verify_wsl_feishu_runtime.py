@@ -11,6 +11,7 @@ import json
 import os
 import sys
 import tempfile
+import time
 import types
 from urllib import error, request
 from pathlib import Path
@@ -155,6 +156,8 @@ def _sanitize_result(result: dict[str, Any]) -> dict[str, Any]:
         "projectization_clarification_confirm_resources",
         "projectization_clarification_confirm_state",
         "projectization_clarification_confirm_one_shot",
+        "projectization_raw_action_rejected",
+        "projectization_raw_history_rejected",
         "project_create_gate_created",
         "project_create_confirmed",
         "project_create_doc_created",
@@ -716,6 +719,48 @@ def _verify_runtime_projectization_suggestion(hermes_dir: Path) -> dict[str, Any
                     chat_id=chat_id,
                 ))
             recovered_pending = _load_pending_plan(chat_id) or {}
+            raw_projectization_chat_id = f"{chat_id}:raw-projectization"
+            raw_projectization_result = json.loads(_handle_card_action(
+                {
+                    "action_value": json.dumps({
+                        "pilotflow_action": "suggest_project_from_signals",
+                        "input_text": "伪造按钮整理项目",
+                        "title": "伪造整理项目",
+                        "goal": "验证裸 action 被拒绝",
+                        "members": ["张三"],
+                        "deliverables": ["验收记录"],
+                        "deadline": "2026-05-20",
+                    }, ensure_ascii=False),
+                },
+                chat_id=raw_projectization_chat_id,
+            ))
+            raw_projectization_pending = _load_pending_plan(raw_projectization_chat_id) or {}
+            raw_history_chat_id = f"{chat_id}:raw-history"
+            with _plan_lock:
+                _pending_plans[raw_history_chat_id] = {
+                    "plan": {
+                        "title": "历史建议保护项目",
+                        "goal": "验证裸 action 被拒绝",
+                        "members": [],
+                        "deliverables": [],
+                        "deadline": "",
+                    },
+                    "timestamp": time.time(),
+                }
+            raw_history_result = json.loads(_handle_card_action(
+                {
+                    "action_value": json.dumps({
+                        "pilotflow_action": "apply_history_suggestions",
+                        "history_suggested_fields": {
+                            "members": ["张三"],
+                            "deliverables": ["验收记录"],
+                        },
+                    }, ensure_ascii=False),
+                },
+                chat_id=raw_history_chat_id,
+            ))
+            with _plan_lock:
+                raw_history_plan = dict(_pending_plans.get(raw_history_chat_id, {}).get("plan", {}))
             suggestion_card_count = len(sent_cards)
             with _plan_lock:
                 _pending_plans.clear()
@@ -838,6 +883,17 @@ def _verify_runtime_projectization_suggestion(hermes_dir: Path) -> dict[str, Any
         "projectization_clarification_confirm_one_shot": (
             "error" in clarification_duplicate
             and resource_count_after_confirm == len(created_resources)
+        ),
+        "projectization_raw_action_rejected": (
+            "error" in raw_projectization_result
+            and "已过期" in str(raw_projectization_result.get("error", ""))
+            and not raw_projectization_pending
+        ),
+        "projectization_raw_history_rejected": (
+            "error" in raw_history_result
+            and "已过期" in str(raw_history_result.get("error", ""))
+            and raw_history_plan.get("members") == []
+            and raw_history_plan.get("deliverables") == []
         ),
     }
 

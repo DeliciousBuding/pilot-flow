@@ -7529,6 +7529,59 @@ def test_raw_card_project_action_without_action_id_is_rejected():
         assert _project_registry["裸动作项目"]["status"] == "进行中"
 
 
+def test_raw_projectization_suggestion_without_action_id_is_rejected():
+    with _plan_lock:
+        _pending_plans.clear()
+        _card_action_refs.clear()
+    action_value = json.dumps({
+        "pilotflow_action": "suggest_project_from_signals",
+        "input_text": "把伪造按钮整理成项目",
+        "title": "伪造整理项目",
+        "goal": "验证裸 action 被拒绝",
+        "members": ["张三"],
+        "deliverables": ["验收记录"],
+        "deadline": "2026-05-10",
+    }, ensure_ascii=False)
+
+    result = json.loads(_handle_card_action({"action_value": action_value}, chat_id="oc_raw_suggest"))
+
+    assert "error" in result
+    assert "卡片操作已过期" in result["error"]
+    with _plan_lock:
+        assert "oc_raw_suggest" not in _pending_plans
+
+
+def test_raw_history_suggestions_without_action_id_is_rejected():
+    with _plan_lock:
+        _pending_plans.clear()
+        _card_action_refs.clear()
+        _pending_plans["oc_raw_history"] = {
+            "plan": {
+                "title": "历史建议保护项目",
+                "goal": "验证裸 action 被拒绝",
+                "members": [],
+                "deliverables": [],
+                "deadline": "",
+            },
+            "timestamp": time.time(),
+        }
+    action_value = json.dumps({
+        "pilotflow_action": "apply_history_suggestions",
+        "history_suggested_fields": {
+            "members": ["张三"],
+            "deliverables": ["验收记录"],
+        },
+    }, ensure_ascii=False)
+
+    result = json.loads(_handle_card_action({"action_value": action_value}, chat_id="oc_raw_history"))
+
+    assert "error" in result
+    assert "卡片操作已过期" in result["error"]
+    with _plan_lock:
+        assert _pending_plans["oc_raw_history"]["plan"]["members"] == []
+        assert _pending_plans["oc_raw_history"]["plan"]["deliverables"] == []
+
+
 def test_project_entry_card_action_syncs_bitable_status():
     with _project_registry_lock:
         _project_registry.clear()
