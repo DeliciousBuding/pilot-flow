@@ -3327,8 +3327,6 @@ def _handle_generate_plan(params: Dict[str, Any], **kwargs) -> str:
     """Parse user input and return a structured project plan with pre-populated scaffold."""
     chat_id = _get_chat_id(kwargs)
     chat_scope = _get_chat_scope(kwargs)
-    if chat_id and chat_scope.get("scope") == "group":
-        _set_plan_gate(chat_id)
 
     text = params.get("input_text", "")
     allow_inferred_fields = bool(params.get("allow_inferred_fields"))
@@ -3362,12 +3360,22 @@ def _handle_generate_plan(params: Dict[str, Any], **kwargs) -> str:
         plan["title"] or plan["goal"] or plan["members"] or plan["deliverables"] or params.get("deadline", "")
     )
     if not has_structured_fields and not allow_inferred_fields:
+        missing = ["title", "goal", "deliverables", "deadline"]
+        missing_labels = ["项目名称", "目标", "交付物", "截止时间"]
+        clarification_text = (
+            f"我需要再确认几个字段，才能生成可执行的项目计划：{'、'.join(missing_labels)}。\n"
+            "请直接补充这些信息，例如：项目名称是...，目标是...，交付物包括...，截止时间是..."
+        )
+        clarification_sent = bool(chat_id and _hermes_send(chat_id, clarification_text))
         return tool_result({
             "status": "needs_clarification",
-            "missing": ["title", "goal", "deliverables", "deadline"],
+            "missing": missing,
+            "clarification_sent": clarification_sent,
             "input": text,
             "instructions": "请用中文向用户追问缺失的项目字段，不要自行从原文兜底解析。",
         })
+    if chat_id and chat_scope.get("scope") == "group":
+        _set_plan_gate(chat_id)
     if not plan["members"] and session_user_name:
         plan["members"] = [session_user_name]
     plan["deliverable_assignees"] = _clean_deliverable_assignees(

@@ -144,6 +144,10 @@ def _sanitize_result(result: dict[str, Any]) -> dict[str, Any]:
         "projectization_schema_assignees_exposed",
         "projectization_pending_recovered",
         "projectization_cards_sent",
+        "projectization_clarification_sent",
+        "projectization_clarification_no_card",
+        "projectization_clarification_no_pending",
+        "projectization_clarification_no_gate",
         "project_create_gate_created",
         "project_create_confirmed",
         "project_create_doc_created",
@@ -599,7 +603,9 @@ def _verify_runtime_projectization_suggestion(hermes_dir: Path) -> dict[str, Any
     from plugins.pilotflow.tools import (  # pylint: disable=import-error
         _card_action_refs,
         _handle_card_action,
+        _handle_generate_plan,
         _handle_scan_chat_signals,
+        _check_plan_gate,
         _load_pending_plan,
         _pending_plans,
         _plan_lock,
@@ -609,11 +615,17 @@ def _verify_runtime_projectization_suggestion(hermes_dir: Path) -> dict[str, Any
     chat_id = os.environ.get("PILOTFLOW_TEST_CHAT_ID", "")
     original_state_path = os.environ.get("PILOTFLOW_STATE_PATH")
     original_send_card = runtime_tools._hermes_send_card
+    original_send = runtime_tools._hermes_send
     sent_cards: list[dict[str, Any]] = []
+    sent_messages: list[str] = []
 
     def tracking_send_card(target_chat_id: str, card_json: dict[str, Any]) -> bool | str:
         sent_cards.append(card_json)
         return original_send_card(target_chat_id, card_json)
+
+    def tracking_send(_target_chat_id: str, text: str) -> bool:
+        sent_messages.append(text)
+        return True
 
     with tempfile.TemporaryDirectory(prefix="pilotflow-projectization-verify-") as tmpdir:
         os.environ["PILOTFLOW_STATE_PATH"] = str(Path(tmpdir) / "pilotflow_state.json")
@@ -621,6 +633,7 @@ def _verify_runtime_projectization_suggestion(hermes_dir: Path) -> dict[str, Any
             _pending_plans.clear()
             _card_action_refs.clear()
         runtime_tools._hermes_send_card = tracking_send_card
+        runtime_tools._hermes_send = tracking_send
         try:
             suggestion = json.loads(_handle_scan_chat_signals(
                 {
@@ -665,8 +678,21 @@ def _verify_runtime_projectization_suggestion(hermes_dir: Path) -> dict[str, Any
             with _plan_lock:
                 _pending_plans.clear()
                 _card_action_refs.clear()
+            sent_cards_before_clarification = len(sent_cards)
+            clarification_chat_id = f"{chat_id}_clarify"
+            os.environ["PILOTFLOW_STATE_PATH"] = str(Path(tmpdir) / "pilotflow_clarification_state.json")
+            clarification = json.loads(_handle_generate_plan(
+                {"input_text": "帮我推进客户上线"},
+                chat_id=clarification_chat_id,
+                chat_type="group",
+            ))
+            clarification_pending = _load_pending_plan(clarification_chat_id) or {}
+            with _plan_lock:
+                clarification_in_memory = clarification_chat_id in _pending_plans
+            clarification_gate_active = _check_plan_gate(clarification_chat_id)
         finally:
             runtime_tools._hermes_send_card = original_send_card
+            runtime_tools._hermes_send = original_send
             if original_state_path is None:
                 os.environ.pop("PILOTFLOW_STATE_PATH", None)
             else:
@@ -697,6 +723,14 @@ def _verify_runtime_projectization_suggestion(hermes_dir: Path) -> dict[str, Any
         ),
         "projectization_pending_recovered": bool(recovered_plan),
         "projectization_cards_sent": len(sent_cards) == 2,
+        "projectization_clarification_sent": (
+            clarification.get("status") == "needs_clarification"
+            and clarification.get("clarification_sent") is True
+            and any("项目名称、目标、交付物、截止时间" in text for text in sent_messages)
+        ),
+        "projectization_clarification_no_card": len(sent_cards) == sent_cards_before_clarification,
+        "projectization_clarification_no_pending": not clarification_pending and not clarification_in_memory,
+        "projectization_clarification_no_gate": clarification_gate_active is False,
     }
 
 

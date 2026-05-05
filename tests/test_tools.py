@@ -1429,17 +1429,41 @@ def test_generate_plan_accepts_explicit_template_key():
 
 
 def test_generate_plan_requires_structured_fields_by_default():
-    with patch("tools._hermes_send_card") as send_card:
+    sent_messages = []
+
+    def fake_send(chat_id, text):
+        sent_messages.append({"chat_id": chat_id, "text": text})
+        return True
+
+    with _plan_lock:
+        _pending_plans.clear()
+        _card_action_refs.clear()
+    _clear_plan_gate("oc_structured_required")
+
+    with (
+        patch("tools._hermes_send_card") as send_card,
+        patch("tools._hermes_send", side_effect=fake_send),
+    ):
         result = json.loads(_handle_generate_plan(
             {
                 "input_text": "帮我创建客户推进项目，成员张三、李四，交付物是项目简报和任务清单，5月10日截止",
             },
             chat_id="oc_structured_required",
+            chat_type="group",
         ))
 
     assert result["status"] == "needs_clarification"
     assert result["missing"] == ["title", "goal", "deliverables", "deadline"]
     send_card.assert_not_called()
+    assert "oc_structured_required" not in _pending_plans
+    assert _check_plan_gate("oc_structured_required") is False
+    assert sent_messages == [{
+        "chat_id": "oc_structured_required",
+        "text": (
+            "我需要再确认几个字段，才能生成可执行的项目计划：项目名称、目标、交付物、截止时间。\n"
+            "请直接补充这些信息，例如：项目名称是...，目标是...，交付物包括...，截止时间是..."
+        ),
+    }]
 
 
 def test_generate_plan_uses_session_chat_and_initiator_context():
