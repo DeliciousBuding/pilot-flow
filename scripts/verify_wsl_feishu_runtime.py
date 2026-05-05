@@ -143,6 +143,8 @@ def _sanitize_result(result: dict[str, Any]) -> dict[str, Any]:
         "projectization_assignees_preserved",
         "projectization_assignees_card_shown",
         "projectization_schema_assignees_exposed",
+        "projectization_session_initiator_preserved",
+        "projectization_session_initiator_card_shown",
         "projectization_pending_recovered",
         "projectization_cards_sent",
         "projectization_clarification_sent",
@@ -643,6 +645,8 @@ def _verify_runtime_projectization_suggestion(hermes_dir: Path) -> dict[str, Any
     original_reminder = runtime_tools._schedule_deadline_reminder
     original_memory = runtime_tools._save_to_hermes_memory
     original_resolve_member = runtime_tools._resolve_member
+    original_gateway = sys.modules.get("gateway")
+    original_session_context = sys.modules.get("gateway.session_context")
     sent_cards: list[dict[str, Any]] = []
     sent_messages: list[str] = []
     created_resources: list[str] = []
@@ -672,6 +676,17 @@ def _verify_runtime_projectization_suggestion(hermes_dir: Path) -> dict[str, Any
         created_resources.append("task")
         return "https://example.invalid/task/clarification-confirm"
 
+    def fake_get_session_env(name: str, default: str = "") -> str:
+        values = {
+            "HERMES_SESSION_USER_NAME": "运行验证员",
+        }
+        return values.get(name, default)
+
+    fake_session_context = types.ModuleType("gateway.session_context")
+    fake_session_context.get_session_env = fake_get_session_env
+    fake_gateway = types.ModuleType("gateway")
+    fake_gateway.session_context = fake_session_context
+
     with tempfile.TemporaryDirectory(prefix="pilotflow-projectization-verify-") as tmpdir:
         os.environ["PILOTFLOW_STATE_PATH"] = str(Path(tmpdir) / "pilotflow_state.json")
         with _plan_lock:
@@ -686,6 +701,8 @@ def _verify_runtime_projectization_suggestion(hermes_dir: Path) -> dict[str, Any
         runtime_tools._schedule_deadline_reminder = lambda *_args, **_kwargs: False
         runtime_tools._save_to_hermes_memory = lambda *_args, **_kwargs: True
         runtime_tools._resolve_member = lambda *_args, **_kwargs: None
+        sys.modules["gateway"] = fake_gateway
+        sys.modules["gateway.session_context"] = fake_session_context
         try:
             suggestion = json.loads(_handle_scan_chat_signals(
                 {
@@ -992,6 +1009,14 @@ def _verify_runtime_projectization_suggestion(hermes_dir: Path) -> dict[str, Any
             runtime_tools._schedule_deadline_reminder = original_reminder
             runtime_tools._save_to_hermes_memory = original_memory
             runtime_tools._resolve_member = original_resolve_member
+            if original_gateway is None:
+                sys.modules.pop("gateway", None)
+            else:
+                sys.modules["gateway"] = original_gateway
+            if original_session_context is None:
+                sys.modules.pop("gateway.session_context", None)
+            else:
+                sys.modules["gateway.session_context"] = original_session_context
             if original_state_path is None:
                 os.environ.pop("PILOTFLOW_STATE_PATH", None)
             else:
@@ -1020,6 +1045,8 @@ def _verify_runtime_projectization_suggestion(hermes_dir: Path) -> dict[str, Any
             "deliverable_assignees" in suggested_props
             and "open_id" in str(suggested_props.get("deliverable_assignees", {}).get("description", ""))
         ),
+        "projectization_session_initiator_preserved": recovered_plan.get("initiator") == "运行验证员",
+        "projectization_session_initiator_card_shown": "**发起人：** 运行验证员" in plan_card_json,
         "projectization_pending_recovered": bool(recovered_plan),
         "projectization_cards_sent": suggestion_card_count == 2,
         "projectization_clarification_sent": (

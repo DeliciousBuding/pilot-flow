@@ -380,6 +380,8 @@ def test_verify_runtime_projectization_suggestion_is_sanitized(tmp_path, monkeyp
     assert result["projectization_assignees_preserved"] is True
     assert result["projectization_assignees_card_shown"] is True
     assert result["projectization_schema_assignees_exposed"] is True
+    assert result["projectization_session_initiator_preserved"] is True
+    assert result["projectization_session_initiator_card_shown"] is True
     assert result["projectization_pending_recovered"] is True
     assert result["projectization_cards_sent"] is True
     assert result["projectization_clarification_sent"] is True
@@ -965,6 +967,8 @@ def test_verifier_projectization_suggestion_mode_outputs_sanitized_runtime_resul
         "projectization_assignees_preserved": True,
         "projectization_assignees_card_shown": True,
         "projectization_schema_assignees_exposed": True,
+        "projectization_session_initiator_preserved": True,
+        "projectization_session_initiator_card_shown": True,
         "projectization_pending_recovered": True,
         "projectization_cards_sent": True,
         "projectization_clarification_sent": True,
@@ -1007,6 +1011,8 @@ def test_verifier_projectization_suggestion_mode_outputs_sanitized_runtime_resul
     assert output["projectization_assignees_preserved"] is True
     assert output["projectization_assignees_card_shown"] is True
     assert output["projectization_schema_assignees_exposed"] is True
+    assert output["projectization_session_initiator_preserved"] is True
+    assert output["projectization_session_initiator_card_shown"] is True
     assert output["projectization_pending_recovered"] is True
     assert output["projectization_cards_sent"] is True
     assert output["projectization_clarification_sent"] is True

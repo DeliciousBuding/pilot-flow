@@ -1859,6 +1859,10 @@ def _build_projectization_suggestion_card(
     )
     members = _clean_signal_list(suggested_project.get("members"), limit=20)
     deadline = str(suggested_project.get("deadline") or (signals.get("deadlines") or [""])[0]).strip()
+    initiator = (
+        _clean_initiator_name(suggested_project.get("initiator"))
+        or _clean_initiator_name(_get_session_value("HERMES_SESSION_USER_NAME", ""))
+    )
     risks = _clean_signal_list(
         suggested_project.get("risks") or signals.get("risks"),
         limit=10,
@@ -1878,6 +1882,7 @@ def _build_projectization_suggestion_card(
             "members": members,
             "deliverables": deliverables,
             "deliverable_assignees": deliverable_assignees,
+            "initiator": initiator,
             "deadline": deadline,
             "risks": risks,
             "signals": signals,
@@ -3171,6 +3176,7 @@ PILOTFLOW_SCAN_CHAT_SIGNALS_SCHEMA = {
                         "additionalProperties": {"type": "string"},
                         "description": "可选。交付物标题到负责人显示名的映射；key 必须完全匹配 deliverables，value 必须是 members 中已有成员的显示名或飞书 @ 提及。不要传 open_id、chat_id、message_id。",
                     },
+                    "initiator": {"type": "string", "description": "可选。发起人显示名；只能传显示名，不要传 open_id、chat_id、message_id。为空时工具会使用 Hermes 会话用户显示名。"},
                     "deadline": {"type": "string"},
                 },
             },
@@ -4123,6 +4129,7 @@ def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
             "members": action_data.get("members", []),
             "deliverables": action_data.get("deliverables", []),
             "deliverable_assignees": action_data.get("deliverable_assignees", {}),
+            "initiator": action_data.get("initiator", ""),
             "deadline": action_data.get("deadline", ""),
             "risks": action_data.get("risks", []),
         }, **kwargs)

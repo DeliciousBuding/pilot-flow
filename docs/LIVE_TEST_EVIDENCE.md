@@ -1760,6 +1760,18 @@
 | 用户价值 | 项目负责人收到群催办时，能直接看到每个交付物该由谁推进，不需要再打开详情卡或回翻项目确认卡，提升后续追踪动作的可执行性 |
 | 隐私处理 | 证据只记录布尔结果和脱敏结论；不写入真实 chat_id、message_id、Feishu URL、用户 open_id、token 或 app secret |
 
+## 2026-05-05 项目化建议发起人保留运行态验证
+
+| 项目 | 证据 |
+| --- | --- |
+| 运行环境 | PilotFlow 已通过 `setup.py --hermes-home <wsl-hermes-home>` 同步到 WSL Hermes runtime；安装验证返回插件、技能、Hermes config 和 Feishu display 配置均 OK |
+| 本地回归 | `C:\Users\Ding\miniforge3\python.exe -m pytest` 返回 `317 passed`；相关 projectization 单元/verifier 测试返回 `6 passed` |
+| 功能硬化 | 群聊信号项目化建议卡生成时会把 Hermes session 发起人显示名写入 opaque action ref；用户稍后点击“整理成项目计划”时，即使点击阶段没有 session context，生成的 pending plan 和确认卡仍保留发起人 |
+| Verifier 新字段 | `verify_wsl_feishu_runtime.py --verify-projectization-suggestion` 在已安装的 WSL Hermes runtime 插件内返回 `projectization_session_initiator_preserved=true`、`projectization_session_initiator_card_shown=true`，并保留 `projectization_plan_generated=true`、`projectization_plan_card_sent=true`、`projectization_assignees_preserved=true` |
+| 基线验证 | 同轮继续通过同一 Feishu venv 下 `--send-card` 的 `card_sent=true`、`card_has_initiator=true`、`pending_plan_recovered=true`，以及 `--probe-llm` 的 `llm_probe_ok=true`、`llm_probe_status=200` |
+| 用户价值 | @PilotFlow 从群聊中冒泡“整理成项目”建议后，确认卡能显示真实请求人的显示名，避免项目从建议卡转为计划时丢失发起人上下文 |
+| 隐私处理 | 证据只记录布尔结果和脱敏结论；不写入真实 chat_id、message_id、Feishu URL、用户 open_id、token 或 app secret |
+
 ## 本地回归
 
 ```bash

@@ -208,6 +208,65 @@ def test_projectization_suggestion_button_generates_pending_plan(monkeypatch):
     assert "确认执行" in followup_card
 
 
+def test_projectization_suggestion_button_uses_session_initiator(monkeypatch):
+    import types
+
+    sent_cards = []
+
+    def fake_send_card(chat_id, card):
+        sent_cards.append({"chat_id": chat_id, "card": card})
+        return f"om_signal_initiator_{len(sent_cards)}"
+
+    def fake_get_session_env(name, default=""):
+        values = {
+            "HERMES_SESSION_USER_NAME": "王小明",
+        }
+        return values.get(name, default)
+
+    fake_session_context = types.ModuleType("gateway.session_context")
+    fake_session_context.get_session_env = fake_get_session_env
+    fake_gateway = types.ModuleType("gateway")
+    fake_gateway.session_context = fake_session_context
+
+    with patch("tools._hermes_send_card", side_effect=fake_send_card):
+        with patch.dict(sys.modules, {
+            "gateway": fake_gateway,
+            "gateway.session_context": fake_session_context,
+        }):
+            _handle_scan_chat_signals({
+                "source_text": "目标是本周把飞书链路验证落地。我来整理验证记录。",
+                "signals": {
+                    "goals": ["本周把飞书链路验证落地"],
+                    "commitments": ["我来整理验证记录"],
+                    "risks": ["权限审批可能卡住"],
+                    "action_items": ["整理验证记录"],
+                    "deadlines": ["2026-05-08"],
+                },
+                "suggested_project": {
+                    "title": "飞书链路验证落地项目",
+                    "goal": "本周把飞书链路验证落地",
+                    "members": [],
+                    "deliverables": ["整理验证记录"],
+                    "deadline": "2026-05-08",
+                },
+                "should_suggest_project": True,
+            }, chat_id="oc_signal_initiator", chat_type="group")
+
+        action_id = sent_cards[0]["card"]["elements"][1]["actions"][0]["value"]["pilotflow_action_id"]
+        result = json.loads(_handle_card_action(
+            {"action_value": json.dumps({"pilotflow_action_id": action_id}, ensure_ascii=False)},
+            chat_id="oc_signal_initiator",
+            chat_type="group",
+        ))
+
+    assert result["status"] == "plan_generated"
+    assert result["plan"]["initiator"] == "王小明"
+    assert _pending_plans["oc_signal_initiator"]["plan"]["initiator"] == "王小明"
+    followup_card = json.dumps(sent_cards[1]["card"], ensure_ascii=False)
+    assert "**发起人：** 王小明" in followup_card
+    assert "open_id" not in followup_card
+
+
 def test_generate_plan_confirmation_card_displays_structured_risks(monkeypatch):
     sent_cards = []
 
