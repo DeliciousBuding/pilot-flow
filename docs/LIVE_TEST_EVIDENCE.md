@@ -1962,6 +1962,17 @@
 | 用户价值 | 用户点击卡片按钮遇到临时 Feishu 连接或资源创建失败时，不会误以为按钮已失效或需要重新发起完整流程，可在故障恢复后继续同一办公动作 |
 | 隐私处理 | 证据只记录布尔结果和脱敏结论；不写入真实会话标识、消息标识、Feishu URL、用户原始标识或凭证 |
 
+## 2026-05-05 项目入口卡发送失败反馈运行态验证
+
+| 项目 | 证据 |
+| --- | --- |
+| 本地回归 | `C:\Users\Ding\miniforge3\python.exe -m pytest -q` 返回 `322 passed`；入口卡发送失败反馈和 project-creation verifier 相关 targeted tests 返回 `3 passed` |
+| 功能硬化 | 项目文档、状态表、任务等资源已创建但项目入口卡片发送失败时，创建结果不再误报“已通知群成员”，而是提示“项目入口卡片未发送” |
+| Verifier 新字段 | `verify_wsl_feishu_runtime.py --verify-project-creation` 在已安装的 WSL Hermes runtime 插件内返回 `project_create_entry_card_failure_displayed=true`，并保留 `project_create_entry_card_sent=true`、`project_create_confirmed=true`、`project_create_state_recorded=true` |
+| 基线验证 | 同轮继续通过同一 Feishu venv 下 `--send-card` 的 `card_sent=true`、`card_has_initiator=true`、`pending_plan_recovered=true`，以及 `--probe-llm` 的 `llm_probe_ok=true`、`llm_probe_status=200` |
+| 用户价值 | 用户不会在入口卡片未送达时误以为群成员已经收到入口消息；反馈能区分资源创建成功与入口通知失败，便于后续重试或人工补发 |
+| 隐私处理 | 证据只记录布尔结果和脱敏结论；不写入真实会话标识、消息标识、Feishu URL、用户原始标识或凭证 |
+
 ## 本地回归
 
 ```bash

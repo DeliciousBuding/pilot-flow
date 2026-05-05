@@ -3956,7 +3956,10 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
         display_items.append("📅 日历提醒已创建")
     if deadline:
         display_items.append("🔔 截止提醒已设置" if reminder_job else "⚠️ 截止提醒未设置")
-    display_items.append("💬 已通知群成员")
+    if "项目入口卡片" in artifacts:
+        display_items.append("💬 已通知群成员")
+    else:
+        display_items.append("⚠️ 项目入口卡片未发送")
 
     trace = PilotFlowTrace.start(chat_id=chat_id, source_text=params.get("input_text", ""))
     trace.set_intent("project_space_creation", "PilotFlow 已创建飞书项目协作空间")

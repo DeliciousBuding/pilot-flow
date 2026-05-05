@@ -1624,6 +1624,7 @@ def test_confirm_card_creates_project_after_clarification_followup(monkeypatch):
         )
 
     with (
+        patch("tools._consume_plan_gate", return_value=True),
         patch("tools._resolve_member", return_value=None),
         patch("tools._create_doc", return_value="https://example.invalid/doc") as create_doc,
         patch("tools._create_bitable", return_value={
@@ -2073,6 +2074,48 @@ def test_create_project_accepts_explicit_confirmation_text():
     assert result["status"] == "project_space_created"
     with _project_registry_lock:
         assert "迁移验证项目" in _project_registry
+
+
+def test_create_project_does_not_report_entry_card_when_card_send_fails():
+    chat_id = "oc_entry_send_failure"
+    with _project_registry_lock:
+        _project_registry.clear()
+    with _plan_lock:
+        _pending_plans.clear()
+        _card_action_refs.clear()
+
+    with (
+        patch("tools._consume_plan_gate", return_value=True),
+        patch("tools._resolve_member", return_value=None),
+        patch("tools._create_doc", return_value="https://example.invalid/doc/entry-fail"),
+        patch("tools._create_bitable", return_value={
+            "url": "https://example.invalid/base/entry-fail",
+            "app_token": "app_entry_fail",
+            "table_id": "tbl_entry_fail",
+            "record_id": "rec_entry_fail",
+        }),
+        patch("tools._create_task", return_value="验收记录: https://example.invalid/task/entry-fail"),
+        patch("tools._hermes_send_card", return_value=False),
+        patch("tools._create_calendar_event", return_value=None),
+        patch("tools._schedule_deadline_reminder", return_value=False),
+        patch("tools._save_to_hermes_memory", return_value=True),
+    ):
+        result = json.loads(_handle_create_project_space(
+            {
+                "confirmation_text": "确认执行",
+                "title": "入口卡失败项目",
+                "goal": "验证入口卡失败反馈",
+                "members": [],
+                "deliverables": ["验收记录"],
+                "deadline": "2026-05-10",
+            },
+            chat_id=chat_id,
+        ))
+
+    assert result["status"] == "project_space_created"
+    assert "项目入口卡片" not in result["artifacts"]
+    assert "💬 已通知群成员" not in result["display"]
+    assert "⚠️ 项目入口卡片未发送" in result["display"]
 
 
 def test_create_project_uses_structured_deliverable_assignees():

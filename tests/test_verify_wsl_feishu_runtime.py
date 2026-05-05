@@ -181,6 +181,7 @@ def test_verify_runtime_project_creation_is_sanitized(tmp_path, monkeypatch):
     assert result["project_create_calendar_created"] is True
     assert result["project_create_reminder_scheduled"] is True
     assert result["project_create_entry_card_sent"] is True
+    assert result["project_create_entry_card_failure_displayed"] is True
     assert result["project_create_state_recorded"] is True
     assert result["project_create_memory_saved"] is True
     assert result["project_create_trace_redacted"] is True
@@ -620,6 +621,7 @@ def test_verifier_project_creation_mode_outputs_sanitized_runtime_result(tmp_pat
         "project_create_calendar_created": True,
         "project_create_reminder_scheduled": True,
         "project_create_entry_card_sent": True,
+        "project_create_entry_card_failure_displayed": True,
         "project_create_state_recorded": True,
         "project_create_memory_saved": True,
         "project_create_trace_redacted": True,
@@ -657,6 +659,7 @@ def test_verifier_project_creation_mode_outputs_sanitized_runtime_result(tmp_pat
     assert output["project_create_calendar_created"] is True
     assert output["project_create_reminder_scheduled"] is True
     assert output["project_create_entry_card_sent"] is True
+    assert output["project_create_entry_card_failure_displayed"] is True
     assert output["project_create_state_recorded"] is True
     assert output["project_create_memory_saved"] is True
     assert output["project_create_trace_redacted"] is True

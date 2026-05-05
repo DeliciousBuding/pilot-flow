@@ -184,6 +184,7 @@ def _sanitize_result(result: dict[str, Any]) -> dict[str, Any]:
         "project_create_calendar_created",
         "project_create_reminder_scheduled",
         "project_create_entry_card_sent",
+        "project_create_entry_card_failure_displayed",
         "project_create_state_recorded",
         "project_create_memory_saved",
         "project_create_trace_redacted",
@@ -1176,6 +1177,8 @@ def _verify_runtime_project_creation(hermes_dir: Path) -> dict[str, Any]:
     appended_docs: list[tuple[str, str]] = []
     saved_memory: list[tuple[str, str, list[str], list[str], str, dict[str, str]]] = []
     sent_cards: list[dict[str, Any]] = []
+    detail_card_snapshot: dict[str, Any] = {}
+    failed_entry_card_display = ""
 
     def fake_create_doc(title: str, markdown_content: str, target_chat_id: str) -> str:
         created_docs.append((title, markdown_content, target_chat_id))
@@ -1284,6 +1287,45 @@ def _verify_runtime_project_creation(hermes_dir: Path) -> dict[str, Any]:
                 {"action_value": json.dumps({"pilotflow_action_id": detail_action_id}, ensure_ascii=False)},
                 chat_id=chat_id,
             ))
+            detail_card_snapshot = sent_cards[-1] if sent_cards else {}
+            runtime_tools._create_doc = lambda *_args, **_kwargs: "https://example.invalid/doc/entry-card-fail"
+            runtime_tools._create_bitable = lambda *_args, **_kwargs: {
+                "url": "https://example.invalid/base/entry-card-fail",
+                "app_token": "app_entry_card_fail",
+                "table_id": "tbl_entry_card_fail",
+                "record_id": "rec_entry_card_fail",
+            }
+            runtime_tools._create_task = lambda summary, *_args, **_kwargs: (
+                f"{summary}: https://example.invalid/task/entry-card-fail"
+            )
+            runtime_tools._create_calendar_event = lambda *_args, **_kwargs: ""
+            runtime_tools._schedule_deadline_reminder = lambda *_args, **_kwargs: False
+            runtime_tools._append_doc_update = lambda *_args, **_kwargs: True
+            runtime_tools._save_to_hermes_memory = lambda *_args, **_kwargs: True
+            _handle_generate_plan(
+                {
+                    "input_text": "创建一个运行态入口卡失败反馈项目",
+                    "title": "运行态入口卡失败反馈项目",
+                    "goal": "验证入口卡失败时不误报通知成功",
+                    "members": ["张三"],
+                    "deliverables": ["失败反馈验收"],
+                    "deadline": "2026-05-21",
+                },
+                chat_id=chat_id,
+            )
+            runtime_tools._hermes_send_card = lambda *_args, **_kwargs: False
+            failed_entry_card = json.loads(_handle_create_project_space(
+                {
+                    "confirmation_text": "确认执行",
+                    "title": "运行态入口卡失败反馈项目",
+                    "goal": "验证入口卡失败时不误报通知成功",
+                    "members": ["张三"],
+                    "deliverables": ["失败反馈验收"],
+                    "deadline": "2026-05-21",
+                },
+                chat_id=chat_id,
+            ))
+            failed_entry_card_display = str(failed_entry_card.get("display", ""))
             state_projects = _load_project_state()
         finally:
             runtime_tools._create_doc = original_create_doc
@@ -1309,8 +1351,8 @@ def _verify_runtime_project_creation(hermes_dir: Path) -> dict[str, Any]:
     if len(sent_cards) >= 2:
         entry_card_text = str(((sent_cards[1].get("elements") or [{}])[0].get("content")) or "")
     detail_card_text = ""
-    if len(sent_cards) >= 3:
-        detail_card_text = str(((sent_cards[-1].get("elements") or [{}])[0].get("content")) or "")
+    if detail_card_snapshot:
+        detail_card_text = str(((detail_card_snapshot.get("elements") or [{}])[0].get("content")) or "")
     generate_props = (
         runtime_tools.PILOTFLOW_GENERATE_PLAN_SCHEMA
         .get("parameters", {})
@@ -1392,7 +1434,7 @@ def _verify_runtime_project_creation(hermes_dir: Path) -> dict[str, Any]:
         and "负责人" in detail_card_text
         and "验收清单 → 李四" in detail_card_text
         and "上线演练 → 张三" in detail_card_text
-        and "pilotflow_chat_id" not in json.dumps(sent_cards[-1] if sent_cards else {}, ensure_ascii=False),
+        and "pilotflow_chat_id" not in json.dumps(detail_card_snapshot, ensure_ascii=False),
         "project_create_detail_calendar_reminder_shown": detail.get("status") == "project_status_sent"
         and "日历: 日历事件: 2026-05-20" in detail_card_text
         and "截止提醒已设置" in detail_card_text,
@@ -1418,6 +1460,10 @@ def _verify_runtime_project_creation(hermes_dir: Path) -> dict[str, Any]:
             and len(sent_cards) >= 2
             and "日历事件: 2026-05-20" in entry_card_text
             and "截止提醒已设置" in entry_card_text
+        ),
+        "project_create_entry_card_failure_displayed": (
+            "⚠️ 项目入口卡片未发送" in failed_entry_card_display
+            and "💬 已通知群成员" not in failed_entry_card_display
         ),
         "project_create_state_recorded": any(
             item.get("title") == "运行态项目创建闭环项目"
