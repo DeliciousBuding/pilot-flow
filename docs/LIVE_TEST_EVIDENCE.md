@@ -2,6 +2,18 @@
 
 > 本文件只记录可复验结论和脱敏摘要，不提交真实群 ID、用户 open_id、应用 secret、message_id 或飞书文档链接。
 
+## 2026-05-05 确认/取消卡片裸 action 拒绝
+
+| 项目 | 证据 |
+| --- | --- |
+| 功能验证 | `confirm_project` 和 `cancel_project` 也必须通过短期 opaque action id 触发；裸 `pilotflow_action` payload 会被视为过期/已处理并拒绝 |
+| 适用边界 | 文字确认路径仍通过 `pilotflow_create_project_space.confirmation_text` 执行；本次只收紧卡片按钮工具，避免伪造 `/card button {"pilotflow_action":"confirm_project"}` 直接创建项目或取消 pending plan |
+| 状态安全 | 裸确认不会调用文档/Base/待办创建；裸取消不会发送取消消息，也不会清除已有 pending plan |
+| 本地回归 | `C:\Users\Ding\miniforge3\python.exe -m pytest tests\test_tools.py::test_raw_confirm_project_without_action_id_is_rejected tests\test_tools.py::test_raw_cancel_project_without_action_id_is_rejected -q` 返回 `2 passed`；合法 opaque 确认/取消桥接和文字 `confirmation_text` 路径保持通过 |
+| Verifier 新字段 | `--verify-projectization-suggestion` 返回 `projectization_raw_confirm_rejected=true`、`projectization_raw_cancel_rejected=true`，并保留项目化建议、裸项目化拒绝、澄清补齐、确认创建和一次性确认基线 |
+| 用户价值 | 项目创建/取消这两个最高影响按钮只能由真实飞书卡片引用推进，降低群聊里误触、重放或伪造命令导致项目被错误创建/取消的风险 |
+| 隐私处理 | 验证只记录布尔结果和脱敏状态；不写入真实 chat_id、open_id、message_id、Feishu URL、token 或 app secret |
+
 ## 2026-05-05 项目化卡片裸 action 拒绝
 
 | 项目 | 证据 |

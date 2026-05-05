@@ -158,6 +158,8 @@ def _sanitize_result(result: dict[str, Any]) -> dict[str, Any]:
         "projectization_clarification_confirm_one_shot",
         "projectization_raw_action_rejected",
         "projectization_raw_history_rejected",
+        "projectization_raw_confirm_rejected",
+        "projectization_raw_cancel_rejected",
         "project_create_gate_created",
         "project_create_confirmed",
         "project_create_doc_created",
@@ -761,6 +763,54 @@ def _verify_runtime_projectization_suggestion(hermes_dir: Path) -> dict[str, Any
             ))
             with _plan_lock:
                 raw_history_plan = dict(_pending_plans.get(raw_history_chat_id, {}).get("plan", {}))
+            raw_confirm_chat_id = f"{chat_id}:raw-confirm"
+            raw_confirm_resources_before = len(created_resources)
+            _clear_plan_gate(raw_confirm_chat_id)
+            with _plan_lock:
+                _pending_plans[raw_confirm_chat_id] = {
+                    "plan": {
+                        "title": "裸确认保护项目",
+                        "goal": "验证裸确认被拒绝",
+                        "members": ["张三"],
+                        "deliverables": ["验收记录"],
+                        "deadline": "2026-05-20",
+                    },
+                    "timestamp": time.time(),
+                }
+            raw_confirm_result = json.loads(_handle_card_action(
+                {
+                    "action_value": json.dumps({
+                        "pilotflow_action": "confirm_project",
+                    }, ensure_ascii=False),
+                },
+                chat_id=raw_confirm_chat_id,
+            ))
+            raw_confirm_resources_after = len(created_resources)
+            with _plan_lock:
+                raw_confirm_pending = dict(_pending_plans.get(raw_confirm_chat_id, {}))
+            raw_cancel_chat_id = f"{chat_id}:raw-cancel"
+            _clear_plan_gate(raw_cancel_chat_id)
+            with _plan_lock:
+                _pending_plans[raw_cancel_chat_id] = {
+                    "plan": {
+                        "title": "裸取消保护项目",
+                        "goal": "验证裸取消被拒绝",
+                        "members": ["张三"],
+                        "deliverables": ["验收记录"],
+                        "deadline": "2026-05-20",
+                    },
+                    "timestamp": time.time(),
+                }
+            raw_cancel_result = json.loads(_handle_card_action(
+                {
+                    "action_value": json.dumps({
+                        "pilotflow_action": "cancel_project",
+                    }, ensure_ascii=False),
+                },
+                chat_id=raw_cancel_chat_id,
+            ))
+            with _plan_lock:
+                raw_cancel_pending = dict(_pending_plans.get(raw_cancel_chat_id, {}))
             suggestion_card_count = len(sent_cards)
             with _plan_lock:
                 _pending_plans.clear()
@@ -894,6 +944,17 @@ def _verify_runtime_projectization_suggestion(hermes_dir: Path) -> dict[str, Any
             and "已过期" in str(raw_history_result.get("error", ""))
             and raw_history_plan.get("members") == []
             and raw_history_plan.get("deliverables") == []
+        ),
+        "projectization_raw_confirm_rejected": (
+            "error" in raw_confirm_result
+            and "已过期" in str(raw_confirm_result.get("error", ""))
+            and bool(raw_confirm_pending)
+            and raw_confirm_resources_before == raw_confirm_resources_after
+        ),
+        "projectization_raw_cancel_rejected": (
+            "error" in raw_cancel_result
+            and "已过期" in str(raw_cancel_result.get("error", ""))
+            and bool(raw_cancel_pending)
         ),
     }
 

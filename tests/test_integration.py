@@ -195,11 +195,16 @@ def test_card_action_confirm_uses_pending_plan():
             },
             chat_id=chat_id,
         )
+    with _plan_lock:
+        action_id = next(
+            k for k, v in _card_action_refs.items()
+            if v["chat_id"] == chat_id and v["action"] == "confirm_project"
+        )
     _call_log.clear()
 
     with patch("tools._send_interactive_card_via_feishu", return_value=True):
         result = json.loads(_handle_card_action(
-            {"action_value": json.dumps({"pilotflow_action": "confirm_project"})},
+            {"action_value": json.dumps({"pilotflow_action_id": action_id})},
             chat_id=chat_id,
         ))
 
@@ -235,11 +240,16 @@ def test_card_action_cancel_clears_pending_plan():
             chat_id=chat_id,
         )
     assert _check_plan_gate(chat_id) is True
+    with _plan_lock:
+        action_id = next(
+            k for k, v in _card_action_refs.items()
+            if v["chat_id"] == chat_id and v["action"] == "cancel_project"
+        )
     _call_log.clear()
 
     with patch("tools._send_interactive_card_via_feishu", return_value=True):
         result = json.loads(_handle_card_action(
-            {"action_value": json.dumps({"pilotflow_action": "cancel_project"})},
+            {"action_value": json.dumps({"pilotflow_action_id": action_id})},
             chat_id=chat_id,
         ))
 

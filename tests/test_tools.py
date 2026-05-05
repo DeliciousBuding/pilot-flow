@@ -7582,6 +7582,77 @@ def test_raw_history_suggestions_without_action_id_is_rejected():
         assert _pending_plans["oc_raw_history"]["plan"]["deliverables"] == []
 
 
+def test_raw_confirm_project_without_action_id_is_rejected():
+    chat_id = "oc_raw_confirm"
+    with _project_registry_lock:
+        _project_registry.clear()
+    with _plan_lock:
+        _pending_plans.clear()
+        _card_action_refs.clear()
+    with patch("tools._hermes_send_card", return_value="om_raw_confirm_plan"):
+        _handle_generate_plan(
+            {
+                "input_text": "准备裸确认项目",
+                "title": "裸确认项目",
+                "goal": "验证裸确认被拒绝",
+                "members": ["张三"],
+                "deliverables": ["验收记录"],
+                "deadline": "2026-05-10",
+            },
+            chat_id=chat_id,
+        )
+    action_value = json.dumps({"pilotflow_action": "confirm_project"}, ensure_ascii=False)
+
+    with (
+        patch("tools._create_doc", return_value="https://example.invalid/doc") as create_doc,
+        patch("tools._create_bitable", return_value={
+            "url": "https://example.invalid/base",
+            "app_token": "app1",
+            "table_id": "tbl1",
+            "record_id": "rec1",
+        }) as create_bitable,
+        patch("tools._create_task", return_value="任务已创建") as create_task,
+    ):
+        result = json.loads(_handle_card_action({"action_value": action_value}, chat_id=chat_id))
+
+    assert "error" in result
+    assert "卡片操作已过期" in result["error"]
+    create_doc.assert_not_called()
+    create_bitable.assert_not_called()
+    create_task.assert_not_called()
+    with _project_registry_lock:
+        assert "裸确认项目" not in _project_registry
+
+
+def test_raw_cancel_project_without_action_id_is_rejected():
+    chat_id = "oc_raw_cancel"
+    with _plan_lock:
+        _pending_plans.clear()
+        _card_action_refs.clear()
+    with patch("tools._hermes_send_card", return_value="om_raw_cancel_plan"):
+        _handle_generate_plan(
+            {
+                "input_text": "准备裸取消项目",
+                "title": "裸取消项目",
+                "goal": "验证裸取消被拒绝",
+                "members": ["张三"],
+                "deliverables": ["验收记录"],
+                "deadline": "2026-05-10",
+            },
+            chat_id=chat_id,
+        )
+    action_value = json.dumps({"pilotflow_action": "cancel_project"}, ensure_ascii=False)
+
+    with patch("tools._hermes_send", return_value=True) as send:
+        result = json.loads(_handle_card_action({"action_value": action_value}, chat_id=chat_id))
+
+    assert "error" in result
+    assert "卡片操作已过期" in result["error"]
+    send.assert_not_called()
+    with _plan_lock:
+        assert chat_id in _pending_plans
+
+
 def test_project_entry_card_action_syncs_bitable_status():
     with _project_registry_lock:
         _project_registry.clear()
