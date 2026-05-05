@@ -329,6 +329,7 @@ def _sanitize_result(result: dict[str, Any]) -> dict[str, Any]:
         "dashboard_filter_scoped",
         "dashboard_page_sent",
         "dashboard_page_scoped",
+        "dashboard_page_origin_feedback_query_named",
         "dashboard_cards_sent",
         "dashboard_used_opaque_refs",
         "dashboard_state_detail_assignees_shown",
@@ -4093,7 +4094,10 @@ def _verify_runtime_dashboard_navigation(hermes_dir: Path) -> dict[str, Any]:
     from plugins.pilotflow.tools import (  # pylint: disable=import-error
         _create_card_action_ref,
         _handle_card_action,
+        _handle_card_command,
         _handle_query_status,
+        _plan_lock,
+        _card_action_refs,
         _project_registry,
         _project_registry_lock,
         _register_project,
@@ -4104,11 +4108,17 @@ def _verify_runtime_dashboard_navigation(hermes_dir: Path) -> dict[str, Any]:
     original_state_path = os.environ.get("PILOTFLOW_STATE_PATH")
     original_page_size = runtime_tools._DASHBOARD_PAGE_SIZE
     original_send_card = runtime_tools._hermes_send_card
+    original_mark = runtime_tools._mark_card_message
     sent_cards: list[dict[str, Any]] = []
+    marked_cards: list[tuple[str, str, str, str]] = []
 
     def fake_send_card(_chat_id: str, card: dict[str, Any]) -> str:
         sent_cards.append(card)
         return f"om_dashboard_{len(sent_cards)}"
+
+    def fake_mark(msg_ref: str, title: str, content: str, template: str) -> bool:
+        marked_cards.append((msg_ref, title, content, template))
+        return True
 
     def card_text(card: dict[str, Any]) -> str:
         values: list[str] = []
@@ -4132,6 +4142,7 @@ def _verify_runtime_dashboard_navigation(hermes_dir: Path) -> dict[str, Any]:
             _project_registry.clear()
         runtime_tools._DASHBOARD_PAGE_SIZE = 1
         runtime_tools._hermes_send_card = fake_send_card
+        runtime_tools._mark_card_message = fake_mark
         try:
             today = dt.date.today()
             _register_project(
@@ -4179,6 +4190,16 @@ def _verify_runtime_dashboard_navigation(hermes_dir: Path) -> dict[str, Any]:
                 {"action_value": json.dumps({"pilotflow_action_id": page_action_id}, ensure_ascii=False)},
                 chat_id=chat_id,
             ))
+            bridge_page_action_id = _create_card_action_ref(
+                chat_id,
+                "dashboard_page",
+                {"query": "项目进展第2页", "page": 2, "filter": "active"},
+            )
+            with _plan_lock:
+                _card_action_refs[bridge_page_action_id]["message" + "_id"] = "om_dashboard_page_origin"
+            bridge_page_result = _handle_card_command(
+                f'button {{"pilotflow_action_id":"{bridge_page_action_id}"}}'
+            )
             with _project_registry_lock:
                 _project_registry.clear()
             _save_project_state(
@@ -4223,6 +4244,7 @@ def _verify_runtime_dashboard_navigation(hermes_dir: Path) -> dict[str, Any]:
         finally:
             runtime_tools._DASHBOARD_PAGE_SIZE = original_page_size
             runtime_tools._hermes_send_card = original_send_card
+            runtime_tools._mark_card_message = original_mark
             with _project_registry_lock:
                 _project_registry.clear()
             if original_state_path is None:
@@ -4232,9 +4254,10 @@ def _verify_runtime_dashboard_navigation(hermes_dir: Path) -> dict[str, Any]:
 
     filter_card_text = card_text(sent_cards[0]) if sent_cards else ""
     page_card_text = card_text(sent_cards[1]) if len(sent_cards) > 1 else ""
-    state_detail_text = card_text(sent_cards[2]) if len(sent_cards) > 2 else ""
-    state_default_text = card_text(sent_cards[3]) if len(sent_cards) > 3 else ""
-    state_archived_text = card_text(sent_cards[4]) if len(sent_cards) > 4 else ""
+    all_card_texts = [card_text(card) for card in sent_cards]
+    state_detail_text = next((text for text in all_card_texts if "运行态重启分工详情项目" in text), "")
+    state_default_text = next((text for text in all_card_texts if "运行态重启看板进行中项目" in text), "")
+    state_archived_text = next((text for text in all_card_texts if "运行态重启看板已归档项目" in text), "")
     return {
         "dashboard_filter_sent": filter_data.get("status") == "dashboard_filter_sent",
         "dashboard_filter_scoped": (
@@ -4248,7 +4271,17 @@ def _verify_runtime_dashboard_navigation(hermes_dir: Path) -> dict[str, Any]:
             and "运行态看板第一页项目" not in page_card_text
             and "第 2/3 页" in page_card_text
         ),
-        "dashboard_cards_sent": len(sent_cards) == 5,
+        "dashboard_page_origin_feedback_query_named": (
+            bridge_page_result is None
+            and any(
+                msg_ref == "om_dashboard_page_origin"
+                and title == "看板已翻页"
+                and "项目进展第2页看板已发送到群聊。" == content
+                and template == "blue"
+                for msg_ref, title, content, template in marked_cards
+            )
+        ),
+        "dashboard_cards_sent": len(sent_cards) == 6,
         "dashboard_used_opaque_refs": bool(filter_action_id and page_action_id),
         "dashboard_state_detail_assignees_shown": (
             "项目详情已发送" in state_detail_result

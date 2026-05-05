@@ -5517,7 +5517,7 @@ def test_card_command_dashboard_page_updates_origin_card_after_success():
         (
             "om_bridge_page_origin",
             "看板已翻页",
-            "新的项目看板已发送到群聊。",
+            "项目进展 第2页看板已发送到群聊。",
             "blue",
         )
     ]
@@ -5600,7 +5600,7 @@ def test_card_action_ref_replays_after_state_reload(tmp_path):
         (
             "om_restart_button_origin",
             "看板已翻页",
-            "新的项目看板已发送到群聊。",
+            "项目进展 第1页看板已发送到群聊。",
             "blue",
         )
     ]

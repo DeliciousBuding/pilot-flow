@@ -541,6 +541,7 @@ def test_verify_runtime_dashboard_navigation_is_sanitized(tmp_path, monkeypatch)
     assert result["dashboard_filter_scoped"] is True
     assert result["dashboard_page_sent"] is True
     assert result["dashboard_page_scoped"] is True
+    assert result["dashboard_page_origin_feedback_query_named"] is True
     assert result["dashboard_cards_sent"] is True
     assert result["dashboard_used_opaque_refs"] is True
     assert result["dashboard_state_detail_assignees_shown"] is True
@@ -1367,6 +1368,7 @@ def test_verifier_dashboard_navigation_mode_outputs_sanitized_runtime_result(tmp
         "dashboard_filter_scoped": True,
         "dashboard_page_sent": True,
         "dashboard_page_scoped": True,
+        "dashboard_page_origin_feedback_query_named": True,
         "dashboard_cards_sent": True,
         "dashboard_used_opaque_refs": True,
         "dashboard_state_detail_assignees_shown": True,
@@ -1390,6 +1392,7 @@ def test_verifier_dashboard_navigation_mode_outputs_sanitized_runtime_result(tmp
     assert output["dashboard_filter_scoped"] is True
     assert output["dashboard_page_sent"] is True
     assert output["dashboard_page_scoped"] is True
+    assert output["dashboard_page_origin_feedback_query_named"] is True
     assert output["dashboard_cards_sent"] is True
     assert output["dashboard_used_opaque_refs"] is True
     assert output["dashboard_state_detail_assignees_shown"] is True

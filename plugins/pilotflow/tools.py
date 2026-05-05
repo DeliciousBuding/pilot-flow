@@ -4718,10 +4718,11 @@ def _handle_card_command(raw_args: str) -> str:
         )
         return None
     if data.get("status") == "dashboard_page_sent":
+        page_query = str(data.get("query") or action_data.get("query") or "新的项目").strip()
         _mark_card_message(
             message_id,
             "看板已翻页",
-            "新的项目看板已发送到群聊。",
+            f"{page_query}看板已发送到群聊。",
             "blue",
         )
         return None
