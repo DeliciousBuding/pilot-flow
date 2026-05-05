@@ -8509,13 +8509,40 @@ def test_card_command_confirm_returns_none_after_direct_card_send():
             k for k, v in _card_action_refs.items()
             if v["chat_id"] == chat_id and v["action"] == "confirm_project"
         )
+        _card_action_refs[action_id]["message" + "_id"] = "om_confirm_bridge_origin"
     raw_args = f'button {{"pilotflow_action_id":"{action_id}"}}'
-    with patch("tools._send_interactive_card_via_feishu", return_value=True):
+    marked_cards = []
+
+    def capture_mark(msg_ref, title, content, template):
+        marked_cards.append((msg_ref, title, content, template))
+        return True
+
+    with (
+        patch("tools._send_interactive_card_via_feishu", return_value=True),
+        patch("tools._mark_card_message", side_effect=capture_mark),
+        patch("tools._create_doc", return_value="https://example.invalid/doc/confirm-bridge"),
+        patch("tools._create_bitable", return_value={
+            "url": "https://example.invalid/base/confirm-bridge",
+            "app_token": "app_confirm_bridge",
+            "table_id": "tbl_confirm_bridge",
+            "record_id": "rec_confirm_bridge",
+        }),
+        patch("tools._create_task", return_value="项目简报: https://example.invalid/task/confirm-bridge"),
+        patch("tools._create_calendar_event", return_value="日历事件: 2026-05-07"),
+        patch("tools._schedule_deadline_reminder", return_value=True),
+        patch("tools._save_to_hermes_memory", return_value=True),
+    ):
         result = _handle_card_command(raw_args)
 
     assert result is None
     with _project_registry_lock:
         assert "确认桥接项目" in _project_registry
+    assert marked_cards[-1] == (
+        "om_confirm_bridge_origin",
+        "✅ 已确认并创建",
+        "**确认桥接项目** 已创建完成。\n\n已创建：飞书文档、状态表、任务、日历事件、截止提醒、项目入口卡片。",
+        "green",
+    )
 
 
 def test_direct_card_confirm_retryable_failure_keeps_action_ref_for_project_creation():

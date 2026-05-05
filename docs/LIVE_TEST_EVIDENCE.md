@@ -1928,6 +1928,18 @@
 | 用户价值 | 用户点击状态类按钮后，原卡反馈能说明后端飞书资源是否已经同步，减少只看到“完成/重开”但不确定文档和状态表是否落库的歧义 |
 | 隐私处理 | 证据只记录布尔结果和脱敏结论；不写入真实会话标识、消息标识、Feishu URL、用户原始标识或凭证 |
 
+## 2026-05-05 确认创建原卡反馈资源清单运行态验证
+
+| 项目 | 证据 |
+| --- | --- |
+| 运行环境 | PilotFlow 已通过 `setup.py --hermes-home <wsl-hermes-home>` 同步到 WSL Hermes runtime；安装验证返回插件、技能、Hermes config 和 Feishu display 配置均 OK |
+| 本地回归 | `C:\Users\Ding\miniforge3\python.exe -m pytest -q` 返回 `321 passed`；确认创建原卡资源清单和 card-command bridge verifier 相关 targeted tests 返回 `3 passed` |
+| 功能硬化 | 用户点击确认创建项目后，原确认卡片成功反馈现在基于真实 `artifacts` 列出已创建的飞书资源，例如飞书文档、状态表、任务、日历事件、截止提醒和项目入口卡片 |
+| Verifier 新字段 | `verify_wsl_feishu_runtime.py --verify-card-command-bridge` 在已安装的 WSL Hermes runtime 插件内返回 `card_command_confirm_origin_artifacts_listed=true`，并保留 `card_command_confirm_project_created=true`、`card_command_confirm_origin_marked=true`、`card_command_bridge_retryable_failure=true` |
+| 基线验证 | 同轮继续通过同一 Feishu venv 下 `--send-card` 的 `card_sent=true`、`card_has_initiator=true`、`pending_plan_recovered=true`，以及 `--probe-llm` 的 `llm_probe_ok=true`、`llm_probe_status=200` |
+| 用户价值 | 项目创建完成后，用户无需打开入口卡即可从原确认卡知道哪些飞书资源已经实际落地，减少“只创建了入口消息还是完整项目空间已创建”的不确定性 |
+| 隐私处理 | 证据只记录布尔结果和脱敏结论；不写入真实会话标识、消息标识、Feishu URL、用户原始标识或凭证 |
+
 ## 本地回归
 
 ```bash

@@ -4637,10 +4637,26 @@ def _handle_card_command(raw_args: str) -> str:
     if data.get("status") == "project_space_created":
         if action_id:
             title = data.get("title", "项目")
+            artifact_labels = []
+            for artifact in data.get("artifacts", []):
+                artifact_text = str(artifact)
+                if artifact_text.startswith("文档:") and "飞书文档" not in artifact_labels:
+                    artifact_labels.append("飞书文档")
+                elif artifact_text.startswith("多维表格:") and "状态表" not in artifact_labels:
+                    artifact_labels.append("状态表")
+                elif artifact_text.startswith("任务:") and "任务" not in artifact_labels:
+                    artifact_labels.append("任务")
+                elif artifact_text.startswith("日历事件:") and "日历事件" not in artifact_labels:
+                    artifact_labels.append("日历事件")
+                elif artifact_text == "截止提醒已设置" and "截止提醒" not in artifact_labels:
+                    artifact_labels.append("截止提醒")
+                elif artifact_text == "项目入口卡片" and "项目入口卡片" not in artifact_labels:
+                    artifact_labels.append("项目入口卡片")
+            artifact_summary = "、".join(artifact_labels) if artifact_labels else "项目入口卡片"
             _mark_card_message(
                 message_id,
                 "✅ 已确认并创建",
-                f"**{title}** 已创建完成。\n\n项目入口卡片已发送到群聊。",
+                f"**{title}** 已创建完成。\n\n已创建：{artifact_summary}。",
                 "green",
             )
         if action_ref:

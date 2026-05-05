@@ -487,6 +487,7 @@ def test_verify_runtime_card_command_bridge_is_sanitized(tmp_path, monkeypatch):
     assert result["card_command_bridge_used_opaque_ref"] is True
     assert result["card_command_confirm_project_created"] is True
     assert result["card_command_confirm_origin_marked"] is True
+    assert result["card_command_confirm_origin_artifacts_listed"] is True
     assert result["card_command_confirm_initiator_preserved"] is True
     assert result["card_command_bridge_retryable_failure"] is True
     assert result["card_command_bridge_feedback_sanitized"] is True
@@ -1236,6 +1237,7 @@ def test_verifier_card_command_bridge_mode_outputs_sanitized_runtime_result(tmp_
         "card_command_bridge_used_opaque_ref": True,
         "card_command_confirm_project_created": True,
         "card_command_confirm_origin_marked": True,
+        "card_command_confirm_origin_artifacts_listed": True,
         "card_command_confirm_initiator_preserved": True,
         "card_command_bridge_retryable_failure": True,
         "card_command_bridge_feedback_sanitized": True,
@@ -1262,6 +1264,7 @@ def test_verifier_card_command_bridge_mode_outputs_sanitized_runtime_result(tmp_
     assert output["card_command_bridge_used_opaque_ref"] is True
     assert output["card_command_confirm_project_created"] is True
     assert output["card_command_confirm_origin_marked"] is True
+    assert output["card_command_confirm_origin_artifacts_listed"] is True
     assert output["card_command_confirm_initiator_preserved"] is True
     assert output["card_command_bridge_retryable_failure"] is True
     assert output["card_command_bridge_feedback_sanitized"] is True

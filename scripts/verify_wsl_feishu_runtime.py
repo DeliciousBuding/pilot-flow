@@ -299,6 +299,7 @@ def _sanitize_result(result: dict[str, Any]) -> dict[str, Any]:
         "card_command_bridge_used_opaque_ref",
         "card_command_confirm_project_created",
         "card_command_confirm_origin_marked",
+        "card_command_confirm_origin_artifacts_listed",
         "card_command_confirm_initiator_preserved",
         "card_command_bridge_retryable_failure",
         "card_command_bridge_feedback_sanitized",
@@ -3603,9 +3604,22 @@ def _verify_runtime_card_command_bridge(hermes_dir: Path) -> dict[str, Any]:
         "card_command_confirm_origin_marked": (
             "om_runtime_card_command_confirm",
             "✅ 已确认并创建",
-            "**运行态桥接确认项目** 已创建完成。\n\n项目入口卡片已发送到群聊。",
+            "**运行态桥接确认项目** 已创建完成。\n\n已创建：飞书文档、状态表、任务、日历事件、截止提醒、项目入口卡片。",
             "green",
         ) in marked_cards,
+        "card_command_confirm_origin_artifacts_listed": any(
+            msg_ref == "om_runtime_card_command_confirm"
+            and title == "✅ 已确认并创建"
+            and "飞书文档" in content
+            and "状态表" in content
+            and "任务" in content
+            and "日历事件" in content
+            and "截止提醒" in content
+            and "项目入口卡片" in content
+            and "example.invalid" not in content
+            and template == "green"
+            for msg_ref, title, content, template in marked_cards
+        ),
         "card_command_confirm_initiator_preserved": confirm_state_project.get("initiator") == "王小明",
         "card_command_bridge_retryable_failure": (
             isinstance(first_retry, str)
