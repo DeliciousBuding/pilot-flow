@@ -2200,7 +2200,25 @@ def _needs_confirmation_for_update(
     chat_scope: dict,
     chat_id: str,
 ) -> tuple[bool, str, str]:
-    """Decide whether a project update should pause for explicit confirmation."""
+    """Decide whether a project update should pause for explicit confirmation.
+
+    Destructive / non-reversible actions covered (must_confirm):
+      - remove_member: 权限收缩，不可静默执行
+      - update_status to "已归档": 隐藏已有协作内容
+
+    Soft-gated actions (ask_once):
+      - add_member with unresolved member: 首次外联先确认一次
+
+    Auto-allowed actions:
+      - send_reminder (group scope): 群聊催办常规推进
+      - update_deadline / add_deliverable / add_progress / add_risk
+        / resolve_risk / update_status (non-archive): 常规项目推进
+
+    ARCHITECTURE.md 提到的"撤权限 / 公开发布 / 对外发送 / 撤销已有内容"
+    在当前 update_project 工具版本中没有对应 action exposed，因此本函数
+    覆盖面已穷尽工具实际暴露的 destructive actions。新增 action 时必须
+    评估是否需要进入 must_confirm / ask_once 集合。
+    """
     scope = (chat_scope or {}).get("scope", "group")
     normalized_action = (action or "").strip()
     if normalized_action == "remove_member":
