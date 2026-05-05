@@ -2,6 +2,20 @@
 
 > 本文件只记录可复验结论和脱敏摘要，不提交真实群 ID、用户 open_id、应用 secret、message_id 或飞书文档链接。
 
+## 2026-05-05 澄清后确认按钮一次性防重复
+
+| 项目 | 证据 |
+| --- | --- |
+| 功能验证 | 澄清后补齐字段并点击确认卡完成项目创建后，同一个确认 action ref 再次提交不会重复创建文档/Base/待办 |
+| 适用边界 | 二次提交被视为已处理/过期卡片动作；Verifier 断言资源 stub 调用次数不增加，避免重复执行真实办公资源创建 |
+| 状态安全 | 该路径覆盖澄清、补齐、确认、创建后的重复点击防护，降低真实群聊中用户重复点击确认按钮导致重复项目的风险 |
+| 本地回归 | `C:\Users\Ding\miniforge3\python.exe -m pytest` 返回 `303 passed`；`tests/test_tools.py tests/test_verify_wsl_feishu_runtime.py` 返回 `269 passed` |
+| WSL 安装态 | `setup.py --hermes-dir D:\Code\LarkProject\hermes-agent --hermes-home \\wsl.localhost\Ubuntu-24.04\home\ding\.hermes` 通过；插件和 skill 已同步到 WSL Hermes runtime profile |
+| Verifier 新字段 | `--verify-projectization-suggestion` 返回 `projectization_clarification_confirm_one_shot=true`，并保留 `projectization_clarification_confirm_created/resources/state=true` |
+| 基线验证 | 同轮继续通过同一 Feishu venv 下 `--send-card` 的 `card_sent=true`、`card_has_title=true`、`card_has_goal=true`、`card_has_initiator=true`、`card_has_risk=true`，以及 `--probe-llm` 的 `llm_probe_ok=true`、`llm_probe_status=200` |
+| 用户价值 | 用户或飞书回调重复提交确认卡时，PilotFlow 不会重复生成项目资源，项目创建链路更适合真实群聊使用 |
+| 隐私处理 | 验证只记录布尔结果和脱敏状态；不写入真实 chat_id、open_id、message_id、Feishu URL、token 或 app secret |
+
 ## 2026-05-05 澄清后确认创建闭环
 
 | 项目 | 证据 |

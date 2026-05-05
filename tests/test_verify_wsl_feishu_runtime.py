@@ -392,6 +392,7 @@ def test_verify_runtime_projectization_suggestion_is_sanitized(tmp_path, monkeyp
     assert result["projectization_clarification_confirm_created"] is True
     assert result["projectization_clarification_confirm_resources"] is True
     assert result["projectization_clarification_confirm_state"] is True
+    assert result["projectization_clarification_confirm_one_shot"] is True
     assert "example.invalid" not in json.dumps(result, ensure_ascii=False)
 
 
@@ -966,6 +967,7 @@ def test_verifier_projectization_suggestion_mode_outputs_sanitized_runtime_resul
         "projectization_clarification_confirm_created": True,
         "projectization_clarification_confirm_resources": True,
         "projectization_clarification_confirm_state": True,
+        "projectization_clarification_confirm_one_shot": True,
         "raw_chat_id": "oc_real_chat_id",
         "raw_doc_url": "https://example.invalid/doc/1",
     }):
@@ -1001,6 +1003,7 @@ def test_verifier_projectization_suggestion_mode_outputs_sanitized_runtime_resul
     assert output["projectization_clarification_confirm_created"] is True
     assert output["projectization_clarification_confirm_resources"] is True
     assert output["projectization_clarification_confirm_state"] is True
+    assert output["projectization_clarification_confirm_one_shot"] is True
     assert "oc_real_chat_id" not in output_text
     assert "example.invalid" not in output_text
 

@@ -154,6 +154,7 @@ def _sanitize_result(result: dict[str, Any]) -> dict[str, Any]:
         "projectization_clarification_confirm_created",
         "projectization_clarification_confirm_resources",
         "projectization_clarification_confirm_state",
+        "projectization_clarification_confirm_one_shot",
         "project_create_gate_created",
         "project_create_confirmed",
         "project_create_doc_created",
@@ -760,6 +761,12 @@ def _verify_runtime_projectization_suggestion(hermes_dir: Path) -> dict[str, Any
                 chat_id=chat_id,
                 chat_type="group",
             )) if confirm_action_id else {}
+            resource_count_after_confirm = len(created_resources)
+            clarification_duplicate = json.loads(_handle_card_action(
+                {"action_value": json.dumps({"pilotflow_action_id": confirm_action_id}, ensure_ascii=False)},
+                chat_id=chat_id,
+                chat_type="group",
+            )) if confirm_action_id else {}
             state_projects = _load_project_state()
         finally:
             runtime_tools._hermes_send_card = original_send_card
@@ -827,6 +834,10 @@ def _verify_runtime_projectization_suggestion(hermes_dir: Path) -> dict[str, Any
             project.get("title") == "运行态澄清后项目"
             for project in state_projects
             if isinstance(project, dict)
+        ),
+        "projectization_clarification_confirm_one_shot": (
+            "error" in clarification_duplicate
+            and resource_count_after_confirm == len(created_resources)
         ),
     }
 

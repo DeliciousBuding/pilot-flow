@@ -1584,10 +1584,17 @@ def test_confirm_card_creates_project_after_clarification_followup(monkeypatch):
             chat_id=chat_id,
             chat_type="group",
         ))
+        duplicate = json.loads(_handle_card_action(
+            {"action_value": json.dumps({"pilotflow_action_id": action_id}, ensure_ascii=False)},
+            chat_id=chat_id,
+            chat_type="group",
+        ))
 
     assert clarification["status"] == "needs_clarification"
     assert followup["status"] == "plan_generated"
     assert result["status"] == "project_space_created"
+    assert "error" in duplicate
+    assert "已过期" in duplicate["error"] or "已处理" in duplicate["error"]
     assert result["title"] == "客户上线推进"
     create_doc.assert_called_once()
     create_bitable.assert_called_once()
