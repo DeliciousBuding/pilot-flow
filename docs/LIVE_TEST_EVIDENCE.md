@@ -1772,6 +1772,18 @@
 | 用户价值 | @PilotFlow 从群聊中冒泡“整理成项目”建议后，确认卡能显示真实请求人的显示名，避免项目从建议卡转为计划时丢失发起人上下文 |
 | 隐私处理 | 证据只记录布尔结果和脱敏结论；不写入真实 chat_id、message_id、Feishu URL、用户 open_id、token 或 app secret |
 
+## 2026-05-05 卡片桥接确认发起人快照运行态验证
+
+| 项目 | 证据 |
+| --- | --- |
+| 运行环境 | PilotFlow 已通过 `setup.py --hermes-home <wsl-hermes-home>` 同步到 WSL Hermes runtime；安装验证返回插件、技能、Hermes config 和 Feishu display 配置均 OK |
+| 本地回归 | `C:\Users\Ding\miniforge3\python.exe -m pytest` 返回 `317 passed`；相关卡片确认/桥接测试返回 `6 passed` |
+| 功能硬化 | `confirm_project` 卡片动作现在把 action ref 里的 `initiator` 显式传入项目创建，旧确认卡按自己的计划快照建项，不会被同群聊中新 pending plan 的发起人污染 |
+| Verifier 新字段 | `verify_wsl_feishu_runtime.py --verify-card-command-bridge` 在已安装的 WSL Hermes runtime 插件内返回 `card_command_confirm_initiator_preserved=true`，并保留 `card_command_confirm_project_created=true`、`card_command_confirm_origin_marked=true`、`card_command_bridge_used_opaque_ref=true` |
+| 基线验证 | 同轮继续通过同一 Feishu venv 下 `--send-card` 的 `card_sent=true`、`card_has_initiator=true`、`pending_plan_recovered=true`，以及 `--probe-llm` 的 `llm_probe_ok=true`、`llm_probe_status=200` |
+| 用户价值 | 用户在群里连续生成多个执行计划后，点击较早的飞书确认卡仍会创建那张卡对应的项目和发起人，避免真实项目负责人归属被后续计划覆盖 |
+| 隐私处理 | 证据只记录布尔结果和脱敏结论；不写入真实 chat_id、message_id、Feishu URL、用户 open_id、token 或 app secret |
+
 ## 本地回归
 
 ```bash

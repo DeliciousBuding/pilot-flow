@@ -8357,6 +8357,7 @@ def test_old_card_confirm_uses_its_own_plan_snapshot():
                 "goal": "验证旧卡计划快照",
                 "members": ["成员A"],
                 "deliverables": ["交付物A"],
+                "initiator": "第一发起人",
                 "deadline": "2026-05-07",
             },
             chat_id=chat_id,
@@ -8373,6 +8374,7 @@ def test_old_card_confirm_uses_its_own_plan_snapshot():
                 "goal": "验证不会被旧卡覆盖",
                 "members": ["成员B"],
                 "deliverables": ["交付物B"],
+                "initiator": "第二发起人",
                 "deadline": "2026-05-08",
             },
             chat_id=chat_id,
@@ -8386,8 +8388,10 @@ def test_old_card_confirm_uses_its_own_plan_snapshot():
     with _project_registry_lock:
         assert "第一个项目" in _project_registry
         assert "第二个项目" not in _project_registry
+        assert _project_registry["第一个项目"]["initiator"] == "第一发起人"
     with _plan_lock:
         assert _pending_plans[chat_id]["plan"]["title"] == "第二个项目"
+        assert _pending_plans[chat_id]["plan"]["initiator"] == "第二发起人"
 
 
 def test_card_action_id_is_single_use():

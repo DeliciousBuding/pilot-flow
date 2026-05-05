@@ -290,6 +290,7 @@ def _sanitize_result(result: dict[str, Any]) -> dict[str, Any]:
         "card_command_bridge_used_opaque_ref",
         "card_command_confirm_project_created",
         "card_command_confirm_origin_marked",
+        "card_command_confirm_initiator_preserved",
         "card_command_bridge_retryable_failure",
         "card_command_bridge_feedback_sanitized",
         "card_status_done_applied",
@@ -3432,10 +3433,12 @@ def _verify_runtime_card_command_bridge(hermes_dir: Path) -> dict[str, Any]:
                 os.environ["PILOTFLOW_STATE_PATH"] = original_state_path
 
     state_updates: list[dict[str, Any]] = []
+    confirm_state_project: dict[str, Any] = {}
     for item in state_projects:
         if item.get("title") == "运行态桥接催办逾期项目":
             state_updates = item.get("updates", [])
-            break
+        if item.get("title") == "运行态桥接确认项目":
+            confirm_state_project = item
     marked_text = "\n".join(" ".join(item) for item in marked_cards)
     return {
         "card_command_bridge_executed": (
@@ -3500,6 +3503,7 @@ def _verify_runtime_card_command_bridge(hermes_dir: Path) -> dict[str, Any]:
             "**运行态桥接确认项目** 已创建完成。\n\n项目入口卡片已发送到群聊。",
             "green",
         ) in marked_cards,
+        "card_command_confirm_initiator_preserved": confirm_state_project.get("initiator") == "王小明",
         "card_command_bridge_retryable_failure": (
             isinstance(first_retry, str)
             and "待办" in first_retry

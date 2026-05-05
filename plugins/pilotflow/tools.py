@@ -4101,6 +4101,7 @@ def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
             "members": recovered_plan.get("members", []),
             "deliverables": recovered_plan.get("deliverables", []),
             "deliverable_assignees": recovered_plan.get("deliverable_assignees", {}),
+            "initiator": recovered_plan.get("initiator", ""),
             "deadline": recovered_plan.get("deadline", ""),
             "risks": recovered_plan.get("risks", []),
         }, **kwargs)
