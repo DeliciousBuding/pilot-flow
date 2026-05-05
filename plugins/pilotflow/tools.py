@@ -4408,13 +4408,13 @@ def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
     if pilotflow_action == "project_followup_task":
         project_title = action_data.get("title") or action_data.get("project_name")
         if not project_title:
-            return tool_error("无法识别项目，请在群里直接询问项目状态。")
+            return retryable_tool_error("无法识别项目，请在群里直接询问项目状态。")
         with _project_registry_lock:
             project = _project_registry.get(project_title)
         if not project:
             state_project = _find_project_state(project_title)
             if not state_project:
-                return tool_error("没有找到这个项目，可能需要先在当前会话创建项目。")
+                return retryable_tool_error("没有找到这个项目，可能需要先在当前会话创建项目。")
             project = {
                 "goal": state_project.get("goal", ""),
                 "members": [],
@@ -4441,7 +4441,7 @@ def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
             members,
         )
         if not task_name:
-            return tool_error("待办创建失败，请检查飞书连接。")
+            return retryable_tool_error("待办创建失败，请检查飞书连接。")
         created_entry = f"任务: {task_name}"
         public_task_value = _public_task_update_value(task_name)
         outcome = _record_action_outcome(
