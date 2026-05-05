@@ -3792,6 +3792,7 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
     if reminder_job:
         link_lines.append("🔔 截止提醒已设置")
     link_lines.append(f"⏰ 截止: {deadline or '待确认'}")
+    initiator_line = f"**发起人：** {initiator}\n" if initiator else ""
     risk_text = ", ".join(risks[:3])
     risk_line = f"**风险：** {risk_text}\n" if risk_text else ""
 
@@ -3811,6 +3812,7 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
                 "tag": "markdown",
                 "content": (
                     f"**目标：** {goal}\n"
+                    f"{initiator_line}"
                     f"**成员：** {member_card_display}\n"
                     f"{risk_line}"
                     + (f"{member_warning}\n" if member_warning else "")

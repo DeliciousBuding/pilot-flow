@@ -2414,6 +2414,7 @@ def test_project_entry_card_uses_plain_member_names_for_visible_markdown():
                 "goal": "验证入口卡片成员展示",
                 "members": ["唐丁"],
                 "deliverables": ["验证记录"],
+                "initiator": "王小明",
                 "deadline": "2026-05-12",
             },
             chat_id=chat_id,
@@ -2423,6 +2424,7 @@ def test_project_entry_card_uses_plain_member_names_for_visible_markdown():
     assert result["status"] == "project_space_created"
     entry_card = captured_cards[0]
     markdown = entry_card["elements"][0]["content"]
+    assert "**发起人：** 王小明" in markdown
     assert "**成员：** 唐丁" in markdown
     assert "<at user_id=" not in markdown
 
