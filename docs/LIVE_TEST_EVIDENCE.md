@@ -2,6 +2,18 @@
 
 > 本文件只记录可复验结论和脱敏摘要，不提交真实群 ID、用户 open_id、应用 secret、message_id 或飞书文档链接。
 
+## 2026-05-05 卡片动作失败后可重试
+
+| 项目 | 证据 |
+| --- | --- |
+| 功能验证 | Hermes `/card button` 桥接执行 action 失败时会恢复刚消费的 opaque action ref；同一按钮在临时故障恢复后可再次点击并成功执行 |
+| 适用边界 | 覆盖 `create_followup_task` 待办创建失败后重试；成功路径仍会消费 action ref，保持按钮单次成功执行，避免重复创建 |
+| 状态安全 | 第一次失败会把原卡片标记为操作失败但不让 action id 永久失效；第二次成功后才移除 action ref 并更新卡片反馈 |
+| 本地回归 | `C:\Users\Ding\miniforge3\python.exe -m pytest tests\test_tools.py::test_card_command_retryable_failure_keeps_action_ref_for_followup_task -q` 返回 `1 passed`；单次成功消费和失败卡片标红回归保持通过 |
+| Verifier 新字段 | `--verify-card-command-bridge` 返回 `card_command_bridge_retryable_failure=true`，并保留桥接执行、原卡片更新、文档/Base 留痕、state 记录和脱敏反馈基线 |
+| 用户价值 | 飞书 API、任务服务或网络短暂失败时，用户不用重新生成项目详情卡；修复后重新点击同一按钮即可继续推进真实办公动作 |
+| 隐私处理 | 验证只记录布尔结果和脱敏状态；不写入真实 chat_id、open_id、message_id、Feishu URL、token 或 app secret |
+
 ## 2026-05-05 确认/取消卡片裸 action 拒绝
 
 | 项目 | 证据 |

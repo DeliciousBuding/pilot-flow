@@ -279,6 +279,27 @@ def _resolve_card_action_ref(action_id: str, *, consume: bool = False) -> Option
     return resolved
 
 
+def _restore_card_action_ref(action_id: str, action_ref: Optional[dict]) -> None:
+    """Restore a consumed action ref so transient action failures can be retried."""
+    if not action_id or not isinstance(action_ref, dict):
+        return
+    now = time.time()
+    if now - action_ref.get("timestamp", 0) >= _PLAN_GATE_TTL:
+        return
+    refs_to_restore = {action_id: dict(action_ref)}
+    message_id = action_ref.get("message_id")
+    if message_id and action_ref.get("action") in ("confirm_project", "cancel_project"):
+        for sibling_id in _card_action_ids_for_message(message_id):
+            sibling_ref = _load_card_action_ref(sibling_id)
+            if isinstance(sibling_ref, dict) and now - sibling_ref.get("timestamp", 0) < _PLAN_GATE_TTL:
+                refs_to_restore[sibling_id] = dict(sibling_ref)
+    with _plan_lock:
+        for ref_id, ref in refs_to_restore.items():
+            _card_action_refs[ref_id] = dict(ref)
+    for ref_id, ref in refs_to_restore.items():
+        _persist_card_action_ref(ref_id, ref)
+
+
 def _attach_card_message_id(action_ids: list[str], message_id: str) -> None:
     """Attach the sent Feishu message_id to the card action refs."""
     if not message_id:
@@ -4505,6 +4526,8 @@ def _handle_card_command(raw_args: str) -> str:
 
     if data.get("error"):
         error_text = str(data["error"])
+        if action_ref:
+            _restore_card_action_ref(action_id, action_ref)
         if action_id and message_id:
             _mark_card_message(message_id, "操作失败", error_text, "red")
         return error_text

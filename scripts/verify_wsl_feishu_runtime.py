@@ -284,6 +284,7 @@ def _sanitize_result(result: dict[str, Any]) -> dict[str, Any]:
         "card_command_bridge_history_recorded",
         "card_command_bridge_state_recorded",
         "card_command_bridge_used_opaque_ref",
+        "card_command_bridge_retryable_failure",
         "card_command_bridge_feedback_sanitized",
         "card_status_done_applied",
         "card_status_reopen_applied",
@@ -3058,9 +3059,11 @@ def _verify_runtime_card_command_bridge(hermes_dir: Path) -> dict[str, Any]:
     import plugins.pilotflow.tools as runtime_tools  # pylint: disable=import-error
     from plugins.pilotflow.tools import (  # pylint: disable=import-error
         _attach_card_message_id,
+        _card_action_refs,
         _create_card_action_ref,
         _handle_card_command,
         _load_project_state,
+        _plan_lock,
         _project_registry,
         _project_registry_lock,
         _register_project,
@@ -3071,12 +3074,14 @@ def _verify_runtime_card_command_bridge(hermes_dir: Path) -> dict[str, Any]:
     original_state_path = os.environ.get("PILOTFLOW_STATE_PATH")
     original_append_doc = runtime_tools._append_project_doc_update
     original_append_history = runtime_tools._append_bitable_update_record
+    original_create_task = runtime_tools._create_task
     original_send = runtime_tools._hermes_send
     original_mark = runtime_tools._mark_card_message
     doc_labels: list[tuple[str, str, str]] = []
     history_labels: list[tuple[str, str, str, str]] = []
     sent_messages: list[str] = []
     marked_cards: list[tuple[str, str, str, str]] = []
+    retry_tasks: list[str] = []
 
     def fake_append_doc(title: str, _project: dict, label: str, value: str, *_args: Any, **_kwargs: Any) -> bool:
         doc_labels.append((title, label, value))
@@ -3090,6 +3095,12 @@ def _verify_runtime_card_command_bridge(hermes_dir: Path) -> dict[str, Any]:
         sent_messages.append(text)
         return True
 
+    def fake_create_task(title: str, *_args: Any, **_kwargs: Any) -> str:
+        retry_tasks.append(title)
+        if len(retry_tasks) == 1:
+            return ""
+        return f"{title}: https://example.invalid/task/card-command-retry"
+
     def fake_mark(message_id: str, title: str, content: str, template: str) -> bool:
         marked_cards.append((message_id, title, content, template))
         return True
@@ -3100,6 +3111,7 @@ def _verify_runtime_card_command_bridge(hermes_dir: Path) -> dict[str, Any]:
             _project_registry.clear()
         runtime_tools._append_project_doc_update = fake_append_doc
         runtime_tools._append_bitable_update_record = fake_append_history
+        runtime_tools._create_task = fake_create_task
         runtime_tools._hermes_send = fake_send
         runtime_tools._mark_card_message = fake_mark
         try:
@@ -3138,10 +3150,23 @@ def _verify_runtime_card_command_bridge(hermes_dir: Path) -> dict[str, Any]:
             command_result = _handle_card_command(
                 f'button {json.dumps({"pilotflow_action_id": action_id}, ensure_ascii=False)}'
             )
+            retry_action_id = _create_card_action_ref(chat_id, "create_followup_task", {"title": "运行态桥接催办逾期项目"})
+            _attach_card_message_id([retry_action_id], "om_runtime_card_command_retry")
+            first_retry = _handle_card_command(
+                f'button {json.dumps({"pilotflow_action_id": retry_action_id}, ensure_ascii=False)}'
+            )
+            with _plan_lock:
+                retry_ref_restored = retry_action_id in _card_action_refs
+            second_retry = _handle_card_command(
+                f'button {json.dumps({"pilotflow_action_id": retry_action_id}, ensure_ascii=False)}'
+            )
+            with _plan_lock:
+                retry_ref_consumed = retry_action_id not in _card_action_refs
             state_projects = _load_project_state()
         finally:
             runtime_tools._append_project_doc_update = original_append_doc
             runtime_tools._append_bitable_update_record = original_append_history
+            runtime_tools._create_task = original_create_task
             runtime_tools._hermes_send = original_send
             runtime_tools._mark_card_message = original_mark
             with _project_registry_lock:
@@ -3159,17 +3184,19 @@ def _verify_runtime_card_command_bridge(hermes_dir: Path) -> dict[str, Any]:
     marked_text = "\n".join(" ".join(item) for item in marked_cards)
     return {
         "card_command_bridge_executed": (
-            len(sent_messages) == 1
-            and "运行态桥接催办逾期项目" in sent_messages[0]
-            and "运行态桥接催办未到期项目" not in sent_messages[0]
+            any(
+                "运行态桥接催办逾期项目" in message
+                and "运行态桥接催办未到期项目" not in message
+                for message in sent_messages
+            )
         ),
         "card_command_bridge_suppressed_text": command_result is None,
-        "card_command_bridge_marked_origin": marked_cards == [(
+        "card_command_bridge_marked_origin": (
             "om_runtime_card_command",
             "批量催办已发送",
             "已向 1 个逾期项目发送催办提醒。",
             "yellow",
-        )],
+        ) in marked_cards,
         "card_command_bridge_doc_recorded": (
             "运行态桥接催办逾期项目", "催办", "请今天同步最新进展"
         ) in doc_labels,
@@ -3182,6 +3209,15 @@ def _verify_runtime_card_command_bridge(hermes_dir: Path) -> dict[str, Any]:
             if isinstance(item, dict)
         ),
         "card_command_bridge_used_opaque_ref": bool(action_id),
+        "card_command_bridge_retryable_failure": (
+            isinstance(first_retry, str)
+            and "待办" in first_retry
+            and "失败" in first_retry
+            and retry_ref_restored
+            and second_retry is None
+            and retry_ref_consumed
+            and len(retry_tasks) == 2
+        ),
         "card_command_bridge_feedback_sanitized": (
             "example.invalid" not in marked_text
             and "<at user_id" not in marked_text
