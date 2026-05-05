@@ -4735,7 +4735,7 @@ def _handle_card_command(raw_args: str) -> str:
         _mark_card_message(
             message_id,
             "项目详情已发送",
-            f"**{project_title}** 的详情卡片已发送到群聊。",
+            f"**{project_title}** 的详情卡片已发送到群聊，包含资源入口和最近进展。",
             "blue",
         )
         return None

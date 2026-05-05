@@ -1940,6 +1940,17 @@
 | 用户价值 | 项目创建完成后，用户无需打开入口卡即可从原确认卡知道哪些飞书资源已经实际落地，减少“只创建了入口消息还是完整项目空间已创建”的不确定性 |
 | 隐私处理 | 证据只记录布尔结果和脱敏结论；不写入真实会话标识、消息标识、Feishu URL、用户原始标识或凭证 |
 
+## 2026-05-05 项目详情原卡反馈资源与进展提示运行态验证
+
+| 项目 | 证据 |
+| --- | --- |
+| 本地回归 | `C:\Users\Ding\miniforge3\python.exe -m pytest -q` 返回 `321 passed`；项目详情原卡反馈和 card-command bridge verifier 相关 targeted tests 返回 `3 passed` |
+| 功能硬化 | 用户点击 `查看状态` 后，原卡片成功反馈现在说明详情卡片包含资源入口和最近进展，不再只提示“详情卡片已发送到群聊” |
+| Verifier 新字段 | `verify_wsl_feishu_runtime.py --verify-card-command-bridge` 在已安装的 WSL Hermes runtime 插件内返回 `card_command_detail_origin_feedback_resources_updates=true`，并保留 `card_command_bridge_executed=true`、`card_command_confirm_project_created=true`、`card_command_confirm_origin_artifacts_listed=true` |
+| 基线验证 | 同轮继续通过同一 Feishu venv 下 `--send-card` 的 `card_sent=true`、`card_has_initiator=true`、`pending_plan_recovered=true`，以及 `--probe-llm` 的 `llm_probe_ok=true`、`llm_probe_status=200` |
+| 用户价值 | 用户从入口卡或看板进入项目详情后，即使只看原卡反馈，也能知道新详情卡不是空确认，而是包含可继续操作的资源入口和最近进展 |
+| 隐私处理 | 证据只记录布尔结果和脱敏结论；不写入真实会话标识、消息标识、Feishu URL、用户原始标识或凭证 |
+
 ## 本地回归
 
 ```bash

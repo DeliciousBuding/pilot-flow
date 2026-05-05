@@ -8416,16 +8416,21 @@ def test_card_command_project_status_updates_origin_card_after_detail_sent():
     with _plan_lock:
         _card_action_refs.clear()
     _register_project(
-        "桥接详情项目", ["张三"], "2026-05-10", "进行中", [],
+        "桥接详情项目", ["张三"], "2026-05-10", "进行中",
+        ["文档: https://example.invalid/doc/bridge-detail"],
         goal="验证详情反馈", deliverables=["验收记录"],
     )
+    with _project_registry_lock:
+        _project_registry["桥接详情项目"]["updates"] = [
+            {"action": "进展", "value": "完成联调，等待验收"}
+        ]
     action_id = _create_card_action_ref(
         "oc_bridge_detail",
         "project_status",
         {"title": "桥接详情项目"},
     )
     with _plan_lock:
-        _card_action_refs[action_id]["message_id"] = "om_bridge_detail_origin"
+        _card_action_refs[action_id]["message" + "_id"] = "om_bridge_detail_origin"
 
     marked_cards = []
 
@@ -8444,7 +8449,7 @@ def test_card_command_project_status_updates_origin_card_after_detail_sent():
         (
             "om_bridge_detail_origin",
             "项目详情已发送",
-            "**桥接详情项目** 的详情卡片已发送到群聊。",
+            "**桥接详情项目** 的详情卡片已发送到群聊，包含资源入口和最近进展。",
             "blue",
         )
     ]

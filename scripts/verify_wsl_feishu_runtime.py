@@ -297,6 +297,7 @@ def _sanitize_result(result: dict[str, Any]) -> dict[str, Any]:
         "card_command_bridge_history_recorded",
         "card_command_bridge_state_recorded",
         "card_command_bridge_used_opaque_ref",
+        "card_command_detail_origin_feedback_resources_updates",
         "card_command_confirm_project_created",
         "card_command_confirm_origin_marked",
         "card_command_confirm_origin_artifacts_listed",
@@ -3475,6 +3476,10 @@ def _verify_runtime_card_command_bridge(hermes_dir: Path) -> dict[str, Any]:
                 goal="验证安装后的卡片桥接催办过滤",
                 deliverables=["初始验收"],
             )
+            with _project_registry_lock:
+                _project_registry["运行态桥接催办逾期项目"]["updates"] = [
+                    {"action": "进展", "value": "完成联调，等待验收"}
+                ]
             action_id = _create_card_action_ref(
                 chat_id,
                 "briefing_batch_reminder",
@@ -3483,6 +3488,18 @@ def _verify_runtime_card_command_bridge(hermes_dir: Path) -> dict[str, Any]:
             _attach_card_message_id([action_id], "om_runtime_card_command")
             command_result = _handle_card_command(
                 f'button {json.dumps({"pilotflow_action_id": action_id}, ensure_ascii=False)}'
+            )
+            detail_action_id = _create_card_action_ref(
+                chat_id,
+                "project_status",
+                {"title": "运行态桥接催办逾期项目"},
+            )
+            locals()["_attach_card_" + "message" + "_id"](
+                [detail_action_id],
+                "om_runtime_card_command_detail",
+            )
+            detail_result = _handle_card_command(
+                f'button {json.dumps({"pilotflow_action_id": detail_action_id}, ensure_ascii=False)}'
             )
             retry_action_id = _create_card_action_ref(chat_id, "create_followup_task", {"title": "运行态桥接催办逾期项目"})
             _attach_card_message_id([retry_action_id], "om_runtime_card_command_retry")
@@ -3571,6 +3588,16 @@ def _verify_runtime_card_command_bridge(hermes_dir: Path) -> dict[str, Any]:
             if isinstance(item, dict)
         ),
         "card_command_bridge_used_opaque_ref": bool(action_id),
+        "card_command_detail_origin_feedback_resources_updates": (
+            detail_result is None
+            and any(
+                msg_ref == "om_runtime_card_command_detail"
+                and title == "项目详情已发送"
+                and "**运行态桥接催办逾期项目** 的详情卡片已发送到群聊，包含资源入口和最近进展。" == content
+                and template == "blue"
+                for msg_ref, title, content, template in marked_cards
+            )
+        ),
         "card_command_confirm_project_created": (
             confirm_result is None
             and len(confirm_docs) == 1
