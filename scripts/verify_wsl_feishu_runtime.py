@@ -286,6 +286,8 @@ def _sanitize_result(result: dict[str, Any]) -> dict[str, Any]:
         "card_command_bridge_history_recorded",
         "card_command_bridge_state_recorded",
         "card_command_bridge_used_opaque_ref",
+        "card_command_confirm_project_created",
+        "card_command_confirm_origin_marked",
         "card_command_bridge_retryable_failure",
         "card_command_bridge_feedback_sanitized",
         "card_status_done_applied",
@@ -3211,7 +3213,13 @@ def _verify_runtime_card_command_bridge(hermes_dir: Path) -> dict[str, Any]:
     original_state_path = os.environ.get("PILOTFLOW_STATE_PATH")
     original_append_doc = runtime_tools._append_project_doc_update
     original_append_history = runtime_tools._append_bitable_update_record
+    original_create_doc = runtime_tools._create_doc
+    original_create_bitable = runtime_tools._create_bitable
     original_create_task = runtime_tools._create_task
+    original_create_calendar = runtime_tools._create_calendar_event
+    original_schedule_reminder = runtime_tools._schedule_deadline_reminder
+    original_save_memory = runtime_tools._save_to_hermes_memory
+    original_send_card = runtime_tools._hermes_send_card
     original_send = runtime_tools._hermes_send
     original_mark = runtime_tools._mark_card_message
     doc_labels: list[tuple[str, str, str]] = []
@@ -3219,6 +3227,11 @@ def _verify_runtime_card_command_bridge(hermes_dir: Path) -> dict[str, Any]:
     sent_messages: list[str] = []
     marked_cards: list[tuple[str, str, str, str]] = []
     retry_tasks: list[str] = []
+    confirm_docs: list[tuple[str, str, str]] = []
+    confirm_bitables: list[tuple[str, str, str, list[str]]] = []
+    confirm_tasks: list[tuple[str, str, str, str, str, list[str]]] = []
+    confirm_saved_memory: list[tuple[str, str, list[str], list[str], str, dict[str, str]]] = []
+    confirm_entry_cards: list[dict[str, Any]] = []
 
     def fake_append_doc(title: str, _project: dict, label: str, value: str, *_args: Any, **_kwargs: Any) -> bool:
         doc_labels.append((title, label, value))
@@ -3238,6 +3251,52 @@ def _verify_runtime_card_command_bridge(hermes_dir: Path) -> dict[str, Any]:
             return ""
         return f"{title}: https://example.invalid/task/card-command-retry"
 
+    def fake_create_doc(title: str, markdown_content: str, target_chat_id: str) -> str:
+        confirm_docs.append((title, markdown_content, target_chat_id))
+        return "https://example.invalid/doc/card-command-confirm"
+
+    def fake_create_bitable(
+        title: str,
+        owner: str,
+        deadline: str,
+        risks: list,
+        target_chat_id: str,
+        deliverables: list[str] | None = None,
+    ) -> dict[str, str]:
+        confirm_bitables.append((title, owner, deadline, list(deliverables or [])))
+        return {
+            "url": "https://example.invalid/base/card-command-confirm",
+            "app_token": "app_card_command_confirm",
+            "table_id": "tbl_card_command_confirm",
+            "record_id": "rec_card_command_confirm",
+        }
+
+    def fake_create_project_task(
+        summary: str,
+        description: str,
+        assignee: str,
+        deadline: str,
+        target_chat_id: str,
+        members: list[str],
+    ) -> str:
+        confirm_tasks.append((summary, description, assignee, deadline, target_chat_id, list(members)))
+        return f"{summary}: https://example.invalid/task/card-command-confirm"
+
+    def fake_save_memory(
+        title: str,
+        goal: str,
+        members: list,
+        deliverables: list,
+        deadline: str,
+        deliverable_assignees: dict[str, str] | None = None,
+    ) -> bool:
+        confirm_saved_memory.append((title, goal, list(members), list(deliverables), deadline, dict(deliverable_assignees or {})))
+        return True
+
+    def fake_send_card(_chat_id: str, card: dict[str, Any]) -> str:
+        confirm_entry_cards.append(card)
+        return f"om_runtime_confirm_entry_{len(confirm_entry_cards)}"
+
     def fake_mark(message_id: str, title: str, content: str, template: str) -> bool:
         marked_cards.append((message_id, title, content, template))
         return True
@@ -3248,7 +3307,13 @@ def _verify_runtime_card_command_bridge(hermes_dir: Path) -> dict[str, Any]:
             _project_registry.clear()
         runtime_tools._append_project_doc_update = fake_append_doc
         runtime_tools._append_bitable_update_record = fake_append_history
+        runtime_tools._create_doc = fake_create_doc
+        runtime_tools._create_bitable = fake_create_bitable
         runtime_tools._create_task = fake_create_task
+        runtime_tools._create_calendar_event = lambda *_args, **_kwargs: "日历事件: 2026-05-20"
+        runtime_tools._schedule_deadline_reminder = lambda *_args, **_kwargs: True
+        runtime_tools._save_to_hermes_memory = fake_save_memory
+        runtime_tools._hermes_send_card = fake_send_card
         runtime_tools._hermes_send = fake_send
         runtime_tools._mark_card_message = fake_mark
         try:
@@ -3299,11 +3364,37 @@ def _verify_runtime_card_command_bridge(hermes_dir: Path) -> dict[str, Any]:
             )
             with _plan_lock:
                 retry_ref_consumed = retry_action_id not in _card_action_refs
+            with _plan_lock:
+                _card_action_refs.clear()
+            runtime_tools._create_task = fake_create_project_task
+            confirm_action_id = _create_card_action_ref(
+                chat_id,
+                "confirm_project",
+                {
+                    "title": "运行态桥接确认项目",
+                    "goal": "验证 Hermes 卡片桥接确认建项",
+                    "members": ["张三", "李四"],
+                    "deliverables": ["验收记录"],
+                    "deadline": "2026-05-20",
+                    "risks": [],
+                    "initiator": "王小明",
+                },
+            )
+            _attach_card_message_id([confirm_action_id], "om_runtime_card_command_confirm")
+            confirm_result = _handle_card_command(
+                f'button {json.dumps({"pilotflow_action_id": confirm_action_id}, ensure_ascii=False)}'
+            )
             state_projects = _load_project_state()
         finally:
             runtime_tools._append_project_doc_update = original_append_doc
             runtime_tools._append_bitable_update_record = original_append_history
+            runtime_tools._create_doc = original_create_doc
+            runtime_tools._create_bitable = original_create_bitable
             runtime_tools._create_task = original_create_task
+            runtime_tools._create_calendar_event = original_create_calendar
+            runtime_tools._schedule_deadline_reminder = original_schedule_reminder
+            runtime_tools._save_to_hermes_memory = original_save_memory
+            runtime_tools._hermes_send_card = original_send_card
             runtime_tools._hermes_send = original_send
             runtime_tools._mark_card_message = original_mark
             with _project_registry_lock:
@@ -3346,6 +3437,42 @@ def _verify_runtime_card_command_bridge(hermes_dir: Path) -> dict[str, Any]:
             if isinstance(item, dict)
         ),
         "card_command_bridge_used_opaque_ref": bool(action_id),
+        "card_command_confirm_project_created": (
+            confirm_result is None
+            and len(confirm_docs) == 1
+            and confirm_docs[0][0] == "运行态桥接确认项目 - 项目简报"
+            and "# 运行态桥接确认项目" in confirm_docs[0][1]
+            and confirm_docs[0][2] == chat_id
+            and confirm_bitables == [("运行态桥接确认项目", "张三, 李四", "2026-05-20", ["验收记录"])]
+            and confirm_tasks == [(
+                "验收记录",
+                "项目: 运行态桥接确认项目",
+                "张三",
+                "2026-05-20",
+                chat_id,
+                ["张三", "李四"],
+            )]
+            and confirm_saved_memory == [(
+                "运行态桥接确认项目",
+                "验证 Hermes 卡片桥接确认建项",
+                ["张三", "李四"],
+                ["验收记录"],
+                "2026-05-20",
+                {},
+            )]
+            and bool(confirm_entry_cards)
+            and any(
+                project.get("title") == "运行态桥接确认项目"
+                for project in state_projects
+                if isinstance(project, dict)
+            )
+        ),
+        "card_command_confirm_origin_marked": (
+            "om_runtime_card_command_confirm",
+            "✅ 已确认并创建",
+            "**运行态桥接确认项目** 已创建完成。\n\n项目入口卡片已发送到群聊。",
+            "green",
+        ) in marked_cards,
         "card_command_bridge_retryable_failure": (
             isinstance(first_retry, str)
             and "待办" in first_retry

@@ -474,6 +474,8 @@ def test_verify_runtime_card_command_bridge_is_sanitized(tmp_path, monkeypatch):
     assert result["card_command_bridge_history_recorded"] is True
     assert result["card_command_bridge_state_recorded"] is True
     assert result["card_command_bridge_used_opaque_ref"] is True
+    assert result["card_command_confirm_project_created"] is True
+    assert result["card_command_confirm_origin_marked"] is True
     assert result["card_command_bridge_retryable_failure"] is True
     assert result["card_command_bridge_feedback_sanitized"] is True
     assert "example.invalid" not in json.dumps(result, ensure_ascii=False)
@@ -1194,6 +1196,8 @@ def test_verifier_card_command_bridge_mode_outputs_sanitized_runtime_result(tmp_
         "card_command_bridge_history_recorded": True,
         "card_command_bridge_state_recorded": True,
         "card_command_bridge_used_opaque_ref": True,
+        "card_command_confirm_project_created": True,
+        "card_command_confirm_origin_marked": True,
         "card_command_bridge_retryable_failure": True,
         "card_command_bridge_feedback_sanitized": True,
         "raw_chat_id": "oc_real_chat_id",
@@ -1217,6 +1221,8 @@ def test_verifier_card_command_bridge_mode_outputs_sanitized_runtime_result(tmp_
     assert output["card_command_bridge_history_recorded"] is True
     assert output["card_command_bridge_state_recorded"] is True
     assert output["card_command_bridge_used_opaque_ref"] is True
+    assert output["card_command_confirm_project_created"] is True
+    assert output["card_command_confirm_origin_marked"] is True
     assert output["card_command_bridge_retryable_failure"] is True
     assert output["card_command_bridge_feedback_sanitized"] is True
     assert "oc_real_chat_id" not in output_text
