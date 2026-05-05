@@ -274,6 +274,10 @@ def _sanitize_result(result: dict[str, Any]) -> dict[str, Any]:
         "card_status_bitable_synced",
         "card_status_doc_recorded",
         "card_status_state_recorded",
+        "card_status_state_done_applied",
+        "card_status_state_reopen_applied",
+        "card_status_state_doc_recorded",
+        "card_status_state_feedback_sent",
         "card_status_feedback_sent",
         "card_status_used_opaque_refs",
         "batch_followup_created",
@@ -2044,6 +2048,7 @@ def _verify_runtime_member_removal(hermes_dir: Path) -> dict[str, Any]:
         _project_registry,
         _project_registry_lock,
         _register_project,
+        _save_project_state,
     )
 
     chat_id = os.environ.get("PILOTFLOW_TEST_CHAT_ID", "")
@@ -2800,6 +2805,7 @@ def _verify_runtime_card_command_bridge(hermes_dir: Path) -> dict[str, Any]:
         _project_registry,
         _project_registry_lock,
         _register_project,
+        _save_project_state,
     )
 
     chat_id = os.environ.get("PILOTFLOW_TEST_CHAT_ID", "")
@@ -2935,6 +2941,7 @@ def _verify_runtime_card_status_cycle(hermes_dir: Path) -> dict[str, Any]:
         _project_registry,
         _project_registry_lock,
         _register_project,
+        _save_project_state,
     )
 
     chat_id = os.environ.get("PILOTFLOW_TEST_CHAT_ID", "")
@@ -3000,6 +3007,41 @@ def _verify_runtime_card_status_cycle(hermes_dir: Path) -> dict[str, Any]:
             ))
             with _project_registry_lock:
                 reopened_status = _project_registry["运行态卡片状态项目"].get("status")
+
+            with _project_registry_lock:
+                _project_registry.clear()
+            _save_project_state(
+                "运行态重启卡片状态项目",
+                "验证安装后重启卡片完成和重开",
+                [],
+                ["验收记录"],
+                "2026-05-30",
+                "进行中",
+                ["文档: https://example.invalid/doc/card-status-state"],
+            )
+            state_done_action_id = _create_card_action_ref(
+                chat_id, "mark_project_done", {"title": "运行态重启卡片状态项目"}
+            )
+            state_done = json.loads(_handle_card_action(
+                {"action_value": json.dumps({"pilotflow_action_id": state_done_action_id}, ensure_ascii=False)},
+                chat_id=chat_id,
+            ))
+            state_done_projects = _load_project_state()
+            state_done_status = next(
+                (
+                    item.get("status")
+                    for item in state_done_projects
+                    if item.get("title") == "运行态重启卡片状态项目"
+                ),
+                "",
+            )
+            state_reopen_action_id = _create_card_action_ref(
+                chat_id, "reopen_project", {"title": "运行态重启卡片状态项目"}
+            )
+            state_reopened = json.loads(_handle_card_action(
+                {"action_value": json.dumps({"pilotflow_action_id": state_reopen_action_id}, ensure_ascii=False)},
+                chat_id=chat_id,
+            ))
             state_projects = _load_project_state()
         finally:
             runtime_tools._append_project_doc_update = original_append_doc
@@ -3014,10 +3056,14 @@ def _verify_runtime_card_status_cycle(hermes_dir: Path) -> dict[str, Any]:
                 os.environ["PILOTFLOW_STATE_PATH"] = original_state_path
 
     state_updates: list[dict[str, Any]] = []
+    state_only_updates: list[dict[str, Any]] = []
+    state_reopened_status = ""
     for item in state_projects:
         if item.get("title") == "运行态卡片状态项目":
             state_updates = item.get("updates", [])
-            break
+        if item.get("title") == "运行态重启卡片状态项目":
+            state_only_updates = item.get("updates", [])
+            state_reopened_status = item.get("status", "")
     feedback_text = "\n".join(sent_messages)
     return {
         "card_status_done_applied": done.get("status") == "project_marked_done" and done_status == "已完成",
@@ -3034,13 +3080,44 @@ def _verify_runtime_card_status_cycle(hermes_dir: Path) -> dict[str, Any]:
             for item in state_updates
             if isinstance(item, dict)
         ),
+        "card_status_state_done_applied": (
+            state_done.get("status") == "project_marked_done"
+            and state_done_status == "已完成"
+            and any(
+                update.get("action") == "状态" and update.get("value") == "已完成"
+                for project in state_done_projects
+                if isinstance(project, dict) and project.get("title") == "运行态重启卡片状态项目"
+                for update in project.get("updates", [])
+                if isinstance(update, dict)
+            )
+        ),
+        "card_status_state_reopen_applied": (
+            state_reopened.get("status") == "project_reopened"
+            and state_reopened_status == "进行中"
+            and any(
+                item.get("action") == "状态" and item.get("value") == "进行中"
+                for item in state_only_updates
+                if isinstance(item, dict)
+            )
+        ),
+        "card_status_state_doc_recorded": (
+            ("运行态重启卡片状态项目", "状态", "已完成") in doc_labels
+            and ("运行态重启卡片状态项目", "状态", "进行中") in doc_labels
+        ),
+        "card_status_state_feedback_sent": (
+            "项目「运行态重启卡片状态项目」已标记为完成" in feedback_text
+            and "项目「运行态重启卡片状态项目」已重新打开" in feedback_text
+            and "项目文档已更新" in feedback_text
+        ),
         "card_status_feedback_sent": (
             "已标记为完成" in feedback_text
             and "已重新打开" in feedback_text
             and "状态表已同步" in feedback_text
             and "项目文档已更新" in feedback_text
         ),
-        "card_status_used_opaque_refs": bool(done_action_id and reopen_action_id),
+        "card_status_used_opaque_refs": bool(
+            done_action_id and reopen_action_id and state_done_action_id and state_reopen_action_id
+        ),
     }
 
 
