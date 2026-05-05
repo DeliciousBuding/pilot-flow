@@ -24,7 +24,7 @@
 | 即插即用安装 | `setup.py` 支持 `--hermes-dir <hermes-agent-path>`，WSL 安装验证通过 | 已证实 |
 | 安装可回滚 | `setup.py` 自动备份 Hermes 配置为 `.pilotflow.bak` | 已证实 |
 | 插件边界清晰 | 不修改 Hermes 源码，仅通过插件和 skill 运行 | 已证实 |
-| 本地测试完整 | `uv run pytest -o addopts='' -q`，47 passed | 已证实 |
+| 本地测试完整 | `pytest tests -q`，328 passed（含多进程并发测试） | 已证实 |
 | Hermes 网关运行 | WSL 中 `hermes gateway run` 可启动 | 已证实 |
 | 卡片发送 | Feishu `interactive` 卡片发送已验证 | 已证实 |
 | 卡片确认续跑 | 真实群内按钮确认已跑通 | 已证实 |
