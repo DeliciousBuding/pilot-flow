@@ -1506,6 +1506,7 @@ def _verify_runtime_plugin_registration(hermes_dir: Path) -> dict[str, Any]:
         "pilotflow_query_status",
         "pilotflow_update_project",
         "pilotflow_health_check",
+        "pilotflow_subscribe_chat",
     ]
 
     class RuntimeRegistrationContext:

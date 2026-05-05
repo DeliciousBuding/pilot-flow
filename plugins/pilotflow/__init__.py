@@ -15,6 +15,7 @@ from plugins.pilotflow.tools import (
     PILOTFLOW_QUERY_STATUS_SCHEMA,
     PILOTFLOW_UPDATE_PROJECT_SCHEMA,
     PILOTFLOW_HEALTH_CHECK_SCHEMA,
+    PILOTFLOW_SUBSCRIBE_CHAT_SCHEMA,
     _handle_scan_chat_signals,
     _handle_generate_plan,
     _handle_detect_risks,
@@ -24,6 +25,7 @@ from plugins.pilotflow.tools import (
     _handle_query_status,
     _handle_update_project,
     _handle_health_check,
+    _handle_subscribe_chat,
     _check_available,
 )
 
@@ -57,6 +59,14 @@ def register(ctx) -> None:
         handler=_handle_health_check,
         check_fn=lambda: True,
         emoji="🩺",
+    )
+    ctx.register_tool(
+        name="pilotflow_subscribe_chat",
+        toolset="pilotflow",
+        schema=PILOTFLOW_SUBSCRIBE_CHAT_SCHEMA,
+        handler=_handle_subscribe_chat,
+        check_fn=lambda: True,
+        emoji="🔔",
     )
 
     # Hermes routes Feishu card clicks as `/card button {...}`. Registering

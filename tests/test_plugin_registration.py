@@ -44,6 +44,7 @@ def test_register_exposes_expected_tools():
         "pilotflow_query_status",
         "pilotflow_update_project",
         "pilotflow_health_check",
+        "pilotflow_subscribe_chat",
     ]
     assert all(call["toolset"] == "pilotflow" for call in ctx.calls)
     assert all(call["schema"]["name"] == call["name"] for call in ctx.calls)

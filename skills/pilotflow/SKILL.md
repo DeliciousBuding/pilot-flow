@@ -17,7 +17,7 @@ metadata:
 
 ## 能力总览
 
-PilotFlow 提供 8 个工具：
+PilotFlow 提供 9 个工具：
 1. **pilotflow_scan_chat_signals** — 根据你已总结的目标、承诺、风险、行动项，冒泡询问是否整理成项目
 2. **pilotflow_generate_plan** — 从自然语言提取项目信息，生成计划
 3. **pilotflow_detect_risks** — 检测项目计划中的风险
@@ -26,6 +26,7 @@ PilotFlow 提供 8 个工具：
 6. **pilotflow_query_status** — 查询项目状态，发送看板卡片
 7. **pilotflow_update_project** — 更新项目（改截止时间、加成员、移除成员、新增任务、记录进展、上报/解除风险、归档、催办）
 8. **pilotflow_health_check** — 脱敏检查 Hermes/Feishu/PilotFlow 运行配置
+9. **pilotflow_subscribe_chat** — 生成群聊订阅配置片段（开启后不需 @ 也能收到消息）
 
 ## 自治与权限
 

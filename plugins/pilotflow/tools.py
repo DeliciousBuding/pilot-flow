@@ -5821,3 +5821,85 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
             + "不要显示工具名或英文。"
         ),
     })
+
+
+# ---------------------------------------------------------------------------
+# Tool: pilotflow_subscribe_chat
+# ---------------------------------------------------------------------------
+
+
+def _generate_subscription_config_snippet(chat_id: str, mode: str) -> str:
+    """Generate the config.yaml snippet for per-group subscription."""
+    require_mention = "false" if mode in ("observe", "subscribe") else "true"
+    return (
+        f"feishu:\n"
+        f"  group_rules:\n"
+        f"    {chat_id}:\n"
+        f"      policy: open\n"
+        f"      require_mention: {require_mention}\n"
+    )
+
+
+PILOTFLOW_SUBSCRIBE_CHAT_SCHEMA = {
+    "name": "pilotflow_subscribe_chat",
+    "description": (
+        "给当前群聊开启消息订阅（不需要 @ 也能收到所有消息）。\n"
+        "注意：pilotflow_subscribe_chat 工具本身不修改 Hermes 配置文件。"
+        "它只生成配置片段，Agent 必须用中文展示给用户，让用户自己编辑 ~/.hermes/config.yaml。\n\n"
+        "开启后，Hermes 会在该群接收所有消息（不强制 @），"
+        "PilotFlow 可主动识别目标/承诺/风险/行动项并冒泡建议项目化。\n\n"
+        "只建议在课程项目群、协作群、站会群开启；纯闲聊群不建议。\n\n"
+        "【输出规则】只展示中文配置说明，不要展示工具名或 JSON。"
+    ),
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "mode": {
+                "type": "string",
+                "enum": ["observe", "mention"],
+                "description": "订阅模式：observe=所有消息进 Agent（主动巡检），mention=仅 @ 触发（默认）。",
+            },
+        },
+        "required": ["mode"],
+    },
+}
+
+
+def _handle_subscribe_chat(params: Dict[str, Any], **kwargs) -> str:
+    """Generate a Feishu group subscription config snippet."""
+    chat_id = _get_chat_id(kwargs)
+    if not chat_id:
+        return tool_error("无法获取当前群聊 ID。请在群聊中使用此功能。")
+
+    mode = str(params.get("mode") or "").strip()
+    if mode not in ("observe", "mention"):
+        return tool_error("mode 必须是 observe 或 mention")
+
+    snippet = _generate_subscription_config_snippet(chat_id, mode)
+
+    if mode == "observe":
+        status_label = "已订阅（非 @ 消息也接收）"
+        next_steps = [
+            "在 ~/.hermes/config.yaml 中找到 feishu: 节点",
+            "如果该节点下已有 group_rules，把上面片段里的群聊 ID 合并进去；没有则直接追加",
+            "重启 hermes gateway 生效",
+        ]
+    else:
+        status_label = "恢复 @ 触发模式"
+        next_steps = [
+            "在 ~/.hermes/config.yaml 里把对应群聊的 require_mention 设为 true，或直接移除该群聊的 group_rules 条目",
+            "重启 hermes gateway 生效",
+        ]
+
+    return tool_result({
+        "status": "config_snippet_generated",
+        "mode": mode,
+        "chat_id": chat_id,
+        "config_snippet": snippet,
+        "next_steps": next_steps,
+        "instructions": (
+            f"已生成「{status_label}」配置片段。请告诉用户：\n\n"
+            + "\n".join(f"{i}. {step}" for i, step in enumerate(next_steps, 1))
+            + "\n\n不要展示工具名、chat_id 或 JSON；只展示配置说明和 step。"
+        ),
+    })
