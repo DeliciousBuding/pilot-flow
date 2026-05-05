@@ -51,12 +51,15 @@
 
 | 工具 | 说明 | 输出 |
 | --- | --- | --- |
-| `pilotflow_generate_plan` | 从自然语言提取项目信息 | 结构化项目计划 + 确认门控指令 |
-| `pilotflow_detect_risks` | 检测计划中的潜在风险 | 风险列表 + 建议 |
-| `pilotflow_create_project_space` | 一键创建全套项目产物 | 文档 + 表格 + 任务 + 群消息 + 日历 |
-| `pilotflow_handle_card_action` | 处理确认卡片按钮 | 从 pending plan 恢复参数并确认/取消 |
-| `pilotflow_query_status` | 查询项目状态，发送看板卡片 | 项目看板卡片 |
-| `pilotflow_update_project` | 更新项目状态 | 内存注册表 + 多维表格记录 + 群通知 |
+| `pilotflow_scan_chat_signals` | 接收 Agent 总结的目标/承诺/风险/行动项，冒泡"要不要整理成项目？"建议卡 | 建议卡片 + 结构化信号 |
+| `pilotflow_generate_plan` | 从用户原话提取项目信息，生成计划，发确认卡片 | 结构化计划 + 确认门控 |
+| `pilotflow_detect_risks` | 检测计划中的潜在风险（缺成员/交付物/截止时间） | 风险列表 + 建议 |
+| `pilotflow_create_project_space` | 一键创建全套项目产物 | 文档 + 表格 + 任务 + 日历 + 群入口卡 |
+| `pilotflow_handle_card_action` | 处理确认卡片按钮（确认/取消/标记完成/催办等） | 从 pending plan 恢复并执行 |
+| `pilotflow_query_status` | 查询项目状态，发送看板/简报卡片 | 看板卡片（支持筛选/分页/详情） |
+| `pilotflow_update_project` | 更新项目（截止时间/成员/交付物/进展/风险/状态/催办） | 状态同步 + 群通知 + 文档留痕 |
+| `pilotflow_health_check` | 脱敏检查运行配置 + 项目健康诊断（逾期/风险/近期截止） | 健康报告 + 建议动作 |
+| `pilotflow_subscribe_chat` | 生成群聊订阅配置片段（开启后不需 @ 也能收到消息） | config.yaml 配置片段 |
 
 ## 工具调用流程
 

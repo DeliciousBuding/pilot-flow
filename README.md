@@ -5,7 +5,7 @@
 
 让群聊的每一句讨论，都能变成可追踪的项目进程。
 
-[English](README_EN.md) &nbsp;·&nbsp; [快速开始](#快速开始) &nbsp;·&nbsp; [使用指南](docs/USER_GUIDE.md)
+[English](README_EN.md) &nbsp;·&nbsp; [快速开始](#quick-start) &nbsp;·&nbsp; [使用指南](docs/USER_GUIDE.md)
 
 <img src="https://img.shields.io/badge/version-1.12.0-blue?style=flat-square" alt="version">
 <img src="https://img.shields.io/badge/python-3.12+-informational?style=flat-square&logo=python" alt="python">
