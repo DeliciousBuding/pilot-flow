@@ -3245,6 +3245,45 @@ def test_history_suggestions_card_action_reports_failure_when_rebuilt_card_not_s
     ]
 
 
+def test_direct_card_action_retryable_failure_keeps_action_ref_for_history_suggestions():
+    with _plan_lock:
+        _pending_plans.clear()
+        _card_action_refs.clear()
+        _pending_plans["oc_history_apply_retry"] = {
+            "plan": {
+                "title": "重试历史建议项目",
+                "goal": "验证历史建议重试",
+                "members": [],
+                "deliverables": [],
+                "deadline": "",
+                "risks": [],
+            }
+        }
+    action_id = _create_card_action_ref(
+        "oc_history_apply_retry",
+        "apply_history_suggestions",
+        {"history_suggested_fields": {"members": ["王五"], "deliverables": ["活动方案"]}},
+    )
+
+    with patch("tools._send_interactive_card_via_feishu", side_effect=[False, "om_history_apply_retry"]):
+        first = json.loads(_handle_card_action(
+            {"action_value": json.dumps({"pilotflow_action_id": action_id}, ensure_ascii=False)},
+            chat_id="ignored_chat",
+        ))
+        second = json.loads(_handle_card_action(
+            {"action_value": json.dumps({"pilotflow_action_id": action_id}, ensure_ascii=False)},
+            chat_id="ignored_chat",
+        ))
+
+    assert "历史建议已应用，但确认卡片发送失败" in first["error"]
+    assert second["status"] == "history_suggestions_applied"
+    with _plan_lock:
+        assert action_id not in _card_action_refs
+        pending_plan = _pending_plans["oc_history_apply_retry"]["plan"]
+    assert pending_plan["members"] == ["王五"]
+    assert pending_plan["deliverables"] == ["活动方案"]
+
+
 def test_query_status_falls_back_to_hermes_memory_after_restart(tmp_path):
     with _project_registry_lock:
         _project_registry.clear()

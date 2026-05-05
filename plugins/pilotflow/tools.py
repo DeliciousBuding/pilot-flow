@@ -4154,7 +4154,7 @@ def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
         if isinstance(sent_message_id, str):
             _attach_card_message_id(action_ids, sent_message_id)
         if not sent_message_id:
-            return tool_error("历史建议已应用，但确认卡片发送失败。请在群里重新生成计划。")
+            return retryable_tool_error("历史建议已应用，但确认卡片发送失败。请在群里重新生成计划。")
         return tool_result({
             "status": "history_suggestions_applied",
             "instructions": "已应用历史建议并重新发送确认卡片。不要展示工具名或英文。",
