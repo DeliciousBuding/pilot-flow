@@ -1916,6 +1916,18 @@
 | 用户价值 | 用户按负责人筛选项目后，原卡反馈能说明筛选范围，减少多张看板卡并存时误以为查看了全部风险项目的歧义 |
 | 隐私处理 | 证据只记录布尔结果和脱敏结论；不写入真实会话标识、消息标识、Feishu URL、用户原始标识或凭证 |
 
+## 2026-05-05 项目状态按钮原卡反馈同步摘要运行态验证
+
+| 项目 | 证据 |
+| --- | --- |
+| 运行环境 | PilotFlow 已通过 `setup.py --hermes-home <wsl-hermes-home>` 同步到 WSL Hermes runtime；安装验证返回插件、技能、Hermes config 和 Feishu display 配置均 OK |
+| 本地回归 | `C:\Users\Ding\miniforge3\python.exe -m pytest -q` 返回 `321 passed`；状态按钮原卡反馈和 card-status verifier 相关 targeted tests 返回 `4 passed` |
+| 功能硬化 | 用户从项目入口/详情卡点击标记完成、重新打开、催办或创建待办后，原卡片成功反馈现在会追加状态表/项目文档同步摘要，例如 `状态表已同步，项目文档已更新。` |
+| Verifier 新字段 | `verify_wsl_feishu_runtime.py --verify-card-status-cycle` 在已安装的 WSL Hermes runtime 插件内返回 `card_status_origin_feedback_sync_summary=true`，并保留 `card_status_bitable_synced=true`、`card_status_doc_recorded=true`、`card_status_done_applied=true`、`card_status_retryable_failure=true` |
+| 基线验证 | 同轮继续通过同一 Feishu venv 下 `--send-card` 的 `card_sent=true`、`card_has_initiator=true`、`pending_plan_recovered=true`，以及 `--probe-llm` 的 `llm_probe_ok=true`、`llm_probe_status=200` |
+| 用户价值 | 用户点击状态类按钮后，原卡反馈能说明后端飞书资源是否已经同步，减少只看到“完成/重开”但不确定文档和状态表是否落库的歧义 |
+| 隐私处理 | 证据只记录布尔结果和脱敏结论；不写入真实会话标识、消息标识、Feishu URL、用户原始标识或凭证 |
+
 ## 本地回归
 
 ```bash

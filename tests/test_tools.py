@@ -8192,17 +8192,41 @@ def test_card_command_opaque_project_action_carries_project_title():
     with _project_registry_lock:
         _project_registry.clear()
     _register_project(
-        "入口按钮项目", ["张三"], "2026-05-10", "进行中", [],
+        "入口按钮项目", ["张三"], "2026-05-10", "进行中",
+        ["文档: https://example.invalid/docx/doc_entry_button"],
         goal="验证入口按钮", deliverables=["验收记录"],
+        app_token="app_entry_button", table_id="tbl_entry_button", record_id="rec_entry_button",
     )
     action_id = _create_card_action_ref("oc_entry_button", "mark_project_done", {"title": "入口按钮项目"})
+    with _plan_lock:
+        _card_action_refs[action_id]["message" + "_id"] = "om_entry_button_origin"
 
-    with patch("tools._hermes_send", return_value=True), patch("tools._mark_card_message", return_value=True):
+    marked_cards = []
+
+    def capture_mark(msg_ref, title, content, template):
+        marked_cards.append((msg_ref, title, content, template))
+        return True
+
+    with (
+        patch("tools._hermes_send", return_value=True),
+        patch("tools._mark_card_message", side_effect=capture_mark),
+        patch("tools._append_project_doc_update", return_value=True),
+        patch("tools._update_bitable_record", return_value=True),
+        patch("tools._append_bitable_update_record", return_value=True),
+    ):
         result = _handle_card_command(f'button {{"pilotflow_action_id":"{action_id}"}}')
 
     assert result is None
     with _project_registry_lock:
         assert _project_registry["入口按钮项目"]["status"] == "已完成"
+    assert marked_cards == [
+        (
+            "om_entry_button_origin",
+            "项目已完成",
+            "**入口按钮项目** 已标记为完成。\n\n状态表已同步，项目文档已更新。",
+            "green",
+        )
+    ]
 
 
 def test_card_command_project_action_updates_card_as_failed_when_action_fails():
@@ -8344,7 +8368,7 @@ def test_card_command_followup_task_feedback_includes_task_name():
         (
             "om_followup_feedback",
             "待办已创建",
-            "**反馈待办项目** 的跟进待办已创建：反馈待办项目跟进。",
+            "**反馈待办项目** 的跟进待办已创建：反馈待办项目跟进。\n\n项目文档已更新。",
             "green",
         )
     ]

@@ -4695,16 +4695,22 @@ def _handle_card_command(raw_args: str) -> str:
         "project_reminder_sent", "project_followup_task_created",
     ):
         project_title = data.get("project") or action_data.get("title") or "项目"
+        sync_parts = []
+        if data.get("bitable_updated"):
+            sync_parts.append("状态表已同步")
+        if data.get("doc_updated"):
+            sync_parts.append("项目文档已更新")
+        sync_suffix = f"\n\n{'，'.join(sync_parts)}。" if sync_parts else ""
         followup_task = _public_task_update_value(data.get("task_name", ""))
         followup_content = f"**{project_title}** 的跟进待办已创建。"
         if followup_task:
             followup_content = f"**{project_title}** 的跟进待办已创建：{followup_task}。"
         feedback = {
-            "project_marked_done": ("项目已完成", f"**{project_title}** 已标记为完成。", "green"),
-            "project_reopened": ("项目已重新打开", f"**{project_title}** 已恢复为进行中。", "blue"),
-            "project_risk_resolved": ("风险已解除", f"**{project_title}** 已恢复为进行中。", "green"),
-            "project_reminder_sent": ("已发送催办提醒", f"**{project_title}** 的催办提醒已发送到群聊。", "yellow"),
-            "project_followup_task_created": ("待办已创建", followup_content, "green"),
+            "project_marked_done": ("项目已完成", f"**{project_title}** 已标记为完成。{sync_suffix}", "green"),
+            "project_reopened": ("项目已重新打开", f"**{project_title}** 已恢复为进行中。{sync_suffix}", "blue"),
+            "project_risk_resolved": ("风险已解除", f"**{project_title}** 已恢复为进行中。{sync_suffix}", "green"),
+            "project_reminder_sent": ("已发送催办提醒", f"**{project_title}** 的催办提醒已发送到群聊。{sync_suffix}", "yellow"),
+            "project_followup_task_created": ("待办已创建", f"{followup_content}{sync_suffix}", "green"),
         }[data["status"]]
         _mark_card_message(message_id, feedback[0], feedback[1], feedback[2])
         return None

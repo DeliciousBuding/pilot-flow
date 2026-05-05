@@ -508,6 +508,7 @@ def test_verify_runtime_card_status_cycle_is_sanitized(tmp_path, monkeypatch):
     assert result["card_status_state_doc_recorded"] is True
     assert result["card_status_state_feedback_sent"] is True
     assert result["card_status_feedback_sent"] is True
+    assert result["card_status_origin_feedback_sync_summary"] is True
     assert result["card_status_used_opaque_refs"] is True
     assert result["card_status_retryable_failure"] is True
     assert "example.invalid" not in json.dumps(result, ensure_ascii=False)
@@ -1283,6 +1284,7 @@ def test_verifier_card_status_cycle_mode_outputs_sanitized_runtime_result(tmp_pa
         "card_status_state_doc_recorded": True,
         "card_status_state_feedback_sent": True,
         "card_status_feedback_sent": True,
+        "card_status_origin_feedback_sync_summary": True,
         "card_status_used_opaque_refs": True,
         "card_status_retryable_failure": True,
         "raw_chat_id": "oc_real_chat_id",
@@ -1309,6 +1311,7 @@ def test_verifier_card_status_cycle_mode_outputs_sanitized_runtime_result(tmp_pa
     assert output["card_status_state_doc_recorded"] is True
     assert output["card_status_state_feedback_sent"] is True
     assert output["card_status_feedback_sent"] is True
+    assert output["card_status_origin_feedback_sync_summary"] is True
     assert output["card_status_used_opaque_refs"] is True
     assert output["card_status_retryable_failure"] is True
     assert "oc_real_chat_id" not in output_text

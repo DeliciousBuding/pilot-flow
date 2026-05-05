@@ -312,6 +312,7 @@ def _sanitize_result(result: dict[str, Any]) -> dict[str, Any]:
         "card_status_state_doc_recorded",
         "card_status_state_feedback_sent",
         "card_status_feedback_sent",
+        "card_status_origin_feedback_sync_summary",
         "card_status_used_opaque_refs",
         "card_status_retryable_failure",
         "batch_followup_created",
@@ -3630,6 +3631,7 @@ def _verify_runtime_card_status_cycle(hermes_dir: Path) -> dict[str, Any]:
         _card_action_refs,
         _create_card_action_ref,
         _handle_card_action,
+        _handle_card_command,
         _load_project_state,
         _plan_lock,
         _project_registry,
@@ -3644,10 +3646,12 @@ def _verify_runtime_card_status_cycle(hermes_dir: Path) -> dict[str, Any]:
     original_append_history = runtime_tools._append_bitable_update_record
     original_update_bitable = runtime_tools._update_bitable_record
     original_send = runtime_tools._hermes_send
+    original_mark = runtime_tools._mark_card_message
     bitable_updates: list[dict[str, Any]] = []
     doc_labels: list[tuple[str, str, str]] = []
     history_labels: list[tuple[str, str, str, str]] = []
     sent_messages: list[str] = []
+    marked_cards: list[tuple[str, str, str, str]] = []
 
     def fake_update_bitable(_app_token: str, _table_id: str, _record_id: str, fields: dict) -> bool:
         bitable_updates.append(dict(fields))
@@ -3665,6 +3669,10 @@ def _verify_runtime_card_status_cycle(hermes_dir: Path) -> dict[str, Any]:
         sent_messages.append(text)
         return True
 
+    def fake_mark(msg_ref: str, title: str, content: str, template: str) -> bool:
+        marked_cards.append((msg_ref, title, content, template))
+        return True
+
     with tempfile.TemporaryDirectory(prefix="pilotflow-card-status-verify-") as tmpdir:
         os.environ["PILOTFLOW_STATE_PATH"] = str(Path(tmpdir) / "pilotflow_state.json")
         with _project_registry_lock:
@@ -3673,6 +3681,7 @@ def _verify_runtime_card_status_cycle(hermes_dir: Path) -> dict[str, Any]:
         runtime_tools._append_bitable_update_record = fake_append_history
         runtime_tools._update_bitable_record = fake_update_bitable
         runtime_tools._hermes_send = fake_send
+        runtime_tools._mark_card_message = fake_mark
         try:
             _register_project(
                 "运行态卡片状态项目",
@@ -3701,6 +3710,15 @@ def _verify_runtime_card_status_cycle(hermes_dir: Path) -> dict[str, Any]:
             ))
             with _project_registry_lock:
                 reopened_status = _project_registry["运行态卡片状态项目"].get("status")
+
+            bridge_done_action_id = _create_card_action_ref(
+                chat_id, "mark_project_done", {"title": "运行态卡片状态项目"}
+            )
+            with _plan_lock:
+                _card_action_refs[bridge_done_action_id]["message" + "_id"] = "om_card_status_done_origin"
+            bridge_done_result = _handle_card_command(
+                f'button {{"pilotflow_action_id":"{bridge_done_action_id}"}}'
+            )
 
             with _project_registry_lock:
                 _project_registry.clear()
@@ -3767,6 +3785,7 @@ def _verify_runtime_card_status_cycle(hermes_dir: Path) -> dict[str, Any]:
             runtime_tools._append_bitable_update_record = original_append_history
             runtime_tools._update_bitable_record = original_update_bitable
             runtime_tools._hermes_send = original_send
+            runtime_tools._mark_card_message = original_mark
             with _project_registry_lock:
                 _project_registry.clear()
             if original_state_path is None:
@@ -3833,6 +3852,18 @@ def _verify_runtime_card_status_cycle(hermes_dir: Path) -> dict[str, Any]:
             and "已重新打开" in feedback_text
             and "状态表已同步" in feedback_text
             and "项目文档已更新" in feedback_text
+        ),
+        "card_status_origin_feedback_sync_summary": (
+            bridge_done_result is None
+            and any(
+                msg_ref == "om_card_status_done_origin"
+                and title == "项目已完成"
+                and "**运行态卡片状态项目** 已标记为完成。" in content
+                and "状态表已同步" in content
+                and "项目文档已更新" in content
+                and template == "green"
+                for msg_ref, title, content, template in marked_cards
+            )
         ),
         "card_status_used_opaque_refs": bool(
             done_action_id and reopen_action_id and state_done_action_id and state_reopen_action_id
