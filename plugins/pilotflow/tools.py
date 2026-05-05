@@ -3272,7 +3272,7 @@ PILOTFLOW_GENERATE_PLAN_SCHEMA = {
         "不要让本工具做意图识别；你需要先理解用户目的并传入结构化字段。\n\n"
         "此工具会：\n"
         "1. 设置确认门控（允许后续调用 pilotflow_create_project_space）\n"
-        "2. 在 Agent 显式传入 template 时应用项目模板（答辩/sprint/活动/上线）并提供建议\n"
+        "2. 在 Agent 显式传入 template 时提供参考模板建议，但不替 Agent 补全计划字段\n"
         "3. 自动发送确认卡片到群聊，包含计划摘要和确认/取消按钮\n"
         "4. 把你提取的字段存入 pending plan，用户点击确认按钮即可一键创建（无需重新提取）\n\n"
         "调用时你必须从用户消息中提取并传入：title、goal、members、deliverables、deadline。\n"
@@ -3304,8 +3304,7 @@ PILOTFLOW_GENERATE_PLAN_SCHEMA = {
             },
             "template": {
                 "type": "string",
-                "enum": ["", "答辩", "sprint", "活动", "上线"],
-                "description": "Agent 显式选择的项目模板；空字符串表示不套模板。",
+                "description": "Agent 显式选择的参考模板名称，可为任意字符串；工具只展示已知模板建议，不会替 Agent 判断或补全交付物/截止时间。",
             },
             "allow_inferred_template": {
                 "type": "boolean",
@@ -3319,7 +3318,7 @@ PILOTFLOW_GENERATE_PLAN_SCHEMA = {
             "deliverables": {
                 "type": "array",
                 "items": {"type": "string"},
-                "description": "交付物列表。只填写用户明确要求或上下文合理确定的交付物；不确定可为空数组，由模板或历史建议补充。",
+                "description": "交付物列表。由 Agent 基于用户原话、群聊上下文和历史 memory 判断；不确定可为空数组并触发澄清，工具不会从模板静默补充。",
             },
             "deliverable_assignees": {
                 "type": "object",
@@ -3331,7 +3330,7 @@ PILOTFLOW_GENERATE_PLAN_SCHEMA = {
                 "items": {"type": "string"},
                 "description": "Hermes 从上下文明确识别出的风险/阻塞；不确定传空数组，工具不会从原文推断。",
             },
-            "deadline": {"type": "string", "description": "截止时间 YYYY-MM-DD（可为空字符串，会被模板补全）。"},
+            "deadline": {"type": "string", "description": "截止时间 YYYY-MM-DD（可为空字符串并触发澄清，工具不会从模板静默补全）。"},
         },
         "required": ["input_text"],
     },
@@ -3440,17 +3439,38 @@ def _handle_generate_plan(params: Dict[str, Any], **kwargs) -> str:
         plan["members"],
     )
 
-    # History is context for the Agent/user, not a silent overwrite. Templates
-    # may fill generic defaults; history is shown explicitly as suggestions.
+    # History and templates are context for the Agent/user, not silent overwrites.
     history_suggestions, history_suggested_fields = _history_suggestions_for_plan(plan, text)
 
-    # Template fills generic gaps.
-    if template:
+    if template and (not plan["deliverables"] or not plan["deadline"]):
+        missing = []
+        missing_labels = []
         if not plan["deliverables"]:
-            plan["deliverables"] = list(template["deliverables"])
+            missing.append("deliverables")
+            missing_labels.append("交付物")
         if not plan["deadline"]:
-            suggested = datetime.date.today() + datetime.timedelta(days=template["suggested_deadline_days"])
-            plan["deadline"] = suggested.strftime("%Y-%m-%d")
+            missing.append("deadline")
+            missing_labels.append("截止时间")
+        suggested = datetime.date.today() + datetime.timedelta(days=template["suggested_deadline_days"])
+        clarification_text = (
+            f"参考「{template['description']}」，我仍需要你确认：{'、'.join(missing_labels)}。\n"
+            f"可参考交付物：{'、'.join(template['deliverables'])}；参考截止时间：{suggested.isoformat()}。"
+        )
+        clarification_sent = bool(chat_id and _hermes_send(chat_id, clarification_text))
+        return tool_result({
+            "status": "needs_clarification",
+            "missing": missing,
+            "clarification_sent": clarification_sent,
+            "input": text,
+            "template": template["description"],
+            "template_suggestions": {
+                "deliverables": list(template["deliverables"]),
+                "deadline": suggested.isoformat(),
+            },
+            "history_suggestions": history_suggestions,
+            "history_suggested_fields": history_suggested_fields,
+            "instructions": "请用中文向用户追问缺失字段；模板只能作为参考建议，不要当作已确认计划字段。",
+        })
 
     # Title fallback: use chat name + date if extraction failed
     if not plan["title"]:
@@ -3492,11 +3512,12 @@ def _handle_generate_plan(params: Dict[str, Any], **kwargs) -> str:
 
     template_hint = ""
     if template:
+        suggested = datetime.date.today() + datetime.timedelta(days=template["suggested_deadline_days"])
         template_hint = (
             f"\n\n【模板建议】检测到「{text}」可能适用模板：\n"
             f"- 建议交付物：{', '.join(template['deliverables'])}\n"
-            f"- 建议截止时间：{plan['deadline']}（{template['suggested_deadline_days']}天后）\n"
-            f"如果用户没有指定，请使用以上建议。"
+            f"- 建议截止时间：{suggested.isoformat()}（{template['suggested_deadline_days']}天后）\n"
+            f"以上仅供参考；用户未确认时不要当作计划字段。"
         )
     history_hint = ""
     if history_suggestions:
@@ -4824,6 +4845,15 @@ PILOTFLOW_QUERY_STATUS_SCHEMA = {
                 "type": "boolean",
                 "description": "仅供回归测试 / 旧客户端回放使用。生产 Agent 不应传 true。本字段不再保留向前兼容承诺。默认 false。",
             },
+            "view_mode": {
+                "type": "string",
+                "enum": ["", "list", "briefing"],
+                "description": "Agent 显式判断的展示模式：list 为项目看板，briefing 为管理简报。必须由 Agent 基于上下文决定，工具不会默认从 query 关键词判断。",
+            },
+            "allow_inferred_view_mode": {
+                "type": "boolean",
+                "description": "仅供回归测试 / 旧客户端回放使用。生产 Agent 不应传 true。本字段不再保留向前兼容承诺。为 true 且 view_mode 为空时，工具才会从 query 关键词退化推断简报视图。默认 false。",
+            },
         },
         "required": ["query"],
     },
@@ -4835,11 +4865,17 @@ def _handle_query_status(params: Dict[str, Any], **kwargs) -> str:
     query = params.get("query", "")
     chat_id = _get_chat_id(kwargs)
     allow_inferred_filters = bool(params.get("allow_inferred_filters"))
+    allow_inferred_view_mode = bool(params.get("allow_inferred_view_mode"))
     explicit_filter = str(params.get("filter") or "").strip()
     allowed_filters = {"", "all", "archived", "risk", "overdue", "due_soon", "active", "completed"}
     status_filter = explicit_filter if explicit_filter in allowed_filters else ""
     if not status_filter and allow_inferred_filters:
         status_filter = _status_filter_from_query(query)
+    explicit_view_mode = str(params.get("view_mode") or "").strip()
+    view_mode = explicit_view_mode if explicit_view_mode in {"", "list", "briefing"} else ""
+    wants_briefing = view_mode == "briefing" or (
+        not view_mode and allow_inferred_view_mode and _is_briefing_query(query)
+    )
 
     projects = []
 
@@ -4961,7 +4997,7 @@ def _handle_query_status(params: Dict[str, Any], **kwargs) -> str:
             p for p in projects
             if any(member in set(_project_member_names(p)) for member in member_filters)
         ]
-    if _is_briefing_query(query):
+    if wants_briefing:
         briefing_card, briefing_count, briefing_action_ids = _build_project_briefing_card(
             query, projects, chat_id, status_filter, member_filters,
         )
@@ -5290,6 +5326,15 @@ PILOTFLOW_UPDATE_PROJECT_SCHEMA = {
                 "items": {"type": "string"},
                 "description": "send_reminder 批量催办时 Agent 显式传入的负责人/成员筛选条件。",
             },
+            "risk_level": {
+                "type": "string",
+                "enum": ["低", "中", "高"],
+                "description": "action=add_risk 时 Agent 基于上下文显式判断的风险等级；工具默认不会从 value 关键词判断。",
+            },
+            "allow_inferred_risk_level": {
+                "type": "boolean",
+                "description": "仅供回归测试 / 旧客户端回放使用。生产 Agent 不应传 true。本字段不再保留向前兼容承诺。为 true 且未传 risk_level 时，工具才会从 value 退化推断风险等级。默认 false。",
+            },
             "allow_inferred_filters": {
                 "type": "boolean",
                 "description": "仅供回归测试 / 旧客户端回放使用。生产 Agent 不应传 true。本字段不再保留向前兼容承诺。默认 false。",
@@ -5501,7 +5546,17 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
         "send_reminder": "催办",
     }
     action_label = action_labels.get(action, action)
-    risk_level = _risk_level_from_text(value) if action == "add_risk" else ("低" if action == "resolve_risk" else "")
+    risk_level = ""
+    if action == "add_risk":
+        explicit_risk_level = str(params.get("risk_level") or "").strip()
+        if explicit_risk_level in {"低", "中", "高"}:
+            risk_level = explicit_risk_level
+        elif bool(params.get("allow_inferred_risk_level")):
+            risk_level = _risk_level_from_text(value)
+        else:
+            risk_level = "中"
+    elif action == "resolve_risk":
+        risk_level = "低"
 
     bitable_updated = False
     bitable_history_created = False

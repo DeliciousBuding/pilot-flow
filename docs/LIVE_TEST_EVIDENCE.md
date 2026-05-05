@@ -1984,6 +1984,18 @@
 | 用户价值 | 当 Hermes Agent 或旧客户端传入不支持的更新动作时，PilotFlow 不会发送误导性的群聊成功反馈，也不会创建飞书任务或写入项目状态，避免真实办公数据被“假成功”污染 |
 | 隐私处理 | 证据只记录布尔结果和脱敏结论；不写入真实会话标识、消息标识、Feishu URL、用户原始标识或凭证 |
 
+## 2026-05-05 工具层语义推断门控运行态验证
+
+| 项目 | 证据 |
+| --- | --- |
+| 本地回归 | `C:\Users\Ding\miniforge3\python.exe -m pytest -q` 返回 `327 passed`；新增/调整用例覆盖 `view_mode` 显式简报、默认不从 query 关键词进简报、任意 `template` 字符串、模板只作参考不补交付物/截止时间、显式 `risk_level` 与默认不从风险文本推断 |
+| 安装验证 | `setup.py --hermes-dir D:\Code\LarkProject\hermes-agent --hermes-home <wsl-hermes-home>` 返回插件、技能、Hermes config、Feishu display 配置均 OK |
+| WSL 基线 | `verify_wsl_feishu_runtime.py --send-card` 返回 `card_sent=true`、`card_has_initiator=true`、`pending_plan_recovered=true`、`trace_has_key=true`；`--probe-llm` 返回 `llm_probe_ok=true`、`llm_probe_status=200` |
+| 运行态门控 | `--verify-dashboard-navigation` 返回 `dashboard_no_implicit_briefing=true` 与 `dashboard_explicit_briefing=true`，证明 query 含简报词时默认仍走看板，只有 Agent 显式传 `view_mode=briefing` 才进入简报 |
+| 风险等级边界 | `--verify-risk-cycle` 返回 `risk_level_high=true`、`risk_level_low=true`，运行态风险上报路径改为显式 `risk_level` 驱动，旧文本推断只保留在 `allow_inferred_risk_level=true` 退化路径 |
+| 项目化边界 | `--verify-projectization-suggestion` 继续返回 `projectization_plan_generated=true`、`projectization_clarification_sent=true`、`projectization_raw_action_rejected=true`，模板/澄清调整未破坏项目化建议与确认门控 |
+| 隐私处理 | 证据只记录布尔结果和脱敏结论；不写入真实会话标识、消息标识、Feishu URL、用户原始标识或凭证 |
+
 ## 本地回归
 
 ```bash

@@ -342,6 +342,8 @@ def _sanitize_result(result: dict[str, Any]) -> dict[str, Any]:
         "dashboard_state_detail_assignees_shown",
         "dashboard_state_archived_hidden",
         "dashboard_state_archived_filter_shown",
+        "dashboard_no_implicit_briefing",
+        "dashboard_explicit_briefing",
         "error",
     }
     return {key: result[key] for key in allowed if key in result}
@@ -2792,6 +2794,7 @@ def _verify_runtime_risk_cycle(hermes_dir: Path) -> dict[str, Any]:
                 "project_name": "运行态风险闭环",
                 "action": "add_risk",
                 "value": "支付接口联调阻塞，高风险",
+                "risk_level": "高",
             },
             chat_id=chat_id,
         ))
@@ -2835,6 +2838,7 @@ def _verify_runtime_risk_cycle(hermes_dir: Path) -> dict[str, Any]:
                     "project_name": "运行态重启风险上报",
                     "action": "add_risk",
                     "value": "验收环境阻塞，高风险",
+                    "risk_level": "高",
                 },
                 chat_id=chat_id,
             ))
@@ -4410,6 +4414,16 @@ def _verify_runtime_dashboard_navigation(hermes_dir: Path) -> dict[str, Any]:
                 {"query": "看看归档项目", "filter": "archived"},
                 chat_id=chat_id,
             )
+            implicit_briefing_index = len(sent_cards)
+            implicit_briefing_dashboard = _handle_query_status(
+                {"query": "站会简报"},
+                chat_id=chat_id,
+            )
+            explicit_briefing_index = len(sent_cards)
+            explicit_briefing_dashboard = _handle_query_status(
+                {"query": "看看项目", "view_mode": "briefing"},
+                chat_id=chat_id,
+            )
         finally:
             runtime_tools._DASHBOARD_PAGE_SIZE = original_page_size
             runtime_tools._hermes_send_card = original_send_card
@@ -4427,6 +4441,10 @@ def _verify_runtime_dashboard_navigation(hermes_dir: Path) -> dict[str, Any]:
     state_detail_text = next((text for text in all_card_texts if "运行态重启分工详情项目" in text), "")
     state_default_text = next((text for text in all_card_texts if "运行态重启看板进行中项目" in text), "")
     state_archived_text = next((text for text in all_card_texts if "运行态重启看板已归档项目" in text), "")
+    implicit_briefing_card = sent_cards[implicit_briefing_index] if len(sent_cards) > implicit_briefing_index else {}
+    explicit_briefing_card = sent_cards[explicit_briefing_index] if len(sent_cards) > explicit_briefing_index else {}
+    implicit_briefing_title = implicit_briefing_card.get("header", {}).get("title", {}).get("content", "")
+    explicit_briefing_title = explicit_briefing_card.get("header", {}).get("title", {}).get("content", "")
     return {
         "dashboard_filter_sent": filter_data.get("status") == "dashboard_filter_sent",
         "dashboard_filter_scoped": (
@@ -4460,7 +4478,7 @@ def _verify_runtime_dashboard_navigation(hermes_dir: Path) -> dict[str, Any]:
                 for msg_ref, title, content, template in marked_cards
             )
         ),
-        "dashboard_cards_sent": len(sent_cards) == 7,
+        "dashboard_cards_sent": len(sent_cards) == 9,
         "dashboard_used_opaque_refs": bool(filter_action_id and page_action_id),
         "dashboard_state_detail_assignees_shown": (
             "项目详情已发送" in state_detail_result
@@ -4475,6 +4493,15 @@ def _verify_runtime_dashboard_navigation(hermes_dir: Path) -> dict[str, Any]:
             "项目看板已发送" in state_archived_dashboard
             and "运行态重启看板进行中项目" not in state_archived_text
             and "运行态重启看板已归档项目" in state_archived_text
+        ),
+        "dashboard_no_implicit_briefing": (
+            "项目看板已发送" in implicit_briefing_dashboard
+            and "项目看板" in implicit_briefing_title
+            and "项目简报" not in implicit_briefing_title
+        ),
+        "dashboard_explicit_briefing": (
+            "项目简报已发送" in explicit_briefing_dashboard
+            and "项目简报" in explicit_briefing_title
         ),
     }
 

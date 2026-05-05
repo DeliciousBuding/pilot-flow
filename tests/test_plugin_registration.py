@@ -115,5 +115,7 @@ def test_allow_inferred_schema_fields_are_marked_legacy_only():
         ("pilotflow_generate_plan", "allow_inferred_fields"),
         ("pilotflow_generate_plan", "allow_inferred_template"),
         ("pilotflow_query_status", "allow_inferred_filters"),
+        ("pilotflow_query_status", "allow_inferred_view_mode"),
+        ("pilotflow_update_project", "allow_inferred_risk_level"),
         ("pilotflow_update_project", "allow_inferred_filters"),
     ]

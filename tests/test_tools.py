@@ -1479,12 +1479,18 @@ def test_generate_plan_accepts_explicit_template_key():
             chat_id="oc_explicit_template",
         ))
 
-    assert result["status"] == "plan_generated"
+    assert result["status"] == "needs_clarification"
     assert result["template"] is not None
     assert "答辩" in result["template"]
-    assert "PPT" in result["plan"]["deliverables"]
-    assert result["plan"]["deadline"]
-    assert captured_cards
+    assert result["missing"] == ["deliverables", "deadline"]
+    assert "PPT" not in result.get("plan", {}).get("deliverables", [])
+    assert not captured_cards
+
+
+def test_generate_plan_schema_allows_arbitrary_template_reference():
+    props = PILOTFLOW_GENERATE_PLAN_SCHEMA["parameters"]["properties"]
+    assert "enum" not in props["template"]
+    assert "Agent" in props["template"]["description"]
 
 
 def test_generate_plan_requires_structured_fields_by_default():
@@ -3267,8 +3273,9 @@ def test_generate_plan_uses_memory_history_when_fields_missing():
             chat_id="oc_history_memory",
         ))
 
-    assert result["plan"]["members"] == []
-    assert result["plan"]["deliverables"] == ["活动方案", "预算表", "宣传物料"]
+    assert result["status"] == "needs_clarification"
+    assert result["missing"] == ["deliverables", "deadline"]
+    assert result["template_suggestions"]["deliverables"] == ["活动方案", "预算表", "宣传物料"]
     assert result["history_suggested_fields"]["members"] == ["王五", "赵六"]
     assert result["history_suggested_fields"]["deliverables"] == ["活动方案", "宣传文案"]
     assert result["history_suggestions"]
@@ -3577,7 +3584,7 @@ def test_query_status_sends_standup_briefing_card_with_priority_summary():
         return "om_standup_briefing"
 
     with patch("tools._send_interactive_card_via_feishu", side_effect=capture_card):
-        result = _handle_query_status({"query": "发一份站会简报"}, chat_id="oc_standup_briefing")
+        result = _handle_query_status({"query": "发一份站会简报", "view_mode": "briefing"}, chat_id="oc_standup_briefing")
 
     assert "项目简报已发送" in result
     card = captured["card"]
@@ -3627,7 +3634,7 @@ def test_standup_briefing_overdue_button_sends_batch_reminders():
         return "om_briefing_buttons"
 
     with patch("tools._send_interactive_card_via_feishu", side_effect=capture_card):
-        _handle_query_status({"query": "站会简报"}, chat_id="oc_briefing_reminder")
+        _handle_query_status({"query": "站会简报", "view_mode": "briefing"}, chat_id="oc_briefing_reminder")
 
     with _plan_lock:
         reminder_id = next(
@@ -3922,7 +3929,7 @@ def test_filtered_briefing_reminder_button_uses_current_filter():
         return "om_briefing_risk_reminder"
 
     with patch("tools._send_interactive_card_via_feishu", side_effect=capture_card):
-        _handle_query_status({"query": "风险项目简报", "filter": "risk"}, chat_id="oc_briefing_risk_reminder")
+        _handle_query_status({"query": "风险项目简报", "filter": "risk", "view_mode": "briefing"}, chat_id="oc_briefing_risk_reminder")
 
     button_texts = [
         button["text"]["content"]
@@ -3982,7 +3989,7 @@ def test_standup_briefing_overdue_button_can_create_batch_followup_tasks():
         return "om_briefing_followup"
 
     with patch("tools._send_interactive_card_via_feishu", side_effect=capture_card):
-        _handle_query_status({"query": "发一份站会简报"}, chat_id="oc_briefing_followup")
+        _handle_query_status({"query": "发一份站会简报", "view_mode": "briefing"}, chat_id="oc_briefing_followup")
 
     button_texts = [
         button["text"]["content"]
@@ -4206,7 +4213,7 @@ def test_standup_briefing_risk_button_can_create_batch_followup_tasks():
         return "om_briefing_risk_followup"
 
     with patch("tools._send_interactive_card_via_feishu", side_effect=capture_card):
-        _handle_query_status({"query": "风险项目简报", "filter": "risk"}, chat_id="oc_briefing_risk_followup")
+        _handle_query_status({"query": "风险项目简报", "filter": "risk", "view_mode": "briefing"}, chat_id="oc_briefing_risk_followup")
 
     with _plan_lock:
         followup_action_id = next(
@@ -4262,7 +4269,7 @@ def test_filtered_briefing_followup_can_filter_by_owner():
 
     with patch("tools._send_interactive_card_via_feishu", return_value="om_owner_risk_followup"):
         _handle_query_status(
-            {"query": "张三负责的风险项目简报", "filter": "risk", "member_filters": ["张三"]},
+            {"query": "张三负责的风险项目简报", "filter": "risk", "member_filters": ["张三"], "view_mode": "briefing"},
             chat_id="oc_owner_risk_followup",
         )
 
@@ -4371,7 +4378,7 @@ def test_filtered_briefing_followup_button_names_current_filter():
         return "om_briefing_due_soon_followup"
 
     with patch("tools._send_interactive_card_via_feishu", side_effect=capture_card):
-        _handle_query_status({"query": "近期截止项目简报", "filter": "due_soon"}, chat_id="oc_briefing_due_soon_followup")
+        _handle_query_status({"query": "近期截止项目简报", "filter": "due_soon", "view_mode": "briefing"}, chat_id="oc_briefing_due_soon_followup")
 
     button_texts = [
         button["text"]["content"]
@@ -4940,6 +4947,49 @@ def test_query_status_does_not_infer_filter_from_query_by_default():
     assert "默认风险项目" in content
 
 
+def test_query_status_does_not_infer_briefing_from_query_by_default():
+    with _project_registry_lock:
+        _project_registry.clear()
+    _register_project(
+        "默认简报关键词项目", [], "2026-05-20", "进行中", [],
+        goal="验证简报视图门控", deliverables=["验收记录"],
+    )
+    captured = {}
+
+    def capture_card(chat_id, card):
+        captured["card"] = card
+        return True
+
+    with patch("tools._send_interactive_card_via_feishu", side_effect=capture_card):
+        result = _handle_query_status({"query": "看看项目简报"}, chat_id="oc_no_infer_briefing")
+
+    assert "项目看板已发送" in result
+    assert "项目看板" in captured["card"]["header"]["title"]["content"]
+
+
+def test_query_status_uses_explicit_briefing_view_mode():
+    with _project_registry_lock:
+        _project_registry.clear()
+    _register_project(
+        "显式简报项目", [], "2026-05-20", "进行中", [],
+        goal="验证显式简报", deliverables=["验收记录"],
+    )
+    captured = {}
+
+    def capture_card(chat_id, card):
+        captured["card"] = card
+        return True
+
+    with patch("tools._send_interactive_card_via_feishu", side_effect=capture_card):
+        result = _handle_query_status(
+            {"query": "看看项目", "view_mode": "briefing"},
+            chat_id="oc_explicit_briefing",
+        )
+
+    assert "项目简报已发送" in result
+    assert captured["card"]["header"]["title"]["content"] == "项目简报"
+
+
 def test_deadline_dashboard_offers_reminder_button_without_chat_id_payload():
     with _project_registry_lock:
         _project_registry.clear()
@@ -4994,7 +5044,7 @@ def test_filtered_briefing_dashboard_buttons_keep_owner_scope():
 
     with patch("tools._send_interactive_card_via_feishu", side_effect=capture_card):
         _handle_query_status(
-            {"query": "张三负责的逾期项目简报", "filter": "overdue", "member_filters": ["张三"]},
+            {"query": "张三负责的逾期项目简报", "filter": "overdue", "member_filters": ["张三"], "view_mode": "briefing"},
             chat_id="oc_owner_scope_dashboard",
         )
 
@@ -5045,7 +5095,7 @@ def test_dashboard_filter_button_keeps_owner_scope_when_clicked_from_owner_brief
 
     with patch("tools._send_interactive_card_via_feishu", side_effect=capture_card):
         _handle_query_status(
-            {"query": "张三负责的风险项目简报", "filter": "risk", "member_filters": ["张三"]},
+            {"query": "张三负责的风险项目简报", "filter": "risk", "member_filters": ["张三"], "view_mode": "briefing"},
             chat_id="oc_owner_dashboard_filter",
         )
 
@@ -6121,6 +6171,7 @@ def test_update_project_reports_risk_to_sanitized_state_after_restart(tmp_path):
                     "project_name": "重启风险上报",
                     "action": "add_risk",
                     "value": "验收环境阻塞，高风险",
+                    "risk_level": "高",
                 },
                 chat_id="oc_state_risk_report",
             ))
@@ -7158,6 +7209,7 @@ def test_update_project_adds_risk_and_marks_project_at_risk():
                 "project_name": "风险上报项目",
                 "action": "add_risk",
                 "value": "支付接口联调阻塞，高风险",
+                "risk_level": "高",
             },
             chat_id="oc_risk_report",
         ))
@@ -7186,6 +7238,37 @@ def test_update_project_adds_risk_and_marks_project_at_risk():
     assert "风险 → 支付接口联调阻塞，高风险" in sent_text
     assert "状态已切换为有风险" in sent_text
     assert "状态表已同步" in sent_text
+
+
+def test_update_project_add_risk_defaults_to_medium_without_inference_flag():
+    with _project_registry_lock:
+        _project_registry.clear()
+    _register_project(
+        "风险默认等级项目", ["张三"], "2026-05-20", "进行中", ["文档: https://example.invalid/doc"],
+        goal="验证风险等级默认不推断", deliverables=["验收记录"],
+        app_token="app1", table_id="tbl1", record_id="rec1",
+    )
+
+    with (
+        patch("tools._append_project_doc_update", return_value=True),
+        patch("tools._append_bitable_update_record", return_value=True),
+        patch("tools._update_bitable_record", return_value=True) as update_bitable,
+        patch("tools._hermes_send", return_value=True),
+        patch("tools._save_project_state", return_value=True),
+    ):
+        result = json.loads(_handle_update_project(
+            {
+                "project_name": "风险默认等级项目",
+                "action": "add_risk",
+                "value": "支付接口联调阻塞，高风险",
+            },
+            chat_id="oc_risk_default_level",
+        ))
+
+    assert result["risk_level"] == "中"
+    update_bitable.assert_called_once_with(
+        "app1", "tbl1", "rec1", {"状态": "有风险", "风险等级": "中"},
+    )
 
 
 def test_update_project_resolves_risk_and_marks_project_active():
