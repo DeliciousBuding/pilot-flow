@@ -5649,6 +5649,46 @@ def test_card_command_dashboard_filter_updates_origin_card_after_success():
     ]
 
 
+def test_card_command_dashboard_filter_feedback_keeps_owner_scope():
+    with _project_registry_lock:
+        _project_registry.clear()
+    with _plan_lock:
+        _card_action_refs.clear()
+    _register_project(
+        "桥接张三风险筛选项目", ["张三"], "2026-05-20", "有风险", [],
+        goal="验证筛选反馈负责人", deliverables=["验收记录"],
+    )
+    action_id = _create_card_action_ref(
+        "oc_bridge_owner_filter",
+        "dashboard_filter",
+        {"query": "看看风险项目", "filter": "risk", "member_filters": ["张三"]},
+    )
+    with _plan_lock:
+        _card_action_refs[action_id]["message" + "_id"] = "om_bridge_owner_filter_origin"
+
+    marked_cards = []
+
+    def capture_mark(msg_ref, title, content, template):
+        marked_cards.append((msg_ref, title, content, template))
+        return True
+
+    with (
+        patch("tools._send_interactive_card_via_feishu", return_value="om_bridge_owner_filter_new"),
+        patch("tools._mark_card_message", side_effect=capture_mark),
+    ):
+        result = _handle_card_command(f'button {{"pilotflow_action_id":"{action_id}"}}')
+
+    assert result is None
+    assert marked_cards == [
+        (
+            "om_bridge_owner_filter_origin",
+            "看板筛选已发送",
+            "张三负责的风险项目看板已发送到群聊。",
+            "blue",
+        )
+    ]
+
+
 def test_direct_card_action_retryable_failure_keeps_action_ref_for_dashboard_filter():
     with _project_registry_lock:
         _project_registry.clear()

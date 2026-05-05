@@ -539,6 +539,7 @@ def test_verify_runtime_dashboard_navigation_is_sanitized(tmp_path, monkeypatch)
 
     assert result["dashboard_filter_sent"] is True
     assert result["dashboard_filter_scoped"] is True
+    assert result["dashboard_filter_origin_feedback_owner_scoped"] is True
     assert result["dashboard_page_sent"] is True
     assert result["dashboard_page_scoped"] is True
     assert result["dashboard_page_origin_feedback_query_named"] is True
@@ -1366,6 +1367,7 @@ def test_verifier_dashboard_navigation_mode_outputs_sanitized_runtime_result(tmp
     with patch.object(_MODULE, "_verify_runtime_dashboard_navigation", return_value={
         "dashboard_filter_sent": True,
         "dashboard_filter_scoped": True,
+        "dashboard_filter_origin_feedback_owner_scoped": True,
         "dashboard_page_sent": True,
         "dashboard_page_scoped": True,
         "dashboard_page_origin_feedback_query_named": True,
@@ -1390,6 +1392,7 @@ def test_verifier_dashboard_navigation_mode_outputs_sanitized_runtime_result(tmp
     assert output["would_send_card"] is False
     assert output["dashboard_filter_sent"] is True
     assert output["dashboard_filter_scoped"] is True
+    assert output["dashboard_filter_origin_feedback_owner_scoped"] is True
     assert output["dashboard_page_sent"] is True
     assert output["dashboard_page_scoped"] is True
     assert output["dashboard_page_origin_feedback_query_named"] is True

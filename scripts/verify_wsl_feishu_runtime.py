@@ -327,6 +327,7 @@ def _sanitize_result(result: dict[str, Any]) -> dict[str, Any]:
         "batch_followup_used_opaque_ref",
         "dashboard_filter_sent",
         "dashboard_filter_scoped",
+        "dashboard_filter_origin_feedback_owner_scoped",
         "dashboard_page_sent",
         "dashboard_page_scoped",
         "dashboard_page_origin_feedback_query_named",
@@ -4181,6 +4182,27 @@ def _verify_runtime_dashboard_navigation(hermes_dir: Path) -> dict[str, Any]:
                 {"action_value": json.dumps({"pilotflow_action_id": filter_action_id}, ensure_ascii=False)},
                 chat_id=chat_id,
             ))
+            _register_project(
+                "运行态看板张三风险项目",
+                ["张三"],
+                (today + dt.timedelta(days=3)).isoformat(),
+                "有风险",
+                ["文档: https://example.invalid/doc/dashboard-owner-risk"],
+                goal="验证安装后的负责人筛选原卡反馈",
+                deliverables=["负责人筛选验收"],
+            )
+            bridge_filter_action_id = _create_card_action_ref(
+                chat_id,
+                "dashboard_filter",
+                {"query": "看看风险项目", "filter": "risk", "member_filters": ["张三"]},
+            )
+            with _plan_lock:
+                _card_action_refs[bridge_filter_action_id]["message" + "_id"] = "om_dashboard_filter_origin"
+            bridge_filter_result = _handle_card_command(
+                f'button {{"pilotflow_action_id":"{bridge_filter_action_id}"}}'
+            )
+            with _project_registry_lock:
+                _project_registry.pop("运行态看板张三风险项目", None)
             page_action_id = _create_card_action_ref(
                 chat_id,
                 "dashboard_page",
@@ -4252,9 +4274,9 @@ def _verify_runtime_dashboard_navigation(hermes_dir: Path) -> dict[str, Any]:
             else:
                 os.environ["PILOTFLOW_STATE_PATH"] = original_state_path
 
-    filter_card_text = card_text(sent_cards[0]) if sent_cards else ""
-    page_card_text = card_text(sent_cards[1]) if len(sent_cards) > 1 else ""
     all_card_texts = [card_text(card) for card in sent_cards]
+    filter_card_text = card_text(sent_cards[0]) if sent_cards else ""
+    page_card_text = next((text for text in all_card_texts if "第 2/3 页" in text), "")
     state_detail_text = next((text for text in all_card_texts if "运行态重启分工详情项目" in text), "")
     state_default_text = next((text for text in all_card_texts if "运行态重启看板进行中项目" in text), "")
     state_archived_text = next((text for text in all_card_texts if "运行态重启看板已归档项目" in text), "")
@@ -4264,6 +4286,16 @@ def _verify_runtime_dashboard_navigation(hermes_dir: Path) -> dict[str, Any]:
             "运行态看板风险项目" in filter_card_text
             and "运行态看板第一页项目" not in filter_card_text
             and "运行态看板第二页项目" not in filter_card_text
+        ),
+        "dashboard_filter_origin_feedback_owner_scoped": (
+            bridge_filter_result is None
+            and any(
+                msg_ref == "om_dashboard_filter_origin"
+                and title == "看板筛选已发送"
+                and "张三负责的风险项目看板已发送到群聊。" == content
+                and template == "blue"
+                for msg_ref, title, content, template in marked_cards
+            )
         ),
         "dashboard_page_sent": page_data.get("status") == "dashboard_page_sent",
         "dashboard_page_scoped": (
@@ -4281,7 +4313,7 @@ def _verify_runtime_dashboard_navigation(hermes_dir: Path) -> dict[str, Any]:
                 for msg_ref, title, content, template in marked_cards
             )
         ),
-        "dashboard_cards_sent": len(sent_cards) == 6,
+        "dashboard_cards_sent": len(sent_cards) == 7,
         "dashboard_used_opaque_refs": bool(filter_action_id and page_action_id),
         "dashboard_state_detail_assignees_shown": (
             "项目详情已发送" in state_detail_result

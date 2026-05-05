@@ -1904,6 +1904,18 @@
 | 用户价值 | 用户连续点击看板分页时，原卡反馈能说明哪一页已经发送，减少多张看板卡并存时的操作歧义 |
 | 隐私处理 | 证据只记录布尔结果和脱敏结论；不写入真实会话标识、消息标识、Feishu URL、用户原始标识或凭证 |
 
+## 2026-05-05 看板筛选原卡反馈负责人范围运行态验证
+
+| 项目 | 证据 |
+| --- | --- |
+| 运行环境 | PilotFlow 已通过 `setup.py --hermes-home <wsl-hermes-home>` 同步到 WSL Hermes runtime；安装验证返回插件、技能、Hermes config 和 Feishu display 配置均 OK |
+| 本地回归 | `C:\Users\Ding\miniforge3\python.exe -m pytest -q` 返回 `321 passed`；看板筛选负责人范围反馈和 dashboard verifier 相关 targeted tests 返回 `4 passed` |
+| 功能硬化 | 用户从负责人范围简报点击看板筛选后，原卡片成功反馈现在保留负责人范围，例如 `张三负责的风险项目看板已发送到群聊。`，不再丢失筛选上下文 |
+| Verifier 新字段 | `verify_wsl_feishu_runtime.py --verify-dashboard-navigation` 在已安装的 WSL Hermes runtime 插件内返回 `dashboard_filter_origin_feedback_owner_scoped=true`，并保留 `dashboard_filter_sent=true`、`dashboard_filter_scoped=true`、`dashboard_page_origin_feedback_query_named=true`、`dashboard_state_detail_assignees_shown=true` |
+| 基线验证 | 同轮继续通过同一 Feishu venv 下 `--send-card` 的 `card_sent=true`、`card_has_initiator=true`、`pending_plan_recovered=true`，以及 `--probe-llm` 的 `llm_probe_ok=true`、`llm_probe_status=200` |
+| 用户价值 | 用户按负责人筛选项目后，原卡反馈能说明筛选范围，减少多张看板卡并存时误以为查看了全部风险项目的歧义 |
+| 隐私处理 | 证据只记录布尔结果和脱敏结论；不写入真实会话标识、消息标识、Feishu URL、用户原始标识或凭证 |
+
 ## 本地回归
 
 ```bash
