@@ -14,6 +14,19 @@
 | 用户价值 | 飞书 API、任务服务或网络短暂失败时，用户不用重新生成项目详情卡；修复后重新点击同一按钮即可继续推进真实办公动作 |
 | 隐私处理 | 验证只记录布尔结果和脱敏状态；不写入真实 chat_id、open_id、message_id、Feishu URL、token 或 app secret |
 
+## 2026-05-05 确认建项资源失败后可重试
+
+| 项目 | 证据 |
+| --- | --- |
+| 功能验证 | `confirm_project` 通过 opaque action ref 触发后，如果项目资源创建阶段整体失败，会恢复确认 action ref 和计划 gate；资源服务恢复后同一确认按钮可再次创建项目 |
+| 适用边界 | 只对 `_handle_create_project_space` 返回的“创建失败，请检查飞书应用凭证配置。”执行层错误恢复；确认成功后仍保持 action id 单次消费，重复点击仍被视为已处理/过期 |
+| 状态安全 | 第一次失败不写入项目 registry/state、不保存 Hermes memory、不清除按钮引用；第二次成功后创建项目空间、写入状态并消费 action ref |
+| 本地回归 | `C:\Users\Ding\miniforge3\python.exe -m pytest tests\test_tools.py::test_direct_card_confirm_retryable_failure_keeps_action_ref_for_project_creation -q` 返回 `1 passed`；`C:\Users\Ding\miniforge3\python.exe -m pytest` 返回 `315 passed` |
+| WSL 安装态 | `setup.py --hermes-dir D:\Code\LarkProject\hermes-agent --hermes-home \\wsl.localhost\Ubuntu-24.04\home\ding\.hermes` 通过；插件和 skill 已同步到 WSL Hermes runtime profile |
+| Verifier 结果 | `--verify-projectization-suggestion` 返回 `projectization_clarification_confirm_created=true`、`projectization_clarification_confirm_resources=true`、`projectization_clarification_confirm_state=true`、`projectization_clarification_confirm_one_shot=true`；同轮 `--send-card` 返回 `card_sent=true`，`--probe-llm` 返回 `llm_probe_ok=true`、`llm_probe_status=200` |
+| 用户价值 | 用户点击确认创建项目时，如果飞书文档/Base/待办/入口卡等资源服务临时不可用，不需要重新生成确认卡；故障恢复后可继续同一个建项闭环 |
+| 隐私处理 | 验证只记录布尔结果和脱敏状态；不写入真实 chat_id、open_id、message_id、Feishu URL、token 或 app secret |
+
 ## 2026-05-05 看板分页/筛选发卡失败后可重试
 
 | 项目 | 证据 |

@@ -4089,7 +4089,7 @@ def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
         # Feed recovered plan into create_project_space
         if recovered_plan_override:
             kwargs["_pilotflow_plan_override"] = True
-        return _handle_create_project_space({
+        create_result = _handle_create_project_space({
             "title": recovered_plan.get("title", ""),
             "goal": recovered_plan.get("goal", ""),
             "members": recovered_plan.get("members", []),
@@ -4098,6 +4098,14 @@ def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
             "deadline": recovered_plan.get("deadline", ""),
             "risks": recovered_plan.get("risks", []),
         }, **kwargs)
+        try:
+            parsed_create_result = json.loads(create_result)
+        except (TypeError, json.JSONDecodeError):
+            parsed_create_result = None
+        if isinstance(parsed_create_result, dict) and "创建失败" in str(parsed_create_result.get("error", "")):
+            _set_plan_gate(chat_id)
+            return retryable_tool_error(parsed_create_result["error"])
+        return create_result
 
     if pilotflow_action == "suggest_project_from_signals":
         input_text = action_data.get("input_text") or ""

@@ -8185,6 +8185,65 @@ def test_card_command_confirm_returns_none_after_direct_card_send():
         assert "确认桥接项目" in _project_registry
 
 
+def test_direct_card_confirm_retryable_failure_keeps_action_ref_for_project_creation():
+    with _project_registry_lock:
+        _project_registry.clear()
+    with _plan_lock:
+        _pending_plans.clear()
+        _card_action_refs.clear()
+    chat_id = "oc_confirm_retry_create"
+    with patch("tools._send_interactive_card_via_feishu", return_value=True):
+        _handle_generate_plan(
+            {
+                "input_text": "准备确认重试项目",
+                "title": "确认重试项目",
+                "goal": "验证确认创建失败后可重试",
+                "members": ["示例成员A"],
+                "deliverables": ["项目简报"],
+                "deadline": "2026-05-07",
+            },
+            chat_id=chat_id,
+        )
+
+    with _plan_lock:
+        action_id = next(
+            k for k, v in _card_action_refs.items()
+            if v["chat_id"] == chat_id and v["action"] == "confirm_project"
+        )
+
+    with (
+        patch("tools._create_doc", side_effect=[None, "https://example.invalid/doc/retry-confirm"]),
+        patch("tools._create_bitable", side_effect=[None, {
+            "url": "https://example.invalid/base/retry-confirm",
+            "app_token": "app_retry_confirm",
+            "table_id": "tbl_retry_confirm",
+            "record_id": "rec_retry_confirm",
+        }]),
+        patch("tools._create_task", side_effect=[None, "确认重试项目任务: https://example.invalid/task/retry-confirm"]),
+        patch("tools._set_permission", return_value=True),
+        patch("tools._add_editors", return_value=True),
+        patch("tools._create_calendar_event", return_value=""),
+        patch("tools._schedule_deadline_reminder", return_value=False),
+        patch("tools._hermes_send_card", side_effect=[None, "om_retry_confirm_entry"]),
+        patch("tools._hermes_send", return_value=True),
+        patch("tools._save_to_hermes_memory", return_value=True),
+    ):
+        first = json.loads(_handle_card_action(
+            {"action_value": json.dumps({"pilotflow_action_id": action_id}, ensure_ascii=False)},
+            chat_id="ignored_chat",
+        ))
+        second = json.loads(_handle_card_action(
+            {"action_value": json.dumps({"pilotflow_action_id": action_id}, ensure_ascii=False)},
+            chat_id="ignored_chat",
+        ))
+
+    assert "创建失败" in first["error"]
+    assert second["status"] == "project_space_created"
+    assert second["title"] == "确认重试项目"
+    with _plan_lock:
+        assert action_id not in _card_action_refs
+
+
 def test_old_card_confirm_uses_its_own_plan_snapshot():
     with _project_registry_lock:
         _project_registry.clear()
