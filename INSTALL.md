@@ -277,3 +277,32 @@ Windows PowerShell:
 ```powershell
 Invoke-RestMethod "$env:OPENAI_BASE_URL/models" -Headers @{ Authorization = "Bearer $env:OPENAI_API_KEY" }
 ```
+
+## 群聊订阅模式（可选）
+
+PilotFlow 默认需要 @bot 才触发。开启订阅模式后，群里所有消息都会进入 Hermes Agent，PilotFlow 可主动识别项目讨论并冒泡建议。
+
+### 适用场景
+
+- 课程项目讨论群：散落目标/承诺/风险时主动建议项目化
+- 小团队协作群：聊天讨论直接沉淀成结构化交付物
+- 站会群：识别新承诺并建议更新项目状态
+
+### 配置
+
+在 `~/.hermes/config.yaml` 给目标群加 `require_mention: false`：
+
+```yaml
+feishu:
+  group_rules:
+    oc_你的群chat_id:     # 在飞书群设置里查看群 chat_id
+      policy: open
+      require_mention: false   # 群内所有消息进 Agent，不需要 @
+    oc_其他群chat_id:
+      policy: allowlist
+      require_mention: true    # 其他群保持 @ 才触发
+```
+
+重启 `hermes gateway` 生效。详细说明见 [CONTEXT_SUBSCRIPTION_SPIKE.md](docs/CONTEXT_SUBSCRIPTION_SPIKE.md)。
+
+> ⚠️ 纯闲聊群不建议开启，每条消息都会触发 LLM 推理，成本高且可能刷屏。

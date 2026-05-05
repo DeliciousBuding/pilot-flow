@@ -162,11 +162,16 @@ uv run hermes gateway
 
 | 文档 | 说明 |
 | --- | --- |
-| [安装指南](INSTALL.md) | 安装步骤 |
+| [安装指南](INSTALL.md) | 安装步骤 + 群聊订阅模式配置 |
+| [用户指南](docs/USER_GUIDE.md) | 我能问什么？指令样例 + 常见问题 |
 | [产品规格](docs/PRODUCT_SPEC.md) | 用户承诺、功能分级 |
 | [架构设计](docs/ARCHITECTURE.md) | 组件、状态模型、工具路由 |
 | [复赛材料](docs/CONTEST_SUBMISSION.md) | 答辩定位、演示路线、证据矩阵 |
 | [真实测试证据](docs/LIVE_TEST_EVIDENCE.md) | 脱敏记录真实 Feishu 测试结果 |
+| [交付审计](docs/DELIVERY_AUDIT.md) | 需求、证据、缺口审计 |
+| [上下文订阅研究](docs/CONTEXT_SUBSCRIPTION_SPIKE.md) | 群聊非 @ 消息订阅可行性 |
+| [个人进度](PERSONAL_PROGRESS.md) | 开发进度和验证结果 |
+| [贡献指南](CONTRIBUTING.md) | 开发环境、代码规范、提交 PR |
 | [交付审计](docs/DELIVERY_AUDIT.md) | 需求、证据、缺口的完整审计清单 |
 | [个人进度](PERSONAL_PROGRESS.md) | 开发进度和验证结果 |
 | [贡献指南](CONTRIBUTING.md) | 开发环境、代码规范、提交 PR |
