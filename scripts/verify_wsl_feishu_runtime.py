@@ -148,6 +148,9 @@ def _sanitize_result(result: dict[str, Any]) -> dict[str, Any]:
         "projectization_clarification_no_card",
         "projectization_clarification_no_pending",
         "projectization_clarification_no_gate",
+        "projectization_clarification_followup_plan_sent",
+        "projectization_clarification_followup_pending",
+        "projectization_clarification_followup_gate",
         "project_create_gate_created",
         "project_create_confirmed",
         "project_create_doc_created",
@@ -602,6 +605,7 @@ def _verify_runtime_projectization_suggestion(hermes_dir: Path) -> dict[str, Any
     import plugins.pilotflow.tools as runtime_tools  # pylint: disable=import-error
     from plugins.pilotflow.tools import (  # pylint: disable=import-error
         _card_action_refs,
+        _clear_plan_gate,
         _handle_card_action,
         _handle_generate_plan,
         _handle_scan_chat_signals,
@@ -675,21 +679,36 @@ def _verify_runtime_projectization_suggestion(hermes_dir: Path) -> dict[str, Any
                     chat_id=chat_id,
                 ))
             recovered_pending = _load_pending_plan(chat_id) or {}
+            suggestion_card_count = len(sent_cards)
             with _plan_lock:
                 _pending_plans.clear()
                 _card_action_refs.clear()
             sent_cards_before_clarification = len(sent_cards)
-            clarification_chat_id = f"{chat_id}_clarify"
+            _clear_plan_gate(chat_id)
             os.environ["PILOTFLOW_STATE_PATH"] = str(Path(tmpdir) / "pilotflow_clarification_state.json")
             clarification = json.loads(_handle_generate_plan(
                 {"input_text": "帮我推进客户上线"},
-                chat_id=clarification_chat_id,
+                chat_id=chat_id,
                 chat_type="group",
             ))
-            clarification_pending = _load_pending_plan(clarification_chat_id) or {}
+            clarification_pending = _load_pending_plan(chat_id) or {}
             with _plan_lock:
-                clarification_in_memory = clarification_chat_id in _pending_plans
-            clarification_gate_active = _check_plan_gate(clarification_chat_id)
+                clarification_in_memory = chat_id in _pending_plans
+            clarification_gate_active = _check_plan_gate(chat_id)
+            sent_cards_after_clarification = len(sent_cards)
+            followup = json.loads(_handle_generate_plan(
+                {
+                    "input_text": "项目名称是运行态澄清后项目，目标是完成客户上线，交付物包括上线清单，截止时间是2026-05-20",
+                    "title": "运行态澄清后项目",
+                    "goal": "完成客户上线",
+                    "deliverables": ["上线清单"],
+                    "deadline": "2026-05-20",
+                },
+                chat_id=chat_id,
+                chat_type="group",
+            ))
+            clarification_followup_pending = _load_pending_plan(chat_id) or {}
+            clarification_followup_gate_active = _check_plan_gate(chat_id)
         finally:
             runtime_tools._hermes_send_card = original_send_card
             runtime_tools._hermes_send = original_send
@@ -722,15 +741,24 @@ def _verify_runtime_projectization_suggestion(hermes_dir: Path) -> dict[str, Any
             and "open_id" in str(suggested_props.get("deliverable_assignees", {}).get("description", ""))
         ),
         "projectization_pending_recovered": bool(recovered_plan),
-        "projectization_cards_sent": len(sent_cards) == 2,
+        "projectization_cards_sent": suggestion_card_count == 2,
         "projectization_clarification_sent": (
             clarification.get("status") == "needs_clarification"
             and clarification.get("clarification_sent") is True
             and any("项目名称、目标、交付物、截止时间" in text for text in sent_messages)
         ),
-        "projectization_clarification_no_card": len(sent_cards) == sent_cards_before_clarification,
+        "projectization_clarification_no_card": sent_cards_after_clarification == sent_cards_before_clarification,
         "projectization_clarification_no_pending": not clarification_pending and not clarification_in_memory,
         "projectization_clarification_no_gate": clarification_gate_active is False,
+        "projectization_clarification_followup_plan_sent": (
+            followup.get("status") == "plan_generated"
+            and followup.get("card_sent") is True
+            and len(sent_cards) == sent_cards_before_clarification + 1
+        ),
+        "projectization_clarification_followup_pending": (
+            clarification_followup_pending.get("plan", {}).get("title") == "运行态澄清后项目"
+        ),
+        "projectization_clarification_followup_gate": clarification_followup_gate_active is True,
     }
 
 

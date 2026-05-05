@@ -1466,6 +1466,61 @@ def test_generate_plan_requires_structured_fields_by_default():
     }]
 
 
+def test_generate_plan_accepts_structured_followup_after_clarification(monkeypatch):
+    sent_messages = []
+    sent_cards = []
+
+    def fake_send(chat_id, text):
+        sent_messages.append({"chat_id": chat_id, "text": text})
+        return True
+
+    def fake_send_card(chat_id, card):
+        sent_cards.append({"chat_id": chat_id, "card": card})
+        return "om_followup_plan"
+
+    chat_id = "oc_structured_followup"
+    with _plan_lock:
+        _pending_plans.clear()
+        _card_action_refs.clear()
+    _clear_plan_gate(chat_id)
+
+    with (
+        patch("tools._hermes_send", side_effect=fake_send),
+        patch("tools._hermes_send_card", side_effect=fake_send_card),
+    ):
+        clarification = json.loads(_handle_generate_plan(
+            {"input_text": "帮我推进客户上线"},
+            chat_id=chat_id,
+            chat_type="group",
+        ))
+        followup = json.loads(_handle_generate_plan(
+            {
+                "input_text": "项目名称是客户上线推进，目标是完成上线准备，交付物包括上线清单，截止时间是2026-05-20",
+                "title": "客户上线推进",
+                "goal": "完成上线准备",
+                "deliverables": ["上线清单"],
+                "deadline": "2026-05-20",
+            },
+            chat_id=chat_id,
+            chat_type="group",
+        ))
+
+    assert clarification["status"] == "needs_clarification"
+    assert followup["status"] == "plan_generated"
+    assert followup["card_sent"] is True
+    assert sent_cards and sent_cards[0]["chat_id"] == chat_id
+    assert _check_plan_gate(chat_id) is True
+    assert _pending_plans[chat_id]["plan"]["title"] == "客户上线推进"
+    assert _pending_plans[chat_id]["plan"]["deadline"] == "2026-05-20"
+    assert sent_messages == [{
+        "chat_id": chat_id,
+        "text": (
+            "我需要再确认几个字段，才能生成可执行的项目计划：项目名称、目标、交付物、截止时间。\n"
+            "请直接补充这些信息，例如：项目名称是...，目标是...，交付物包括...，截止时间是..."
+        ),
+    }]
+
+
 def test_generate_plan_uses_session_chat_and_initiator_context():
     import datetime
     import types
