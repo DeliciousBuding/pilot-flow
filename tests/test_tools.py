@@ -2118,6 +2118,35 @@ def test_create_project_does_not_report_entry_card_when_card_send_fails():
     assert "⚠️ 项目入口卡片未发送" in result["display"]
 
 
+def test_update_project_rejects_unknown_action_without_side_effects():
+    with _project_registry_lock:
+        _project_registry.clear()
+    _register_project(
+        "未知动作保护项目",
+        ["张三"],
+        "2026-05-20",
+        "进行中",
+        [],
+        goal="验证未知动作保护",
+        deliverables=["验收记录"],
+    )
+
+    sent_messages = []
+    with patch("tools._hermes_send", side_effect=lambda chat_id, text: sent_messages.append((chat_id, text)) or True):
+        result = json.loads(_handle_update_project(
+            {
+                "project_name": "未知动作保护项目",
+                "action": "rename_project",
+                "value": "误传的新项目名",
+            },
+            chat_id="oc_unknown_update_action",
+        ))
+
+    assert "error" in result
+    assert "不支持的项目更新操作" in result["error"]
+    assert sent_messages == []
+
+
 def test_create_project_uses_structured_deliverable_assignees():
     chat_id = "oc_create_assignments"
     created_tasks = []

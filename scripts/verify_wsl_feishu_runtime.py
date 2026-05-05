@@ -214,6 +214,7 @@ def _sanitize_result(result: dict[str, Any]) -> dict[str, Any]:
         "update_task_state_assignee_used",
         "update_task_state_assignee_persisted",
         "update_task_state_internal_id_rejected",
+        "update_task_unknown_action_rejected",
         "archive_gate_required",
         "archive_gate_no_write",
         "archive_gate_confirmed",
@@ -1984,6 +1985,21 @@ def _verify_runtime_update_task_summary(hermes_dir: Path) -> dict[str, Any]:
             },
             chat_id=chat_id,
         ))
+        unknown_action_message_count = len(sent_messages)
+        unknown_action_task_count = len(task_calls)
+        unknown_action_data = json.loads(_handle_update_project(
+            {
+                "project_name": "运行态交付物",
+                "action": "rename_project",
+                "value": "误传的新项目名",
+            },
+            chat_id=chat_id,
+        ))
+        unknown_action_rejected = (
+            "error" in unknown_action_data
+            and len(sent_messages) == unknown_action_message_count
+            and len(task_calls) == unknown_action_task_count
+        )
         with _project_registry_lock:
             project = _project_registry["运行态交付物验证项目"]
             artifacts = list(project.get("artifacts", []))
@@ -2093,6 +2109,9 @@ def _verify_runtime_update_task_summary(hermes_dir: Path) -> dict[str, Any]:
         "update_task_state_internal_id_rejected": (
             "error" in internal_data
             and not any(len(call) >= 1 and call[0] == "运行态内部待办" for call in state_task_calls)
+        ),
+        "update_task_unknown_action_rejected": (
+            unknown_action_rejected
         ),
     }
 

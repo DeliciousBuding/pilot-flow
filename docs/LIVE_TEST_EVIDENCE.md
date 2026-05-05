@@ -1973,6 +1973,17 @@
 | 用户价值 | 用户不会在入口卡片未送达时误以为群成员已经收到入口消息；反馈能区分资源创建成功与入口通知失败，便于后续重试或人工补发 |
 | 隐私处理 | 证据只记录布尔结果和脱敏结论；不写入真实会话标识、消息标识、Feishu URL、用户原始标识或凭证 |
 
+## 2026-05-05 项目更新未知动作防误报运行态验证
+
+| 项目 | 证据 |
+| --- | --- |
+| 本地回归 | `C:\Users\Ding\miniforge3\python.exe -m pytest -q` 返回 `323 passed`；未知更新动作防误报和 update-task verifier 相关 targeted tests 返回 `3 passed` |
+| 功能硬化 | `pilotflow_update_project` 现在会在运行时拒绝 schema 之外的更新动作，不再把 Agent 调用漂移或动作名拼写错误误报为“项目已更新” |
+| Verifier 新字段 | `verify_wsl_feishu_runtime.py --verify-update-task` 在已安装的 WSL Hermes runtime 插件内返回 `update_task_unknown_action_rejected=true`，并保留 `update_task_created=true`、`update_task_feedback_includes_summary=true`、`update_task_state_internal_id_rejected=true` |
+| 基线验证 | 同轮继续通过同一 Feishu venv 下 `--send-card` 的 `card_sent=true`、`card_has_initiator=true`、`pending_plan_recovered=true`，以及 `--probe-llm` 的 `llm_probe_ok=true`、`llm_probe_status=200` |
+| 用户价值 | 当 Hermes Agent 或旧客户端传入不支持的更新动作时，PilotFlow 不会发送误导性的群聊成功反馈，也不会创建飞书任务或写入项目状态，避免真实办公数据被“假成功”污染 |
+| 隐私处理 | 证据只记录布尔结果和脱敏结论；不写入真实会话标识、消息标识、Feishu URL、用户原始标识或凭证 |
+
 ## 本地回归
 
 ```bash

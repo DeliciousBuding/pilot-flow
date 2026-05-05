@@ -5308,11 +5308,20 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
     value = params.get("value", "")
     chat_id = _get_chat_id(kwargs)
     chat_scope = _get_chat_scope(kwargs)
+    supported_actions = {
+        "update_deadline", "add_member", "remove_member", "add_deliverable",
+        "add_progress", "add_risk", "resolve_risk", "update_status", "send_reminder",
+    }
 
     if not project_name:
         return tool_error("请指定项目名称")
     if not action or not value:
         return tool_error("请指定操作类型和新值")
+    if action not in supported_actions:
+        return tool_error(
+            "不支持的项目更新操作。请使用 update_deadline、add_member、remove_member、"
+            "add_deliverable、add_progress、add_risk、resolve_risk、update_status 或 send_reminder。"
+        )
     if action in ("add_member", "remove_member"):
         value = _clean_member_update_value(value)
 

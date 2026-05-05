@@ -239,6 +239,7 @@ def test_verify_runtime_update_task_summary_is_sanitized(tmp_path, monkeypatch):
     assert result["update_task_state_assignee_used"] is True
     assert result["update_task_state_assignee_persisted"] is True
     assert result["update_task_state_internal_id_rejected"] is True
+    assert result["update_task_unknown_action_rejected"] is True
     assert "example.invalid" not in json.dumps(result, ensure_ascii=False)
 
 
@@ -570,6 +571,7 @@ def test_verifier_update_task_mode_outputs_sanitized_runtime_result(tmp_path, ca
         "update_task_state_assignee_used": True,
         "update_task_state_assignee_persisted": True,
         "update_task_state_internal_id_rejected": True,
+        "update_task_unknown_action_rejected": True,
         "raw_task_url": "https://example.invalid/task/1",
     }):
         exit_code = _MODULE.main([
@@ -592,6 +594,7 @@ def test_verifier_update_task_mode_outputs_sanitized_runtime_result(tmp_path, ca
     assert output["update_task_state_assignee_used"] is True
     assert output["update_task_state_assignee_persisted"] is True
     assert output["update_task_state_internal_id_rejected"] is True
+    assert output["update_task_unknown_action_rejected"] is True
     assert "oc_real_chat_id" not in output_text
     assert "example.invalid" not in output_text
 
