@@ -2545,6 +2545,31 @@ def _append_project_doc_update(project_name: str, project: dict, action_label: s
     return _append_doc_update(doc_url, markdown)
 
 
+def _append_project_doc_resource_index(
+    doc_url: str,
+    bitable_url: str = "",
+    task_artifacts: Optional[list[str]] = None,
+    calendar_result: str = "",
+    reminder_job: bool = False,
+) -> bool:
+    """Append post-creation resource links to the project document."""
+    if not doc_url:
+        return False
+    lines = ["## 协作资源"]
+    if bitable_url:
+        lines.append(f"- 状态表: {bitable_url}")
+    for task in task_artifacts or []:
+        if task:
+            lines.append(f"- 待办: {task}")
+    if calendar_result:
+        lines.append(f"- 日历: {calendar_result}")
+    if reminder_job:
+        lines.append("- 截止提醒: 已设置")
+    if len(lines) == 1:
+        return False
+    return _append_doc_update(doc_url, "\n".join(lines) + "\n")
+
+
 def _create_task(summary: str, description: str,
                  assignee_name: str = "", deadline: str = "",
                  chat_id: str = "", collaborator_names: Optional[list[str]] = None) -> Optional[str]:
@@ -3766,6 +3791,7 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
         artifacts.append(f"多维表格: {bitable_url}")
 
     # 3. Create tasks (lark_oapi) — with assignee + deadline
+    task_artifacts = []
     if deliverables:
         created_tasks = 0
         max_tasks = 10
@@ -3774,6 +3800,7 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
             task_name = _create_task(d, f"项目: {title}", assignee, deadline, chat_id, members)
             if task_name:
                 artifacts.append(f"任务: {task_name}")
+                task_artifacts.append(task_name)
                 created_tasks += 1
         if len(deliverables) > max_tasks:
             logger.warning("deliverables capped: %d -> %d tasks created", len(deliverables), created_tasks)
@@ -3787,6 +3814,13 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
         reminder_job = _schedule_deadline_reminder(title, deadline, chat_id)
         if reminder_job:
             artifacts.append("截止提醒已设置")
+    _append_project_doc_resource_index(
+        doc_url,
+        bitable_url or "",
+        task_artifacts,
+        cal_result or "",
+        reminder_job,
+    )
 
     # 5. Send entry card (via Hermes) — interactive card with clickable links
     link_lines = []

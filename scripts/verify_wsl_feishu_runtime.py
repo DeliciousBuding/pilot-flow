@@ -169,6 +169,7 @@ def _sanitize_result(result: dict[str, Any]) -> dict[str, Any]:
         "project_create_doc_created",
         "project_create_doc_initiator_shown",
         "project_create_doc_assignees_shown",
+        "project_create_doc_resource_index_appended",
         "project_create_bitable_created",
         "project_create_task_created",
         "project_create_structured_assignees_used",
@@ -1153,6 +1154,7 @@ def _verify_runtime_project_creation(hermes_dir: Path) -> dict[str, Any]:
     original_create_task = runtime_tools._create_task
     original_create_calendar = runtime_tools._create_calendar_event
     original_schedule_reminder = runtime_tools._schedule_deadline_reminder
+    original_append_doc = runtime_tools._append_doc_update
     original_save_memory = runtime_tools._save_to_hermes_memory
     original_send_card = runtime_tools._hermes_send_card
     created_docs: list[tuple[str, str, str]] = []
@@ -1160,6 +1162,7 @@ def _verify_runtime_project_creation(hermes_dir: Path) -> dict[str, Any]:
     created_tasks: list[tuple[str, str, str, str, str, list[str]]] = []
     created_calendars: list[tuple[str, str, str, list[str], str]] = []
     scheduled_reminders: list[tuple[str, str, str]] = []
+    appended_docs: list[tuple[str, str]] = []
     saved_memory: list[tuple[str, str, list[str], list[str], str, dict[str, str]]] = []
     sent_cards: list[dict[str, Any]] = []
 
@@ -1208,6 +1211,10 @@ def _verify_runtime_project_creation(hermes_dir: Path) -> dict[str, Any]:
         scheduled_reminders.append((title, deadline, target_chat_id))
         return True
 
+    def fake_append_doc(doc_url: str, markdown_content: str) -> bool:
+        appended_docs.append((doc_url, markdown_content))
+        return True
+
     def fake_save_memory(
         title: str,
         goal: str,
@@ -1235,6 +1242,7 @@ def _verify_runtime_project_creation(hermes_dir: Path) -> dict[str, Any]:
         runtime_tools._create_task = fake_create_task
         runtime_tools._create_calendar_event = fake_create_calendar
         runtime_tools._schedule_deadline_reminder = fake_schedule_reminder
+        runtime_tools._append_doc_update = fake_append_doc
         runtime_tools._save_to_hermes_memory = fake_save_memory
         runtime_tools._hermes_send_card = fake_send_card
         try:
@@ -1272,6 +1280,7 @@ def _verify_runtime_project_creation(hermes_dir: Path) -> dict[str, Any]:
             runtime_tools._create_task = original_create_task
             runtime_tools._create_calendar_event = original_create_calendar
             runtime_tools._schedule_deadline_reminder = original_schedule_reminder
+            runtime_tools._append_doc_update = original_append_doc
             runtime_tools._save_to_hermes_memory = original_save_memory
             runtime_tools._hermes_send_card = original_send_card
             with _plan_lock:
@@ -1321,6 +1330,15 @@ def _verify_runtime_project_creation(hermes_dir: Path) -> dict[str, Any]:
         and "## 发起人\n王小明" in created_docs[0][1],
         "project_create_doc_assignees_shown": bool(created_docs)
         and "## 负责人\n- 验收清单 → 李四\n- 上线演练 → 张三" in created_docs[0][1],
+        "project_create_doc_resource_index_appended": appended_docs == [(
+            "https://example.invalid/doc/project-create",
+            "## 协作资源\n"
+            "- 状态表: https://example.invalid/base/project-create\n"
+            "- 待办: 验收清单: https://example.invalid/task/project-create\n"
+            "- 待办: 上线演练: https://example.invalid/task/project-create\n"
+            "- 日历: 日历事件: 2026-05-20\n"
+            "- 截止提醒: 已设置\n",
+        )],
         "project_create_bitable_created": created_bitables == [(
             "运行态项目创建闭环项目",
             "张三, 李四",

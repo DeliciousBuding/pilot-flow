@@ -2240,6 +2240,62 @@ def test_create_project_calendar_event_invites_project_members():
     assert "📅 日历提醒已创建" in result["display"]
 
 
+def test_create_project_appends_resource_index_to_project_doc():
+    chat_id = "oc_project_doc_resources"
+    with _project_registry_lock:
+        _project_registry.clear()
+    with _plan_lock:
+        _pending_plans.clear()
+        _card_action_refs.clear()
+    appended_docs = []
+
+    def fake_append_doc(doc_url, markdown_content):
+        appended_docs.append((doc_url, markdown_content))
+        return True
+
+    with (
+        patch("tools._consume_plan_gate", return_value=True),
+        patch("tools._create_doc", return_value="https://example.invalid/docx/doc_resources"),
+        patch("tools._create_bitable", return_value={
+            "url": "https://example.invalid/base/resources",
+            "app_token": "app1",
+            "table_id": "tbl1",
+            "record_id": "rec1",
+        }),
+        patch("tools._create_task", side_effect=[
+            "验收清单: https://example.invalid/task/checklist",
+            "上线演练: https://example.invalid/task/rehearsal",
+        ]),
+        patch("tools._create_calendar_event", return_value="日历事件: 2026-05-20；已邀请 2 位成员"),
+        patch("tools._schedule_deadline_reminder", return_value=True),
+        patch("tools._append_doc_update", side_effect=fake_append_doc),
+        patch("tools._hermes_send_card", return_value="om_entry"),
+        patch("tools._save_to_hermes_memory", return_value=True),
+    ):
+        result = json.loads(_handle_create_project_space(
+            {
+                "confirmation_text": "确认执行",
+                "title": "文档资源索引项目",
+                "goal": "验证项目文档回填资源入口",
+                "members": ["张三", "李四"],
+                "deliverables": ["验收清单", "上线演练"],
+                "deadline": "2026-05-20",
+            },
+            chat_id=chat_id,
+        ))
+
+    assert result["status"] == "project_space_created"
+    assert appended_docs == [(
+        "https://example.invalid/docx/doc_resources",
+        "## 协作资源\n"
+        "- 状态表: https://example.invalid/base/resources\n"
+        "- 待办: 验收清单: https://example.invalid/task/checklist\n"
+        "- 待办: 上线演练: https://example.invalid/task/rehearsal\n"
+        "- 日历: 日历事件: 2026-05-20；已邀请 2 位成员\n"
+        "- 截止提醒: 已设置\n",
+    )]
+
+
 def test_create_project_returns_redacted_flight_record():
     chat_id = "oc_create_trace"
     with _project_registry_lock:

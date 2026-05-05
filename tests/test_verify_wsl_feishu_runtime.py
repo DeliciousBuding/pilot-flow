@@ -166,6 +166,7 @@ def test_verify_runtime_project_creation_is_sanitized(tmp_path, monkeypatch):
     assert result["project_create_doc_created"] is True
     assert result["project_create_doc_initiator_shown"] is True
     assert result["project_create_doc_assignees_shown"] is True
+    assert result["project_create_doc_resource_index_appended"] is True
     assert result["project_create_bitable_created"] is True
     assert result["project_create_task_created"] is True
     assert result["project_create_structured_assignees_used"] is True
@@ -594,6 +595,7 @@ def test_verifier_project_creation_mode_outputs_sanitized_runtime_result(tmp_pat
         "project_create_doc_created": True,
         "project_create_doc_initiator_shown": True,
         "project_create_doc_assignees_shown": True,
+        "project_create_doc_resource_index_appended": True,
         "project_create_bitable_created": True,
         "project_create_task_created": True,
         "project_create_structured_assignees_used": True,
@@ -629,6 +631,7 @@ def test_verifier_project_creation_mode_outputs_sanitized_runtime_result(tmp_pat
     assert output["project_create_doc_created"] is True
     assert output["project_create_doc_initiator_shown"] is True
     assert output["project_create_doc_assignees_shown"] is True
+    assert output["project_create_doc_resource_index_appended"] is True
     assert output["project_create_bitable_created"] is True
     assert output["project_create_task_created"] is True
     assert output["project_create_structured_assignees_used"] is True
