@@ -8216,6 +8216,49 @@ def test_direct_card_action_retryable_failure_keeps_action_ref_for_followup_task
         assert action_id not in _card_action_refs
 
 
+def test_card_command_followup_task_feedback_includes_task_name():
+    with _project_registry_lock:
+        _project_registry.clear()
+    with _plan_lock:
+        _card_action_refs.clear()
+    _register_project(
+        "反馈待办项目", ["张三"], "2026-05-10", "进行中", [],
+        goal="验证待办反馈", deliverables=["验收记录"],
+    )
+    action_id = _create_card_action_ref(
+        "oc_followup_feedback",
+        "create_followup_task",
+        {"title": "反馈待办项目"},
+    )
+    with _plan_lock:
+        _card_action_refs[action_id]["message" + "_id"] = "om_followup_feedback"
+
+    marked_cards = []
+
+    def capture_mark(msg_ref, title, content, template):
+        marked_cards.append((msg_ref, title, content, template))
+        return True
+
+    with (
+        patch("tools._create_task", return_value="反馈待办项目跟进: https://example.invalid/task/followup-feedback"),
+        patch("tools._mark_card_message", side_effect=capture_mark),
+        patch("tools._hermes_send", return_value=True),
+        patch("tools._append_project_doc_update", return_value=True),
+        patch("tools._append_bitable_update_record", return_value=True),
+    ):
+        result = _handle_card_command(f'button {{"pilotflow_action_id":"{action_id}"}}')
+
+    assert result is None
+    assert marked_cards == [
+        (
+            "om_followup_feedback",
+            "待办已创建",
+            "**反馈待办项目** 的跟进待办已创建：反馈待办项目跟进。",
+            "green",
+        )
+    ]
+
+
 def test_direct_card_action_retryable_failure_keeps_action_ref_for_dashboard_followup_task():
     with _project_registry_lock:
         _project_registry.clear()

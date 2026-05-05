@@ -264,6 +264,7 @@ def test_verify_runtime_followup_task_is_sanitized(tmp_path, monkeypatch):
 
     assert result["followup_task_created"] is True
     assert result["followup_task_feedback_sent"] is True
+    assert result["followup_task_origin_feedback_named"] is True
     assert result["followup_task_artifact_recorded"] is True
     assert result["followup_task_public_update_recorded"] is True
     assert result["followup_task_state_assignee_used"] is True
@@ -701,6 +702,7 @@ def test_verifier_followup_task_mode_outputs_sanitized_runtime_result(tmp_path, 
     with patch.object(_MODULE, "_verify_runtime_followup_task", return_value={
         "followup_task_created": True,
         "followup_task_feedback_sent": True,
+        "followup_task_origin_feedback_named": True,
         "followup_task_artifact_recorded": True,
         "followup_task_public_update_recorded": True,
         "followup_task_state_assignee_used": True,
@@ -720,6 +722,7 @@ def test_verifier_followup_task_mode_outputs_sanitized_runtime_result(tmp_path, 
     assert output["would_send_card"] is False
     assert output["followup_task_created"] is True
     assert output["followup_task_feedback_sent"] is True
+    assert output["followup_task_origin_feedback_named"] is True
     assert output["followup_task_artifact_recorded"] is True
     assert output["followup_task_public_update_recorded"] is True
     assert output["followup_task_state_assignee_used"] is True

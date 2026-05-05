@@ -223,6 +223,7 @@ def _sanitize_result(result: dict[str, Any]) -> dict[str, Any]:
         "archive_state_feedback_sent",
         "followup_task_created",
         "followup_task_feedback_sent",
+        "followup_task_origin_feedback_named",
         "followup_task_artifact_recorded",
         "followup_task_public_update_recorded",
         "followup_task_state_assignee_used",
@@ -1136,6 +1137,7 @@ def _verify_runtime_project_creation(hermes_dir: Path) -> dict[str, Any]:
     import plugins.pilotflow.tools as runtime_tools  # pylint: disable=import-error
     from plugins.pilotflow.tools import (  # pylint: disable=import-error
         _card_action_refs,
+        _handle_card_command,
         _create_card_action_ref,
         _handle_card_action,
         _handle_create_project_space,
@@ -1892,7 +1894,9 @@ def _verify_runtime_update_task_summary(hermes_dir: Path) -> dict[str, Any]:
     original_refs_path = os.environ.get("PILOTFLOW_PROJECT_REFS_PATH")
     original_create_task = runtime_tools._create_task
     original_send = runtime_tools._hermes_send
+    original_mark = runtime_tools._mark_card_message
     sent_messages: list[str] = []
+    marked_cards: list[tuple[str, str, str, str]] = []
     task_calls: list[tuple[Any, ...]] = []
 
     def fake_create_task(*args: Any, **_kwargs: Any) -> str:
@@ -2195,6 +2199,7 @@ def _verify_runtime_followup_task(hermes_dir: Path) -> dict[str, Any]:
         _card_action_refs,
         _create_card_action_ref,
         _handle_card_action,
+        _handle_card_command,
         _load_project_state,
         _plan_lock,
         _project_registry,
@@ -2207,7 +2212,9 @@ def _verify_runtime_followup_task(hermes_dir: Path) -> dict[str, Any]:
     original_state_path = os.environ.get("PILOTFLOW_STATE_PATH")
     original_create_task = runtime_tools._create_task
     original_send = runtime_tools._hermes_send
+    original_mark = runtime_tools._mark_card_message
     sent_messages: list[str] = []
+    marked_cards: list[tuple[str, str, str, str]] = []
     task_calls: list[tuple[Any, ...]] = []
 
     def fake_create_task(*args: Any, **_kwargs: Any) -> str:
@@ -2218,12 +2225,17 @@ def _verify_runtime_followup_task(hermes_dir: Path) -> dict[str, Any]:
         sent_messages.append(text)
         return True
 
+    def fake_mark(msg_ref: str, title: str, content: str, template: str) -> bool:
+        marked_cards.append((msg_ref, title, content, template))
+        return True
+
     with tempfile.TemporaryDirectory(prefix="pilotflow-followup-verify-") as tmpdir:
         os.environ["PILOTFLOW_STATE_PATH"] = str(Path(tmpdir) / "pilotflow_state.json")
         with _project_registry_lock:
             _project_registry.clear()
         runtime_tools._create_task = fake_create_task
         runtime_tools._hermes_send = fake_send
+        runtime_tools._mark_card_message = fake_mark
         try:
             _register_project(
                 "运行态详情跟进项目",
@@ -2273,9 +2285,18 @@ def _verify_runtime_followup_task(hermes_dir: Path) -> dict[str, Any]:
                 },
                 chat_id=chat_id,
             ))
+            bridge_action_id = _create_card_action_ref(
+                chat_id,
+                "create_followup_task",
+                {"title": "运行态详情跟进项目"},
+            )
+            with _plan_lock:
+                _card_action_refs[bridge_action_id]["message" + "_id"] = "om_followup_origin"
+            bridge_result = _handle_card_command(f'button {{"pilotflow_action_id":"{bridge_action_id}"}}')
         finally:
             runtime_tools._create_task = original_create_task
             runtime_tools._hermes_send = original_send
+            runtime_tools._mark_card_message = original_mark
             with _project_registry_lock:
                 _project_registry.clear()
             if original_state_path is None:
@@ -2291,6 +2312,17 @@ def _verify_runtime_followup_task(hermes_dir: Path) -> dict[str, Any]:
     return {
         "followup_task_created": data.get("status") == "project_followup_task_created" and data.get("task_created") is True,
         "followup_task_feedback_sent": any("运行态详情跟进" in msg for msg in sent_messages),
+        "followup_task_origin_feedback_named": (
+            bridge_result is None
+            and any(
+                msg_ref == "om_followup_origin"
+                and title == "待办已创建"
+                and "运行态详情跟进" in content
+                and "example.invalid" not in content
+                and template == "green"
+                for msg_ref, title, content, template in marked_cards
+            )
+        ),
         "followup_task_artifact_recorded": any(item.startswith("任务: 运行态详情跟进") for item in artifacts),
         "followup_task_public_update_recorded": any(
             item.get("action") == "任务" and item.get("value") == "运行态详情跟进"
