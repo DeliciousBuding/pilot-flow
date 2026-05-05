@@ -3771,7 +3771,58 @@ def test_card_command_briefing_followup_feedback_includes_owner_scope():
         (
             "om_bridge_owner_followup",
             "批量待办已创建",
-            "已为 1 个张三负责的风险项目创建跟进待办。",
+            "已为 1 个张三负责的风险项目创建跟进待办：桥接张三风险待办项目。",
+            "green",
+        )
+    ]
+
+
+def test_card_command_briefing_followup_feedback_lists_projects():
+    with _project_registry_lock:
+        _project_registry.clear()
+    with _plan_lock:
+        _card_action_refs.clear()
+    overdue = (dt.date.today() - dt.timedelta(days=1)).isoformat()
+    _register_project(
+        "桥接逾期待办A", ["张三"], overdue, "进行中", [],
+        goal="验证批量反馈项目名", deliverables=["验收记录"],
+    )
+    _register_project(
+        "桥接逾期待办B", ["李四"], overdue, "进行中", [],
+        goal="验证批量反馈项目名", deliverables=["验收记录"],
+    )
+    action_id = _create_card_action_ref(
+        "oc_bridge_followup_projects",
+        "briefing_batch_followup_task",
+        {"filter": "overdue"},
+    )
+    with _plan_lock:
+        _card_action_refs[action_id]["message" + "_id"] = "om_bridge_followup_projects"
+
+    marked_cards = []
+
+    def capture_mark(msg_ref, title, content, template):
+        marked_cards.append((msg_ref, title, content, template))
+        return True
+
+    with (
+        patch("tools._create_task", side_effect=[
+            "桥接逾期待办A跟进: https://example.invalid/task/a",
+            "桥接逾期待办B跟进: https://example.invalid/task/b",
+        ]),
+        patch("tools._hermes_send", return_value=True),
+        patch("tools._append_project_doc_update", return_value=True),
+        patch("tools._append_bitable_update_record", return_value=False),
+        patch("tools._mark_card_message", side_effect=capture_mark),
+    ):
+        result = _handle_card_command(f'button {{"pilotflow_action_id":"{action_id}"}}')
+
+    assert result is None
+    assert marked_cards == [
+        (
+            "om_bridge_followup_projects",
+            "批量待办已创建",
+            "已为 2 个逾期项目创建跟进待办：桥接逾期待办A、桥接逾期待办B。",
             "green",
         )
     ]
@@ -4298,7 +4349,7 @@ def test_card_command_briefing_batch_followup_updates_card_after_success_with_fi
         (
             "om_bridge_risk_followup",
             "批量待办已创建",
-            "已为 1 个风险项目创建跟进待办。",
+            "已为 1 个风险项目创建跟进待办：桥接风险待办项目。",
             "green",
         )
     ]

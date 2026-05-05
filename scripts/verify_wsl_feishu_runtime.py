@@ -322,6 +322,7 @@ def _sanitize_result(result: dict[str, Any]) -> dict[str, Any]:
         "batch_followup_state_assignee_used",
         "batch_followup_state_assignee_filtered",
         "batch_followup_feedback_sent",
+        "batch_followup_origin_feedback_projects_named",
         "batch_followup_used_opaque_ref",
         "dashboard_filter_sent",
         "dashboard_filter_scoped",
@@ -3823,7 +3824,10 @@ def _verify_runtime_batch_followup_task(hermes_dir: Path) -> dict[str, Any]:
     from plugins.pilotflow.tools import (  # pylint: disable=import-error
         _create_card_action_ref,
         _handle_card_action,
+        _handle_card_command,
         _load_project_state,
+        _plan_lock,
+        _card_action_refs,
         _project_registry,
         _project_registry_lock,
         _register_project,
@@ -3836,10 +3840,12 @@ def _verify_runtime_batch_followup_task(hermes_dir: Path) -> dict[str, Any]:
     original_append_doc = runtime_tools._append_project_doc_update
     original_append_history = runtime_tools._append_bitable_update_record
     original_send = runtime_tools._hermes_send
+    original_mark = runtime_tools._mark_card_message
     created_tasks: list[tuple[str, str, str, str, str, list[str]]] = []
     doc_labels: list[tuple[str, str, str]] = []
     history_labels: list[tuple[str, str, str, str]] = []
     sent_messages: list[str] = []
+    marked_cards: list[tuple[str, str, str, str]] = []
 
     def fake_create_task(
         title: str,
@@ -3864,6 +3870,10 @@ def _verify_runtime_batch_followup_task(hermes_dir: Path) -> dict[str, Any]:
         sent_messages.append(text)
         return True
 
+    def fake_mark(msg_ref: str, title: str, content: str, template: str) -> bool:
+        marked_cards.append((msg_ref, title, content, template))
+        return True
+
     with tempfile.TemporaryDirectory(prefix="pilotflow-batch-followup-verify-") as tmpdir:
         os.environ["PILOTFLOW_STATE_PATH"] = str(Path(tmpdir) / "pilotflow_state.json")
         with _project_registry_lock:
@@ -3872,6 +3882,7 @@ def _verify_runtime_batch_followup_task(hermes_dir: Path) -> dict[str, Any]:
         runtime_tools._append_project_doc_update = fake_append_doc
         runtime_tools._append_bitable_update_record = fake_append_history
         runtime_tools._hermes_send = fake_send
+        runtime_tools._mark_card_message = fake_mark
         try:
             overdue = (dt.date.today() - dt.timedelta(days=1)).isoformat()
             future = (dt.date.today() + dt.timedelta(days=10)).isoformat()
@@ -3905,6 +3916,10 @@ def _verify_runtime_batch_followup_task(hermes_dir: Path) -> dict[str, Any]:
                 chat_id=chat_id,
             ))
             state_projects = _load_project_state()
+            bridge_action_id = _create_card_action_ref(chat_id, "briefing_batch_followup_task", {"filter": "overdue"})
+            with _plan_lock:
+                _card_action_refs[bridge_action_id]["message" + "_id"] = "om_batch_followup_origin"
+            bridge_result = _handle_card_command(f'button {{"pilotflow_action_id":"{bridge_action_id}"}}')
             with _project_registry_lock:
                 _project_registry.clear()
             os.environ["PILOTFLOW_STATE_PATH"] = str(Path(tmpdir) / "pilotflow_state_assignee.json")
@@ -3958,6 +3973,7 @@ def _verify_runtime_batch_followup_task(hermes_dir: Path) -> dict[str, Any]:
             runtime_tools._append_project_doc_update = original_append_doc
             runtime_tools._append_bitable_update_record = original_append_history
             runtime_tools._hermes_send = original_send
+            runtime_tools._mark_card_message = original_mark
             with _project_registry_lock:
                 _project_registry.clear()
             if original_state_path is None:
@@ -4022,6 +4038,18 @@ def _verify_runtime_batch_followup_task(hermes_dir: Path) -> dict[str, Any]:
             "已为 1 个逾期项目创建跟进待办" in feedback_text
             and "运行态批量待办逾期项目" in feedback_text
             and "运行态批量待办未到期项目" not in feedback_text
+        ),
+        "batch_followup_origin_feedback_projects_named": (
+            bridge_result is None
+            and any(
+                msg_ref == "om_batch_followup_origin"
+                and title == "批量待办已创建"
+                and "运行态批量待办逾期项目" in content
+                and "运行态批量待办未到期项目" not in content
+                and "example.invalid" not in content
+                and template == "green"
+                for msg_ref, title, content, template in marked_cards
+            )
         ),
         "batch_followup_used_opaque_ref": bool(action_id),
     }

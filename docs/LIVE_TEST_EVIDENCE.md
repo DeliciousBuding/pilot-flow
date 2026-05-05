@@ -1868,6 +1868,18 @@
 | 用户价值 | 用户点击卡片创建跟进待办后，即使只看原卡反馈，也能知道创建了哪个待办；真实任务链接仍不进入公开证据和原卡反馈正文 |
 | 隐私处理 | 证据只记录布尔结果和脱敏结论；不写入真实会话标识、消息标识、Feishu URL、用户原始标识或凭证 |
 
+## 2026-05-05 批量跟进待办原卡反馈项目列表运行态验证
+
+| 项目 | 证据 |
+| --- | --- |
+| 运行环境 | PilotFlow 已通过 `setup.py --hermes-home <wsl-hermes-home>` 同步到 WSL Hermes runtime；安装验证返回插件、技能、Hermes config 和 Feishu display 配置均 OK |
+| 本地回归 | `C:\Users\Ding\miniforge3\python.exe -m pytest -q` 返回 `320 passed`；批量跟进待办原卡反馈和 verifier 相关 targeted tests 返回 `4 passed` |
+| 功能硬化 | 用户从项目简报卡点击批量创建跟进待办后，原卡片成功反馈现在展示实际命中的项目名列表，例如逾期或风险项目集合，而不是只显示数量 |
+| Verifier 新字段 | `verify_wsl_feishu_runtime.py --verify-batch-followup-task` 在已安装的 WSL Hermes runtime 插件内返回 `batch_followup_origin_feedback_projects_named=true`，并保留 `batch_followup_created=true`、`batch_followup_filtered=true`、`batch_followup_task_created=true`、`batch_followup_state_assignee_filtered=true` |
+| 基线验证 | 同轮继续通过同一 Feishu venv 下 `--send-card` 的 `card_sent=true`、`card_has_initiator=true`、`pending_plan_recovered=true`，以及 `--probe-llm` 的 `llm_probe_ok=true`、`llm_probe_status=200` |
+| 用户价值 | 用户批量创建跟进待办后，即使只看原卡反馈，也能知道哪些项目实际生成了待办；真实任务链接仍不进入公开证据和原卡反馈正文 |
+| 隐私处理 | 证据只记录布尔结果和脱敏结论；不写入真实会话标识、消息标识、Feishu URL、用户原始标识或凭证 |
+
 ## 本地回归
 
 ```bash
