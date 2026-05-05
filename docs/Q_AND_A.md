@@ -126,7 +126,7 @@
 - [ ] R-20260505-1230 P0 修复落地（Q2 完整版才能用）
 - [ ] 4 段录屏完成（Q1 + Q10 fallback）
 - [ ] 真实产物链接私有汇总（Q10）
-- [ ] 个人信息填全（PERSONAL_PROGRESS / CONTEST_SUBMISSION）
+- [ ] 个人信息填全（复赛提交模板 / 飞书 wiki）
 - [ ] LIVE_TEST_EVIDENCE.md "Agent 主驾驶硬证据" 段加好
 - [ ] `pytest tests -q` ≥ 323 passed 当场可复现
 - [ ] `verify_wsl_feishu_runtime.py --probe-llm` 一行可复现

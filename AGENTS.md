@@ -19,7 +19,6 @@ PilotFlow/
 ├── docs/                    # Product spec, architecture, innovation docs
 ├── README.md / README_EN.md # Project documentation
 ├── INSTALL.md               # Installation guide
-├── PERSONAL_PROGRESS.md     # Development progress
 └── .env.example             # Environment template
 ```
 
