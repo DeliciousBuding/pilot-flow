@@ -23,7 +23,7 @@
 | 状态安全 | 第一次失败会保留已应用的成员/交付物建议和 action ref；第二次成功后发送确认卡并消费 action ref，避免用户卡在没有确认卡的中间态 |
 | 本地回归 | `C:\Users\Ding\miniforge3\python.exe -m pytest tests\test_tools.py::test_direct_card_action_retryable_failure_keeps_action_ref_for_history_suggestions -q` 返回 `1 passed`；`C:\Users\Ding\miniforge3\python.exe -m pytest` 返回 `316 passed` |
 | WSL 安装态 | `setup.py --hermes-dir D:\Code\LarkProject\hermes-agent --hermes-home \\wsl.localhost\Ubuntu-24.04\home\ding\.hermes` 通过；插件和 skill 已同步到 WSL Hermes runtime profile |
-| Verifier 结果 | `--verify-projectization-suggestion` 返回 `projectization_plan_card_sent=true`、`projectization_raw_history_rejected=true`、`projectization_pending_recovered=true`、`projectization_cards_sent=true`；同轮 `--send-card` 返回 `card_sent=true`，`--probe-llm` 返回 `llm_probe_ok=true`、`llm_probe_status=200` |
+| Verifier 结果 | `--verify-projectization-suggestion` 返回 `projectization_history_apply_retryable_failure=true`、`projectization_plan_card_sent=true`、`projectization_raw_history_rejected=true`、`projectization_pending_recovered=true`、`projectization_cards_sent=true`；同轮 `--send-card` 返回 `card_sent=true`，`--probe-llm` 返回 `llm_probe_ok=true`、`llm_probe_status=200` |
 | 用户价值 | 用户采用历史建议后如果 Feishu 临时发卡失败，不需要重新生成项目计划；同一按钮可恢复确认卡，让后续确认建项闭环继续推进 |
 | 隐私处理 | 验证只记录布尔结果和脱敏状态；不写入真实 chat_id、open_id、message_id、Feishu URL、token 或 app secret |
 

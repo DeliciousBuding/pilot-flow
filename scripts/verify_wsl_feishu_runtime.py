@@ -156,6 +156,7 @@ def _sanitize_result(result: dict[str, Any]) -> dict[str, Any]:
         "projectization_clarification_confirm_resources",
         "projectization_clarification_confirm_state",
         "projectization_clarification_confirm_one_shot",
+        "projectization_history_apply_retryable_failure",
         "projectization_raw_action_rejected",
         "projectization_raw_history_rejected",
         "projectization_raw_confirm_rejected",
@@ -865,6 +866,51 @@ def _verify_runtime_projectization_suggestion(hermes_dir: Path) -> dict[str, Any
                 chat_type="group",
             )) if confirm_action_id else {}
             state_projects = _load_project_state()
+            with _plan_lock:
+                _pending_plans["oc_projectization_history_retry"] = {
+                    "plan": {
+                        "title": "运行态历史建议重试项目",
+                        "goal": "验证历史建议确认卡重试",
+                        "members": [],
+                        "deliverables": [],
+                        "deadline": "",
+                        "risks": [],
+                    },
+                    "timestamp": time.time(),
+                }
+            history_retry_action_id = runtime_tools._create_card_action_ref(
+                "oc_projectization_history_retry",
+                "apply_history_suggestions",
+                {
+                    "history_suggested_fields": {
+                        "members": ["王五"],
+                        "deliverables": ["验收记录"],
+                    },
+                },
+            )
+            retry_send_attempts = 0
+
+            def fail_then_send_history_card(target_chat_id: str, card_json: dict[str, Any]) -> bool | str:
+                nonlocal retry_send_attempts
+                retry_send_attempts += 1
+                sent_cards.append(card_json)
+                return f"om_projectization_history_retry_{retry_send_attempts}" if retry_send_attempts > 1 else False
+
+            runtime_tools._hermes_send_card = fail_then_send_history_card
+            history_retry_first = json.loads(_handle_card_action(
+                {"action_value": json.dumps({"pilotflow_action_id": history_retry_action_id}, ensure_ascii=False)},
+                chat_id=chat_id,
+                chat_type="group",
+            ))
+            with _plan_lock:
+                history_retry_ref_restored = history_retry_action_id in _card_action_refs
+            history_retry_second = json.loads(_handle_card_action(
+                {"action_value": json.dumps({"pilotflow_action_id": history_retry_action_id}, ensure_ascii=False)},
+                chat_id=chat_id,
+                chat_type="group",
+            ))
+            with _plan_lock:
+                history_retry_ref_consumed = history_retry_action_id not in _card_action_refs
         finally:
             runtime_tools._hermes_send_card = original_send_card
             runtime_tools._hermes_send = original_send
@@ -935,6 +981,14 @@ def _verify_runtime_projectization_suggestion(hermes_dir: Path) -> dict[str, Any
         "projectization_clarification_confirm_one_shot": (
             "error" in clarification_duplicate
             and resource_count_after_confirm == len(created_resources)
+        ),
+        "projectization_history_apply_retryable_failure": (
+            "error" in history_retry_first
+            and "确认卡片发送失败" in str(history_retry_first.get("error", ""))
+            and history_retry_ref_restored is True
+            and history_retry_second.get("status") == "history_suggestions_applied"
+            and history_retry_ref_consumed is True
+            and retry_send_attempts == 2
         ),
         "projectization_raw_action_rejected": (
             "error" in raw_projectization_result
