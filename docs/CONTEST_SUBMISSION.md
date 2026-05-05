@@ -2,87 +2,81 @@
 
 ## 项目定位
 
-PilotFlow 是飞书群里的 AI 项目运行官。它面向团队在群聊中发起项目、筹备答辩、推进活动和管理交付的场景，把自然语言需求转成可确认的计划，并在确认后编排飞书文档、多维表格、任务、日历、群卡片、权限和提醒。
+PilotFlow 是飞书群里的 AI 项目运行官。群聊一句需求 → 确认卡片 → 一键创建飞书文档、多维表格、任务、日历、群卡片、权限和提醒。Hermes Agent 负责理解意图和选择下一步，PilotFlow 负责确认门控和飞书执行。
 
-飞书生态有成熟的”飞书项目”管理平台，PilotFlow 与它互补：PilotFlow 聚焦项目形成之前的群聊意图层——当目标、承诺、风险和行动项散落在聊天中时，Hermes 先理解上下文并判断下一步，PilotFlow 再负责确认门控、飞书写入和提醒分发。飞书项目承载项目创建后的深度管理，PilotFlow 解决”项目还没形成时”的识别、追问和启动问题。飞书项目 OpenAPI 可用后，PilotFlow 优先对接飞书项目作为权威项目后端。
+与飞书项目互补：PilotFlow 解决项目形成前的群聊意图识别和启动问题；飞书项目承载创建后的深度管理。飞书项目 OpenAPI 可用后优先对接为权威项目后端。
 
 ## 一、个人信息
 
-> ⚠️ **提交前必填**：以下为占位符，填全后同步到飞书 wiki。
-
-| 姓名 | 项目中负责的工作简述 | 个人基本信息介绍 | 实习信息 |
+| 姓名 | 负责工作 | 基本信息 | 实习信息 |
 | --- | --- | --- | --- |
-| **TODO 填姓名** | PilotFlow 产品设计、Hermes 插件实现、飞书 API 集成、测试体系、文档和演示材料 | **TODO 填学校/年级/方向** | **TODO 填实习信息或填"无"** |
+| **TODO** | 产品设计、Hermes 插件实现、飞书 API 集成、测试体系、文档和演示 | **TODO** | **TODO** |
 
 ## 二、项目结果展示
 
-## 评委视角三句话
+**痛点**：群聊讨论散，目标/成员/交付物/风险不会自动沉淀为协作产物。  
+**方案**：Hermes Agent 底座 + 飞书 OpenAPI 直连，群聊入口 → 项目启动流程。  
+**可信**：写入前发卡片确认，确认后才执行，状态可追踪、可取消、可重试。
 
-1. 痛点：群聊讨论容易散，任务、负责人、截止时间和风险很难自动沉淀。
-2. 方案：PilotFlow 用 Hermes 做 Agent 底座，用飞书 OpenAPI 创建真实协作产物，把群聊入口变成项目启动流程。
-3. 可信：所有写入前先发计划卡片确认，确认后才执行，过程有状态、可追踪、可取消、可降级。
-
-## Demo 展示
-
-当前仓库已完成本地测试、演示脚本、真实飞书卡片发送、按钮确认续跑和原卡片状态更新验证；提交前把录屏和真实产物链接汇总进材料包即可。演示脚本入口：
-
-- GitHub README: https://github.com/DeliciousBuding/PilotFlow
-- Demo script: https://github.com/DeliciousBuding/PilotFlow/blob/main/docs/demo/README.md
-- Architecture: https://github.com/DeliciousBuding/PilotFlow/blob/main/docs/ARCHITECTURE.md
-
-## Hermes 与 PilotFlow 的边界
-
-| 层级 | Hermes | PilotFlow |
-| --- | --- | --- |
-| Agent 底座 | LLM 调度、工具注册、飞书网关、消息、memory、cron | 项目运行语义、模板、风险检测、确认门控、pending plan、多轮状态 |
-| 飞书连接 | 网关接收消息，发送消息，卡片 action 路由 | 创建文档/多维表格/任务/日历，设置权限，解析成员，生成项目入口卡 |
-| 用户体验 | 通用 agent runtime | 群聊需求到项目产物的一体化工作流 |
-
-## 演示路线
+### 演示路线
 
 | 场景 | 输入 | 展示重点 |
 | --- | --- | --- |
-| 聊天信号项目化 | 群里散落出现目标、承诺、风险、提醒；Hermes 总结后调用 PilotFlow | 冒泡“要不要整理成项目？”卡片，证明不是关键词匹配，而是 Agent 语义理解后执行 |
-| 成功路径 | `@PilotFlow 帮我准备答辩项目空间，成员示例成员A，交付物是项目简报和任务清单，5月7日截止` | 计划卡片、确认门控、文档/表格/任务/日历/入口卡、运行摘要 |
-| 卡片确认 | 点击确认卡片的确认按钮 | 原卡片变为处理中 → Hermes card action → 插件 `/card` 桥接 → 从计划快照续跑 → 原卡片变为已创建 |
-| 取消路径 | 点击取消按钮 | 原卡片变为已取消，清理确认门控，不创建项目 |
-| 状态看板 | `@PilotFlow 项目进展如何？` | 项目看板、截止倒计时 |
-| 多轮更新 | `@PilotFlow 把答辩项目的截止时间改成5月10日` | 状态同步、群通知 |
+| 成功路径 | `@PilotFlow 帮我准备答辩项目空间，成员小王、小李，交付物是项目简报和任务清单，5月7日截止` | 计划卡 → 文字"确认执行" → 文档/Base/任务/日历/入口卡 |
+| 取消路径 | 同上，点击取消按钮或回复"取消" | 原卡片变灰，清理确认门控，不创建产物 |
+| 卡片确认 | 点击计划卡 ✅ 确认按钮 | 原卡片 → 处理中 → 已创建，通过 `/card` 桥接不依赖直调测试路径 |
+| 状态看板 | `@PilotFlow 项目进展如何？` | 看板卡 + 截止倒计时色标 |
+| 多轮更新 | `@PilotFlow 把答辩项目的截止时间改成5月10日` | 状态同步 + 群通知 |
+| Agent 主动巡检 | `pilotflow_scan_chat_signals` 接收 Hermes 总结的信号，冒泡建议卡 | 证明不是关键词匹配，是 Agent 语义理解后调用工具 |
 
-## 当前证据
+### 演示入口
+
+- GitHub: https://github.com/DeliciousBuding/PilotFlow
+- Demo script: https://github.com/DeliciousBuding/PilotFlow/blob/main/docs/demo/README.md
+- Architecture: https://github.com/DeliciousBuding/PilotFlow/blob/main/docs/ARCHITECTURE.md
+
+## 三、Hermes 与 PilotFlow 边界
+
+| 层级 | Hermes 提供 | PilotFlow 提供 |
+| --- | --- | --- |
+| Agent 底座 | LLM 调度、工具注册、飞书网关、消息通道、memory、cron | 项目语义、确认门控、pending plan、风险检测、多轮状态 |
+| 飞书连接 | 网关接收消息、发送文本消息、卡片 action 路由 | 文档/Base/任务/日历创建、权限、成员解析、项目入口卡、卡片反馈 |
+| 用户体感 | 通用 agent runtime | 群聊需求 → 项目产物的一体化工作流 |
+
+**不改 Hermes 源码**。PilotFlow 通过 `ctx.register_tool()` 注册 9 个工具和 1 个 `/card` 桥接命令；文本消息复用 `registry.dispatch("send_message")`；memory/cron 走 `registry.dispatch`。
+
+## 四、当前证据
 
 | 证据 | 状态 |
 | --- | --- |
-| 本地测试 | `C:\Users\Ding\miniforge3\python.exe -m pytest tests\test_tools.py tests\test_setup.py tests\test_plugin_registration.py -q`，153 个测试通过 |
-| 插件注册 | 测试覆盖 PilotFlow Hermes 工具注册 |
-| 卡片 action | 测试覆盖确认/取消路径和插件 `/card` 桥接 |
-| 安装脚本 | 测试覆盖复制插件、复制 skill、环境变量、config 校验和 Feishu 显示降噪 |
-| 真实飞书卡片 | 已验证发送为 `interactive` 卡片，点击后原卡片状态可更新 |
-| 真实状态看板 | 2026-05-03 通过 lark-cli 发送状态查询，Bot 返回中文文本反馈和 `interactive` 看板卡片；见 [LIVE_TEST_EVIDENCE.md](LIVE_TEST_EVIDENCE.md) |
-| 真实文字确认创建 | 2026-05-03 通过 lark-cli 跑通创建需求 → 计划卡片 → 文字确认 → 已确认并创建卡片 → 项目入口卡片；见 [LIVE_TEST_EVIDENCE.md](LIVE_TEST_EVIDENCE.md) |
-| 真实文字取消 | 2026-05-03 通过 lark-cli 跑通创建需求 → 计划卡片 → 取消执行 → 已取消反馈且未创建项目；见 [LIVE_TEST_EVIDENCE.md](LIVE_TEST_EVIDENCE.md) |
-| 真实飞书产物 | 2026-05-03 在真实群点击确认后创建文档、状态表和项目入口卡片 |
-| 真实项目化建议卡 | 2026-05-04 在 WSL Hermes runtime 中用 Hermes 结构化信号调用 PilotFlow，真实测试群返回 `interactive` 建议卡；见 [LIVE_TEST_EVIDENCE.md](LIVE_TEST_EVIDENCE.md) |
-| 录屏 | 提交前补齐 |
+| 本地测试 | `pytest tests -q` — 328 passed（含单元、集成、配置校验、多进程并发） |
+| WSL 安装复现 | `python setup.py --hermes-dir <path> --hermes-home ~/.hermes` — 配置校验 + 6 文件复制 + display 降噪 |
+| WSL runtime verifier | `scripts/verify_wsl_feishu_runtime.py` 支持 `--probe-llm` / `--send-card` / `--verify-health-check` / `--verify-card-command-bridge` / `--verify-history-suggestions` 五模式，输出脱敏布尔字段 |
+| 完整 @Bot 端到端 | 2026-05-04 真实群 @PilotFlow → mimo-v2.5-pro Agent 推理 → 计划卡 → 确认 → 飞书产物 → 入口卡，脱敏记录见 [LIVE_TEST_EVIDENCE](LIVE_TEST_EVIDENCE.md) |
+| Agent 主驾驶硬证据 | 2026-05-05 view_mode / template / risk_level / page 4 处必须 Agent 显式传字段，`allow_inferred_*=true` 仅回归用，6 个对应单测 |
+| 卡片失败可重试 | 13 个 fix commit 覆盖 7 类 retryable 卡片失败，按钮失败后保留 action ref |
+| 重启后恢复 | 8+ 场景覆盖看板/详情/催办/批量待办/截止更新从脱敏 state + 私有 refs 恢复 |
+| 录屏 | 提交前补齐（4 段，私有材料包） |
+| 真实产物链接 | 提交前汇总至私有飞书云文档（不进 GitHub） |
 
-## 风险与应对
+## 五、风险与应对
 
 | 风险 | 应对 |
 | --- | --- |
-| 现场飞书权限不足 | 提前跑真实群端到端验证，保留录屏和真实产物链接 |
-| 卡片按钮在真实网关不续跑 | 插件 `/card` 桥接优先；文本 `确认执行` 作为兜底确认路径 |
-| 群聊暴露内部工具名 | 安装脚本配置 `display.platforms.feishu.tool_progress=off` |
-| memory 持久化隐私 | 默认不保存成员姓名，需环境变量显式开启 |
-| 新机器安装失败 | `setup.py` 校验 `.env`、`config.yaml`、插件和 skill 安装结果 |
+| LLM 401 认证失败 | `scripts/verify_wsl_feishu_runtime.py --probe-llm` 一行脱敏探针；INSTALL.md 已写 401 排查步 |
+| 现场飞书权限不足 | 提前在测试群跑完整 e2e，保留录屏和真实产物链接 |
+| 卡片按钮在网关不续跑 | `/card` 桥接优先；文本 `确认执行` 兜底；失败保留 action ref 可重试 |
+| 群聊暴露内部工具名 | setup.py 配置 `display.platforms.feishu.tool_progress=off` |
+| 隐私泄漏 | 公共 state 脱敏（不含 URL/token/open_id）；`<at>` markup 注入清理；memory 默认不存成员姓名 |
+| 新机安装失败 | setup.py 校验 `.env` / `config.yaml` / 插件 / skill 安装结果 |
 
-## 提交前补齐材料
+## 六、提交前补齐
 
 | 材料 | 状态 | 存放位置 |
 | --- | --- | --- |
-| 成功路径录屏 | 私有材料包待补 | 飞书云空间私有链接，不进 GitHub |
-| 失败/取消路径录屏 | 私有材料包待补 | 飞书云空间私有链接，不进 GitHub |
-| 真实飞书文档/多维表格/任务/日历链接 | 私有材料包待补 | 飞书云文档"PilotFlow 复赛证据私有材料包"，不进 GitHub |
-| 答辩 Q&A | [docs/Q_AND_A.md](Q_AND_A.md) 已就位 | 公开仓库，不含真实链接 |
-| 演示脚本与录屏清单 | [docs/demo/README.md](demo/README.md) 已就位 | 公开仓库，链接占位指向私有材料包 |
+| 4 段录屏（成功/取消/看板/多轮） | 待补齐 | 飞书云空间私有链接 |
+| 真实产物链接汇总 | 待补齐 | 飞书云文档"PilotFlow 复赛证据私有材料包" |
+| 答辩 Q&A | [Q_AND_A.md](Q_AND_A.md) 已就位 | GitHub 公开仓库（不含真实链接） |
+| 演示脚本 | [demo/README.md](demo/README.md) 已就位 | GitHub 公开仓库 |
 
-> 公开仓库严格不出现：真实 chat_id / open_id / message_id / Feishu URL / token / app secret / 个人姓名。所有真实证据通过私有飞书云文档汇总并在答辩时打开。
+> 公开仓库不写：真实 chat_id / open_id / message_id / Feishu URL / token / app secret / 个人姓名。
