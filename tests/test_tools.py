@@ -2412,8 +2412,12 @@ def test_project_entry_card_uses_plain_member_names_for_visible_markdown():
             {
                 "title": "入口卡片成员项目",
                 "goal": "验证入口卡片成员展示",
-                "members": ["唐丁"],
-                "deliverables": ["验证记录"],
+                "members": ["唐丁", "李四"],
+                "deliverables": ["验证记录", "上线演练"],
+                "deliverable_assignees": {
+                    "验证记录": "唐丁",
+                    "上线演练": "李四",
+                },
                 "initiator": "王小明",
                 "deadline": "2026-05-12",
             },
@@ -2425,7 +2429,8 @@ def test_project_entry_card_uses_plain_member_names_for_visible_markdown():
     entry_card = captured_cards[0]
     markdown = entry_card["elements"][0]["content"]
     assert "**发起人：** 王小明" in markdown
-    assert "**成员：** 唐丁" in markdown
+    assert "**成员：** 唐丁, 李四" in markdown
+    assert "**负责人：** 验证记录 → 唐丁；上线演练 → 李四" in markdown
     assert "<at user_id=" not in markdown
 
 

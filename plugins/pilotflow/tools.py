@@ -3793,6 +3793,11 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
         link_lines.append("🔔 截止提醒已设置")
     link_lines.append(f"⏰ 截止: {deadline or '待确认'}")
     initiator_line = f"**发起人：** {initiator}\n" if initiator else ""
+    assignee_items = [
+        f"{deliverable} → {assignee}"
+        for deliverable, assignee in deliverable_assignees.items()
+    ]
+    assignee_line = f"**负责人：** {'；'.join(assignee_items)}\n" if assignee_items else ""
     risk_text = ", ".join(risks[:3])
     risk_line = f"**风险：** {risk_text}\n" if risk_text else ""
 
@@ -3814,6 +3819,7 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
                     f"**目标：** {goal}\n"
                     f"{initiator_line}"
                     f"**成员：** {member_card_display}\n"
+                    f"{assignee_line}"
                     f"{risk_line}"
                     + (f"{member_warning}\n" if member_warning else "")
                     + "\n".join(link_lines)
