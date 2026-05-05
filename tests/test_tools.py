@@ -3727,7 +3727,7 @@ def test_card_command_briefing_batch_reminder_updates_card_after_success():
         (
             "om_bridge_batch_reminder",
             "批量催办已发送",
-            "已向 1 个逾期项目发送催办提醒。",
+            "已向 1 个逾期项目发送催办提醒：桥接逾期催办项目。",
             "yellow",
         )
     ]

@@ -4677,10 +4677,16 @@ def _handle_card_command(raw_args: str) -> str:
         member_filters = [str(member).strip() for member in data.get("member_filters") or action_data.get("member_filters", []) if str(member).strip()]
         if member_filters:
             filter_label = f"{'、'.join(member_filters)}负责的{filter_label}"
+        project_names = [
+            str(project).strip()
+            for project in data.get("projects", [])
+            if str(project).strip()
+        ]
+        project_suffix = f"：{'、'.join(project_names)}" if project_names else ""
         _mark_card_message(
             message_id,
             "批量催办已发送",
-            f"已向 {data.get('reminder_count', 0)} 个{filter_label}发送催办提醒。",
+            f"已向 {data.get('reminder_count', 0)} 个{filter_label}发送催办提醒{project_suffix}。",
             "yellow",
         )
         return None

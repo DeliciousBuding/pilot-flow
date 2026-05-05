@@ -288,6 +288,7 @@ def _sanitize_result(result: dict[str, Any]) -> dict[str, Any]:
         "briefing_batch_reminder_history_recorded",
         "briefing_batch_reminder_state_recorded",
         "briefing_batch_reminder_feedback_sent",
+        "briefing_batch_reminder_origin_feedback_projects_named",
         "briefing_batch_reminder_used_opaque_ref",
         "card_command_bridge_executed",
         "card_command_bridge_suppressed_text",
@@ -3173,6 +3174,7 @@ def _verify_runtime_briefing_batch_reminder(hermes_dir: Path) -> dict[str, Any]:
         _card_action_refs,
         _create_card_action_ref,
         _handle_card_action,
+        _handle_card_command,
         _load_project_state,
         _plan_lock,
         _project_registry,
@@ -3186,9 +3188,11 @@ def _verify_runtime_briefing_batch_reminder(hermes_dir: Path) -> dict[str, Any]:
     original_append_doc = runtime_tools._append_project_doc_update
     original_append_history = runtime_tools._append_bitable_update_record
     original_send = runtime_tools._hermes_send
+    original_mark = runtime_tools._mark_card_message
     doc_labels: list[tuple[str, str, str]] = []
     history_labels: list[tuple[str, str, str, str]] = []
     sent_messages: list[str] = []
+    marked_cards: list[tuple[str, str, str, str]] = []
 
     def fake_append_doc(title: str, _project: dict, label: str, value: str, *_args: Any, **_kwargs: Any) -> bool:
         doc_labels.append((title, label, value))
@@ -3202,6 +3206,10 @@ def _verify_runtime_briefing_batch_reminder(hermes_dir: Path) -> dict[str, Any]:
         sent_messages.append(text)
         return True
 
+    def fake_mark(msg_ref: str, title: str, content: str, template: str) -> bool:
+        marked_cards.append((msg_ref, title, content, template))
+        return True
+
     with tempfile.TemporaryDirectory(prefix="pilotflow-briefing-reminder-verify-") as tmpdir:
         os.environ["PILOTFLOW_STATE_PATH"] = str(Path(tmpdir) / "pilotflow_state.json")
         with _project_registry_lock:
@@ -3209,6 +3217,7 @@ def _verify_runtime_briefing_batch_reminder(hermes_dir: Path) -> dict[str, Any]:
         runtime_tools._append_project_doc_update = fake_append_doc
         runtime_tools._append_bitable_update_record = fake_append_history
         runtime_tools._hermes_send = fake_send
+        runtime_tools._mark_card_message = fake_mark
         try:
             overdue = (dt.date.today() - dt.timedelta(days=1)).isoformat()
             future = (dt.date.today() + dt.timedelta(days=10)).isoformat()
@@ -3246,10 +3255,19 @@ def _verify_runtime_briefing_batch_reminder(hermes_dir: Path) -> dict[str, Any]:
                 chat_id=chat_id,
             ))
             state_projects = _load_project_state()
+            bridge_action_id = _create_card_action_ref(
+                chat_id,
+                "briefing_batch_reminder",
+                {"filter": "overdue", "value": "请今天同步最新进展"},
+            )
+            with _plan_lock:
+                _card_action_refs[bridge_action_id]["message" + "_id"] = "om_briefing_reminder_origin"
+            bridge_result = _handle_card_command(f'button {{"pilotflow_action_id":"{bridge_action_id}"}}')
         finally:
             runtime_tools._append_project_doc_update = original_append_doc
             runtime_tools._append_bitable_update_record = original_append_history
             runtime_tools._hermes_send = original_send
+            runtime_tools._mark_card_message = original_mark
             with _project_registry_lock:
                 _project_registry.clear()
             if original_state_path is None:
@@ -3284,6 +3302,18 @@ def _verify_runtime_briefing_batch_reminder(hermes_dir: Path) -> dict[str, Any]:
             and "运行态简报催办未到期项目" not in feedback_text
             and "example.invalid" not in feedback_text
             and "<at user_id" not in feedback_text
+        ),
+        "briefing_batch_reminder_origin_feedback_projects_named": (
+            bridge_result is None
+            and any(
+                msg_ref == "om_briefing_reminder_origin"
+                and title == "批量催办已发送"
+                and "运行态简报催办逾期项目" in content
+                and "运行态简报催办未到期项目" not in content
+                and "example.invalid" not in content
+                and template == "yellow"
+                for msg_ref, title, content, template in marked_cards
+            )
         ),
         "briefing_batch_reminder_used_opaque_ref": bool(action_id),
     }
@@ -3522,7 +3552,7 @@ def _verify_runtime_card_command_bridge(hermes_dir: Path) -> dict[str, Any]:
         "card_command_bridge_marked_origin": (
             "om_runtime_card_command",
             "批量催办已发送",
-            "已向 1 个逾期项目发送催办提醒。",
+            "已向 1 个逾期项目发送催办提醒：运行态桥接催办逾期项目。",
             "yellow",
         ) in marked_cards,
         "card_command_bridge_doc_recorded": (

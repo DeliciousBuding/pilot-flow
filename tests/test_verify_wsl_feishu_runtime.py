@@ -468,6 +468,7 @@ def test_verify_runtime_briefing_batch_reminder_is_sanitized(tmp_path, monkeypat
     assert result["briefing_batch_reminder_history_recorded"] is True
     assert result["briefing_batch_reminder_state_recorded"] is True
     assert result["briefing_batch_reminder_feedback_sent"] is True
+    assert result["briefing_batch_reminder_origin_feedback_projects_named"] is True
     assert result["briefing_batch_reminder_used_opaque_ref"] is True
     assert "example.invalid" not in json.dumps(result, ensure_ascii=False)
 
@@ -1190,6 +1191,7 @@ def test_verifier_briefing_batch_reminder_mode_outputs_sanitized_runtime_result(
         "briefing_batch_reminder_history_recorded": True,
         "briefing_batch_reminder_state_recorded": True,
         "briefing_batch_reminder_feedback_sent": True,
+        "briefing_batch_reminder_origin_feedback_projects_named": True,
         "briefing_batch_reminder_used_opaque_ref": True,
         "raw_chat_id": "oc_real_chat_id",
         "raw_doc_url": "https://example.invalid/doc/1",
@@ -1211,6 +1213,7 @@ def test_verifier_briefing_batch_reminder_mode_outputs_sanitized_runtime_result(
     assert output["briefing_batch_reminder_history_recorded"] is True
     assert output["briefing_batch_reminder_state_recorded"] is True
     assert output["briefing_batch_reminder_feedback_sent"] is True
+    assert output["briefing_batch_reminder_origin_feedback_projects_named"] is True
     assert output["briefing_batch_reminder_used_opaque_ref"] is True
     assert "oc_real_chat_id" not in output_text
     assert "example.invalid" not in output_text
