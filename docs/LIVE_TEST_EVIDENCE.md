@@ -14,6 +14,18 @@
 | 用户价值 | 飞书 API、任务服务或网络短暂失败时，用户不用重新生成项目详情卡；修复后重新点击同一按钮即可继续推进真实办公动作 |
 | 隐私处理 | 验证只记录布尔结果和脱敏状态；不写入真实 chat_id、open_id、message_id、Feishu URL、token 或 app secret |
 
+## 2026-05-05 直调卡片动作失败后可重试
+
+| 项目 | 证据 |
+| --- | --- |
+| 功能验证 | `pilotflow_handle_card_action` 直接收到 `pilotflow_action_id` 时，若真实办公动作失败，也会恢复刚消费的 opaque action ref；同一 action id 可在故障恢复后再次执行 |
+| 适用边界 | 覆盖 `send_project_reminder` 群聊催办发送失败后重试；确认/取消和成功路径仍保持单次消费，不改变已建立的防重复边界 |
+| 状态安全 | 第一次失败不写入催办留痕、不清除 action ref；第二次成功后发送群消息、记录文档/Base/state 更新并消费 action ref |
+| 本地回归 | `C:\Users\Ding\miniforge3\python.exe -m pytest tests\test_tools.py::test_direct_card_action_retryable_failure_keeps_action_ref_for_followup_task -q` 返回 `1 passed`；桥接重试、单次成功消费和裸 action 拒绝回归保持通过 |
+| Verifier 新字段 | `--verify-card-status-cycle` 返回 `card_status_retryable_failure=true`，并保留完成/重开、状态表同步、文档/Base 留痕、state 记录和脱敏反馈基线 |
+| 用户价值 | Hermes 直接调用卡片处理工具或测试/兼容入口遇到临时 Feishu 发送失败时，不需要重新生成状态卡；同一按钮引用可继续完成真实办公动作 |
+| 隐私处理 | 验证只记录布尔结果和脱敏状态；不写入真实 chat_id、open_id、message_id、Feishu URL、token 或 app secret |
+
 ## 2026-05-05 确认/取消卡片裸 action 拒绝
 
 | 项目 | 证据 |

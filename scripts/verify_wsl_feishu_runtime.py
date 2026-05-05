@@ -297,6 +297,7 @@ def _sanitize_result(result: dict[str, Any]) -> dict[str, Any]:
         "card_status_state_feedback_sent",
         "card_status_feedback_sent",
         "card_status_used_opaque_refs",
+        "card_status_retryable_failure",
         "batch_followup_created",
         "batch_followup_filtered",
         "batch_followup_task_created",
@@ -1992,9 +1993,11 @@ def _verify_runtime_followup_task(hermes_dir: Path) -> dict[str, Any]:
     sys.path.insert(0, str(hermes_dir))
     import plugins.pilotflow.tools as runtime_tools  # pylint: disable=import-error
     from plugins.pilotflow.tools import (  # pylint: disable=import-error
+        _card_action_refs,
         _create_card_action_ref,
         _handle_card_action,
         _load_project_state,
+        _plan_lock,
         _project_registry,
         _project_registry_lock,
         _register_project,
@@ -2935,9 +2938,11 @@ def _verify_runtime_briefing_batch_reminder(hermes_dir: Path) -> dict[str, Any]:
     import datetime as dt
     import plugins.pilotflow.tools as runtime_tools  # pylint: disable=import-error
     from plugins.pilotflow.tools import (  # pylint: disable=import-error
+        _card_action_refs,
         _create_card_action_ref,
         _handle_card_action,
         _load_project_state,
+        _plan_lock,
         _project_registry,
         _project_registry_lock,
         _register_project,
@@ -3230,9 +3235,11 @@ def _verify_runtime_card_status_cycle(hermes_dir: Path) -> dict[str, Any]:
     sys.path.insert(0, str(hermes_dir))
     import plugins.pilotflow.tools as runtime_tools  # pylint: disable=import-error
     from plugins.pilotflow.tools import (  # pylint: disable=import-error
+        _card_action_refs,
         _create_card_action_ref,
         _handle_card_action,
         _load_project_state,
+        _plan_lock,
         _project_registry,
         _project_registry_lock,
         _register_project,
@@ -3337,6 +3344,31 @@ def _verify_runtime_card_status_cycle(hermes_dir: Path) -> dict[str, Any]:
                 {"action_value": json.dumps({"pilotflow_action_id": state_reopen_action_id}, ensure_ascii=False)},
                 chat_id=chat_id,
             ))
+            retry_action_id = _create_card_action_ref(
+                chat_id, "send_project_reminder", {"title": "运行态重启卡片状态项目"}
+            )
+            original_send_for_retry = runtime_tools._hermes_send
+            retry_send_attempts = {"count": 0}
+
+            def retrying_send(target_chat_id: str, text: str) -> bool:
+                retry_send_attempts["count"] += 1
+                if retry_send_attempts["count"] == 1:
+                    return False
+                return original_send_for_retry(target_chat_id, text)
+
+            runtime_tools._hermes_send = retrying_send
+            first_retry = json.loads(_handle_card_action(
+                {"action_value": json.dumps({"pilotflow_action_id": retry_action_id}, ensure_ascii=False)},
+                chat_id=chat_id,
+            ))
+            with _plan_lock:
+                retry_ref_restored = retry_action_id in _card_action_refs
+            second_retry = json.loads(_handle_card_action(
+                {"action_value": json.dumps({"pilotflow_action_id": retry_action_id}, ensure_ascii=False)},
+                chat_id=chat_id,
+            ))
+            with _plan_lock:
+                retry_ref_consumed = retry_action_id not in _card_action_refs
             state_projects = _load_project_state()
         finally:
             runtime_tools._append_project_doc_update = original_append_doc
@@ -3412,6 +3444,14 @@ def _verify_runtime_card_status_cycle(hermes_dir: Path) -> dict[str, Any]:
         ),
         "card_status_used_opaque_refs": bool(
             done_action_id and reopen_action_id and state_done_action_id and state_reopen_action_id
+        ),
+        "card_status_retryable_failure": (
+            "催办" in str(first_retry.get("error", ""))
+            and "失败" in str(first_retry.get("error", ""))
+            and retry_ref_restored
+            and second_retry.get("status") == "project_reminder_sent"
+            and retry_ref_consumed
+            and retry_send_attempts["count"] == 2
         ),
     }
 

@@ -7844,6 +7844,42 @@ def test_card_command_retryable_failure_keeps_action_ref_for_followup_task():
         assert action_id not in _card_action_refs
 
 
+def test_direct_card_action_retryable_failure_keeps_action_ref_for_followup_task():
+    with _project_registry_lock:
+        _project_registry.clear()
+    with _plan_lock:
+        _card_action_refs.clear()
+    _register_project(
+        "直调重试待办项目", ["张三"], "2026-05-10", "进行中", [],
+        goal="验证直调失败后可重试", deliverables=["验收记录"],
+    )
+    action_id = _create_card_action_ref(
+        "oc_direct_retry_followup",
+        "create_followup_task",
+        {"title": "直调重试待办项目"},
+    )
+
+    with (
+        patch("tools._create_task", side_effect=[None, "直调重试待办项目跟进"]),
+        patch("tools._hermes_send", return_value=True),
+        patch("tools._append_project_doc_update", return_value=True),
+        patch("tools._append_bitable_update_record", return_value=True),
+    ):
+        first = json.loads(_handle_card_action(
+            {"action_value": json.dumps({"pilotflow_action_id": action_id}, ensure_ascii=False)},
+            chat_id="ignored_chat",
+        ))
+        second = json.loads(_handle_card_action(
+            {"action_value": json.dumps({"pilotflow_action_id": action_id}, ensure_ascii=False)},
+            chat_id="ignored_chat",
+        ))
+
+    assert "待办创建失败" in first["error"]
+    assert second["status"] == "project_followup_task_created"
+    with _plan_lock:
+        assert action_id not in _card_action_refs
+
+
 def test_card_command_project_status_updates_origin_card_after_detail_sent():
     with _project_registry_lock:
         _project_registry.clear()

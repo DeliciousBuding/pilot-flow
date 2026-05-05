@@ -4015,6 +4015,7 @@ def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
         return tool_error("无法解析卡片按钮值")
 
     action_id = action_data.get("pilotflow_action_id", "")
+    action_ref = None
     resolved_from_action_ref = bool(kwargs.pop("_pilotflow_action_ref_resolved", False))
     if action_id:
         action_ref = _resolve_card_action_ref(action_id, consume=True)
@@ -4039,6 +4040,11 @@ def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
 
     recovered_plan_override = kwargs.pop("_pilotflow_plan_override", None)
     gate_consumed = bool(kwargs.get("_pilotflow_gate_consumed"))
+
+    def retryable_tool_error(message: str) -> str:
+        if action_ref:
+            _restore_card_action_ref(action_id, action_ref)
+        return tool_error(message)
 
     if pilotflow_action == "cancel_project":
         if not gate_consumed:
@@ -4135,7 +4141,7 @@ def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
     if pilotflow_action in ("project_status", "mark_project_done", "reopen_project", "resolve_risk", "send_project_reminder", "create_followup_task"):
         project_title = action_data.get("title") or action_data.get("project_name")
         if not project_title:
-            return tool_error("无法识别项目，请在群里直接询问项目状态。")
+            return retryable_tool_error("无法识别项目，请在群里直接询问项目状态。")
 
         bitable_updated = False
         doc_updated = False
@@ -4151,7 +4157,7 @@ def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
         if not project:
             state_project = _find_project_state(project_title)
             if not state_project:
-                return tool_error("没有找到这个项目，可能需要先在当前会话创建项目。")
+                return retryable_tool_error("没有找到这个项目，可能需要先在当前会话创建项目。")
             project = {
                 "goal": state_project.get("goal", ""),
                 "members": [],
@@ -4179,7 +4185,7 @@ def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
                 members,
             )
             if not task_name:
-                return tool_error("待办创建失败，请检查飞书连接。")
+                return retryable_tool_error("待办创建失败，请检查飞书连接。")
             created_task_entry = f"任务: {task_name}"
             public_task_value = _public_task_update_value(task_name)
             outcome = _record_action_outcome(
@@ -4205,7 +4211,7 @@ def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
             if isinstance(sent_detail_message_id, str):
                 _attach_card_message_id(action_ids, sent_detail_message_id)
             if not sent_detail_message_id:
-                return tool_error("项目详情卡发送失败，请检查 Feishu 连接。")
+                return retryable_tool_error("项目详情卡发送失败，请检查 Feishu 连接。")
             return tool_result({
                 "status": "project_status_sent",
                 "project": project_title,
@@ -4216,7 +4222,7 @@ def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
         if pilotflow_action == "send_project_reminder":
             reminder_sent = _hermes_send(chat_id, _build_project_reminder_text(chat_id, project_title, project))
             if not reminder_sent:
-                return tool_error("项目催办提醒发送失败，请检查 Feishu 连接。")
+                return retryable_tool_error("项目催办提醒发送失败，请检查 Feishu 连接。")
             outcome = _record_action_outcome(project_title, project, "催办", "已发送催办提醒")
             return tool_result({
                 "status": "project_reminder_sent",
