@@ -5545,8 +5545,8 @@ def test_query_status_paginates_large_dashboards():
         return True
 
     with patch("tools._send_interactive_card_via_feishu", side_effect=capture_card):
-        first_result = _handle_query_status({"query": "项目进展"}, chat_id="oc_page_1")
-        second_result = _handle_query_status({"query": "项目进展第2页"}, chat_id="oc_page_2")
+        first_result = _handle_query_status({"query": "项目进展", "page": 1}, chat_id="oc_page_1")
+        second_result = _handle_query_status({"query": "项目进展", "page": 2}, chat_id="oc_page_2")
 
     assert "项目看板已发送" in first_result
     first_content = json.dumps(captured_cards[0], ensure_ascii=False)
@@ -5561,6 +5561,42 @@ def test_query_status_paginates_large_dashboards():
     assert "分页项目11" in second_content
     assert "分页项目12" in second_content
     assert "第 2/2 页" in second_content
+
+
+def test_query_status_does_not_infer_page_from_query_by_default():
+    """Verify R-20260505-1230 P1-4: page must be passed explicitly; query keywords default ignored."""
+    with _project_registry_lock:
+        _project_registry.clear()
+    for i in range(1, 13):
+        _register_project(
+            f"分页门控{i:02d}",
+            ["待确认"],
+            "2026-05-20",
+            "进行中",
+            [],
+        )
+    captured = []
+
+    def capture_card(chat_id, card):
+        captured.append(card)
+        return True
+
+    with patch("tools._send_interactive_card_via_feishu", side_effect=capture_card):
+        _handle_query_status({"query": "项目进展第2页"}, chat_id="oc_page_default")
+    content = json.dumps(captured[0], ensure_ascii=False)
+    assert "分页门控01" in content, "默认应保持第 1 页，不再从 query 关键词推断"
+    assert "第 1/2 页" in content
+
+    captured.clear()
+    with patch("tools._send_interactive_card_via_feishu", side_effect=capture_card):
+        _handle_query_status(
+            {"query": "项目进展第2页", "allow_inferred_page": True},
+            chat_id="oc_page_inferred",
+        )
+    content = json.dumps(captured[0], ensure_ascii=False)
+    assert "分页门控01" not in content, "allow_inferred_page=true 时才能从 query 退化推断"
+    assert "分页门控11" in content
+    assert "第 2/2 页" in content
 
 
 def test_dashboard_pagination_button_sends_next_page_card():

@@ -2,6 +2,18 @@
 
 > 本文件只记录可复验结论和脱敏摘要，不提交真实群 ID、用户 open_id、应用 secret、message_id 或飞书文档链接。
 
+## 2026-05-05 看板分页 page 必须显式传（R-20260505-1230 P1-4）
+
+| 项目 | 证据 |
+| --- | --- |
+| 范围 | 看板分页参数 page 改为 Hermes Agent / 看板按钮 action ref payload 显式传入；删除 `_dashboard_query_for_page` 函数（不再把 page 编码进自然语言 query 字符串再让工具关键词解析回结构化） |
+| 工具变更 | `pilotflow_query_status` schema 加 `page: integer minimum=1` + `allow_inferred_page: bool` 默认 false；`_handle_query_status` 优先用 `params["page"]`，仅 allow_inferred_page=true 才退到 `_dashboard_page_from_query(query)` 关键词推断 |
+| 看板按钮变更 | dashboard navigation 上一页/下一页 action ref payload 直接携带 `{filter, member_filters, view_mode, page}` 结构化字段；`_handle_card_action` dashboard_page 分支直接透传 page 给 `_handle_query_status`，不再重组中文 query |
+| 单测覆盖 | `test_query_status_does_not_infer_page_from_query_by_default` 验证 query 含 "第2页" 时默认仍走第 1 页；只有显式传 page 或 allow_inferred_page=true 才生效 |
+| 本地回归 | `pytest tests -q` 返回 `328 passed`；`setup.py --hermes-dir D:\Code\LarkProject\hermes-agent` 通过 |
+| 用户价值 | "工具内拍板"硬编码点又少一处：page 不再从 query 关键词解析，结构化数据保持结构化全程不降级再解析 |
+| 隐私处理 | 验证只记录布尔结果和 commit 哈希；不写入真实 chat_id、open_id、message_id、Feishu URL、token 或 app secret |
+
 ## 2026-05-05 Agent 主驾驶硬证据（R-20260505-1230 P0 闭环）
 
 | 项目 | 证据 |

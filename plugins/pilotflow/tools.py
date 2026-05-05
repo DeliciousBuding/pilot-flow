@@ -2818,17 +2818,6 @@ def _dashboard_page_from_query(query: str) -> int:
     return 1
 
 
-def _dashboard_query_for_page(query: str, page: int) -> str:
-    """Build a Chinese dashboard query that preserves filters and targets a page."""
-    base = (query or "项目进展").strip()
-    target = max(1, int(page))
-    if re.search(r"第\s*\d+\s*页", base):
-        return re.sub(r"第\s*\d+\s*页", f"第{target}页", base, count=1)
-    if "下一页" in base:
-        return base.replace("下一页", f"第{target}页", 1)
-    return f"{base} 第{target}页"
-
-
 def _is_archived_status(status: str) -> bool:
     return str(status).strip() in ("已归档", "归档", "archived")
 
@@ -4386,16 +4375,24 @@ def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
         })
 
     if pilotflow_action == "dashboard_page":
-        page_query = action_data.get("query") or _dashboard_query_for_page("项目进展", action_data.get("page", 1))
+        target_page_raw = action_data.get("page", 1)
+        try:
+            target_page = max(1, int(target_page_raw))
+        except (TypeError, ValueError):
+            target_page = 1
+        page_query = action_data.get("query") or "项目进展"
         sent_result = _handle_query_status({
             "query": page_query,
             "filter": action_data.get("filter") or "",
             "member_filters": action_data.get("member_filters", []),
+            "view_mode": action_data.get("view_mode") or "",
+            "page": target_page,
         }, chat_id=chat_id)
         if isinstance(sent_result, str) and "项目看板已发送" in sent_result:
             return tool_result({
                 "status": "dashboard_page_sent",
                 "query": page_query,
+                "page": target_page,
                 "instructions": "已发送项目看板分页。不要展示工具名或英文。",
             })
         retryable_error = retryable_dashboard_send_error(sent_result)
@@ -4854,6 +4851,15 @@ PILOTFLOW_QUERY_STATUS_SCHEMA = {
                 "type": "boolean",
                 "description": "仅供回归测试 / 旧客户端回放使用。生产 Agent 不应传 true。本字段不再保留向前兼容承诺。为 true 且 view_mode 为空时，工具才会从 query 关键词退化推断简报视图。默认 false。",
             },
+            "page": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Agent 显式指定的看板页码（≥1）。看板分页按钮会通过 action ref 携带 page 字段；不传则默认第 1 页，不再从 query 关键词推断。",
+            },
+            "allow_inferred_page": {
+                "type": "boolean",
+                "description": "仅供回归测试 / 旧客户端回放使用。生产 Agent 不应传 true。本字段不再保留向前兼容承诺。为 true 且未传 page 时，工具才会从 query 关键词退化推断页码。默认 false。",
+            },
         },
         "required": ["query"],
     },
@@ -5020,7 +5026,19 @@ def _handle_query_status(params: Dict[str, Any], **kwargs) -> str:
     else:
         page_size = max(1, _DASHBOARD_PAGE_SIZE)
         total_pages = max(1, (total_projects + page_size - 1) // page_size)
-        page = min(_dashboard_page_from_query(query), total_pages)
+        explicit_page_raw = params.get("page")
+        try:
+            explicit_page = int(explicit_page_raw) if explicit_page_raw not in (None, "") else 0
+        except (TypeError, ValueError):
+            explicit_page = 0
+        allow_inferred_page = bool(params.get("allow_inferred_page"))
+        if explicit_page >= 1:
+            page = explicit_page
+        elif allow_inferred_page:
+            page = _dashboard_page_from_query(query)
+        else:
+            page = 1
+        page = min(max(1, page), total_pages)
         start = (page - 1) * page_size
         projects = projects[start:start + page_size]
 
@@ -5087,10 +5105,20 @@ def _handle_query_status(params: Dict[str, Any], **kwargs) -> str:
             })
 
     if chat_id and total_pages > 1:
+        nav_query = (query or "项目进展").strip()
+        nav_query = re.sub(r"\s*第\s*\d+\s*页", "", nav_query).strip()
+        nav_query = nav_query.replace("下一页", "").replace("上一页", "").strip() or "项目进展"
+        nav_payload_base = {
+            "query": nav_query,
+            "filter": status_filter,
+            "member_filters": list(member_filters or []),
+            "view_mode": view_mode if view_mode else "",
+        }
         nav_actions = []
         if page > 1:
-            prev_query = _dashboard_query_for_page(query, page - 1)
-            prev_action_id = _create_card_action_ref(chat_id, "dashboard_page", {"query": prev_query, "page": page - 1})
+            prev_payload = dict(nav_payload_base)
+            prev_payload["page"] = page - 1
+            prev_action_id = _create_card_action_ref(chat_id, "dashboard_page", prev_payload)
             action_ids.append(prev_action_id)
             nav_actions.append({
                 "tag": "button",
@@ -5099,8 +5127,9 @@ def _handle_query_status(params: Dict[str, Any], **kwargs) -> str:
                 "value": {"pilotflow_action_id": prev_action_id},
             })
         if page < total_pages:
-            next_query = _dashboard_query_for_page(query, page + 1)
-            next_action_id = _create_card_action_ref(chat_id, "dashboard_page", {"query": next_query, "page": page + 1})
+            next_payload = dict(nav_payload_base)
+            next_payload["page"] = page + 1
+            next_action_id = _create_card_action_ref(chat_id, "dashboard_page", next_payload)
             action_ids.append(next_action_id)
             nav_actions.append({
                 "tag": "button",
