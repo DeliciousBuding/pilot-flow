@@ -70,7 +70,7 @@ Copy-Item .\.env.example "$HOME\.hermes\.env"
 # LLM 配置
 OPENAI_BASE_URL=https://api.openai.com/v1
 OPENAI_API_KEY=your-api-key-here
-OPENAI_MODEL=gpt-4.1
+OPENAI_MODEL=Doubao
 
 # 飞书应用凭证
 FEISHU_APP_ID=cli_xxxxxxxxxxxxxxxx
@@ -87,14 +87,14 @@ PILOTFLOW_MEMORY_INCLUDE_MEMBERS=false
 
 ```yaml
 model:
-  default: gpt-4.1
+  default: Doubao
   provider: openai
 
 providers:
   openai:
     base_url: https://api.openai.com/v1
     key_env: OPENAI_API_KEY
-    model: gpt-4.1
+    model: Doubao
 
 gateway:
   default_platform: feishu

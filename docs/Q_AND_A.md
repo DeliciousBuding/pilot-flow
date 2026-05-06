@@ -38,12 +38,12 @@
 
 ## Q3: Hermes 跑出 401 / 模型不可用怎么办？现场你怎么排查？
 
-**核心回答**：仓库里有 `scripts/verify_wsl_feishu_runtime.py --probe-llm`，输出脱敏的 `llm_probe_status` / `llm_probe_provider`，不打印 API key / base_url / 响应正文。一行命令就能确认 Hermes 实际加载的模型 / provider / base_url 是否可用。我们已经在 INSTALL.md 里写明：401 时优先改 `~/.hermes/.env` 和 `~/.hermes/config.yaml`，不要只改 Windows 侧配置。
+**核心回答**：仓库里有 `scripts/verify_wsl_feishu_runtime.py --probe-llm`，输出脱敏的 `llm_probe_status` / `llm_probe_provider`，不打印 API key / base_url / 响应正文。一行命令就能确认 Hermes 实际加载的模型 / provider / base_url 是否可用。我们已经在 INSTALL.md 里写明：401 时优先改 `~/.hermes/.env` 和 `~/.hermes/config.yaml`，两边配置文件要一致。
 
 **证据**：
 - `scripts/verify_wsl_feishu_runtime.py:60+` `_read_runtime_config` 解析 providers 字段
 - INSTALL.md 401 排查 step
-- LIVE_TEST_EVIDENCE.md 顶部 e2e 段记载："2026-05-04 14:22 401 因 WSL profile 用旧 gpt-5.5；20:54-20:58 切 mimo-v2.5-pro 后端到端通过"
+- LIVE_TEST_EVIDENCE.md 顶部 e2e 段记载："2026-05-04 14:22 401 因旧模型配置未更新；20:54-20:58 切 当前模型 后端到端通过"
 
 ---
 
@@ -107,7 +107,7 @@
 
 ## Q9: 测试 300 多个，有没有 mock 偏多 / 真实链路覆盖不够？
 
-**核心回答**：单元测试用 mock registry 是必要的（保证不依赖飞书凭证就能跑），真实链路证据由 LIVE_TEST_EVIDENCE.md 60+ 场景 + WSL `verify_wsl_feishu_runtime.py` 5 类 verifier mode 覆盖（probe-llm / send-card / health-check / card-command-bridge / history-suggestions），全部脱敏输出。每条 verifier 输出的字段（`card_has_title=true` / `llm_probe_ok=true` 等）都在白名单内，不打印真实 ID/URL/token。
+**核心回答**：单元测试用 mock registry 是必要的（保证不依赖飞书凭证就能跑），真实链路证据由 LIVE_TEST_EVIDENCE.md 60+ 场景 + `verify_wsl_feishu_runtime.py` 5 类 verifier mode 覆盖（probe-llm / send-card / health-check / card-command-bridge / history-suggestions），全部脱敏输出。每条 verifier 输出的字段（`card_has_title=true` / `llm_probe_ok=true` 等）都在白名单内，不打印真实 ID/URL/token。
 
 **证据**：
 - `scripts/verify_wsl_feishu_runtime.py` `_sanitize_result` 白名单
@@ -117,7 +117,7 @@
 
 ## Q10: 现场如果飞书权限不足 / 网络断 / Hermes 起不来怎么办？
 
-**核心回答**：(a) 提前在测试群跑过完整 e2e（录屏作为 fallback 证据）；(b) 演示设备和评委网络隔离的话有 WSL 本地 verifier 一行命令能脱敏输出所有运行态 / 凭证 / 模型连接状态；(c) 真实产物链接（文档 / Base / 任务 / 日历）已私有汇总在飞书云文档，可现场直接打开。
+**核心回答**：(a) 提前在测试群跑过完整 e2e（录屏作为 fallback 证据）；(b) 演示设备和评委网络隔离的话有 本地 verifier 一行命令能脱敏输出所有运行态 / 凭证 / 模型连接状态；(c) 真实产物链接（文档 / Base / 任务 / 日历）已私有汇总在飞书云文档，可现场直接打开。
 
 ---
 
