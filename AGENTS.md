@@ -77,3 +77,14 @@ PilotFlow/
 - Run `python setup.py --hermes-dir <hermes-agent-path>` after plugin changes.
 - In the Hermes runtime, import `plugins.pilotflow` and verify registered tools.
 - For release claims, separate local test evidence from real Feishu live evidence.
+
+## Public Repo Boundaries
+
+This is a public GitHub repo. Never commit:
+
+- Personal info, contest submission forms, Q&A prep, demo scripts, internal reviews
+- Model provider details, endpoint URLs, API keys, secrets, tokens
+- Local paths (`C:\Users\...`, `/mnt/d/...`), WSL-specific notes
+- Internal roadmap, delivery audits, spike reports, review inbox
+
+These belong in `D:\Code\LarkProject\Docs\` or `Archive\`, not in git.
