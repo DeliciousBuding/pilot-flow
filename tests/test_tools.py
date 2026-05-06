@@ -1356,13 +1356,15 @@ def test_extract_inline_project_fields_parses_group_message():
 
 
 def test_extract_inline_project_fields_uses_mentions_and_relative_deadline():
+    import datetime as _dt
+    tomorrow = (_dt.date.today() + _dt.timedelta(days=1)).isoformat()
     text = '请准备上线项目，成员是<at user_id="ou_zhangsan">张三</at>和李四，产出上线方案、回滚方案，明天截止'
 
     fields = _extract_inline_project_fields(text)
 
     assert fields["members"] == ["张三", "李四"]
     assert fields["deliverables"] == ["上线方案", "回滚方案"]
-    assert fields["deadline"] == "2026-05-06"
+    assert fields["deadline"] == tomorrow
 
 
 def test_generate_plan_does_not_show_placeholder_members():

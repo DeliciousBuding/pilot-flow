@@ -9,7 +9,7 @@ PilotFlow is a Hermes Agent plugin for Feishu group chat project supervision. Us
 ```
 PilotFlow/
 ├── plugins/pilotflow/       # Core plugin (tools.py + __init__.py + plugin.yaml)
-│   ├── tools.py             # All 6 tool handlers + Feishu API wrappers
+│   ├── tools.py             # 9 tool handlers + Feishu API wrappers (~5800 lines)
 │   ├── trace.py             # Business-readable Flight Recorder trace primitives
 │   ├── __init__.py          # Plugin registration with Hermes tool registry
 │   └── plugin.yaml          # Plugin metadata
@@ -60,11 +60,10 @@ PilotFlow/
 
 ## Testing
 
-- Local tests: `C:\Users\Ding\miniforge3\python.exe -m pytest -q`
-- Gateway test: `uv run hermes gateway` in hermes-agent directory
-- Direct tool test: set `PILOTFLOW_TEST_CHAT_ID` env var
-- WSL Feishu runtime verifier: run `scripts/verify_wsl_feishu_runtime.py` from WSL Hermes runtime with `--env-file ~/.hermes/.env --config-file ~/.hermes/config.yaml`; use `--probe-llm`, `--send-card`, `--verify-health-check`, `--verify-plugin-registration`, `--verify-history`, `--verify-projectization-suggestion`, `--verify-project-creation`, `--verify-collaboration-resources`, `--verify-update-task`, `--verify-archive-gate`, `--verify-followup-task`, `--verify-deadline-update`, `--verify-member-permissions`, `--verify-member-removal`, `--verify-risk-cycle`, `--verify-progress-update`, `--verify-project-reminder`, `--verify-briefing-batch-reminder`, `--verify-card-command-bridge`, `--verify-card-status-cycle`, `--verify-batch-followup-task`, and `--verify-dashboard-navigation` for release evidence.
-- End-to-end: @PilotFlow in Feishu group chat
+- Local: `C:\Users\Ding\miniforge3\python.exe -m pytest tests -q` (328 passed)
+- Plugin install: `python setup.py --hermes-dir D:\Code\LarkProject\hermes-agent`
+- WSL runtime verifier: `scripts/verify_wsl_feishu_runtime.py --hermes-dir <path> --env-file ~/.hermes/.env --config-file ~/.hermes/config.yaml` supports `--probe-llm`, `--send-card`, `--verify-health-check`, `--verify-plugin-registration`, `--verify-projectization-suggestion`, `--verify-card-command-bridge`, `--verify-history-suggestions` and ~15 additional modes for release evidence.
+- E2E: @PilotFlow in Feishu group chat
 
 ## Dependencies
 
