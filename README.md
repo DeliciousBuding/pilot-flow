@@ -122,7 +122,6 @@ uv run hermes gateway
 | 📖 [用户指南](docs/USER_GUIDE.md) | 我能问什么？自然语言指令样例 + FAQ |
 | 📦 [安装指南](INSTALL.md) | 安装 + 群聊订阅配置 |
 | 🏗 [架构设计](docs/ARCHITECTURE.md) | 组件 · 状态模型 · 工具路由 |
-| 🎤 [答辩 Q&A](docs/Q_AND_A.md) | 评委高频追问 |
 | 📋 [产品规格](docs/PRODUCT_SPEC.md) | 功能分级 · 技术约束 |
 
 <br>

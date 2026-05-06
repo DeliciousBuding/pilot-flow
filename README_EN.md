@@ -52,7 +52,7 @@ Hermes Agent runtime (LLM + Feishu WebSocket gateway + tool registry + memory + 
 - **Zero Hermes core changes**: pure plugin via `ctx.register_tool()` and `/card` bridge
 - **Agent is the pilot**: 5 semantic params must be Agent-passed; tools default to refusing inference
 - **Direct Feishu**: doc/Base/task/calendar via lark_oapi SDK; cards via Feishu IM API; text via `registry.dispatch`
-- **LLM swappable**: OpenAI-compatible API per Hermes config; verified with `mimo-v2.5-pro`
+- **LLM swappable**: OpenAI-compatible API per Hermes config; verified with `Doubao`
 - **Known tech debt**: `tools.py` >5000 lines; post-contest refactor to `actions.py` / `state.py` / `feishu_client.py`
 
 ## Quick Start
@@ -71,11 +71,10 @@ See [INSTALL.md](INSTALL.md) for group subscription setup, [USER_GUIDE.md](docs/
 
 | For Judges | For Users |
 | --- | --- |
-| [Contest Submission](docs/CONTEST_SUBMISSION.md) | [User Guide](docs/USER_GUIDE.md) |
+| [Architecture](docs/ARCHITECTURE.md) | [User Guide](docs/USER_GUIDE.md) |
 | [Product Spec](docs/PRODUCT_SPEC.md) | [Install Guide](INSTALL.md) |
-| [Architecture](docs/ARCHITECTURE.md) | [Q&A Prep](docs/Q_AND_A.md) |
 | [Live Test Evidence](docs/LIVE_TEST_EVIDENCE.md) | |
-| [Delivery Audit](docs/DELIVERY_AUDIT.md) | |
+| [Live Test Evidence](docs/LIVE_TEST_EVIDENCE.md) | |
 
 ## Credits
 
