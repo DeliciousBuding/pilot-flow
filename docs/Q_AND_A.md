@@ -28,11 +28,7 @@
 - LIVE_TEST_EVIDENCE.md "Agent 主驾驶硬证据" 段：mocked LLM 给定原话不传结构化字段时工具拒绝执行
 - tests/test_tools.py 覆盖 needs_clarification 路径
 
-**如果继续追问"那 _TEMPLATES / _is_briefing_query 那些函数还在文件里啊"**：是的，作为兼容旧客户端的 deprecated path 保留，不在默认路径调用。这是工程演进的过渡态，复赛后第一个 issue 是把它们搬到 `_legacy_inference.py` 加 deprecation warning。
-
-> ⚠️ **本条回答的部分能力（view_mode / risk_level / template 改造）依赖 R-20260505-1230 P0 修复落地。如果答辩前未落地，本条改成保守版本：见下方"保守版"。**
-
-**保守版（如果 P0 未落地）**：PilotFlow 在 4 个核心入口（generate_plan / create_project_space / query_status / send_reminder batch）严格走 Agent 显式传入路径；旧版关键词 fallback 仅在 `allow_inferred_*=true` 时启用。视图判断、模板套用、风险分级当前仍由工具内部辅助处理，下一步迭代会把这部分也改为 Agent 显式传入，让"Agent 主驾驶"在代码层 100% 落地。
+**如果继续追问"那 _TEMPLATES / _is_briefing_query 那些函数还在文件里啊"**：作为兼容旧客户端的 deprecated path 保留，不在默认路径调用。复赛后第一个 issue 会把这些旧路径彻底清理。
 
 ---
 
@@ -123,7 +119,7 @@
 
 ## 准备答辩前 checklist
 
-- [ ] R-20260505-1230 P0 修复落地（Q2 完整版才能用）
+- [ ] Agent 主驾驶全部落地（Q2 已回答）
 - [ ] 4 段录屏完成（Q1 + Q10 fallback）
 - [ ] 真实产物链接私有汇总（Q10）
 - [ ] 个人信息填全（复赛提交模板 / 飞书 wiki）
