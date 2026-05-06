@@ -1,81 +1,127 @@
+<div align="center">
+
 # ✈️ PilotFlow
+## AI project kickoff officer for Feishu group chats
 
-**AI project operator for Feishu group chats.** Mention a need, get a confirmable plan, and PilotFlow orchestrates Feishu docs, bitable, tasks, calendar, cards, and permissions — all through a Hermes Agent plugin that never touches Hermes core.
+Turn the goals, commitments, and deadlines scattered across a chat into a confirmed Feishu project.
 
-[中文版](README.md)
-[![Hermes](https://img.shields.io/badge/Hermes-plugin-6f42c1)](https://github.com/NousResearch/hermes-agent)
+[中文版](README.md) &nbsp;·&nbsp; [Quick Start](#quick-start) &nbsp;·&nbsp; [User Guide](docs/USER_GUIDE.md)
 
-## Problem
+<img src="https://img.shields.io/badge/version-1.12.0-blue?style=flat-square" alt="version">
+<img src="https://img.shields.io/badge/python-3.12+-informational?style=flat-square&logo=python" alt="python">
+<img src="https://img.shields.io/badge/license-MIT-lightgrey?style=flat-square" alt="license">
 
-Project discussions in Feishu group chats scatter goals, members, deliverables, deadlines, and risks across messages. These don't automatically become collaborative artifacts. **PilotFlow identifies these signals in chat, sends a confirmation card, and upon confirmation creates real Feishu resources — then keeps tracking state.**
+</div>
 
-## Differentiation
 
-| Feishu Project (飞书项目) | PilotFlow |
-| --- | --- |
-| Post-creation management & execution | Pre-creation: intent recognition, proactive suggestion, confirmed writing |
-| Workbench / project space entry | Group chat entry, natural language driven |
-| Manual project creation | Agent discovers from context; Hermes understands, PilotFlow executes |
+## The kickoff officer for group-chat projects
 
-Complementary relationship. PilotFlow will target Feishu Project OpenAPI as its authoritative backend when available.
+Project discussions in a Feishu group chat scatter goals, members, deliverables, deadlines, and risks across messages. PilotFlow picks up these signals, sends a confirmation card, and once the user confirms it creates the Feishu doc, Bitable record, task, calendar event, and project entry card.
 
-## Verified Capabilities
+**How it relates to Feishu Project (Meego)**: Feishu Project is for managing work items after a project has been formed. PilotFlow handles the step before that — turning a fuzzy chat discussion into a confirmed project. The natural sequence is PilotFlow → Feishu Project, not a replacement.
 
-| Capability | Evidence |
-| --- | --- |
-| One-sentence project creation | @bot → Agent reasoning → plan card → confirm → doc/Base/task/calendar/entry card |
-| Confirmation gate + cancel | chat_id-scoped TTL (10min), text/card/cancel all verified |
-| Destructive action gate | remove_member / archive require explicit confirmation text |
-| Agent-driven (tool doesn't guess) | view_mode / template / risk_level / page / filters: 5 params must be Agent-passed; `allow_inferred_*=true` is legacy-only |
-| Interactive cards + button callback | `/card` bridge, confirm/cancel/mark-done/reopen/resolve-risk/remind/todo/paginate |
-| Dashboard + overdue boards | Progress/overdue/due-soon/risk filters with countdown color coding |
-| Standup briefing | Risk-prioritized summary with batch-remind / batch-todo buttons |
-| Doc audit trail | Status changes / reminders / new deliverables written back to Feishu docs |
-| Bitable change log | Every update appends a history record |
-| Card retry on failure | Failed button ops retain action ref for retry |
-| Restart recovery | Sanitized state file (public) + private resource refs, with file locks (msvcrt/fcntl) |
-| Privacy sanitization | Public state excludes URL/token/open_id/chat_id/message_id; resource links in private refs |
-| Non-@ subscription | `pilotflow_subscribe_chat` generates per-group `require_mention: false` config snippet |
-| Hermes deep integration | memory write, cron reminders, `/card` bridge, `registry.dispatch` messaging — zero Hermes source changes |
-| Automated tests | 328 unit/integration/config/multiprocess tests |
-| Reproducible WSL install | `python setup.py --hermes-dir <path> --hermes-home ~/.hermes` with config validation |
+<br>
 
-Full evidence in [LIVE_TEST_EVIDENCE.md](docs/LIVE_TEST_EVIDENCE.md).
+## How it works
+
+```
+You: @PilotFlow Help me kick off a product launch. Members: Alice and Bob.
+     Deliverables: release notes, checklist. Deadline: May 7.
+
+PilotFlow:
+  1. Sends a plan card to the group with the extracted goal, members,
+     deliverables, and deadline
+  2. You click confirm (or reply "确认执行")
+  3. PilotFlow creates, in one step:
+     - Feishu Doc (formatted, members @-mentioned, link permission opened)
+     - Bitable (project status registry with seed records)
+     - Feishu Tasks (assigned to owners with deadlines)
+     - Calendar event (deadline reminder)
+     - Hermes cron (best-effort reminder before deadline)
+     - Project entry card (one-click navigation in the group)
+
+  Afterwards:
+  4. "How is it going?" -> dashboard card with countdown coloring
+  5. "Move the deadline to May 10." -> status table updated, group notified
+  6. "We're blocked." -> risk recorded, audit trail written to the doc
+  7. "Done." -> project marked complete and archived
+```
+
+<br>
+
+## Where AI participates
+
+| Surface | What AI does |
+| :--- | :--- |
+| Chat intent | Extracts title, members, deliverables, deadline, and risks from natural-language input |
+| Missing-info judgment | Decides whether to ask the user back instead of guessing with keywords |
+| Proactive scanning (opt-in) | When the subscription mode is enabled for a group, recognizes commitments and risks from ordinary discussion and offers to organize them into a project |
+| Project content | Drafts the doc body and Bitable schema in the plan card before any write happens |
+
+PilotFlow keeps the execution side deterministic: every Feishu write goes through a confirmation card; high-risk actions (member removal, archival) need explicit confirmation; public state files exclude chat IDs, member IDs, document URLs, and tokens.
+
+<br>
 
 ## Architecture
 
 ```
-Hermes Agent runtime (LLM + Feishu WebSocket gateway + tool registry + memory + cron)
-  └── PilotFlow plugin (9 tools, lark_oapi SDK, /card command bridge)
+ Hermes Agent runtime (LLM dispatch + Feishu gateway + tool registry + memory + cron)
+                          |
+                 Plugin Interface
+                          |
+  +-----------------------v-----------------------+
+  |              PilotFlow Plugin                 |
+  |   9 tools  ·  /card bridge  ·  lark_oapi SDK  |
+  +-----------------------+-----------------------+
+                          | lark_oapi SDK
+                          v
+  +-----------------------------------------------+
+  |              Feishu Open API                  |
+  |  Doc · Bitable · Tasks · Calendar · IM · Card |
+  +-----------------------------------------------+
 ```
 
-- **Zero Hermes core changes**: pure plugin via `ctx.register_tool()` and `/card` bridge
-- **Agent is the pilot**: 5 semantic params must be Agent-passed; tools default to refusing inference
-- **Direct Feishu**: doc/Base/task/calendar via lark_oapi SDK; cards via Feishu IM API; text via `registry.dispatch`
-- **LLM swappable**: OpenAI-compatible API per Hermes config; verified with `Doubao`
-- **Known tech debt**: `tools.py` >5000 lines; post-contest refactor to `actions.py` / `state.py` / `feishu_client.py`
+PilotFlow is a pure plugin: it does not modify any Hermes source. It registers tools through `ctx.register_tool()` and handles card buttons through a plugin-level `/card` command bridge. The LLM is configured through Hermes' OpenAI-compatible interface and is swappable.
+
+<br>
 
 ## Quick Start
 
 ```bash
-git clone https://github.com/NousResearch/hermes-agent.git && cd hermes-agent && uv sync --extra feishu
+git clone https://github.com/NousResearch/hermes-agent.git && cd hermes-agent
+uv sync --extra feishu
+
 git clone https://github.com/DeliciousBuding/PilotFlow.git && cd PilotFlow
 python setup.py --hermes-dir <hermes-agent-path>
-# Edit ~/.hermes/.env with FEISHU_APP_ID / FEISHU_APP_SECRET and LLM API key
+
+# Edit ~/.hermes/.env -> FEISHU_APP_ID / FEISHU_APP_SECRET / LLM API key
 uv run hermes gateway
 ```
 
-See [INSTALL.md](INSTALL.md) for group subscription setup, [USER_GUIDE.md](docs/USER_GUIDE.md) for usage.
+See [INSTALL.md](INSTALL.md) for full installation, including the optional group subscription mode.
+
+<br>
 
 ## Docs
 
-| For Judges | For Users |
-| --- | --- |
-| [Architecture](docs/ARCHITECTURE.md) | [User Guide](docs/USER_GUIDE.md) |
-| [Product Spec](docs/PRODUCT_SPEC.md) | [Install Guide](INSTALL.md) |
-| [Live Test Evidence](docs/LIVE_TEST_EVIDENCE.md) | |
-| [Live Test Evidence](docs/LIVE_TEST_EVIDENCE.md) | |
+| | |
+| :--- | :--- |
+| [User Guide](docs/USER_GUIDE.md) | What you can ask, with sample prompts and FAQ |
+| [Install Guide](INSTALL.md) | Installation and group subscription configuration |
+| [Architecture](docs/ARCHITECTURE.md) | Components, state model, tool routing |
+| [Product Spec](docs/PRODUCT_SPEC.md) | Feature tiers and technical constraints |
+| [Innovation Notes](docs/INNOVATION.md) | Product and engineering differentiators |
+
+<br>
 
 ## Credits
 
-[Hermes Agent](https://github.com/NousResearch/hermes-agent) — Agent runtime · Feishu Open Platform · Feishu AI Campus Challenge
+[Hermes Agent](https://github.com/NousResearch/hermes-agent) — Agent runtime · Feishu Open Platform
+
+<br>
+
+<div align="center">
+
+### ✈️ Bring the project parts of group chat into Feishu.
+
+</div>

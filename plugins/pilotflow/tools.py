@@ -90,6 +90,7 @@ _pending_plans: Dict[str, dict] = {}  # chat_id -> plan params
 _card_action_refs: Dict[str, dict] = {}  # action_id -> {chat_id, action, message_id, timestamp}
 _recent_confirmed_projects: Dict[str, dict] = {}  # chat_id -> {title, timestamp}
 _idempotent_project_results: Dict[str, dict] = {}  # idempotency_key -> successful create result
+_idempotent_project_inflight: Dict[str, dict] = {}  # idempotency_key -> {title, timestamp}
 _RECENT_CONFIRM_TTL = 30
 
 # lark_oapi client timeout (seconds)
@@ -298,6 +299,36 @@ def _restore_card_action_ref(action_id: str, action_ref: Optional[dict]) -> None
             _card_action_refs[ref_id] = dict(ref)
     for ref_id, ref in refs_to_restore.items():
         _persist_card_action_ref(ref_id, ref)
+
+
+def _find_text_cancel_action_ref(chat_id: str) -> tuple[str, Optional[dict]]:
+    """Find the active cancel action ref for a pending plan in this chat."""
+    now = time.time()
+    candidates: dict[str, dict] = {}
+    with _plan_lock:
+        candidates.update({
+            action_id: dict(ref)
+            for action_id, ref in _card_action_refs.items()
+            if isinstance(ref, dict)
+        })
+    payload = _load_state_payload()
+    stored = payload.get("card_actions")
+    if isinstance(stored, dict):
+        for action_id, ref in stored.items():
+            if isinstance(ref, dict):
+                candidates.setdefault(action_id, dict(ref))
+    for action_id, ref in sorted(
+        candidates.items(),
+        key=lambda item: item[1].get("timestamp", 0),
+        reverse=True,
+    ):
+        if (
+            ref.get("chat_id") == chat_id
+            and ref.get("action") == "cancel_project"
+            and now - ref.get("timestamp", 0) < _PLAN_GATE_TTL
+        ):
+            return action_id, ref
+    return "", None
 
 
 def _attach_card_message_id(action_ids: list[str], message_id: str) -> None:
@@ -1178,34 +1209,63 @@ def _save_project_resource_refs(title: str, artifacts: Optional[list]) -> None:
             _write_resource_refs_payload_unlocked(payload)
 
 
-def _mutate_project_resource_refs(payload: dict, title: str, artifacts: Optional[list]) -> bool:
+def _mutate_project_resource_refs(
+    payload: dict,
+    title: str,
+    artifacts: Optional[list],
+    *,
+    app_token: str = "",
+    table_id: str = "",
+    record_id: str = "",
+) -> bool:
     """Mutate private resource refs in memory; caller owns state locking."""
     refs = _safe_resource_artifacts(artifacts)
-    if refs:
-        payload[title] = {
+    existing = payload.get(title) if isinstance(payload.get(title), dict) else {}
+    private_refs = {
+        "app_token": str(app_token or existing.get("app_token", "") or ""),
+        "table_id": str(table_id or existing.get("table_id", "") or ""),
+        "record_id": str(record_id or existing.get("record_id", "") or ""),
+    }
+    if refs or any(private_refs.values()):
+        entry = {
             "artifacts": refs,
             "updated_at": int(time.time()),
         }
+        for key, value in private_refs.items():
+            if value:
+                entry[key] = value
+        payload[title] = entry
     else:
         payload.pop(title, None)
     return True
 
 
-def _load_project_resource_refs(title: str) -> list[str]:
-    """Load persisted non-secret resource links for a project."""
+def _load_project_private_refs(title: str) -> dict:
+    """Load private restart refs for execution; never expose this payload to users."""
     if not title:
-        return []
+        return {"artifacts": [], "app_token": "", "table_id": "", "record_id": ""}
     with _state_file_lock:
         with _state_payload_file_lock():
             payload = _load_resource_refs_payload_unlocked()
     refs = payload.get(title)
     if not isinstance(refs, dict):
-        return []
-    return _safe_resource_artifacts(refs.get("artifacts"))
+        return {"artifacts": [], "app_token": "", "table_id": "", "record_id": ""}
+    return {
+        "artifacts": _safe_resource_artifacts(refs.get("artifacts")),
+        "app_token": str(refs.get("app_token", "") or ""),
+        "table_id": str(refs.get("table_id", "") or ""),
+        "record_id": str(refs.get("record_id", "") or ""),
+    }
+
+
+def _load_project_resource_refs(title: str) -> list[str]:
+    """Load persisted non-secret resource links for a project."""
+    return _load_project_private_refs(title)["artifacts"]
 
 
 def _state_project_candidate(title: str, item: dict) -> dict:
     """Build an execution candidate from sanitized state plus private resource refs."""
+    private_refs = _load_project_private_refs(title)
     return {
         "goal": item.get("goal", ""),
         "members": [],
@@ -1214,11 +1274,11 @@ def _state_project_candidate(title: str, item: dict) -> dict:
         "initiator": item.get("initiator", ""),
         "deadline": item.get("deadline", ""),
         "status": item.get("status", "进行中"),
-        "artifacts": _load_project_resource_refs(title),
+        "artifacts": private_refs["artifacts"],
         "updates": item.get("updates", []),
-        "app_token": "",
-        "table_id": "",
-        "record_id": "",
+        "app_token": private_refs["app_token"],
+        "table_id": private_refs["table_id"],
+        "record_id": private_refs["record_id"],
     }
 
 
@@ -1273,7 +1333,12 @@ def _save_project_state(title: str, goal: str, members: list, deliverables: list
             return True
 
         def mutate_refs(payload: dict) -> bool:
-            return _mutate_project_resource_refs(payload, title, artifacts)
+            return _mutate_project_resource_refs(
+                payload, title, artifacts,
+                app_token=app_token,
+                table_id=table_id,
+                record_id=record_id,
+            )
 
         return _update_state_and_refs(mutate_state, mutate_refs)
     except Exception as e:
@@ -1614,6 +1679,20 @@ def _is_execution_confirmation(text: str) -> bool:
         "okay",
         "yes",
     }
+
+
+def _has_independent_execution_confirmation(params: Dict[str, Any]) -> bool:
+    """Validate that text confirmation came from a standalone user reply."""
+    confirmation_text = params.get("confirmation_text") or ""
+    if not _is_execution_confirmation(confirmation_text):
+        return False
+    input_text = str(params.get("input_text") or "").strip()
+    # If the Agent also passes the original project brief, it is trying to
+    # approve the same turn that generated the plan. Only a standalone latest
+    # user reply such as "确认执行" may accompany confirmation_text.
+    if input_text and not _is_execution_confirmation(input_text):
+        return False
+    return True
 
 
 def _score_history_project(query: str, project: dict, plan: Optional[dict] = None) -> int:
@@ -2700,6 +2779,8 @@ def _create_bitable(
         from lark_oapi.api.bitable.v1 import (
             CreateAppRequest, App, CreateAppTableRecordRequest,
             AppTableRecord, CreateAppTableFieldRequest, AppTableField,
+            ListAppTableRecordRequest, BatchDeleteAppTableRecordRequest,
+            BatchDeleteAppTableRecordRequestBody,
         )
 
         app_body = App.builder().name(f"{title} - 项目状态").build()
@@ -2721,6 +2802,15 @@ def _create_bitable(
             if not field_resp.success():
                 logger.warning("create bitable field '%s' failed: %s", fname, field_resp.msg)
 
+        _delete_empty_bitable_records(
+            client,
+            app_token,
+            table_id,
+            ListAppTableRecordRequest,
+            BatchDeleteAppTableRecordRequest,
+            BatchDeleteAppTableRecordRequestBody,
+        )
+
         deliverable_text = ", ".join(deliverables or []) or "待确认"
         record = AppTableRecord.builder().fields({
             "类型": "project", "负责人": owner or "待确认", "截止时间": deadline or "待确认",
@@ -2741,6 +2831,60 @@ def _create_bitable(
     except Exception as e:
         logger.warning("create bitable error: %s", e)
         return None
+
+
+def _delete_empty_bitable_records(
+    client: Any,
+    app_token: str,
+    table_id: str,
+    list_request_cls: Any,
+    batch_delete_request_cls: Any,
+    batch_delete_body_cls: Any,
+) -> int:
+    """Delete blank records that Feishu's default Base table may create."""
+    try:
+        list_req = (
+            list_request_cls.builder()
+            .app_token(app_token)
+            .table_id(table_id)
+            .page_size(200)
+            .build()
+        )
+        list_resp = client.bitable.v1.app_table_record.list(list_req)
+        if not list_resp.success():
+            logger.warning("list default bitable records failed: %s", list_resp.msg)
+            return 0
+        data = getattr(list_resp, "data", None)
+        records = (
+            getattr(data, "items", None)
+            or getattr(data, "records", None)
+            or getattr(data, "record_list", None)
+            or []
+        )
+        blank_record_ids: list[str] = []
+        for record in records:
+            fields = getattr(record, "fields", None) or {}
+            record_id = getattr(record, "record_id", "") or getattr(record, "id", "")
+            if record_id and not any(str(v or "").strip() for v in fields.values()):
+                blank_record_ids.append(record_id)
+        if not blank_record_ids:
+            return 0
+        body = batch_delete_body_cls.builder().records(blank_record_ids).build()
+        delete_req = (
+            batch_delete_request_cls.builder()
+            .app_token(app_token)
+            .table_id(table_id)
+            .request_body(body)
+            .build()
+        )
+        delete_resp = client.bitable.v1.app_table_record.batch_delete(delete_req)
+        if delete_resp.success():
+            logger.info("deleted %s default blank bitable records", len(blank_record_ids))
+            return len(blank_record_ids)
+        logger.warning("delete default blank bitable records failed: %s", delete_resp.msg)
+    except Exception as e:
+        logger.warning("delete default blank bitable records error: %s", e)
+    return 0
 
 
 def _deadline_countdown(iso_date: str) -> str:
@@ -3581,7 +3725,7 @@ def _handle_generate_plan(params: Dict[str, Any], **kwargs) -> str:
             + "【用户确认路径】\n"
             + "- 路径A: 用户点击卡片 ✅ 按钮 → PilotFlow 的 /card 插件命令会自动续跑\n"
             + "- 路径B: 用户文字回复「确认」「可以」「好的」「行」「ok」\n"
-            + "  → 直接调用 pilotflow_create_project_space；若只剩用户最新回复，就把原文填入 input_text，若已有结构化确认字段也可继续传 confirmation_text。\n"
+            + "  → 只在收到这条新的独立确认回复后调用 pilotflow_create_project_space，并把确认原文填入 confirmation_text；禁止在当前计划生成轮次里自行补 confirmation_text。\n"
             + "- 路径C: 用户点击 ❌ 或文字回复「取消」\n"
             + "  → 调用 pilotflow_handle_card_action（action=cancel_project）\n\n"
             + "【自治规则】\n"
@@ -3718,7 +3862,7 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
         confirmation_text = params.get("confirmation_text") or ""
         require_confirm, autonomy_mode, autonomy_reason = _needs_confirmation_for_create(chat_scope, [])
         if require_confirm:
-            if not _is_execution_confirmation(confirmation_text):
+            if not _has_independent_execution_confirmation(params):
                 return tool_error("请等待用户明确回复「确认执行」并由 Agent 传入 confirmation_text，或点击卡片确认按钮后再创建项目。")
             if not _consume_plan_gate(chat_id):
                 recent_title = _recent_confirmed_project(chat_id)
@@ -3762,13 +3906,33 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
     replayed = _replay_idempotent_project_result(idempotency_key)
     if replayed:
         return tool_result(replayed)
+    now = time.time()
+    with _plan_lock:
+        stale_inflight = [
+            key for key, value in _idempotent_project_inflight.items()
+            if now - value.get("timestamp", 0) >= _PLAN_GATE_TTL
+        ]
+        for key in stale_inflight:
+            _idempotent_project_inflight.pop(key, None)
+        existing_inflight = _idempotent_project_inflight.get(idempotency_key)
+        if existing_inflight:
+            return tool_result({
+                "status": "duplicate_creation_in_progress",
+                "title": existing_inflight.get("title") or title,
+                "idempotency_key": idempotency_key,
+                "instructions": "同一个项目正在创建中。不要再次调用创建工具，不要声称创建失败；只提示用户稍等。"
+            })
+        _idempotent_project_inflight[idempotency_key] = {
+            "title": title,
+            "timestamp": now,
+        }
 
     artifacts = []
     unresolved_members = _find_unresolved_members(members, chat_id)
     require_confirm, autonomy_mode, autonomy_reason = _needs_confirmation_for_create(chat_scope, unresolved_members)
     if not skip_gate and require_confirm and chat_scope.get("scope") == "private":
         confirmation_text = params.get("confirmation_text") or ""
-        if not _is_execution_confirmation(confirmation_text):
+        if not _has_independent_execution_confirmation(params):
             return tool_error("涉及未解析成员，请先确认一次并由 Agent 传入 confirmation_text 再执行。")
         if not _consume_plan_gate(chat_id):
             recent_title = _recent_confirmed_project(chat_id)
@@ -3926,6 +4090,8 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
         artifacts.append("项目入口卡片")
 
     if not artifacts:
+        with _plan_lock:
+            _idempotent_project_inflight.pop(idempotency_key, None)
         return tool_error("创建失败，请检查飞书应用凭证配置。")
 
     initial_status = "有风险" if risks else "进行中"
@@ -4056,6 +4222,8 @@ def _handle_create_project_space(params: Dict[str, Any], **kwargs) -> str:
         "message": f"已创建 {len(artifacts)} 个产物: {', '.join(artifacts)}",
     }
     _remember_idempotent_project_result(idempotency_key, result_payload)
+    with _plan_lock:
+        _idempotent_project_inflight.pop(idempotency_key, None)
     return tool_result(result_payload)
 
 
@@ -4087,6 +4255,11 @@ PILOTFLOW_HANDLE_CARD_ACTION_SCHEMA = {
                     "卡片按钮的值，JSON 字符串，如 '{\"pilotflow_action\":\"confirm_project\"}'。"
                     "从 /card button {...} 合成消息中提取。"
                 ),
+            },
+            "text_confirmation": {
+                "type": "string",
+                "description": "用户明确文字取消 pending plan 时的原文。仅用于取消尚未创建的项目计划。",
+                "default": "",
             },
         },
         "required": ["action_value"],
@@ -4127,6 +4300,21 @@ def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
         "dashboard_page", "dashboard_filter", "briefing_batch_reminder",
         "briefing_batch_followup_task",
     }
+    if (
+        pilotflow_action == "cancel_project"
+        and not resolved_from_action_ref
+        and str(params.get("text_confirmation") or "").strip()
+        and _load_pending_plan(chat_id)
+    ):
+        cancel_action_id, cancel_action_ref = _find_text_cancel_action_ref(chat_id)
+        if cancel_action_id and cancel_action_ref:
+            resolved = _resolve_card_action_ref(cancel_action_id, consume=True)
+            if resolved:
+                action_id = cancel_action_id
+                action_ref = resolved
+                action_data.update(resolved.get("plan") or {})
+        resolved_from_action_ref = True
+
     if pilotflow_action in actions_requiring_ref and not resolved_from_action_ref:
         return tool_error("卡片操作已过期或已处理，请重新发起操作。")
 
@@ -4153,6 +4341,13 @@ def _handle_card_action(params: Dict[str, Any], **kwargs) -> str:
         return None
 
     if pilotflow_action == "cancel_project":
+        if action_ref and action_ref.get("message_id"):
+            _mark_card_message(
+                action_ref.get("message_id", ""),
+                "已取消项目创建",
+                "本次计划已取消，未创建任何项目产物。",
+                "grey",
+            )
         if not gate_consumed:
             _clear_plan_gate(chat_id)
             with _plan_lock:
@@ -5519,6 +5714,7 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
         if action in ("add_member", "remove_member"):
             return tool_error("重启后的脱敏状态不保存成员名单。请在项目创建会话内加成员，或重新指定完整项目成员。")
         project_name = state_project.get("title", project_name)
+        private_refs = _load_project_private_refs(state_project.get("title", project_name))
         project = {
             "goal": state_project.get("goal", ""),
             "members": [],
@@ -5527,11 +5723,11 @@ def _handle_update_project(params: Dict[str, Any], **kwargs) -> str:
             "initiator": state_project.get("initiator", ""),
             "deadline": state_project.get("deadline", ""),
             "status": state_project.get("status", "进行中"),
-            "artifacts": _load_project_resource_refs(state_project.get("title", project_name)),
+            "artifacts": private_refs["artifacts"],
             "updates": state_project.get("updates", []),
-            "app_token": "",
-            "table_id": "",
-            "record_id": "",
+            "app_token": private_refs["app_token"],
+            "table_id": private_refs["table_id"],
+            "record_id": private_refs["record_id"],
         }
 
     require_confirm, autonomy_mode, autonomy_reason = _needs_confirmation_for_update(action, value, project, chat_scope, chat_id)

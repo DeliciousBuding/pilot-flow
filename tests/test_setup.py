@@ -49,7 +49,7 @@ def test_load_lark_cli_profiles_hides_secret_values(tmp_path):
 {
   "apps": [
     {
-      "name": "pilotflow-contest",
+      "name": "test-profile",
       "appId": "cli_testvalue",
       "appSecret": {
         "source": "keychain",
@@ -70,7 +70,7 @@ def test_load_lark_cli_profiles_hides_secret_values(tmp_path):
 
     assert setup._load_lark_cli_profiles(str(config_file)) == [
         {
-            "name": "pilotflow-contest",
+            "name": "test-profile",
             "app_id": "cli_testvalue",
             "secret_source": "keychain",
         }
@@ -94,7 +94,7 @@ def test_check_env_explains_matching_lark_cli_secret_boundary(tmp_path, capsys):
 {
   "apps": [
     {
-      "name": "pilotflow-contest",
+      "name": "test-profile",
       "appId": "cli_testvalue",
       "appSecret": {
         "source": "keychain",
@@ -109,7 +109,7 @@ def test_check_env_explains_matching_lark_cli_secret_boundary(tmp_path, capsys):
 
     assert setup.check_env(str(env_file), lark_cli_config_file=str(config_file)) is False
     output = capsys.readouterr().out
-    assert "pilotflow-contest" in output
+    assert "test-profile" in output
     assert "Hermes gateway does not read lark-cli keychain secrets automatically" in output
     assert "do-not-print-this" not in output
 
@@ -132,7 +132,7 @@ def test_check_lark_cli_alignment_reports_matching_profile(tmp_path, capsys):
 {
   "apps": [
     {
-      "name": "pilotflow-contest",
+      "name": "test-profile",
       "appId": "cli_testvalue",
       "appSecret": {
         "source": "keychain"
@@ -167,7 +167,7 @@ def test_check_lark_cli_alignment_warns_on_mismatch(tmp_path, capsys):
 {
   "apps": [
     {
-      "name": "pilotflow-contest",
+      "name": "test-profile",
       "appId": "cli_other",
       "appSecret": {
         "source": "keychain"

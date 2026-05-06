@@ -19,10 +19,10 @@ uv sync --extra feishu
 
 `--extra feishu` 会安装 `lark-oapi` SDK。
 
-WSL 注意：如果 Hermes 仓库位于 `/mnt/c` 或 `/mnt/d`，默认 `.venv` 写在 Windows 挂载盘上可能非常慢，甚至卡在复制依赖。推荐把虚拟环境放在 WSL ext4 用户目录：
+WSL 注意：如果 Hermes 仓库位于 Windows 挂载盘，默认 `.venv` 可能很慢。推荐把虚拟环境放在 Linux 文件系统的用户目录：
 
 ```bash
-cd /mnt/d/Code/LarkProject/hermes-agent
+cd <hermes-agent-path>
 UV_PROJECT_ENVIRONMENT=/home/$USER/.venvs/hermes-agent-feishu \
 UV_LINK_MODE=copy \
 uv sync --extra feishu
@@ -70,7 +70,7 @@ Copy-Item .\.env.example "$HOME\.hermes\.env"
 # LLM 配置
 OPENAI_BASE_URL=https://api.openai.com/v1
 OPENAI_API_KEY=your-api-key-here
-OPENAI_MODEL=Doubao
+OPENAI_MODEL=example-model
 
 # 飞书应用凭证
 FEISHU_APP_ID=cli_xxxxxxxxxxxxxxxx
@@ -87,14 +87,14 @@ PILOTFLOW_MEMORY_INCLUDE_MEMBERS=false
 
 ```yaml
 model:
-  default: Doubao
+  default: example-model
   provider: openai
 
 providers:
   openai:
     base_url: https://api.openai.com/v1
     key_env: OPENAI_API_KEY
-    model: Doubao
+    model: example-model
 
 gateway:
   default_platform: feishu
@@ -173,23 +173,23 @@ print('PilotFlow loaded OK')
 "
 ```
 
-WSL Feishu runtime 验证（默认不发消息）：
+Runtime 验证（默认不发消息）：
 
 ```bash
-cd /mnt/d/Code/LarkProject/hermes-agent
+cd <hermes-agent-path>
 UV_PROJECT_ENVIRONMENT=/home/$USER/.venvs/hermes-agent-feishu \
-uv run python /mnt/d/Code/LarkProject/PilotFlow/scripts/verify_wsl_feishu_runtime.py \
-  --hermes-dir /mnt/d/Code/LarkProject/hermes-agent \
+uv run python <pilotflow-path>/scripts/verify_wsl_feishu_runtime.py \
+  --hermes-dir <hermes-agent-path> \
   --env-file /home/$USER/.hermes/.env \
   --config-file /home/$USER/.hermes/config.yaml
 ```
 
-如果要在上场前提前排除模型侧 `401 auth_unavailable` / API key / base_url 漂移问题，加 `--probe-llm`。输出只包含状态码和 provider，不会打印 API key、base_url 或响应正文：
+如果要提前排除模型侧 `401 auth_unavailable` / API key / base_url 漂移问题，加 `--probe-llm`。输出只包含状态码和 provider，不会打印 API key、base_url 或响应正文：
 
 ```bash
 UV_PROJECT_ENVIRONMENT=/home/$USER/.venvs/hermes-agent-feishu \
-uv run python /mnt/d/Code/LarkProject/PilotFlow/scripts/verify_wsl_feishu_runtime.py \
-  --hermes-dir /mnt/d/Code/LarkProject/hermes-agent \
+uv run python <pilotflow-path>/scripts/verify_wsl_feishu_runtime.py \
+  --hermes-dir <hermes-agent-path> \
   --env-file /home/$USER/.hermes/.env \
   --config-file /home/$USER/.hermes/config.yaml \
   --probe-llm
@@ -199,8 +199,8 @@ uv run python /mnt/d/Code/LarkProject/PilotFlow/scripts/verify_wsl_feishu_runtim
 
 ```bash
 UV_PROJECT_ENVIRONMENT=/home/$USER/.venvs/hermes-agent-feishu \
-uv run python /mnt/d/Code/LarkProject/PilotFlow/scripts/verify_wsl_feishu_runtime.py \
-  --hermes-dir /mnt/d/Code/LarkProject/hermes-agent \
+uv run python <pilotflow-path>/scripts/verify_wsl_feishu_runtime.py \
+  --hermes-dir <hermes-agent-path> \
   --env-file /home/$USER/.hermes/.env \
   --config-file /home/$USER/.hermes/config.yaml \
   --send-card
@@ -239,7 +239,7 @@ ModuleNotFoundError: No module named 'lark_oapi'
 
 运行 `uv sync --extra feishu`
 
-如果在 WSL 的 `/mnt/*` 仓库中长时间无输出，使用前置条件里的 `UV_PROJECT_ENVIRONMENT=/home/$USER/.venvs/hermes-agent-feishu` 方案重新同步，避免跨文件系统 `.venv` 写入卡住。
+如果在 Windows 挂载盘上的 WSL 仓库中长时间无输出，使用前置条件里的 `UV_PROJECT_ENVIRONMENT=/home/$USER/.venvs/hermes-agent-feishu` 方案重新同步，避免跨文件系统 `.venv` 写入卡住。
 
 ### 群消息收不到
 
@@ -257,14 +257,14 @@ ModuleNotFoundError: No module named 'lark_oapi'
 
 ```bash
 UV_PROJECT_ENVIRONMENT=/home/$USER/.venvs/hermes-agent-feishu \
-uv run python /mnt/d/Code/LarkProject/PilotFlow/scripts/verify_wsl_feishu_runtime.py \
-  --hermes-dir /mnt/d/Code/LarkProject/hermes-agent \
+uv run python <pilotflow-path>/scripts/verify_wsl_feishu_runtime.py \
+  --hermes-dir <hermes-agent-path> \
   --env-file /home/$USER/.hermes/.env \
   --config-file /home/$USER/.hermes/config.yaml \
   --probe-llm
 ```
 
-如果输出 `llm_probe_ok=false` 且 `llm_probe_status=401`，说明当前 WSL Hermes profile 的模型 key/base_url/provider 不可用；先修 `~/.hermes/.env` 和 `~/.hermes/config.yaml`，不要只改 Windows 侧配置。
+如果输出 `llm_probe_ok=false` 且 `llm_probe_status=401`，说明当前 Hermes profile 的模型 key/base_url/provider 不可用；先修 `~/.hermes/.env` 和 `~/.hermes/config.yaml`。
 
 Linux / macOS:
 
@@ -303,6 +303,6 @@ feishu:
       require_mention: true    # 其他群保持 @ 才触发
 ```
 
-重启 `hermes gateway` 生效。详细说明见 [CONTEXT_SUBSCRIPTION_SPIKE.md](docs/CONTEXT_SUBSCRIPTION_SPIKE.md)。
+重启 `hermes gateway` 生效。
 
 > ⚠️ 纯闲聊群不建议开启，每条消息都会触发 LLM 推理，成本高且可能刷屏。

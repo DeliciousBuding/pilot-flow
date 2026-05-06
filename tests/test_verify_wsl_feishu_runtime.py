@@ -59,8 +59,8 @@ def test_verifier_defaults_to_dry_run_and_does_not_send_card(tmp_path, capsys):
     config_file.write_text(
         "\n".join([
             "model:",
-            "  default: mimo-v2.5-pro",
-            "  provider: vectorcontrol",
+            "  default: example-model",
+            "  provider: example-provider",
             "gateway:",
             "  default_platform: feishu",
         ]),
@@ -81,8 +81,8 @@ def test_verifier_defaults_to_dry_run_and_does_not_send_card(tmp_path, capsys):
     assert output["has_chat_id"] is True
     assert output["has_feishu_credentials"] is True
     assert output["has_config_file"] is True
-    assert output["config_model"] == "mimo-v2.5-pro"
-    assert output["config_provider"] == "vectorcontrol"
+    assert output["config_model"] == "example-model"
+    assert output["config_provider"] == "example-provider"
     assert output["config_has_feishu_gateway"] is True
     assert "oc_real_chat_id" not in json.dumps(output)
     send_card.assert_not_called()
@@ -1436,10 +1436,10 @@ def test_verifier_probe_llm_outputs_sanitized_success(tmp_path, capsys):
     config_file.write_text(
         "\n".join([
             "model:",
-            "  default: mimo-v2.5-pro",
-            "  provider: vectorcontrol",
+            "  default: example-model",
+            "  provider: example-provider",
             "providers:",
-            "  vectorcontrol:",
+            "  example-provider:",
             "    base_url: https://llm.example.invalid/v1",
             "    key_env: OPENAI_API_KEY",
             "gateway:",
@@ -1473,7 +1473,7 @@ def test_verifier_probe_llm_outputs_sanitized_success(tmp_path, capsys):
     assert exit_code == 0
     assert output["llm_probe_ok"] is True
     assert output["llm_probe_status"] == 200
-    assert output["llm_probe_provider"] == "vectorcontrol"
+    assert output["llm_probe_provider"] == "example-provider"
     assert "sk-real-secret" not in output_text
     assert "llm.example.invalid" not in output_text
     urlopen.assert_called_once()

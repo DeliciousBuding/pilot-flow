@@ -50,6 +50,7 @@ from tools import (
     _save_to_hermes_memory,
     _save_project_state,
     _load_project_state,
+    _load_project_private_refs,
     _load_project_resource_refs,
     _schedule_deadline_reminder,
     _clean_plan_list,
@@ -78,6 +79,7 @@ from tools import (
     _recent_confirmed_projects,
     _plan_lock,
     _remember_idempotent_project_result,
+    _idempotent_project_inflight,
     _build_project_reminder_text,
     _clean_recent_updates,
     _get_chat_scope,
@@ -538,6 +540,9 @@ def _install_fake_bitable_sdk(monkeypatch):
         "AppTableRecord",
         "CreateAppTableFieldRequest",
         "AppTableField",
+        "ListAppTableRecordRequest",
+        "BatchDeleteAppTableRecordRequest",
+        "BatchDeleteAppTableRecordRequestBody",
     ]:
         setattr(fake_v1, name, type(name, (_Model,), {}))
 
@@ -635,11 +640,16 @@ class _FakeBitableClient:
     def __init__(self):
         self.field_names = []
         self.records = []
+        self.deleted_records = []
         self.bitable = types.SimpleNamespace(
             v1=types.SimpleNamespace(
                 app=types.SimpleNamespace(create=self._create_app),
                 app_table_field=types.SimpleNamespace(create=self._create_field),
-                app_table_record=types.SimpleNamespace(create=self._create_record),
+                app_table_record=types.SimpleNamespace(
+                    create=self._create_record,
+                    list=self._list_records,
+                    batch_delete=self._batch_delete_records,
+                ),
             )
         )
 
@@ -661,6 +671,18 @@ class _FakeBitableClient:
         self.records.append(request.request_body.fields)
         data = types.SimpleNamespace(record=types.SimpleNamespace(record_id="rec_test"))
         return _FakeBitableResponse(data=data)
+
+    def _list_records(self, _request):
+        data = types.SimpleNamespace(items=[
+            types.SimpleNamespace(record_id="rec_blank_1", fields={}),
+            types.SimpleNamespace(record_id="rec_blank_2", fields={"类型": ""}),
+            types.SimpleNamespace(record_id="rec_keep", fields={"类型": "project"}),
+        ])
+        return _FakeBitableResponse(data=data)
+
+    def _batch_delete_records(self, request):
+        self.deleted_records.extend(request.request_body.records)
+        return _FakeBitableResponse()
 
 
 # --- Template detection ---
@@ -762,6 +784,7 @@ def test_create_bitable_includes_deliverables_field_and_initial_value(monkeypatc
     assert meta["app_token"] == "app_token_test"
     assert "交付物" in fake_client.field_names
     assert "更新内容" in fake_client.field_names
+    assert fake_client.deleted_records == ["rec_blank_1", "rec_blank_2"]
     assert fake_client.records[0]["交付物"] == "验收记录, 评审清单"
 
 
@@ -2376,6 +2399,52 @@ def test_create_project_appends_resource_index_to_project_doc():
     )]
 
 
+def test_create_project_persists_private_bitable_refs_for_restart(tmp_path):
+    state_path = tmp_path / "pilotflow-projects.json"
+    chat_id = "oc_project_private_refs"
+    with _project_registry_lock:
+        _project_registry.clear()
+    with patch.dict(os.environ, {"PILOTFLOW_STATE_PATH": str(state_path)}):
+        with (
+            patch("tools._consume_plan_gate", return_value=True),
+            patch("tools._resolve_member", return_value="ou_private_refs_member"),
+            patch("tools._create_doc", return_value="https://example.invalid/docx/private_refs"),
+            patch("tools._create_bitable", return_value={
+                "url": "https://example.invalid/base/private_refs",
+                "app_token": "app_private",
+                "table_id": "tbl_private",
+                "record_id": "rec_private",
+            }),
+            patch("tools._create_task", return_value="任务已创建"),
+            patch("tools._create_calendar_event", return_value=None),
+            patch("tools._schedule_deadline_reminder", return_value=False),
+            patch("tools._hermes_send_card", return_value="om_entry"),
+            patch("tools._save_to_hermes_memory", return_value=True),
+        ):
+            result = json.loads(_handle_create_project_space(
+                {
+                    "confirmation_text": "确认执行",
+                    "title": "私有引用持久化项目",
+                    "goal": "验证重启后状态表还能同步",
+                    "members": ["张三"],
+                    "deliverables": ["验收记录"],
+                    "deadline": "2026-05-20",
+                },
+                chat_id=chat_id,
+            ))
+        private_refs = _load_project_private_refs("私有引用持久化项目")
+        resource_refs = _load_project_resource_refs("私有引用持久化项目")
+
+    assert result["status"] == "project_space_created"
+    assert private_refs["app_token"] == "app_private"
+    assert private_refs["table_id"] == "tbl_private"
+    assert private_refs["record_id"] == "rec_private"
+    assert resource_refs == [
+        "文档: https://example.invalid/docx/private_refs",
+        "多维表格: https://example.invalid/base/private_refs",
+    ]
+
+
 def test_create_project_returns_redacted_flight_record():
     chat_id = "oc_create_trace"
     with _project_registry_lock:
@@ -3041,6 +3110,75 @@ def test_create_project_idempotency_key_prevents_duplicate_artifact_creation(tmp
     assert create_task.call_count == 1
 
 
+def test_create_project_inflight_idempotency_blocks_parallel_artifact_creation(tmp_path):
+    chat_id = "oc_create_idempotency_inflight"
+    idempotency_key = "pik_inflight_plan"
+    state_path = tmp_path / "pilotflow-projects.json"
+    with _project_registry_lock:
+        _project_registry.clear()
+    with _plan_lock:
+        _pending_plans.clear()
+        _card_action_refs.clear()
+        _recent_confirmed_projects.clear()
+        _idempotent_project_inflight.clear()
+
+    create_doc_entered = threading.Event()
+    release_create_doc = threading.Event()
+
+    def slow_create_doc(*_args, **_kwargs):
+        create_doc_entered.set()
+        assert release_create_doc.wait(5), "timed out waiting to release first create"
+        return "https://example.invalid/doc"
+
+    params = {
+        "title": "并发幂等项目",
+        "goal": "验证同一计划不会并发创建两套飞书产物",
+        "members": ["张三"],
+        "deliverables": ["验证记录"],
+        "deadline": "2026-05-10",
+        "idempotency_key": idempotency_key,
+    }
+    results = {}
+
+    with patch.dict(os.environ, {"PILOTFLOW_STATE_PATH": str(state_path)}):
+        with (
+            patch("tools._resolve_member", return_value="ou_real_member"),
+            patch("tools._create_doc", side_effect=slow_create_doc) as create_doc,
+            patch("tools._create_bitable", return_value={
+                "url": "https://example.invalid/base",
+                "app_token": "app1",
+                "table_id": "tbl1",
+                "record_id": "rec1",
+            }) as create_bitable,
+            patch("tools._create_task", return_value="任务已创建") as create_task,
+            patch("tools._hermes_send_card", return_value="om_entry"),
+            patch("tools._create_calendar_event", return_value=None),
+            patch("tools._schedule_deadline_reminder", return_value=False),
+            patch("tools._save_to_hermes_memory", return_value=True),
+        ):
+            worker = threading.Thread(
+                target=lambda: results.setdefault(
+                    "first",
+                    json.loads(_handle_create_project_space(params, chat_id=chat_id, chat_scope="private")),
+                )
+            )
+            worker.start()
+            assert create_doc_entered.wait(5), "first create did not enter artifact creation"
+            results["second"] = json.loads(_handle_create_project_space(params, chat_id=chat_id, chat_scope="private"))
+            release_create_doc.set()
+            worker.join(5)
+            assert not worker.is_alive()
+
+    assert results["first"]["status"] == "project_space_created"
+    assert results["second"]["status"] == "duplicate_creation_in_progress"
+    assert results["second"]["title"] == "并发幂等项目"
+    assert create_doc.call_count == 1
+    assert create_bitable.call_count == 1
+    assert create_task.call_count == 1
+    with _plan_lock:
+        _idempotent_project_inflight.clear()
+
+
 def test_create_project_idempotency_replays_after_state_reload(tmp_path):
     chat_id = "oc_create_idempotency_persist"
     idempotency_key = "pik_persisted_plan"
@@ -3144,6 +3282,53 @@ def test_create_project_rejects_non_confirming_input_text():
 
     assert "error" in result
     assert "确认执行" in result["error"]
+
+
+def test_create_project_rejects_same_turn_fabricated_confirmation_text():
+    chat_id = "oc_same_turn_fake_confirm"
+    with _project_registry_lock:
+        _project_registry.clear()
+    with _plan_lock:
+        _pending_plans.clear()
+        _card_action_refs.clear()
+
+    original_brief = "明天中午挑战赛报告。我。交付复赛材料。你自己完善。全部建好。"
+    with patch("tools._hermes_send_card", return_value="om_plan"):
+        _handle_generate_plan(
+            {
+                "input_text": original_brief,
+                "title": "挑战赛复赛材料准备",
+                "goal": "完成挑战赛复赛材料并提交报告",
+                "members": [],
+                "deliverables": ["复赛材料"],
+                "deadline": "2026-05-07",
+            },
+            chat_id=chat_id,
+        )
+
+    with (
+        patch("tools._create_doc") as create_doc,
+        patch("tools._create_bitable") as create_bitable,
+        patch("tools._create_task") as create_task,
+    ):
+        result = json.loads(_handle_create_project_space(
+            {
+                "input_text": original_brief,
+                "confirmation_text": "确认",
+                "title": "挑战赛复赛材料准备",
+                "goal": "完成挑战赛复赛材料并提交报告",
+                "members": ["用户本人"],
+                "deliverables": ["复赛材料"],
+                "deadline": "2026-05-07",
+            },
+            chat_id=chat_id,
+        ))
+
+    assert "error" in result
+    assert "确认执行" in result["error"]
+    create_doc.assert_not_called()
+    create_bitable.assert_not_called()
+    create_task.assert_not_called()
 
 
 def test_create_project_reports_unresolved_members():
@@ -6898,6 +7083,49 @@ def test_update_project_archive_state_project_requires_confirmation(tmp_path):
     assert "本地状态已更新" in send_confirmed.call_args.args[1]
 
 
+def test_update_project_state_project_syncs_private_bitable_refs_after_restart(tmp_path):
+    state_path = tmp_path / "pilotflow-projects.json"
+    with _project_registry_lock:
+        _project_registry.clear()
+
+    with patch.dict(os.environ, {"PILOTFLOW_STATE_PATH": str(state_path)}):
+        assert _save_project_state(
+            "重启状态表同步项目",
+            "验证重启后更新状态表",
+            [],
+            ["验收记录"],
+            "2026-05-20",
+            "进行中",
+            artifacts=["文档: https://example.invalid/doc/restart-bitable"],
+            app_token="app_restart",
+            table_id="tbl_restart",
+            record_id="rec_restart",
+        )
+        with (
+            patch("tools._append_project_doc_update", return_value=True),
+            patch("tools._update_bitable_record", return_value=True) as update_bitable,
+            patch("tools._append_bitable_update_record", return_value=True) as append_history,
+            patch("tools._hermes_send", return_value=True) as send,
+        ):
+            result = json.loads(_handle_update_project(
+                {
+                    "project_name": "重启状态表同步",
+                    "action": "update_status",
+                    "value": "已完成",
+                },
+                chat_id="oc_restart_bitable",
+            ))
+        projects_after_update = _load_project_state()
+
+    assert result["status"] == "project_updated"
+    assert result["state_updated"] is True
+    assert result["bitable_updated"] is True
+    update_bitable.assert_called_once_with("app_restart", "tbl_restart", "rec_restart", {"状态": "已完成"})
+    append_history.assert_called_once()
+    assert projects_after_update[0]["status"] == "已完成"
+    assert "状态表已同步" in send.call_args.args[1]
+
+
 def test_update_project_remove_member_rejects_unknown_member_without_writes():
     with _project_registry_lock:
         _project_registry.clear()
@@ -8272,6 +8500,41 @@ def test_raw_cancel_project_without_action_id_is_rejected():
     send.assert_not_called()
     with _plan_lock:
         assert chat_id in _pending_plans
+
+
+def test_text_cancel_pending_plan_updates_original_card_and_clears_pending():
+    chat_id = "oc_text_cancel"
+    with _plan_lock:
+        _pending_plans.clear()
+        _card_action_refs.clear()
+    with patch("tools._hermes_send_card", return_value="om_text_cancel_plan"):
+        _handle_generate_plan(
+            {
+                "input_text": "准备文字取消项目",
+                "title": "文字取消项目",
+                "goal": "验证文字取消",
+                "members": ["张三"],
+                "deliverables": ["验收记录"],
+                "deadline": "2026-05-10",
+            },
+            chat_id=chat_id,
+        )
+    action_value = json.dumps({"pilotflow_action": "cancel_project"}, ensure_ascii=False)
+
+    with (
+        patch("tools._hermes_send", return_value=True) as send,
+        patch("tools._update_interactive_card_via_feishu", return_value=True) as update_card,
+    ):
+        result = json.loads(_handle_card_action(
+            {"action_value": action_value, "text_confirmation": "取消刚才计划"},
+            chat_id=chat_id,
+        ))
+
+    assert result["status"] == "cancelled"
+    send.assert_called_once_with(chat_id, "已取消本次项目创建。")
+    update_card.assert_called_once()
+    with _plan_lock:
+        assert chat_id not in _pending_plans
 
 
 def test_project_entry_card_action_syncs_bitable_status():

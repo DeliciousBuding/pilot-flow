@@ -17,7 +17,7 @@ PilotFlow 是飞书群聊中的 AI 项目运行官。详见 [README.md](README.m
 
 ```
 plugins/pilotflow/
-├── tools.py          # 核心工具（6个注册工具 + 辅助函数）
+├── tools.py          # 核心工具（9个注册工具 + 辅助函数）
 ├── __init__.py       # 插件注册
 └── plugin.yaml       # 插件元数据
 
